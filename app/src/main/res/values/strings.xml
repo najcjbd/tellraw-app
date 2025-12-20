@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tellraw生成器</string>
+    
+    <!-- 主界面 -->
+    <string name="selector_input_hint">输入选择器 (如: @a, @p, @e[type=player])</string>
+    <string name="message_input_hint">输入消息内容 (支持颜色代码: §a绿色§r)</string>
+    <string name="generate_command">生成命令</string>
+    <string name="clear_all">清空</string>
+    <string name="copy_java">复制Java版</string>
+    <string name="copy_bedrock">复制基岩版</string>
+    <string name="share_java">分享Java版</string>
+    <string name="share_bedrock">分享基岩版</string>
+    
+    <!-- 选择器类型 -->
+    <string name="selector_type_java">Java版</string>
+    <string name="selector_type_bedrock">基岩版</string>
+    <string name="selector_type_universal">通用</string>
+    <string name="detected_selector_type">检测到%s选择器</string>
+    
+    <!-- 命令结果 -->
+    <string name="java_command">Java版</string>
+    <string name="bedrock_command">基岩版</string>
+    <string name="generated_commands">生成的命令</string>
+    
+    <!-- 警告和提示 -->
+    <string name="conversion_warnings">转换提醒</string>
+    <string name="mn_code_detected">检测到§m§n代码</string>
+    <string name="mn_code_dialog_message">检测到§m§n代码，请选择处理方式：
+
+1. Java版使用字体方式，基岩版使用颜色代码方式
+2. Java版和基岩版都使用颜色代码方式</string>
+    <string name="mn_code_option_1">方式1</string>
+    <string name="mn_code_option_2">方式2</string>
+    
+    <!-- 颜色代码 -->
+    <string name="color_black">黑色</string>
+    <string name="color_dark_blue">深蓝</string>
+    <string name="color_dark_green">深绿</string>
+    <string name="color_dark_aqua">深青</string>
+    <string name="color_dark_red">深红</string>
+    <string name="color_dark_purple">深紫</string>
+    <string name="color_gold">金色</string>
+    <string name="color_gray">灰色</string>
+    <string name="color_dark_gray">深灰</string>
+    <string name="color_blue">蓝色</string>
+    <string name="color_green">绿色</string>
+    <string name="color_aqua">青色</string>
+    <string name="color_red">红色</string>
+    <string name="color_light_purple">粉色</string>
+    <string name="color_yellow">黄色</string>
+    <string name="color_white">白色</string>
+    
+    <!-- 格式代码 -->
+    <string name="format_bold">粗体</string>
+    <string name="format_strikethrough">删除</string>
+    <string name="format_underline">下划</string>
+    <string name="format_italic">斜体</string>
+    <string name="format_obfuscated">混乱</string>
+    <string name="format_reset">重置</string>
+    
+    <!-- 帮助界面 -->
+    <string name="help_title">帮助</string>
+    <string name="help_about">关于应用</string>
+    <string name="help_about_content">Tellraw命令生成器是一个帮助Minecraft玩家生成tellraw命令的工具。
+
+支持Java版和基岩版的选择器转换，以及文本格式化功能。</string>
+    <string name="help_selector_input">选择器输入</string>
+    <string name="help_selector_content">选择器用于指定命令的目标：
+
+• @a - 所有玩家
+• @p - 最近的玩家
+• @r - 随机玩家
+• @e - 所有实体
+• @s - 命令执行者
+
+支持参数过滤，如：
+• @a[gamemode=survival] - 生存模式的所有玩家
+• @e[type=cow] - 所有牛
+• @p[distance=..10] - 10格内的最近玩家</string>
+    <string name="help_text_formatting">文本格式化</string>
+    <string name="help_text_formatting_content">支持Minecraft颜色代码和格式代码：
+
+颜色代码：
+• §0 - 黑色    §1 - 深蓝色   §2 - 深绿色
+• §3 - 深青色   §4 - 深红色   §5 - 深紫色
+• §6 - 金色    §7 - 灰色     §8 - 深灰色
+• §9 - 蓝色    §a - 绿色     §b - 青色
+• §c - 红色    §d - 粉色     §e - 黄色
+• §f - 白色
+
+格式代码：
+• §l - 粗体    §m - 删除线   §n - 下划线
+• §o - 斜体    §k - 混乱字   §r - 重置</string>
+    <string name="help_version_differences">版本差异</string>
+    <string name="help_version_differences_content">Java版和基岩版在选择器和格式化方面存在差异：
+
+选择器差异：
+• Java版使用distance参数，基岩版使用r/rm参数
+• Java版使用gamemode参数，基岩版使用m参数
+• Java版支持nbt参数，基岩版支持hasitem参数
+
+格式化差异：
+• §m§n代码在两个版本中的处理方式不同
+• 某些颜色代码在基岩版中有特殊含义</string>
+    <string name="help_usage_tips">使用提示</string>
+    <string name="help_usage_tips_content">1. 输入选择器和消息内容
+2. 应用会自动检测选择器类型
+3. 生成Java版和基岩版命令
+4. 可以复制命令或分享给他人
+
+如果遇到§m§n代码，应用会询问处理方式：
+• Java版字体方式：Java版保持原样，基岩版转换为颜色代码
+• 颜色代码方式：两个版本都转换为颜色代码</string>
+    
+    <!-- 通用 -->
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="back">返回</string>
+    <string name="help">帮助</string>
+    <string name="copy">复制</string>
+    <string name="share">分享</string>
+    <string name="copied_to_clipboard">已复制到剪贴板</string>
+    <string name="error">错误</string>
+    <string name="loading">加载中...</string>
+</resources>

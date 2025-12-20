@@ -476,10 +476,6 @@ def convert_hasitem_to_nbt_with_reminders(params_part):
     
     params_part = re.sub(simple_pattern, replace_simple_hasitem, params_part)
     
-    # 添加通用的转换提醒
-    if reminders:
-        reminders.append(f"hasitem参数已转换为nbt格式，可能无法完全保留原意")
-    
     # 清理多余的逗号和空括号
     params_part = re.sub(r',,', ',', params_part)
     params_part = re.sub(r',\]', ']', params_part)
@@ -868,6 +864,7 @@ def convert_nbt_to_hasitem(params_part):
         
         if hasitem_result:
             # 如果可以转换，返回hasitem参数
+            all_reminders.append("nbt参数已转换为hasitem格式，可能无法完全保留原意")
             return f'hasitem={hasitem_result}'
         else:
             # 如果不能转换，返回原始nbt参数（保持完整格式）
@@ -1321,6 +1318,9 @@ def filter_selector_parameters(selector, target_version):
     selector_var = selector.split('[')[0]
     params_part = selector[selector.find('[')+1:selector.rfind(']')]
     
+    # 初始化nbt_conversion_reminders变量
+    nbt_conversion_reminders = []
+    
     # 处理hasitem到nbt的转换（基岩版到Java版）
     if target_version == 'java':
         params_part, hasitem_to_nbt_reminders = convert_hasitem_to_nbt_with_reminders(params_part)
@@ -1379,9 +1379,6 @@ def filter_selector_parameters(selector, target_version):
             return full_match
         
         params_part = re.sub(scores_pattern, process_scores_negation, params_part)
-        
-        # 初始化nbt_conversion_reminders变量，避免未定义错误
-        nbt_conversion_reminders = []
         
     # 处理nbt到hasitem的转换（Java版到基岩版）
     elif target_version == 'bedrock':
@@ -1470,9 +1467,32 @@ def filter_selector_parameters(selector, target_version):
         # 这里不需要特殊处理，因为sort参数已经在上面被移除了
     
     # 分割参数，但要处理包含大括号的参数
-    # 使用正则表达式来正确分割参数，避免在{}内部分割
-    param_pattern = r'([^=,\{\}]+=\{[^{}]*\}|[^=,\{\}]+=[^,\{\}]+)'
-    params = re.findall(param_pattern, params_part)
+    # 使用更智能的方法来分割参数，避免在{}内部分割
+    params = []
+    current_param = ""
+    brace_count = 0
+    in_param_value = False
+    
+    for char in params_part:
+        if char == '{':
+            brace_count += 1
+            in_param_value = True
+        elif char == '}':
+            brace_count -= 1
+            if brace_count == 0:
+                in_param_value = False
+        
+        if char == ',' and brace_count == 0:
+            # 在最外层遇到逗号，分割参数
+            if current_param.strip():
+                params.append(current_param.strip())
+            current_param = ""
+        else:
+            current_param += char
+    
+    # 添加最后一个参数
+    if current_param.strip():
+        params.append(current_param.strip())
     
     # 调试：打印分割后的参数
     
@@ -1628,7 +1648,8 @@ def process_range_values(params_part):
 def parse_hasitem_simple(hasitem_content):
     """
     解析简单的hasitem参数并转换为nbt参数
-    例如：hasitem={item=diamond,quantity=3..} -> nbt={Inventory:[{id:"minecraft:diamond",Count:3b}]}
+    例如：hasitem={item=diamond,quantity=3..} -> nbt={Inventory:[{id:"minecraft:diamond"}]}
+    注意：Java版NBT不需要Count值，有了反而会让检测失效
     """
     import re
     
@@ -1651,7 +1672,7 @@ def parse_hasitem_simple(hasitem_content):
     location = params.get('location', None)
     slot = params.get('slot', None)
     
-    # 解析数量范围
+    # 解析数量范围 - 仍然解析但不用于NBT
     count_value = 1
     has_quantity = 'quantity' in params
     range_reminders = []
@@ -1715,34 +1736,22 @@ def parse_hasitem_simple(hasitem_content):
                 else:
                     slot_num = int(slot)
             
-            # 构建带Slot信息的NBT项
+            # 构建带Slot信息的NBT项，不包含Count字段
             if slot_num is not None:
-                if has_quantity:
-                    nbt_items.append(f'{{id:"{item_name}",Count:{count_value}b,Slot:{slot_num}b}}')
-                else:
-                    nbt_items.append(f'{{id:"{item_name}",Slot:{slot_num}b}}')
+                nbt_items.append(f'{{id:"{item_name}",Slot:{slot_num}b}}')
             else:
                 # 无法确定槽位，使用通用格式
-                if has_quantity:
-                    nbt_items.append(f'{{id:"{item_name}",Count:{count_value}b}}')
-                else:
-                    nbt_items.append(f'{{id:"{item_name}"}}')
+                nbt_items.append(f'{{id:"{item_name}"}}')
         else:
             # 没有具体位置信息，使用通用格式
-            if has_quantity:
-                nbt_items.append(f'{{id:"{item_name}",Count:{count_value}b}}')
-            else:
-                nbt_items.append(f'{{id:"{item_name}"}}')
+            nbt_items.append(f'{{id:"{item_name}"}}')
         
         # 构建完整的NBT内容
         nbt_content = f'{{Inventory:[{",".join(nbt_items)}]}}'
         
         # 添加转换提醒
-        if has_quantity:
-            reminders.append(f"hasitem参数已转换为nbt格式，数量信息已保留为NBT Count字段")
-            reminders.append(f"注意：NBT格式中物品数量由Count字段表示，不再使用quantity参数")
-        else:
-            reminders.append(f"hasitem={{item={item_name}}}未指定quantity参数，将匹配任意数量的物品")
+        reminders.append(f"hasitem参数已转换为nbt格式，可能无法完全保留原意")
+        reminders.append(f"注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
         
         if location and slot:
             reminders.append(f"hasitem参数位置信息已转换为NBT Slot字段")
@@ -1757,7 +1766,8 @@ def parse_hasitem_complex(hasitem_content):
     """
     解析复杂的hasitem参数并转换为nbt参数
     例如：hasitem=[{item=diamond,quantity=3..},{item=stick,quantity=2..}] 
-    -> nbt={Inventory:[{id:"minecraft:diamond",Count:3b},{id:"minecraft:stick",Count:2b}]}
+    -> nbt={Inventory:[{id:"minecraft:diamond"},{id:"minecraft:stick"}]}
+    注意：Java版NBT不需要Count值，有了反而会让检测失效
     """
     import re
     
@@ -1863,27 +1873,18 @@ def parse_hasitem_complex(hasitem_content):
                     else:
                         slot_num = int(slot)
             
-            # 构建带Slot信息的NBT项
+            # 构建带Slot信息的NBT项，不包含Count字段
             if slot_num is not None:
-                if has_quantity:
-                    nbt_items.append(f'{{id:"{item_name}",Count:{count_value}b,Slot:{slot_num}b}}')
-                    reminders.append(f"hasitem参数中{item_name}的数量信息已转换为NBT Count字段，位置信息已转换为NBT Slot字段")
-                else:
-                    nbt_items.append(f'{{id:"{item_name}",Slot:{slot_num}b}}')
-                    reminders.append(f"hasitem中{item_name}的位置信息已转换为NBT Slot字段")
+                nbt_items.append(f'{{id:"{item_name}",Slot:{slot_num}b}}')
             else:
                 # 没有具体位置信息，使用通用格式
-                if has_quantity:
-                    nbt_items.append(f'{{id:"{item_name}",Count:{count_value}b}}')
-                    reminders.append(f"hasitem参数中{item_name}的数量信息已转换为NBT Count字段")
-                else:
-                    nbt_items.append(f'{{id:"{item_name}"}}')
-                    reminders.append(f"hasitem中{item_name}未指定quantity参数，将匹配任意数量的物品")
+                nbt_items.append(f'{{id:"{item_name}"}}')
     
     if nbt_items:
         nbt_content = '{Inventory:[' + ','.join(nbt_items) + ']}'
         # 添加关于NBT格式的说明
-        reminders.append("注意：NBT格式中物品数量由Count字段表示，不再使用quantity参数")
+        reminders.append("hasitem参数已转换为nbt格式，可能无法完全保留原意")
+        reminders.append("注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
         return f'nbt={nbt_content}', reminders
     else:
         # 如果没有物品信息，返回None表示转换失败
