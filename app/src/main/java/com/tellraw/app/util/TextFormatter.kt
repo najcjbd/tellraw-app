@@ -270,9 +270,9 @@ object TextFormatter {
                         extraParts.add(newPart)
                     }
                 } else {
-                    // 检查是否可以与主文本合并
+                    // Check if can merge with main text
                     if (result["text"] as String?.isNotEmpty() == true) {
-                        // 检查主文本格式是否与当前格式相同
+                        // Check if main text format matches current format
                         val allFormatKeys = (currentFormat.keys + result.keys.filter { it != "text" }).toSet()
                         val formatsMatch = allFormatKeys.all { key ->
                             if (key == "text") true else currentFormat[key] == result[key]
