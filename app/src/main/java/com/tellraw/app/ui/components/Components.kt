@@ -190,10 +190,10 @@ fun MNCodeDialog(
             Text("检测到§m§n代码")
         },
         text = {
-            Text("检测到§m§n代码，请选择处理方式：
+            Text("""检测到§m§n代码，请选择处理方式：
 
 1. Java版使用字体方式，基岩版使用颜色代码方式
-2. Java版和基岩版都使用颜色代码方式")
+2. Java版和基岩版都使用颜色代码方式""")
         },
         confirmButton = {
             TextButton(

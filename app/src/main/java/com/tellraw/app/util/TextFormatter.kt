@@ -257,8 +257,7 @@ object TextFormatter {
                     // 检查格式是否完全相同（包括所有格式属性）
                     val allFormatKeys = (currentFormat.keys + lastPart.keys.filter { it != "text" }).toSet()
                     val formatsMatch = allFormatKeys.all { key ->
-                        if (key == "text") return@all true
-                        currentFormat[key] == lastPart[key]
+                        if (key == "text") true else currentFormat[key] == lastPart[key]
                     }
                         
                     if (formatsMatch) {
@@ -276,8 +275,7 @@ object TextFormatter {
                         // 检查主文本格式是否与当前格式相同
                         val allFormatKeys = (currentFormat.keys + result.keys.filter { it != "text" }).toSet()
                         val formatsMatch = allFormatKeys.all { key ->
-                            if (key == "text") return@all true
-                            currentFormat[key] == result[key]
+                            if (key == "text") true else currentFormat[key] == result[key]
                         }
                             
                         if (formatsMatch) {
