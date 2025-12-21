@@ -271,7 +271,7 @@ object TextFormatter {
                     }
                 } else {
                     // 检查是否可以与主文本合并
-                    if (result["text"] as String??.isNotEmpty() == true) {
+                    if (result["text"] as String?.isNotEmpty() == true) {
                         // 检查主文本格式是否与当前格式相同
                         val allFormatKeys = (currentFormat.keys + result.keys.filter { it != "text" }).toSet()
                         val formatsMatch = allFormatKeys.all { key ->
@@ -362,11 +362,6 @@ object TextFormatter {
     fun convertToBedrockJson(text: String, useJavaFontStyle: Boolean = true): String {
         var processedText = text
         
-        // 首先处理所有基岩版特有颜色代码
-        BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
-            processedText = processedText.replace(bedrockCode, replacement)
-        }
-        
         // 使用TEXT_COLOR_CODES处理所有颜色代码
         // 按长度降序排列，确保较长的代码先被处理
         val sortedCodes = TEXT_COLOR_CODES.entries.sortedByDescending { it.key.length }
@@ -378,14 +373,14 @@ object TextFormatter {
         if (useJavaFontStyle) {
             // 基岩版使用默认颜色代码方式
             // 将基岩版特有颜色代码转换为相似的Java版颜色代码
-            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
+            TEXT_COLOR_CODES.forEach { (bedrockCode, replacement) ->
                 if (processedText.contains(bedrockCode)) {
                     processedText = processedText.replace(bedrockCode, replacement)
                 }
             }
         } else {
             // 同样使用颜色代码方式
-            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
+            TEXT_COLOR_CODES.forEach { (bedrockCode, replacement) ->
                 if (processedText.contains(bedrockCode)) {
                     processedText = processedText.replace(bedrockCode, replacement)
                 }
