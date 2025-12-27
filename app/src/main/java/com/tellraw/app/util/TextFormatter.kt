@@ -273,7 +273,7 @@ object TextFormatter {
                     // Check if can merge with main text
                     if (result["text"] as String?.isNotEmpty() == true) {
                         // Check if main text format matches current format
-                        val allFormatKeys = (currentFormat.keys + result.keys.filter { (key: String) -> key != "text" }).toSet()
+                        val allFormatKeys = (currentFormat.keys + result.keys.filter { key: String -> key != "text" }).toSet()
                         val formatsMatch = allFormatKeys.all { key ->
                             if (key == "text") true else currentFormat[key] == result[key]
                         }
