@@ -183,7 +183,7 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码
-                if (code[1] in "0123456789abcdefg hijpqs tuv") {
+                if (code[1] in "0123456789abcdefghijpqstuv") {
                     // 颜色代码
                     when (code) {
                         "§0" -> currentFormat["color"] = "black"
