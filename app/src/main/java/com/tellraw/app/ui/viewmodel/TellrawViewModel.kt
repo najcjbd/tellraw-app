@@ -178,7 +178,7 @@ class TellrawViewModel @Inject constructor(
         val javaCommand = "tellraw $javaSelectorFiltered $javaJson"
         
         // 生成基岩版命令
-        val bedrockJson = TextFormatter.convertToBedrock(message, mNHandling)
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling)
         val bedrockCommand = "tellraw $bedrockSelectorFiltered $bedrockJson"
         
         // 处理提醒信息显示
@@ -267,24 +267,6 @@ class TellrawViewModel @Inject constructor(
                     bedrockCommand = result.bedrockCommand
                 )
             }
-            
-            // 生成tellraw命令（与Python版本的generate_tellraw_commands函数逻辑一致）
-            val javaCommand = generateJavaCommand(
-                selector = javaSelectorFiltered,
-                message = message,
-                mNHandling = mNHandling
-            )
-            
-            val bedrockCommand = generateBedrockCommand(
-                selector = bedrockSelectorFiltered,
-                message = message,
-                mNHandling = mNHandling
-            )
-            
-            _javaCommand.value = javaCommand
-            _bedrockCommand.value = bedrockCommand
-            _warnings.value = allWarnings
-            _isLoading.value = false
         }
     }
     

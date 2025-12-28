@@ -266,7 +266,7 @@ object SelectorConverter {
                 val levelPattern = "level=([^,\\}]+)".toRegex()
                 val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
                     val levelValue = levelMatch.groupValues[1]
-                    conversionReminders.add("Java版level=$levelValue参数已转换为基岩版lm=$levelValue,l=$levelValue")
+                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + levelValue + ",l=" + levelValue)
                     "lm=$levelValue,l=$levelValue"
                 }
                 
@@ -1038,7 +1038,7 @@ object SelectorConverter {
                 // 检查是否有反选模式
                 if ("![" in scoresContent || "!" in scoresContent) {
                     // Java版不支持scores反选，直接移除整个scores参数
-                    conversionReminders.add("基岩版scores反选参数$fullMatch在Java版中不支持，已移除")
+                    conversionReminders.add("基岩版scores反选参数" + fullMatch + "在Java版中不支持，已移除")
                     ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
@@ -1056,7 +1056,7 @@ object SelectorConverter {
                 val levelPattern = "level=([^,\\}]+)".toRegex()
                 val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
                     val levelValue = levelMatch.groupValues[1]
-                    conversionReminders.add("Java版level=$levelValue参数已转换为基岩版lm=$levelValue,l=$levelValue")
+                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + levelValue + ",l=" + levelValue)
                     "lm=$levelValue,l=$levelValue"
                 }
                 
