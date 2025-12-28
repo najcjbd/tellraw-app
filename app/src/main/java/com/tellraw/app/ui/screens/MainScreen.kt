@@ -41,6 +41,16 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     
+    // 用于跟踪光标位置的状态
+    val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
+    
+    // 当messageInput变化时，更新TextFieldValue
+    LaunchedEffect(messageInput) {
+        if (messageTextFieldValue.value.text != messageInput) {
+            messageTextFieldValue.value = messageTextFieldValue.value.copy(text = messageInput)
+        }
+    }
+    
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }
@@ -87,7 +97,8 @@ fun MainScreen(
                 OutlinedTextField(
                     value = selectorInput,
                     onValueChange = { viewModel.updateSelector(it) },
-                    label = { Text("输入选择器 (如: @a, @p, @e[type=player])") },
+                    label = { Text("输入选择器") },
+                    placeholder = { Text("例如: @a, @p, @e[type=player]") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     trailingIcon = {
@@ -122,8 +133,11 @@ fun MainScreen(
                 )
                 
                 OutlinedTextField(
-                    value = messageInput,
-                    onValueChange = { viewModel.updateMessage(it) },
+                    value = messageTextFieldValue.value,
+                    onValueChange = { 
+                        messageTextFieldValue.value = it
+                        viewModel.updateMessage(it.text)
+                    },
                     label = { Text("输入消息文本") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
@@ -133,8 +147,20 @@ fun MainScreen(
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
                     onCodeSelected = { code ->
-                        val currentText = messageInput
-                        viewModel.updateMessage(currentText + code)
+                        val currentValue = messageTextFieldValue.value
+                        val cursorPosition = currentValue.selection.start
+                        val textBeforeCursor = currentValue.text.substring(0, cursorPosition)
+                        val textAfterCursor = currentValue.text.substring(cursorPosition)
+                        val newText = textBeforeCursor + code + textAfterCursor
+                        val newCursorPosition = cursorPosition + code.length
+                        
+                        val newTextFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                            text = newText,
+                            selection = androidx.compose.ui.text.TextRange(newCursorPosition)
+                        )
+                        
+                        messageTextFieldValue.value = newTextFieldValue
+                        viewModel.updateMessage(newText)
                     }
                 )
             }

@@ -68,6 +68,16 @@ class TellrawViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     
+    // 跟踪§m和§n的使用次数
+    private val _mCodeCount = MutableStateFlow(0)
+    val mCodeCount: StateFlow<Int> = _mCodeCount.asStateFlow()
+    
+    private val _nCodeCount = MutableStateFlow(0)
+    val nCodeCount: StateFlow<Int> = _nCodeCount.asStateFlow()
+    
+    // 上一次的消息内容，用于检测新增的§m和§n
+    private var lastMessageContent = ""
+    
     // 版本检查相关状态
     private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
     val showUpdateDialog: StateFlow<GithubRelease?> = _showUpdateDialog.asStateFlow()
@@ -91,12 +101,61 @@ class TellrawViewModel @Inject constructor(
     fun updateMessage(message: String) {
         _messageInput.value = message
         
-        // 检测是否包含§m§n代码
-        if (TextFormatter.containsMNCodes(message)) {
+        // 检测新增的§m和§n代码
+        detectAndCountMNCodes(message)
+        
+        // 检测是否包含§m§n代码，但避免频繁弹出对话框
+        if (TextFormatter.containsMNCodes(message) && !_showMNDialog.value) {
             _showMNDialog.value = true
         } else {
             generateCommands()
         }
+    }
+    
+    /**
+     * 检测并计数§m和§n代码的使用
+     */
+    private fun detectAndCountMNCodes(message: String) {
+        // 检测新增的§m代码
+        val newMCount = countOccurrences(message, "§m") - countOccurrences(lastMessageContent, "§m")
+        if (newMCount > 0) {
+            _mCodeCount.value += newMCount
+            // 每次使用§m时添加提醒
+            val newWarnings = _warnings.value.toMutableList()
+            newWarnings.add("提醒：您已使用§m（删除线）格式代码 ${_mCodeCount.value} 次")
+            _warnings.value = newWarnings
+        }
+        
+        // 检测新增的§n代码
+        val newNCount = countOccurrences(message, "§n") - countOccurrences(lastMessageContent, "§n")
+        if (newNCount > 0) {
+            _nCodeCount.value += newNCount
+            // 每次使用§n时添加提醒
+            val newWarnings = _warnings.value.toMutableList()
+            newWarnings.add("提醒：您已使用§n（下划线）格式代码 ${_nCodeCount.value} 次")
+            _warnings.value = newWarnings
+        }
+        
+        // 更新上一次的消息内容
+        lastMessageContent = message
+    }
+    
+    /**
+     * 计算字符串中某个子串的出现次数
+     */
+    private fun countOccurrences(text: String, substring: String): Int {
+        var count = 0
+        var index = 0
+        while (index < text.length) {
+            val foundIndex = text.indexOf(substring, index)
+            if (foundIndex != -1) {
+                count++
+                index = foundIndex + substring.length
+            } else {
+                break
+            }
+        }
+        return count
     }
     
     fun setUseJavaFontStyle(useJavaFont: Boolean) {
@@ -247,25 +306,29 @@ class TellrawViewModel @Inject constructor(
                 return@launch
             }
             
-            // 确定m_n_handling参数（与Python版本一致）
-            val mNHandling = if (_useJavaFontStyle.value) "font" else "color"
-            
-            // 使用统一的命令生成函数
-            val result = generateTellrawCommands(selector, message, mNHandling)
-            
-            _javaCommand.value = result.javaCommand
-            _bedrockCommand.value = result.bedrockCommand
-            _warnings.value = result.warnings
-            _isLoading.value = false
-            
-            // 保存到历史记录
-            viewModelScope.launch {
+            try {
+                // 确定m_n_handling参数（与Python版本一致）
+                val mNHandling = if (_useJavaFontStyle.value) "font" else "color"
+                
+                // 使用统一的命令生成函数
+                val result = generateTellrawCommands(selector, message, mNHandling)
+                
+                _javaCommand.value = result.javaCommand
+                _bedrockCommand.value = result.bedrockCommand
+                _warnings.value = result.warnings
+                
+                // 保存到历史记录
                 tellrawRepository.saveCommandToHistory(
                     selector = selector,
                     message = message,
                     javaCommand = result.javaCommand,
                     bedrockCommand = result.bedrockCommand
                 )
+            } catch (e: Exception) {
+                // 处理可能的异常，防止卡死
+                _warnings.value = listOf("命令生成出错: ${e.message}")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -323,6 +386,23 @@ class TellrawViewModel @Inject constructor(
     }
     
     fun clearAll() {
+        val selector = _selectorInput.value
+        val message = _messageInput.value
+        val javaCommand = _javaCommand.value
+        val bedrockCommand = _bedrockCommand.value
+        
+        // 如果有内容，先保存到历史记录
+        if (selector.isNotEmpty() || message.isNotEmpty()) {
+            viewModelScope.launch {
+                tellrawRepository.saveCommandToHistory(
+                    selector = selector,
+                    message = message,
+                    javaCommand = javaCommand,
+                    bedrockCommand = bedrockCommand
+                )
+            }
+        }
+        
         _selectorInput.value = ""
         _messageInput.value = ""
         _javaCommand.value = ""
@@ -330,6 +410,11 @@ class TellrawViewModel @Inject constructor(
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _useJavaFontStyle.value = true
+        
+        // 重置§m和§n计数器
+        _mCodeCount.value = 0
+        _nCodeCount.value = 0
+        lastMessageContent = ""
     }
     
     // 历史记录管理函数
@@ -361,6 +446,11 @@ class TellrawViewModel @Inject constructor(
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
         detectSelectorType()
+        
+        // 重置§m和§n计数器
+        _mCodeCount.value = 0
+        _nCodeCount.value = 0
+        lastMessageContent = history.message
     }
     
     // 搜索历史记录
