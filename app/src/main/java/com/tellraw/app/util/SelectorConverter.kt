@@ -93,7 +93,19 @@ object SelectorConverter {
             return when {
                 javaCount > bedrockCount -> SelectorType.JAVA
                 bedrockCount > javaCount -> SelectorType.BEDROCK
-                else -> SelectorType.BEDROCK // 默认返回基岩版
+                else -> {
+                    // 当Java参数和基岩参数数量相等时，尝试使用其他启发式方法
+                    // 如果参数完全相等或只有通用参数，使用更细致的判断
+                    if (javaCount == 0 && bedrockCount == 0 && '[' in selector && ']' in selector) {
+                        // 只有通用参数，根据社区使用习惯，Java版更常使用scores等参数
+                        // 所以如果只有通用参数，更可能认为是Java版
+                        // 但为了保持与Python版本的一致性，这里仍然返回bedrock
+                        SelectorType.BEDROCK
+                    } else {
+                        // 默认返回bedrock
+                        SelectorType.BEDROCK
+                    }
+                }
             }
         }
         
@@ -243,6 +255,30 @@ object SelectorConverter {
             conversionReminders.addAll(nbtToHasitemReminders)
         }
         
+        // 处理scores参数中的level参数
+        if (targetVersion == SelectorType.BEDROCK && "scores=" in paramsPart) {
+            val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
+            paramsPart = paramsPart.replace(scoresPattern) { match ->
+                val fullMatch = match.value
+                val scoresContent = match.groupValues[1]
+                
+                // 处理level参数
+                val levelPattern = "level=([^,\\}]+)".toRegex()
+                val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
+                    val levelValue = levelMatch.groupValues[1]
+                    conversionReminders.add("Java版level=$levelValue参数已转换为基岩版lm=$levelValue,l=$levelValue")
+                    "lm=$levelValue,l=$levelValue"
+                }
+                
+                // 如果scores内容发生了变化，返回新的scores参数
+                if (newScoresContent != scoresContent) {
+                    "scores={$newScoresContent}"
+                } else {
+                    fullMatch
+                }
+            }
+        }
+        
         // 根据目标版本进行参数转换
         if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
@@ -305,9 +341,10 @@ object SelectorConverter {
                     removedParams.add(paramName)
                     when (paramName) {
                         "family" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有直接对应的功能，已移除。建议使用type参数指定实体类型作为替代")
-                                        "haspermission" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
-                                        "has_property" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
-                                        else -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中不支持，已移除")                    }
+                        "haspermission" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
+                        "has_property" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
+                        else -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中不支持，已移除")
+                    }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
@@ -980,6 +1017,61 @@ object SelectorConverter {
         return result
     }
     
+    // 特殊处理scores参数中的!=反选：在Java版输出中移除整个scores参数
+    fun processScoresNegation(selector: String, targetVersion: SelectorType): Pair<String, List<String>> {
+        val conversionReminders = mutableListOf<String>()
+        
+        if ('[' !in selector || ']' !in selector) {
+            return selector to conversionReminders
+        }
+        
+        val selectorVar = selector.split('[')[0]
+        var paramsPart = selector.substringAfter('[').substringBefore(']')
+        
+        // 特殊处理scores参数中的!=反选：在Java版输出中移除整个scores参数
+        if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
+            val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
+            paramsPart = paramsPart.replace(scoresPattern) { match ->
+                val fullMatch = match.value
+                val scoresContent = match.groupValues[1]
+                
+                // 检查是否有反选模式
+                if ("![" in scoresContent || "!" in scoresContent) {
+                    // Java版不支持scores反选，直接移除整个scores参数
+                    conversionReminders.add("基岩版scores反选参数$fullMatch在Java版中不支持，已移除")
+                    ""  // 返回空字符串，表示移除整个参数
+                } else {
+                    fullMatch
+                }
+            }
+        }
+        // 处理scores参数中的level参数（Java版到基岩版转换）
+        else if (targetVersion == SelectorType.BEDROCK && "scores=" in paramsPart) {
+            val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
+            paramsPart = paramsPart.replace(scoresPattern) { match ->
+                val fullMatch = match.value
+                val scoresContent = match.groupValues[1]
+                
+                // 处理level参数
+                val levelPattern = "level=([^,\\}]+)".toRegex()
+                val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
+                    val levelValue = levelMatch.groupValues[1]
+                    conversionReminders.add("Java版level=$levelValue参数已转换为基岩版lm=$levelValue,l=$levelValue")
+                    "lm=$levelValue,l=$levelValue"
+                }
+                
+                // 如果scores内容发生了变化，返回新的scores参数
+                if (newScoresContent != scoresContent) {
+                    "scores={$newScoresContent}"
+                } else {
+                    fullMatch
+                }
+            }
+        }
+        
+        return selectorVar + "[" + paramsPart + "]" to conversionReminders
+    }
+    
     
     
     private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>): String {
@@ -1086,7 +1178,7 @@ object SelectorConverter {
         // 清理参数
         var cleanParams = paramsPart
         cleanParams = cleanParams.replace(",,", ",")
-        cleanParams = cleanParams.replace("\\[,", "[".toRegex())
+        cleanParams = cleanParams.replace("\\[,".toRegex(), "[")
         cleanParams = cleanParams.replace(",\\]".toRegex(), "]")
         cleanParams = cleanParams.replace("\\[\\]".toRegex(), "")
         

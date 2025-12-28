@@ -1,17 +1,25 @@
 package com.tellraw.app.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.format.DateFormat
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun SelectorTypeBadge(type: com.tellraw.app.model.SelectorType) {
@@ -214,4 +222,180 @@ fun MNCodeDialog(
             }
         }
     )
+}
+
+@Composable
+fun HistoryDialog(
+    historyList: List<com.tellraw.app.data.local.CommandHistory>,
+    onDismiss: () -> Unit,
+    onLoadHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
+    onDeleteHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
+    onClearAll: () -> Unit,
+    onSearch: (String) -> Unit = {}
+) {
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("命令历史记录")
+                if (historyList.isNotEmpty()) {
+                    IconButton(
+                        onClick = onClearAll
+                    ) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "清空历史",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 搜索框
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { 
+                        searchQuery = it
+                        onSearch(it)
+                    },
+                    label = { Text("搜索历史记录") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { 
+                                searchQuery = ""
+                                onSearch("")
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "清除搜索")
+                            }
+                        }
+                    }
+                )
+                
+                if (historyList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = if (searchQuery.isEmpty()) "暂无历史记录" else "没有找到匹配的历史记录",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(historyList) { history ->
+                            HistoryItem(
+                                history = history,
+                                onLoad = { onLoadHistory(history) },
+                                onDelete = { onDeleteHistory(history) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+@Composable
+private fun HistoryItem(
+    history: com.tellraw.app.data.local.CommandHistory,
+    onLoad: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+    val timeText = dateFormat.format(Date(history.timestamp))
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = timeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "选择器: ${history.selector}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "消息: ${history.message.take(30)}${if (history.message.length > 30) "..." else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1
+                    )
+                }
+                
+                Row {
+                    IconButton(
+                        onClick = onLoad,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = "加载",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "删除",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

@@ -7,13 +7,16 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tellraw.app.data.local.CommandHistory
 import com.tellraw.app.data.remote.GithubRelease
+import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +25,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TellrawViewModel @Inject constructor(
+    private val tellrawRepository: TellrawRepository,
     private val versionCheckRepository: VersionCheckRepository
 ) : ViewModel() {
     
@@ -71,6 +75,13 @@ class TellrawViewModel @Inject constructor(
     private val _showDisableCheckDialog = MutableStateFlow(false)
     val showDisableCheckDialog: StateFlow<Boolean> = _showDisableCheckDialog.asStateFlow()
     
+    // 历史记录相关状态
+    val commandHistory: Flow<List<CommandHistory>> = tellrawRepository.getCommandHistory()
+    
+    // 搜索结果状态
+    private val _searchResults = MutableStateFlow<List<CommandHistory>>(emptyList())
+    val searchResults: StateFlow<List<CommandHistory>> = _searchResults.asStateFlow()
+    
     fun updateSelector(selector: String) {
         _selectorInput.value = selector
         detectSelectorType()
@@ -105,6 +116,122 @@ class TellrawViewModel @Inject constructor(
         }
     }
     
+    /**
+     * 生成tellraw命令 - 与Python版本的generate_tellraw_commands函数逻辑完全一致
+     */
+    private fun generateTellrawCommands(
+        selector: String, 
+        message: String, 
+        mNHandling: String = "none"
+    ): TellrawCommand {
+        val allWarnings = mutableListOf<String>()
+        
+        // 检测选择器类型（与Python版本的detect_selector_type函数逻辑一致）
+        val detectedType = SelectorConverter.detectSelectorType(selector)
+        
+        // 将基岩版选择器转换为Java版（如果需要）
+        val javaSelectorConversion = SelectorConverter.convertBedrockToJava(selector)
+        val wasConverted = javaSelectorConversion.wasConverted
+        val originalSelector = if (wasConverted) selector else null
+        val convertedSelector = if (wasConverted) javaSelectorConversion.javaSelector else null
+        
+        // 转换gamemode/m参数并收集提醒
+        val (javaSelectorConverted, bedrockSelectorConverted, javaGamemodeReminders, bedrockGamemodeReminders) = 
+            javaSelectorConversion
+        
+        // 根据原始选择器类型选择转换后的选择器作为基础
+        val (javaSelectorFinal, bedrockSelectorFinal) = when (detectedType) {
+            SelectorType.BEDROCK -> {
+                // 对于基岩版输入：
+                // 基岩版输出直接使用原始输入
+                // Java版输出需要将基岩版参数转换为Java版
+                val javaFinal = if (wasConverted) javaSelectorConversion.javaSelector else bedrockSelectorConverted
+                Pair(javaFinal, selector)
+            }
+            else -> {
+                // 对于Java版输入：
+                // Java版输出直接使用原始输入
+                // 基岩版输出需要将Java版参数转换为基岩版
+                Pair(selector, javaSelectorConverted)
+            }
+        }
+        
+        // 过滤Java版参数，移除基岩版特有的参数（完全不支持）
+        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorConversion.javaSelector, SelectorType.JAVA)
+        
+        // 过滤基岩版参数，移除Java版特有的参数（完全不支持）
+        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorConversion.bedrockSelector, SelectorType.BEDROCK)
+        
+        // 合并所有Java版提醒信息并去重
+        val allJavaReminders = mutableListOf<String>()
+        allJavaReminders.addAll(javaGamemodeReminders)
+        allJavaReminders.addAll(javaRemovedParams)
+        if (wasConverted) allJavaReminders.addAll(javaSelectorConversion.javaReminders)
+        
+        // 合并所有基岩版提醒信息并去重
+        val allBedrockReminders = mutableListOf<String>()
+        allBedrockReminders.addAll(bedrockGamemodeReminders)
+        allBedrockReminders.addAll(bedrockRemovedParams)
+        
+        // 生成Java版命令
+        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling)
+        val javaCommand = "tellraw $javaSelectorFiltered $javaJson"
+        
+        // 生成基岩版命令
+        val bedrockJson = TextFormatter.convertToBedrock(message, mNHandling)
+        val bedrockCommand = "tellraw $bedrockSelectorFiltered $bedrockJson"
+        
+        // 处理提醒信息显示
+        // 分类并去重处理Java版提醒
+        val javaNonReminders = allJavaReminders.filter { 
+            !it.startsWith("Java版") && !it.startsWith("基岩版") && 
+            "nbt参数" !in it && "参数已转换为" !in it && "已转换为" !in it 
+        }.distinct()
+        
+        val javaSpecificReminders = allJavaReminders.filter { 
+            "参数已转换为" in it || "nbt参数" in it || 
+            "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
+        }.distinct()
+        
+        // 分类并去重处理基岩版提醒
+        val bedrockNonReminders = allBedrockReminders.filter { 
+            !it.startsWith("Java版") && !it.startsWith("基岩版") && 
+            "nbt参数" !in it && "参数已转换为" !in it && "已转换为" !in it 
+        }.distinct()
+        
+        val bedrockSpecificReminders = allBedrockReminders.filter { 
+            "参数已转换为" in it || "nbt参数" in it || 
+            "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
+        }.distinct()
+        
+        // 添加Java版参数剔除提醒
+        if (javaNonReminders.isNotEmpty()) {
+            allWarnings.add("注意: Java版不支持以下参数，已从Java版命令中移除: ${javaNonReminders.joinToString(", ")}")
+        }
+        
+        // 添加Java版特殊提醒
+        javaSpecificReminders.forEach { reminder ->
+            allWarnings.add("注意: $reminder")
+        }
+        
+        // 添加基岩版参数剔除提醒
+        if (bedrockNonReminders.isNotEmpty()) {
+            allWarnings.add("注意: 基岩版不支持以下参数，已从基岩版命令中移除: ${bedrockNonReminders.joinToString(", ")}")
+        }
+        
+        // 添加基岩版特殊提醒
+        bedrockSpecificReminders.forEach { reminder ->
+            allWarnings.add("注意: $reminder")
+        }
+        
+        // 添加选择器转换提醒
+        if (wasConverted && originalSelector != null && convertedSelector != null) {
+            allWarnings.add("注意: 基岩版选择器 $originalSelector 在Java版中不支持，已转换为 $convertedSelector")
+        }
+        
+        return TellrawCommand(javaCommand, bedrockCommand, allWarnings)
+    }
+
     private fun generateCommands() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -120,87 +247,25 @@ class TellrawViewModel @Inject constructor(
                 return@launch
             }
             
-            val allWarnings = mutableListOf<String>()
-            
-            // 检测选择器类型（与Python版本的detect_selector_type函数逻辑一致）
-            val detectedType = SelectorConverter.detectSelectorType(selector)
-            
-            // 转换选择器
-            val conversionResult = when (detectedType) {
-                SelectorType.JAVA -> {
-                    // Java版输入：Java版输出使用原始输入，基岩版输出需要转换
-                    val result = SelectorConverter.convertJavaToBedrock(selector)
-                    allWarnings.addAll(result.bedrockReminders)
-                    selector to result.bedrockSelector
-                }
-                SelectorType.BEDROCK -> {
-                    // 基岩版输入：基岩版输出使用原始输入，Java版输出需要转换
-                    val result = SelectorConverter.convertBedrockToJava(selector)
-                    allWarnings.addAll(result.javaReminders)
-                    result.javaSelector to selector
-                }
-                SelectorType.UNIVERSAL -> {
-                    selector to selector
-                }
-            }
-            
             // 确定m_n_handling参数（与Python版本一致）
             val mNHandling = if (_useJavaFontStyle.value) "font" else "color"
             
-            // 过滤Java版参数，移除基岩版特有的参数（完全不支持）
-            val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(conversionResult.first, SelectorType.JAVA)
+            // 使用统一的命令生成函数
+            val result = generateTellrawCommands(selector, message, mNHandling)
             
-            // 过滤基岩版参数，移除Java版特有的参数（完全不支持）
-            val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(conversionResult.second, SelectorType.BEDROCK)
+            _javaCommand.value = result.javaCommand
+            _bedrockCommand.value = result.bedrockCommand
+            _warnings.value = result.warnings
+            _isLoading.value = false
             
-            // 合并所有Java版提醒信息并去重
-            val allJavaReminders = mutableListOf<String>()
-            allJavaReminders.addAll(javaRemovedParams)
-            
-            // 分类并去重处理Java版提醒
-            val javaNonReminders = allJavaReminders.filter { 
-                !it.startsWith("Java版") && !it.startsWith("基岩版") && 
-                !"nbt参数" in it && !"参数已转换为" in it && !"已转换为" in it 
-            }.distinct()
-            
-            val javaSpecificReminders = allJavaReminders.filter { 
-                "参数已转换为" in it || "nbt参数" in it || 
-                "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
-            }.distinct()
-            
-            // 合并所有基岩版提醒信息并去重
-            val allBedrockReminders = mutableListOf<String>()
-            allBedrockReminders.addAll(bedrockRemovedParams)
-            
-            // 分类并去重处理基岩版提醒
-            val bedrockNonReminders = allBedrockReminders.filter { 
-                !it.startsWith("Java版") && !it.startsWith("基岩版") && 
-                !"nbt参数" in it && !"参数已转换为" in it && !"已转换为" in it 
-            }.distinct()
-            
-            val bedrockSpecificReminders = allBedrockReminders.filter { 
-                "参数已转换为" in it || "nbt参数" in it || 
-                "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
-            }.distinct()
-            
-            // 添加Java版参数剔除提醒
-            if (javaNonReminders.isNotEmpty()) {
-                allWarnings.add("注意: Java版不支持以下参数，已从Java版命令中移除: ${javaNonReminders.joinToString(", ")}")
-            }
-            
-            // 添加Java版特殊提醒
-            javaSpecificReminders.forEach { reminder ->
-                allWarnings.add("注意: $reminder")
-            }
-            
-            // 添加基岩版参数剔除提醒
-            if (bedrockNonReminders.isNotEmpty()) {
-                allWarnings.add("注意: 基岩版不支持以下参数，已从基岩版命令中移除: ${bedrockNonReminders.joinToString(", ")}")
-            }
-            
-            // 添加基岩版特殊提醒
-            bedrockSpecificReminders.forEach { reminder ->
-                allWarnings.add("注意: $reminder")
+            // 保存到历史记录
+            viewModelScope.launch {
+                tellrawRepository.saveCommandToHistory(
+                    selector = selector,
+                    message = message,
+                    javaCommand = result.javaCommand,
+                    bedrockCommand = result.bedrockCommand
+                )
             }
             
             // 生成tellraw命令（与Python版本的generate_tellraw_commands函数逻辑一致）
@@ -283,6 +348,51 @@ class TellrawViewModel @Inject constructor(
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _useJavaFontStyle.value = true
+    }
+    
+    // 历史记录管理函数
+    
+    /**
+     * 删除指定的历史记录
+     */
+    fun deleteHistoryItem(history: CommandHistory) {
+        viewModelScope.launch {
+            tellrawRepository.deleteCommandHistory(history)
+        }
+    }
+    
+    /**
+     * 清空所有历史记录
+     */
+    fun clearAllHistory() {
+        viewModelScope.launch {
+            tellrawRepository.clearAllHistory()
+        }
+    }
+    
+    /**
+     * 从历史记录加载命令
+     */
+    fun loadFromHistory(history: CommandHistory) {
+        _selectorInput.value = history.selector
+        _messageInput.value = history.message
+        _javaCommand.value = history.javaCommand
+        _bedrockCommand.value = history.bedrockCommand
+        detectSelectorType()
+    }
+    
+    // 搜索历史记录
+    fun searchHistory(query: String) {
+        viewModelScope.launch {
+            tellrawRepository.searchHistory(query).collect { results ->
+                _searchResults.value = results
+            }
+        }
+    }
+    
+    // 根据ID获取历史记录
+    suspend fun getHistoryById(id: Long): CommandHistory? {
+        return tellrawRepository.getHistoryById(id)
     }
     
     // 版本检查相关方法

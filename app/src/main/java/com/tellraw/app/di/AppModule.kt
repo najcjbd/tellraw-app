@@ -3,7 +3,6 @@ package com.tellraw.app.di
 import android.content.Context
 import androidx.room.Room
 import com.tellraw.app.data.local.AppDatabase
-import com.tellraw.app.data.remote.ApiService
 import com.tellraw.app.data.remote.GithubApiService
 import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
@@ -44,28 +43,12 @@ object AppModule {
     
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl("https://api.tellraw.com/") // 示例URL，实际使用时需要替换
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-    
-    @Provides
-    @Singleton
     fun provideGithubRetrofit(okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl("https://api.github.com/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-    }
-    
-    @Provides
-    @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService {
-        return retrofit.create(ApiService::class.java)
     }
     
     @Provides
@@ -87,10 +70,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTellrawRepository(
-        apiService: ApiService,
         database: AppDatabase
     ): TellrawRepository {
-        return TellrawRepository(apiService, database)
+        return TellrawRepository(database)
     }
     
     @Provides

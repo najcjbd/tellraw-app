@@ -15,10 +15,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.tellraw.app.data.local.CommandHistory
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +41,11 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     
+    // 历史记录状态
+    val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
+    val showHistoryDialog = remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    
     // 设置Context到ViewModel
     LaunchedEffect(context) {
         viewModel.setContext(context)
@@ -55,6 +62,9 @@ fun MainScreen(
         TopAppBar(
             title = { Text("Tellraw命令生成器") },
             actions = {
+                IconButton(onClick = { showHistoryDialog.value = true }) {
+                    Icon(Icons.Default.History, contentDescription = "历史记录")
+                }
                 IconButton(onClick = onNavigateToHelp) {
                     Icon(Icons.Default.Help, contentDescription = "帮助")
                 }
@@ -178,6 +188,26 @@ fun MainScreen(
                 )
             }
         }
+    }
+
+    // 历史记录对话框
+    if (showHistoryDialog.value) {
+        HistoryDialog(
+            historyList = commandHistory,
+            onDismiss = { showHistoryDialog.value = false },
+            onLoadHistory = { history ->
+                viewModel.loadFromHistory(history)
+                showHistoryDialog.value = false
+            },
+            onDeleteHistory = { history ->
+                viewModel.deleteHistoryItem(history)
+            },
+            onClearAll = {
+                viewModel.clearAllHistory()
+                showHistoryDialog.value = false
+            },
+            onSearch = { query -> viewModel.searchHistory(query) }
+        )
     }
 
     // §m§n代码处理对话框
