@@ -690,7 +690,8 @@ object SelectorConverter {
             
             val distanceValue = when {
                 rmValue != null && rValue != null -> rmValue + ".." + rValue
-                            rmValue != null -> rmValue + ".."                rValue != null -> "..$rValue"
+                rmValue != null -> rmValue + ".."
+                rValue != null -> "..$rValue"
                 else -> ""
             }
             
@@ -825,7 +826,8 @@ object SelectorConverter {
             
             val rotationValue = when {
                 minValue != null && maxValue != null -> minValue + ".." + maxValue
-                            minValue != null -> minValue + ".."                maxValue != null -> "..$maxValue"
+                minValue != null -> minValue + ".."
+                maxValue != null -> "..$maxValue"
                 else -> ""
             }
             
