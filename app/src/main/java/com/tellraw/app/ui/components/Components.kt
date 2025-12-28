@@ -53,7 +53,7 @@ fun ColorCodeQuickInput(
                 onClick = { onCodeSelected(code) },
                 label = { 
                     Text(
-                        text = "$code $name",
+                        text = code + " " + name,
                         maxLines = 1
                     ) 
                 },

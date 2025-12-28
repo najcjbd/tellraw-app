@@ -3,6 +3,7 @@ package com.tellraw.app.util
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.tellraw.app.model.TellrawCommand
+import com.tellraw.app.model.MinecraftVersion
 
 object TextFormatter {
     
@@ -404,7 +405,7 @@ object TextFormatter {
         
         // 转换为JSON字符串
         return component.entries.joinToString(",", "{", "}") { (key, value) ->
-            "\"$key\":${if (value is String) "\"$value\"" else value}"
+            "\"" + key + "\":" + if (value is String) "\"" + value + "\"" else value
         }
     }
     
@@ -455,7 +456,7 @@ object TextFormatter {
         val javaCommand = "tellraw $selector $javaMessage"
         
         // 转换为基岩版JSON格式，与Python版本保持一致
-        val bedrockMessage = convertToBedrockJson(processedMessage, useJavaFontStyle)
+        val bedrockMessage = convertToBedrockJson(processedMessage, mNHandling)
         val bedrockCommand = "tellraw $selector $bedrockMessage"
         
         return TellrawCommand(
