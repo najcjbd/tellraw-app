@@ -286,7 +286,7 @@ object TextFormatter {
                         
                     if (formatsMatch) {
                         // 格式相同，合并文本
-                        extraParts[extraParts.size - 1] = lastPart + ("text" to (lastPart["text"] as String + textContent))
+                        extraParts[extraParts.size - 1] = lastPart + ("text" to ((lastPart["text"] as? String) ?: "" + textContent))
                     } else {
                         // 格式不同，添加新部分
                         val newPart = mutableMapOf<String, Any>("text" to textContent)
@@ -295,7 +295,7 @@ object TextFormatter {
                     }
                 } else {
                     // Check if can merge with main text
-                    if (result["text"] as String?.isNotEmpty() == true) {
+                    if ((result["text"] as? String)?.isNotEmpty() == true) {
                         // Check if main text format matches current format
                         val resultKeysFiltered = result.keys.filter { it != "text" }
                         val allFormatKeys = (currentFormat.keys + resultKeysFiltered).toSet()
@@ -305,7 +305,7 @@ object TextFormatter {
                             
                         if (formatsMatch) {
                             // 格式相同，合并到主文本
-                            result["text"] = (result["text"] as String) + textContent
+                            result["text"] = ((result["text"] as? String) ?: "") + textContent
                         } else {
                             // 格式不同，添加到extra部分
                             val newPart = mutableMapOf<String, Any>("text" to textContent)
