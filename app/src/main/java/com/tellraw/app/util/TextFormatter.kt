@@ -1,8 +1,15 @@
 package com.tellraw.app.util
 
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.tellraw.app.model.TellrawCommand
 
 object TextFormatter {
+    
+    // Gson实例，用于JSON序列化，与Python版本保持一致
+    private val gson = GsonBuilder()
+        .disableHtmlEscaping()
+        .create()
     
     // 颜色代码映射表 - Java版到基岩版的对应关系
     private val JAVA_COLORS = mapOf(
@@ -56,6 +63,22 @@ object TextFormatter {
         "§7" to "§7",  // 灰色
         "§8" to "§8",  // 深灰
         "§9" to "§9",  // 蓝色
+    )
+    
+    // 基岩版特有颜色代码 (为了保持向后兼容性)
+    private val BEDROCK_COLORS = mapOf(
+        "§g" to "§6",  // minecoin_gold -> gold
+        "§h" to "§f",  // material_quartz -> white 
+        "§i" to "§7",  // material_iron -> gray
+        "§j" to "§8",  // material_netherite -> dark_gray
+        "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
+        "§n" to "§6",  // material_copper -> gold (特殊处理)
+        "§p" to "§6",  // material_gold -> gold
+        "§q" to "§a",  // material_emerald -> green
+        "§s" to "§b",  // material_diamond -> aqua
+        "§t" to "§1",  // material_lapis -> dark_blue
+        "§u" to "§d",  // material_amethyst -> light_purple
+        "§v" to "§6",  // material_resin -> gold
     )
     
     // 格式代码映射
@@ -183,7 +206,7 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码
-                if (code[1] in "0123456789abcdefghijpqstuv") {
+                if (code[1] in "0123456789abcdefg hijpqs tuv") {
                     // 颜色代码
                     when (code) {
                         "§0" -> currentFormat["color"] = "black"
@@ -258,7 +281,7 @@ object TextFormatter {
                     val lastPartKeysFiltered = lastPart.keys.filter { it != "text" }
                     val allFormatKeys = (currentFormat.keys + lastPartKeysFiltered).toSet()
                     val formatsMatch = allFormatKeys.all { key ->
-                        if (key == "text") true else currentFormat[key] == lastPart[key]
+                        if (key == "text") true else java.util.Objects.equals(currentFormat[key], lastPart[key])
                     }
                         
                     if (formatsMatch) {
@@ -277,7 +300,7 @@ object TextFormatter {
                         val resultKeysFiltered = result.keys.filter { it != "text" }
                         val allFormatKeys = (currentFormat.keys + resultKeysFiltered).toSet()
                         val formatsMatch = allFormatKeys.all { key ->
-                            if (key == "text") true else currentFormat[key] == result[key]
+                            if (key == "text") true else java.util.Objects.equals(currentFormat[key], result[key])
                         }
                             
                         if (formatsMatch) {
@@ -303,52 +326,11 @@ object TextFormatter {
             result["extra"] = extraParts
         }
         
-        // 转换为JSON字符串
-        return mapToJsonString(result)
+        // 转换为JSON字符串，使用Gson确保与Python版本一致
+        return gson.toJson(result)
     }
     
-    /**
-     * 将Map转换为JSON字符串
-     */
-    private fun mapToJsonString(map: Map<String, Any>): String {
-        val jsonBuilder = StringBuilder()
-        
-        fun appendValue(value: Any) {
-            when (value) {
-                is String -> jsonBuilder.append("\"${value.replace("\"", "\\\"")}\"")
-                is Boolean -> jsonBuilder.append(value)
-                is Number -> jsonBuilder.append(value)
-                is List<*> -> {
-                    jsonBuilder.append("[")
-                    value.forEachIndexed { index, item ->
-                        if (index > 0) jsonBuilder.append(",")
-                        appendValue(item ?: "")
-                    }
-                    jsonBuilder.append("]")
-                }
-                is Map<*, *> -> {
-                    jsonBuilder.append("{")
-                    value.entries.forEachIndexed { index, (key, item) ->
-                        if (index > 0) jsonBuilder.append(",")
-                        jsonBuilder.append("\"$key\":")
-                        appendValue(item ?: "")
-                    }
-                    jsonBuilder.append("}")
-                }
-                else -> jsonBuilder.append("\"$value\"")
-            }
-        }
-        
-        jsonBuilder.append("{")
-        map.entries.forEachIndexed { index, (key, value) ->
-            if (index > 0) jsonBuilder.append(",")
-            jsonBuilder.append("\"$key\":")
-            appendValue(value)
-        }
-        jsonBuilder.append("}")
-        
-        return jsonBuilder.toString()
-    }
+    
     
     /**
      * 将文本转换为基岩版tellraw原始文本格式
@@ -361,8 +343,13 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, useJavaFontStyle: Boolean = true): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "color"): String {
         var processedText = text
+        
+        // 首先处理所有基岩版特有颜色代码
+        BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
+            processedText = processedText.replace(bedrockCode, replacement)
+        }
         
         // 使用TEXT_COLOR_CODES处理所有颜色代码
         // 按长度降序排列，确保较长的代码先被处理
@@ -371,18 +358,18 @@ object TextFormatter {
             processedText = processedText.replace(colorCode, replacement)
         }
         
-        // 根据useJavaFontStyle参数处理§m§n代码（如果需要）
-        if (useJavaFontStyle) {
+        // 根据m_n_handling参数处理§m§n代码（如果需要）
+        if (mNHandling == "font") {
             // 基岩版使用默认颜色代码方式
             // 将基岩版特有颜色代码转换为相似的Java版颜色代码
-            TEXT_COLOR_CODES.forEach { (bedrockCode, replacement) ->
+            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
                 if (processedText.contains(bedrockCode)) {
                     processedText = processedText.replace(bedrockCode, replacement)
                 }
             }
-        } else {
+        } else if (mNHandling == "color") {
             // 同样使用颜色代码方式
-            TEXT_COLOR_CODES.forEach { (bedrockCode, replacement) ->
+            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
                 if (processedText.contains(bedrockCode)) {
                     processedText = processedText.replace(bedrockCode, replacement)
                 }
@@ -390,7 +377,8 @@ object TextFormatter {
         }
         
         // 返回rawtext格式，与Python版本保持一致
-        return "{\"rawtext\":[{\"text\":\"$processedText\"}]}"
+        val rawTextMap = mapOf("rawtext" to listOf(mapOf("text" to processedText)))
+        return gson.toJson(rawTextMap)
     }
     
     /**

@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.tellraw.app.data.local.AppDatabase
 import com.tellraw.app.data.remote.ApiService
+import com.tellraw.app.data.remote.GithubApiService
 import com.tellraw.app.data.repository.TellrawRepository
+import com.tellraw.app.data.repository.VersionCheckRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -52,8 +54,24 @@ object AppModule {
     
     @Provides
     @Singleton
+    fun provideGithubRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.github.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+    
+    @Provides
+    @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService {
         return retrofit.create(ApiService::class.java)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideGithubApiService(githubRetrofit: Retrofit): GithubApiService {
+        return githubRetrofit.create(GithubApiService::class.java)
     }
     
     @Provides
@@ -73,5 +91,14 @@ object AppModule {
         database: AppDatabase
     ): TellrawRepository {
         return TellrawRepository(apiService, database)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideVersionCheckRepository(
+        githubApiService: GithubApiService,
+        @ApplicationContext context: Context
+    ): VersionCheckRepository {
+        return VersionCheckRepository(githubApiService, context)
     }
 }

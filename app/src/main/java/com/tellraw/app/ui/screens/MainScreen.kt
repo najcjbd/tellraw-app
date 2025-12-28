@@ -1,5 +1,6 @@
 package com.tellraw.app.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,9 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
@@ -23,6 +26,7 @@ fun MainScreen(
     onNavigateToHelp: () -> Unit,
     viewModel: TellrawViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
     val javaCommand by viewModel.javaCommand.collectAsState()
@@ -32,6 +36,13 @@ fun MainScreen(
     val useJavaFontStyle by viewModel.useJavaFontStyle.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
+    val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
+    
+    // 设置Context到ViewModel
+    LaunchedEffect(context) {
+        viewModel.setContext(context)
+    }
 
     Column(
         modifier = Modifier
@@ -103,28 +114,40 @@ fun MainScreen(
                 OutlinedTextField(
                     value = messageInput,
                     onValueChange = { viewModel.updateMessage(it) },
-                    label = { Text("输入消息内容 (支持颜色代码: §a绿色§r)") },
+                    label = { Text("输入消息文本") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    maxLines = 3
                 )
                 
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
                     onCodeSelected = { code ->
-                        viewModel.updateMessage(messageInput + code)
+                        val currentText = messageInput
+                        viewModel.updateMessage(currentText + code)
                     }
                 )
             }
         }
 
         // 警告信息
-        if (warnings.isNotEmpty()) {
-            WarningCard(warnings = warnings)
+        warnings.forEach { warning ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Text(
+                    text = warning,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
         }
 
-        // 生成结果
+        // 命令结果
         if (javaCommand.isNotEmpty() || bedrockCommand.isNotEmpty()) {
             CommandResults(
                 javaCommand = javaCommand,
@@ -165,6 +188,24 @@ fun MainScreen(
                 viewModel.setUseJavaFontStyle(useJava)
                 viewModel.dismissMNDialog()
             }
+        )
+    }
+    
+    // 更新对话框
+    showUpdateDialog?.let { release ->
+        UpdateDialog(
+            release = release,
+            onDismiss = { viewModel.dismissUpdateDialog() },
+            onOpenUrl = { url -> viewModel.openDownloadUrl(url) },
+            onDisableChecks = { viewModel.showDisableCheckDialog() }
+        )
+    }
+    
+    // 禁用版本检查对话框
+    if (showDisableCheckDialog) {
+        DisableCheckDialog(
+            onConfirm = { viewModel.disableVersionCheck() },
+            onDismiss = { viewModel.dismissDisableCheckDialog() }
         )
     }
 }

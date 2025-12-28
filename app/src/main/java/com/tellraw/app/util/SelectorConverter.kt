@@ -940,29 +940,44 @@ object SelectorConverter {
     
     private fun convertMToGamemode(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
+        
+        // 基岩版游戏模式到Java版的映射
+        val bedrockToJavaGamemode = mapOf(
+            "survival" to "survival",
+            "creative" to "creative",
+            "adventure" to "adventure",
+            "default" to "survival",
+            "s" to "survival",
+            "c" to "creative",
+            "a" to "adventure",
+            "d" to "survival",
+            "0" to "survival",
+            "1" to "creative",
+            "2" to "adventure",
+            "5" to "survival"
+        )
+        
+        // 从m到gamemode的转换（基岩版到Java版）
         val mPattern = "\\bm=(!?)([^,\\]]+)".toRegex()
         
-        val match = mPattern.find(result)
-        if (match != null) {
-            val negation = match.groupValues[1]
-            val mValue = match.groupValues[2]
+        result = result.replace(mPattern) { match ->
+            val negation = match.groupValues[1]  // ! 或空
+            val mValue = match.groupValues[2].trim()
             
-            val gamemodeValue = when (mValue) {
-                "default", "d", "5" -> {
-                    if (negation.isNotEmpty()) {
-                        reminders.add("基岩版反选默认模式(m=!$mValue)在Java版中不支持，已转换为反选生存模式")
-                    } else {
-                        reminders.add("基岩版默认模式(m=$mValue)在Java版中不支持，已转换为生存模式")
-                    }
-                    "survival"
+            // 如果是默认模式，需要提醒用户并转换为生存模式
+            if (mValue == "default" || mValue == "d" || mValue == "5") {
+                if (negation.isNotEmpty()) {
+                    reminders.add("基岩版反选默认模式(m=!$mValue)在Java版中不支持，已转换为反选生存模式")
+                } else {
+                    reminders.add("基岩版默认模式(m=$mValue)在Java版中不支持，已转换为生存模式")
                 }
-                "s", "0" -> "survival"
-                "c", "1" -> "creative"
-                "a", "2" -> "adventure"
-                else -> mValue
+                "gamemode=${negation}survival"
+            } else if (mValue in bedrockToJavaGamemode) {
+                "gamemode=${negation}${bedrockToJavaGamemode[mValue]}"
+            } else {
+                // 保持原值
+                match.value
             }
-            
-            result = result.replace(mPattern, "gamemode=$negation$gamemodeValue")
         }
         
         return result

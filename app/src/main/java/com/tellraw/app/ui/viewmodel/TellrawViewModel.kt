@@ -1,7 +1,14 @@
 package com.tellraw.app.ui.viewmodel
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tellraw.app.data.remote.GithubRelease
+import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.util.SelectorConverter
@@ -14,10 +21,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class TellrawViewModel @Inject constructor() : ViewModel() {
+class TellrawViewModel @Inject constructor(
+    private val versionCheckRepository: VersionCheckRepository
+) : ViewModel() {
     
     private val _selectorInput = MutableStateFlow("")
     val selectorInput: StateFlow<String> = _selectorInput.asStateFlow()
+    
+    // 用于存储Context，在UI层设置
+    private var context: Context? = null
+    
+    /**
+     * 设置Context，由UI层在创建ViewModel后调用
+     */
+    fun setContext(context: Context) {
+        this.context = context
+        // 设置Context后初始化版本检查
+        initializeVersionCheck()
+    }
     
     private val _messageInput = MutableStateFlow("")
     val messageInput: StateFlow<String> = _messageInput.asStateFlow()
@@ -42,6 +63,13 @@ class TellrawViewModel @Inject constructor() : ViewModel() {
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    
+    // 版本检查相关状态
+    private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
+    val showUpdateDialog: StateFlow<GithubRelease?> = _showUpdateDialog.asStateFlow()
+    
+    private val _showDisableCheckDialog = MutableStateFlow(false)
+    val showDisableCheckDialog: StateFlow<Boolean> = _showDisableCheckDialog.asStateFlow()
     
     fun updateSelector(selector: String) {
         _selectorInput.value = selector
@@ -223,18 +251,28 @@ class TellrawViewModel @Inject constructor() : ViewModel() {
         val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
         
         // 转换文本为基岩版JSON格式
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling == "font")
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling)
         return "tellraw $filteredSelector $bedrockJson"
     }
     
     fun copyToClipboard(text: String) {
-        // 这里需要实现复制到剪贴板的功能
-        // 在实际应用中，需要使用Android的ClipboardManager
+        context?.let { ctx ->
+            val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Tellraw Command", text)
+            clipboard.setPrimaryClip(clip)
+        }
     }
     
     fun shareCommand(command: String) {
-        // 这里需要实现分享功能
-        // 在实际应用中，需要使用Android的分享Intent
+        context?.let { ctx ->
+            val shareIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, command)
+                putExtra(Intent.EXTRA_SUBJECT, "Minecraft Tellraw Command")
+            }
+            ctx.startActivity(Intent.createChooser(shareIntent, "分享Tellraw命令"))
+        }
     }
     
     fun clearAll() {
@@ -245,5 +283,87 @@ class TellrawViewModel @Inject constructor() : ViewModel() {
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _useJavaFontStyle.value = true
+    }
+    
+    // 版本检查相关方法
+    
+    /**
+     * 初始化版本检查
+     */
+    private fun initializeVersionCheck() {
+        context?.let { ctx ->
+            // 保存当前版本（从BuildConfig获取）
+            try {
+                val version = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+                versionCheckRepository.saveCurrentVersion(version)
+            } catch (e: Exception) {
+                // 如果获取版本失败，使用默认值
+                versionCheckRepository.saveCurrentVersion("1.0.0")
+            }
+            
+            // 检查更新
+            checkForUpdates()
+        }
+    }
+    
+    /**
+     * 检查更新
+     */
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            val result = versionCheckRepository.checkForUpdates()
+            result.onSuccess { release ->
+                if (release != null) {
+                    _showUpdateDialog.value = release
+                }
+            }
+        }
+    }
+    
+    /**
+     * 打开下载链接
+     */
+    fun openDownloadUrl(url: String) {
+        context?.let { ctx ->
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            ctx.startActivity(intent)
+        }
+    }
+    
+    /**
+     * 关闭更新对话框
+     */
+    fun dismissUpdateDialog() {
+        _showUpdateDialog.value = null
+    }
+    
+    /**
+     * 显示禁用版本检查对话框
+     */
+    fun showDisableCheckDialog() {
+        _showDisableCheckDialog.value = true
+    }
+    
+    /**
+     * 关闭禁用版本检查对话框
+     */
+    fun dismissDisableCheckDialog() {
+        _showDisableCheckDialog.value = false
+    }
+    
+    /**
+     * 禁用版本检查
+     */
+    fun disableVersionCheck() {
+        versionCheckRepository.disableVersionCheck()
+        dismissUpdateDialog()
+        dismissDisableCheckDialog()
+    }
+    
+    /**
+     * 获取版本检查状态
+     */
+    fun isVersionCheckDisabled(): Boolean {
+        return versionCheckRepository.isVersionCheckDisabled()
     }
 }
