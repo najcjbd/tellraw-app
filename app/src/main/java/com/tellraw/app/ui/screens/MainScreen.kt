@@ -44,10 +44,20 @@ fun MainScreen(
     // 用于跟踪光标位置的状态
     val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
     
-    // 当messageInput变化时，更新TextFieldValue
+    // 当messageInput变化时，更新TextFieldValue，但保留光标位置（如果文本长度相同）
     LaunchedEffect(messageInput) {
-        if (messageTextFieldValue.value.text != messageInput) {
-            messageTextFieldValue.value = messageTextFieldValue.value.copy(text = messageInput)
+        val current = messageTextFieldValue.value
+        if (current.text != messageInput) {
+            // 如果文本长度相同，保留光标位置
+            if (current.text.length == messageInput.length) {
+                messageTextFieldValue.value = current.copy(text = messageInput)
+            } else {
+                // 如果文本长度不同，将光标移到末尾
+                messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+                    text = messageInput,
+                    selection = androidx.compose.ui.text.TextRange(messageInput.length)
+                )
+            }
         }
     }
     
@@ -98,7 +108,6 @@ fun MainScreen(
                     value = selectorInput,
                     onValueChange = { viewModel.updateSelector(it) },
                     label = { Text("输入选择器") },
-                    placeholder = { Text("例如: @a, @p, @e[type=player]") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     trailingIcon = {
@@ -138,7 +147,7 @@ fun MainScreen(
                         messageTextFieldValue.value = it
                         viewModel.updateMessage(it.text)
                     },
-                    label = { Text("输入消息文本") },
+                    label = { Text("输入文本") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
