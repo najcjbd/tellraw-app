@@ -109,7 +109,7 @@ class TellrawViewModel @Inject constructor(
         
         // 检测是否包含§m§n代码，但避免频繁弹出对话框
         // 只有在第一次检测到§m§n代码时才弹出对话框
-        if (TextFormatter.containsMNCodes(message) && !hasShownMNDialog && !lastMessageContent.contains("§m") && !lastMessageContent.contains("§n")) {
+        if (TextFormatter.containsMNCodes(message) && !hasShownMNDialog) {
             _showMNDialog.value = true
             hasShownMNDialog = true
         }
@@ -322,14 +322,6 @@ class TellrawViewModel @Inject constructor(
                 _javaCommand.value = result.javaCommand
                 _bedrockCommand.value = result.bedrockCommand
                 _warnings.value = result.warnings
-                
-                // 保存到历史记录
-                tellrawRepository.saveCommandToHistory(
-                    selector = selector,
-                    message = message,
-                    javaCommand = result.javaCommand,
-                    bedrockCommand = result.bedrockCommand
-                )
             } catch (e: Exception) {
                 // 处理可能的异常，防止卡死
                 _warnings.value = listOf("命令生成出错: ${e.message}")

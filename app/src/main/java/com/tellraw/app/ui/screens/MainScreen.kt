@@ -44,23 +44,6 @@ fun MainScreen(
     // 用于跟踪光标位置的状态
     val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
     
-    // 当messageInput变化时，更新TextFieldValue，但保留光标位置（如果文本长度相同）
-    LaunchedEffect(messageInput) {
-        val current = messageTextFieldValue.value
-        if (current.text != messageInput) {
-            // 如果文本长度相同，保留光标位置
-            if (current.text.length == messageInput.length) {
-                messageTextFieldValue.value = current.copy(text = messageInput)
-            } else {
-                // 如果文本长度不同，将光标移到末尾
-                messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
-                    text = messageInput,
-                    selection = androidx.compose.ui.text.TextRange(messageInput.length)
-                )
-            }
-        }
-    }
-    
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }
