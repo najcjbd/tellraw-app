@@ -97,7 +97,7 @@ jobs:
       run: |
         if [ -n "$KEYSTORE_FILE" ]; then
           echo "$KEYSTORE_FILE" | base64 --decode > app/release.keystore
-          ./gradlew assembleRelease -PKEYSTORE_FILE=app/release.keystore -PKEY_ALIAS=$KEY_ALIAS -PKEY_PASSWORD=$KEY_PASSWORD -PSTORE_PASSWORD=$STORE_PASSWORD
+          ./gradlew assembleRelease -PRELEASE_KEYSTORE_FILE=app/release.keystore -PRELEASE_KEY_ALIAS=$KEY_ALIAS -PRELEASE_KEY_PASSWORD=$KEY_PASSWORD -PRELEASE_STORE_PASSWORD=$STORE_PASSWORD
         else
           echo "Warning: No keystore provided, building unsigned release APK"
           ./gradlew assembleRelease

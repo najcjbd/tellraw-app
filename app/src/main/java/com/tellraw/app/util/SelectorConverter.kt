@@ -1237,9 +1237,9 @@ object SelectorConverter {
                 reminders.add("注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
                 nbtResult
             } else {
-                // 转换失败，移除参数并添加提醒
-                reminders.add("hasitem参数转换失败，已移除")
-                ""
+                // 转换失败，保留原始hasitem参数并添加提醒
+                reminders.add("hasitem参数转换失败，保留原始hasitem参数")
+                fullMatch
             }
         }
         

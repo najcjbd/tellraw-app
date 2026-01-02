@@ -454,9 +454,9 @@ def convert_hasitem_to_nbt_with_reminders(params_part):
         if nbt_result:
             return nbt_result
         else:
-            # 转换失败，移除参数并添加提醒
-            reminders.append(f"hasitem参数转换失败，已移除")
-            return ''
+            # 转换失败，保留原始hasitem参数并添加提醒
+            reminders.append(f"hasitem参数转换失败，保留原始hasitem参数")
+            return full_match
     
     params_part = re.sub(complex_pattern, replace_complex_hasitem, params_part)
     
@@ -470,9 +470,9 @@ def convert_hasitem_to_nbt_with_reminders(params_part):
         if nbt_result:
             return nbt_result
         else:
-            # 转换失败，移除参数并添加提醒
-            reminders.append(f"hasitem参数转换失败，已移除")
-            return ''
+            # 转换失败，保留原始hasitem参数并添加提醒
+            reminders.append(f"hasitem参数转换失败，保留原始hasitem参数")
+            return full_match
     
     params_part = re.sub(simple_pattern, replace_simple_hasitem, params_part)
     
