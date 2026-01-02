@@ -44,6 +44,13 @@ fun MainScreen(
     // 用于跟踪光标位置的状态
     val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
     
+    // 当messageInput变化时，同步更新messageTextFieldValue
+    LaunchedEffect(messageInput) {
+        if (messageTextFieldValue.value.text != messageInput) {
+            messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(messageInput)
+        }
+    }
+    
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }

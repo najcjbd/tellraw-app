@@ -122,23 +122,31 @@ class TellrawViewModel @Inject constructor(
      * 检测并计数§m和§n代码的使用
      */
     private fun detectAndCountMNCodes(message: String) {
+        // 统计当前消息中所有的§m和§n数量
+        val currentMCount = countOccurrences(message, "§m")
+        val currentNCount = countOccurrences(message, "§n")
+        
         // 检测新增的§m代码
-        val newMCount = countOccurrences(message, "§m") - countOccurrences(lastMessageContent, "§m")
+        val newMCount = currentMCount - countOccurrences(lastMessageContent, "§m")
         if (newMCount > 0) {
             _mCodeCount.value += newMCount
             // 每次使用§m时添加提醒，不清除之前的提醒
             val newWarnings = _warnings.value.toMutableList()
-            newWarnings.add("提醒：您已使用§m（删除线）格式代码 ${_mCodeCount.value} 次")
+            repeat(newMCount) {
+                newWarnings.add("提醒：您已使用§m（删除线）格式代码 ${_mCodeCount.value - newMCount + it + 1} 次")
+            }
             _warnings.value = newWarnings
         }
         
         // 检测新增的§n代码
-        val newNCount = countOccurrences(message, "§n") - countOccurrences(lastMessageContent, "§n")
+        val newNCount = currentNCount - countOccurrences(lastMessageContent, "§n")
         if (newNCount > 0) {
             _nCodeCount.value += newNCount
             // 每次使用§n时添加提醒，不清除之前的提醒
             val newWarnings = _warnings.value.toMutableList()
-            newWarnings.add("提醒：您已使用§n（下划线）格式代码 ${_nCodeCount.value} 次")
+            repeat(newNCount) {
+                newWarnings.add("提醒：您已使用§n（下划线）格式代码 ${_nCodeCount.value - newNCount + it + 1} 次")
+            }
             _warnings.value = newWarnings
         }
         
@@ -322,8 +330,15 @@ class TellrawViewModel @Inject constructor(
                 _javaCommand.value = result.javaCommand
                 _bedrockCommand.value = result.bedrockCommand
                 _warnings.value = result.warnings
+            } catch (e: IllegalArgumentException) {
+                // 处理未知§组合的异常
+                _javaCommand.value = ""
+                _bedrockCommand.value = ""
+                _warnings.value = listOf(e.message ?: "命令生成出错")
             } catch (e: Exception) {
-                // 处理可能的异常，防止卡死
+                // 处理其他可能的异常，防止卡死
+                _javaCommand.value = ""
+                _bedrockCommand.value = ""
                 _warnings.value = listOf("命令生成出错: ${e.message}")
             } finally {
                 _isLoading.value = false

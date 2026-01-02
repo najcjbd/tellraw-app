@@ -177,15 +177,49 @@ object TextFormatter {
         var currentText = ""
         var currentFormat = mutableMapOf<String, Any>()
         
+        // 已知的§组合
+        val knownCodes = setOf(
+            "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9",
+            "§a", "§b", "§c", "§d", "§e", "§f",
+            "§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v",
+            "§k", "§l", "§m", "§n", "§o", "§r"
+        )
+        
+        // 检测未知的§组合
+        val unknownCodes = mutableSetOf<String>()
+        var i = 0
+        while (i < jsonText.length) {
+            if (jsonText[i] == '§' && i + 1 < jsonText.length) {
+                val code = jsonText.substring(i, i + 2)
+                if (code !in knownCodes) {
+                    unknownCodes.add(code)
+                }
+                i += 2
+            } else if (jsonText[i] == '§') {
+                // 单独的§符号，跳过不处理
+                i++
+            } else {
+                i++
+            }
+        }
+        
+        // 如果有未知的§组合，抛出异常或返回警告
+        if (unknownCodes.isNotEmpty()) {
+            throw IllegalArgumentException("检测到未知的§格式代码: ${unknownCodes.joinToString(", ")}")
+        }
+        
         // 使用正则表达式解析颜色代码和文本
         // 匹配§+字符的模式，然后处理后续的文本
         val tokens = mutableListOf<Pair<String, String>>() // (type, value)
-        var i = 0
+        i = 0
         while (i < jsonText.length) {
             if (jsonText[i] == '§' && i + 1 < jsonText.length) {
                 val code = jsonText.substring(i, i + 2)
                 tokens.add("format_code" to code)
                 i += 2
+            } else if (jsonText[i] == '§') {
+                // 单独的§符号，跳过不处理
+                i++
             } else {
                 // 收集非§开头的文本
                 val start = i
