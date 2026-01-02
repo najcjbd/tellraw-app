@@ -236,8 +236,9 @@ fun MainScreen(
     }
 
     // §m§n代码处理对话框
-    if (showMNDialog) {
+    showMNDialog?.let { codeType ->
         MNCodeDialog(
+            codeType = codeType,
             onDismiss = { viewModel.dismissMNDialog() },
             onUseJavaFontStyle = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)

@@ -80,9 +80,21 @@ jobs:
         name: debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
         
-    - name: Build release APK
+    - name: Build release APK (signed)
       if: github.ref == 'refs/heads/main'
-      run: ./gradlew assembleRelease
+      env:
+        KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+      run: |
+        if [ -n "$KEYSTORE_FILE" ]; then
+          echo "$KEYSTORE_FILE" | base64 --decode > app/release.keystore
+          ./gradlew assembleRelease -PKEYSTORE_FILE=app/release.keystore -PKEY_ALIAS=$KEY_ALIAS -PKEY_PASSWORD=$KEY_PASSWORD -PSTORE_PASSWORD=$STORE_PASSWORD
+        else
+          echo "Warning: No keystore provided, building unsigned release APK"
+          ./gradlew assembleRelease
+        fi
       
     - name: Upload release APK
       if: github.ref == 'refs/heads/main' && success()

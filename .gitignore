@@ -1,1 +1,60 @@
-.gradle
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio
+.idea/
+*.iml
+local.properties
+
+# Keystore files (安全：不要提交到git)
+*.jks
+*.keystore
+app/debug.keystore
+app/release.keystore
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Lint
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+
+# Test results
+test-results/
+*.hprof
+
+# Log files
+*.log
+
+# Navigation
+.navigation/
+
+# Captures
+captures/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Linux
+*~
+
+# Temporary files
+*.tmp
+*.bak
+*.swp

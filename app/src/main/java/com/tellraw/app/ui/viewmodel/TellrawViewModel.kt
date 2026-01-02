@@ -62,8 +62,8 @@ class TellrawViewModel @Inject constructor(
     private val _useJavaFontStyle = MutableStateFlow(true)
     val useJavaFontStyle: StateFlow<Boolean> = _useJavaFontStyle.asStateFlow()
     
-    private val _showMNDialog = MutableStateFlow(false)
-    val showMNDialog: StateFlow<Boolean> = _showMNDialog.asStateFlow()
+    private val _showMNDialog = MutableStateFlow<String?>(null)
+    val showMNDialog: StateFlow<String?> = _showMNDialog.asStateFlow()
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -77,9 +77,6 @@ class TellrawViewModel @Inject constructor(
     
     // 上一次的消息内容，用于检测新增的§m和§n
     private var lastMessageContent = ""
-    
-    // 标记是否已经显示过§m§n对话框
-    private var hasShownMNDialog = false
     
     // 版本检查相关状态
     private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
@@ -107,13 +104,6 @@ class TellrawViewModel @Inject constructor(
         // 检测新增的§m和§n代码
         detectAndCountMNCodes(message)
         
-        // 检测是否包含§m§n代码，但避免频繁弹出对话框
-        // 只有在第一次检测到§m§n代码时才弹出对话框
-        if (TextFormatter.containsMNCodes(message) && !hasShownMNDialog) {
-            _showMNDialog.value = true
-            hasShownMNDialog = true
-        }
-        
         // 始终生成命令，不等待对话框关闭
         generateCommands()
     }
@@ -130,24 +120,16 @@ class TellrawViewModel @Inject constructor(
         val newMCount = currentMCount - countOccurrences(lastMessageContent, "§m")
         if (newMCount > 0) {
             _mCodeCount.value += newMCount
-            // 每次使用§m时添加提醒，不清除之前的提醒
-            val newWarnings = _warnings.value.toMutableList()
-            repeat(newMCount) {
-                newWarnings.add("提醒：您已使用§m（删除线）格式代码 ${_mCodeCount.value - newMCount + it + 1} 次")
-            }
-            _warnings.value = newWarnings
+            // 每次使用§m时弹出单独的提醒对话框
+            _showMNDialog.value = "§m"
         }
         
         // 检测新增的§n代码
         val newNCount = currentNCount - countOccurrences(lastMessageContent, "§n")
         if (newNCount > 0) {
             _nCodeCount.value += newNCount
-            // 每次使用§n时添加提醒，不清除之前的提醒
-            val newWarnings = _warnings.value.toMutableList()
-            repeat(newNCount) {
-                newWarnings.add("提醒：您已使用§n（下划线）格式代码 ${_nCodeCount.value - newNCount + it + 1} 次")
-            }
-            _warnings.value = newWarnings
+            // 每次使用§n时弹出单独的提醒对话框
+            _showMNDialog.value = "§n"
         }
         
         // 更新上一次的消息内容
@@ -178,7 +160,7 @@ class TellrawViewModel @Inject constructor(
     }
     
     fun dismissMNDialog() {
-        _showMNDialog.value = false
+        _showMNDialog.value = null
         generateCommands()
     }
     
@@ -429,8 +411,8 @@ class TellrawViewModel @Inject constructor(
         _nCodeCount.value = 0
         lastMessageContent = ""
         
-        // 重置对话框标志
-        hasShownMNDialog = false
+        // 重置对话框状态
+        _showMNDialog.value = null
     }
     
     // 历史记录管理函数
@@ -483,6 +465,9 @@ class TellrawViewModel @Inject constructor(
         _mCodeCount.value = 0
         _nCodeCount.value = 0
         lastMessageContent = history.message
+        
+        // 重置对话框状态
+        _showMNDialog.value = null
     }
     
     // 搜索历史记录

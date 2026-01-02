@@ -189,16 +189,23 @@ private fun CommandDisplay(
 
 @Composable
 fun MNCodeDialog(
+    codeType: String?,
     onDismiss: () -> Unit,
     onUseJavaFontStyle: (Boolean) -> Unit
 ) {
+    val codeName = when (codeType) {
+        "§m" -> "§m（删除线）"
+        "§n" -> "§n（下划线）"
+        else -> "§m§n"
+    }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("检测到§m§n代码")
+            Text("检测到$codeName 代码")
         },
         text = {
-            Text("""检测到§m§n代码，请选择处理方式：
+            Text("""检测到$codeName 格式代码，请选择处理方式：
 
 1. Java版使用字体方式，基岩版使用颜色代码方式
 2. Java版和基岩版都使用颜色代码方式""")
