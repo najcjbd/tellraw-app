@@ -307,8 +307,49 @@ object SelectorConverter {
         }
         
         // 分割参数，但要处理包含大括号的参数
-        val paramPattern = "([^=,\\{\\}]+=\\{[^{}]*\\}|[^=,\\{\\}]+=[^,\\{\\}]+)".toRegex()
-        val params = paramPattern.findAll(paramsPart).map { it.value }.toList()
+        // 使用更智能的方法来分割参数，避免在{}内部分割（与Python版本一致）
+        val params = mutableListOf<String>()
+        var currentParam = ""
+        var braceCount = 0
+        var inStringValue = false
+        var stringChar = '"'
+
+        for (char in paramsPart) {
+            when {
+                !inStringValue && (char == '"' || char == '\'') -> {
+                    inStringValue = true
+                    stringChar = char
+                    currentParam += char
+                }
+                inStringValue && char == stringChar -> {
+                    inStringValue = false
+                    currentParam += char
+                }
+                !inStringValue && char == '{' -> {
+                    braceCount++
+                    currentParam += char
+                }
+                !inStringValue && char == '}' -> {
+                    braceCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 -> {
+                    // 在最外层遇到逗号，分割参数
+                    if (currentParam.trim().isNotEmpty()) {
+                        params.add(currentParam.trim())
+                    }
+                    currentParam = ""
+                }
+                else -> {
+                    currentParam += char
+                }
+            }
+        }
+
+        // 添加最后一个参数
+        if (currentParam.trim().isNotEmpty()) {
+            params.add(currentParam.trim())
+        }
         
         // 过滤参数并收集提醒信息
         val filteredParams = mutableListOf<String>()
