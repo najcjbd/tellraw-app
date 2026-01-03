@@ -1136,8 +1136,11 @@ object SelectorConverter {
                     result = addParameterToResult(result, "sort=furthest")
                 }
             } else {
-                reminders.add("基岩版c=" + cValue + "参数已转换为Java版limit=" + cValue)
+                reminders.add("基岩版c=" + cValue + "参数已转换为Java版limit=" + cValue + ",sort=nearest")
                 result = result.replace(cPattern, "limit=$cValue")
+                if (!result.contains("sort=")) {
+                    result = addParameterToResult(result, "sort=nearest")
+                }
             }
         }
         
@@ -1161,16 +1164,24 @@ object SelectorConverter {
             
             when (sortValue) {
                 "nearest" -> {
+                    // 当limit=数字,sort=nearest时，基岩版转换为c=数字
+                    // 当只有sort=nearest，没有limit时，基岩版转换为c=9999
                     val cValue = limitValue ?: "9999"
                     result = result.replace(sortPattern, "")
-                    result = result.replace(limitPattern, "")
+                    if (limitValue != null) {
+                        result = result.replace(limitPattern, "")
+                    }
                     result = addParameterToResult(result, "c=$cValue")
                     reminders.add("Java版sort=nearest已转换为基岩版c=" + cValue)
                 }
                 "furthest" -> {
+                    // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
+                    // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
                     val cValue = if (limitValue != null) "-$limitValue" else "-9999"
                     result = result.replace(sortPattern, "")
-                    result = result.replace(limitPattern, "")
+                    if (limitValue != null) {
+                        result = result.replace(limitPattern, "")
+                    }
                     result = addParameterToResult(result, "c=$cValue")
                     reminders.add("Java版sort=furthest已转换为基岩版c=" + cValue)
                 }
@@ -1179,15 +1190,19 @@ object SelectorConverter {
                     reminders.add("Java版sort=arbitrary在基岩版中不支持，已移除")
                 }
                 "random" -> {
+                    // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
+                    // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
                     val cValue = limitValue ?: "9999"
-                    if (selectorVar == "@a") {
-                        reminders.add("Java版@a[sort=random]已转换为基岩版@r")
-                        result = result.replace("@a", "@r")
+                    if (selectorVar == "@a" || selectorVar == "@r") {
+                        reminders.add("Java版" + selectorVar + "[sort=random]已转换为基岩版@r[c=" + cValue + "]")
+                        result = result.replace(selectorVar, "@r")
                     } else {
                         reminders.add("Java版sort=random已转换为基岩版c=" + cValue)
                     }
                     result = result.replace(sortPattern, "")
-                    result = result.replace(limitPattern, "")
+                    if (limitValue != null) {
+                        result = result.replace(limitPattern, "")
+                    }
                     result = addParameterToResult(result, "c=$cValue")
                 }
                 else -> {
@@ -1202,6 +1217,7 @@ object SelectorConverter {
             if (limitMatch != null) {
                 val limitValue = limitMatch.groupValues[1]
                 reminders.add("Java版limit=" + limitValue + "参数已转换为基岩版c=" + limitValue)
+                reminders.add("limit只是限制数量，c当由近到远")
                 result = result.replace(limitPattern, "c=$limitValue")
             }
         }

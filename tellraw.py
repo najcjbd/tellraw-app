@@ -296,8 +296,15 @@ def convert_limit_c_parameters(params_part):
     c_pattern = r'c=([+-]?\d+)'
     def replace_c_to_limit(match):
         c_value = match.group(1)
-        reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={c_value}")
-        return f'limit={c_value}'
+        # 当c=数字时，转换为limit=数字,sort=nearest
+        if not c_value.startswith('-'):
+            reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={c_value},sort=nearest")
+            return f'limit={c_value},sort=nearest'
+        # 当c=-数字时，转换为limit=数字,sort=furthest
+        else:
+            abs_c_val = c_value[1:]  # 移除负号
+            reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={abs_c_val},sort=furthest")
+            return f'limit={abs_c_val},sort=furthest'
     
     params_part = re.sub(c_pattern, replace_c_to_limit, params_part)
     
@@ -319,29 +326,23 @@ def convert_sort_parameters(params_part, selector_var):
         sort_value = match.group(1)
         
         # 查找limit参数（如果存在）
-        # 先查找limit参数，如果不存在再查找c参数
         limit_pattern = r'limit=([+-]?\d+)'
         limit_match = re.search(limit_pattern, params_part)
         limit_value = limit_match.group(1) if limit_match else None
         
-        # 如果没有找到limit参数，查找c参数（可能limit已经被转换为c）
-        c_pattern = r'c=([+-]?\d+)'
-        c_match = re.search(c_pattern, params_part)
-        c_value_from_limit = c_match.group(1) if c_match and not limit_match else None
-        
         # 根据sort值进行转换
         if sort_value == 'nearest':
-            # sort=nearest转换为c=9999（如果有limit则用limit值）
-            c_value = limit_value if limit_value else (c_value_from_limit if c_value_from_limit else '9999')
-            # 移除sort参数
+            # 当limit=数字,sort=nearest时，基岩版转换为c=数字
+            # 当只有sort=nearest，没有limit时，基岩版转换为c=9999
+            c_value = limit_value if limit_value else '9999'
+            # 移除sort参数和limit参数
             params_part = re.sub(sort_pattern, '', params_part)
-            # 添加c参数（替换已有的c参数或添加新的）
+            if limit_value:
+                params_part = re.sub(limit_pattern, '', params_part)
+            # 添加c参数
             if re.search(r'c=[+-]?\d+', params_part):
-                # 如果已有c参数，替换它
                 params_part = re.sub(r'c=[+-]?\d+', f'c={c_value}', params_part)
             else:
-                # 如果没有c参数，添加它
-                # 检查是否有其他参数
                 if params_part.endswith('['):
                     params_part = params_part[:-1] + f'c={c_value}]'
                 elif params_part.endswith(']'):
@@ -350,27 +351,17 @@ def convert_sort_parameters(params_part, selector_var):
                     params_part = params_part + f'c={c_value}'
             reminders.append(f"Java版sort=nearest已转换为基岩版c={c_value}")
         elif sort_value == 'furthest':
-            # sort=furthest转换为c=-9999（如果有limit则用-limit值）
-            if limit_value:
-                c_value = f"-{limit_value}"
-            elif c_value_from_limit:
-                # 如果c值是正数，转换为负数；如果是负数，保持不变
-                try:
-                    c_int = int(c_value_from_limit)
-                    c_value = str(-c_int) if c_int > 0 else str(c_int)
-                except ValueError:
-                    c_value = '-9999'
-            else:
-                c_value = '-9999'
-            # 移除sort参数
+            # 当limit=数字,sort=furthest时，基岩版转换为c=-数字
+            # 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
+            c_value = f"-{limit_value}" if limit_value else '-9999'
+            # 移除sort参数和limit参数
             params_part = re.sub(sort_pattern, '', params_part)
-            # 添加c参数（替换已有的c参数或添加新的）
+            if limit_value:
+                params_part = re.sub(limit_pattern, '', params_part)
+            # 添加c参数
             if re.search(r'c=[+-]?\d+', params_part):
-                # 如果已有c参数，替换它
                 params_part = re.sub(r'c=[+-]?\d+', f'c={c_value}', params_part)
             else:
-                # 如果没有c参数，添加它
-                # 检查是否有其他参数
                 if params_part.endswith('['):
                     params_part = params_part[:-1] + f'c={c_value}]'
                 elif params_part.endswith(']'):
@@ -383,38 +374,36 @@ def convert_sort_parameters(params_part, selector_var):
             params_part = re.sub(sort_pattern, '', params_part)
             reminders.append("Java版sort=arbitrary在基岩版中不支持，已移除")
         elif sort_value == 'random':
-            # "@a"中的sort=random可以改为基岩版的"@r"的c=9999
-            # 如果有limit参数，则使用limit参数的值
-            c_value = limit_value if limit_value else (c_value_from_limit if c_value_from_limit else '9999')
-            if selector_var == '@a':
-                # 对于@a[sort=random,limit=N]，应该转换为@r[c=N]
-                # 移除sort参数
+            # 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
+            # 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
+            c_value = limit_value if limit_value else '9999'
+            if selector_var in ['@a', '@r']:
+                # 对于@a[sort=random]或@r[sort=random]，转换为@r[c=9999]
+                # 移除sort参数和limit参数
                 params_part = re.sub(sort_pattern, '', params_part)
-                # 添加c参数（替换已有的c参数或添加新的）
+                if limit_value:
+                    params_part = re.sub(limit_pattern, '', params_part)
+                # 添加c参数
                 if re.search(r'c=[+-]?\d+', params_part):
-                    # 如果已有c参数，替换它
                     params_part = re.sub(r'c=[+-]?\d+', f'c={c_value}', params_part)
                 else:
-                    # 如果没有c参数，添加它
-                    # 检查是否有其他参数
                     if params_part.endswith('['):
                         params_part = params_part[:-1] + f'c={c_value}]'
                     elif params_part.endswith(']'):
                         params_part = params_part[:-1] + f',c={c_value}]'
                     else:
                         params_part = params_part + f'c={c_value}'
-                reminders.append("Java版@a[sort=random]已转换为基岩版@r")
+                reminders.append(f"Java版{selector_var}[sort=random]已转换为基岩版@r[c={c_value}]")
             else:
                 # 对于其他选择器，如@e[sort=random,limit=N]，转换为@e[c=N]
-                # 移除sort参数
+                # 移除sort参数和limit参数
                 params_part = re.sub(sort_pattern, '', params_part)
-                # 添加c参数（替换已有的c参数或添加新的）
+                if limit_value:
+                    params_part = re.sub(limit_pattern, '', params_part)
+                # 添加c参数
                 if re.search(r'c=[+-]?\d+', params_part):
-                    # 如果已有c参数，替换它
                     params_part = re.sub(r'c=[+-]?\d+', f'c={c_value}', params_part)
                 else:
-                    # 如果没有c参数，添加它
-                    # 检查是否有其他参数
                     if params_part.endswith('['):
                         params_part = params_part[:-1] + f'c={c_value}]'
                     elif params_part.endswith(']'):
@@ -1086,8 +1075,9 @@ def convert_limit_c_between_versions(java_selector, bedrock_selector):
     def replace_limit_to_c(match):
         negation = match.group(1)  # ! 或空
         limit_value = match.group(2).strip()
-        # 提醒信息
+        # 提醒信息：当只有limit=数字时，转换为c=数字，并给出提醒"limit只是限制数量，c当由近到远"
         java_to_bedrock_reminders.append(f"Java版limit={limit_value}参数已转换为基岩版c={limit_value}")
+        java_to_bedrock_reminders.append("limit只是限制数量，c当由近到远")
         return f'c={negation}{limit_value}'
     
     bedrock_converted = re.sub(limit_pattern, replace_limit_to_c, bedrock_converted)
@@ -1097,9 +1087,15 @@ def convert_limit_c_between_versions(java_selector, bedrock_selector):
     def replace_c_to_limit(match):
         negation = match.group(1)  # ! 或空
         c_value = match.group(2).strip()
-        # 提醒信息
-        bedrock_to_java_reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={c_value}")
-        return f'limit={negation}{c_value}'
+        # 当c=数字时，转换为limit=数字,sort=nearest
+        # 当c=-数字时，转换为limit=数字,sort=furthest
+        if not c_value.startswith('-'):
+            bedrock_to_java_reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={c_value},sort=nearest")
+            return f'limit={negation}{c_value},sort=nearest'
+        else:
+            abs_c_val = c_value[1:]  # 移除负号
+            bedrock_to_java_reminders.append(f"基岩版c={c_value}参数已转换为Java版limit={abs_c_val},sort=furthest")
+            return f'limit={negation}{abs_c_val},sort=furthest'
     
     java_converted = re.sub(c_pattern, replace_c_to_limit, java_converted)
     
