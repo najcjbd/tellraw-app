@@ -261,23 +261,9 @@ android {
 }
 ```
 
-## 📋 版本历史
-
-### v1.0.0 (当前版本)
-- ✅ 初始版本发布
-- ✅ 完整实现Python版tellraw.py的所有功能
-- ✅ 支持Java版和基岩版选择器转换
-- ✅ 支持所有颜色代码和格式代码
-- ✅ 实现命令历史记录功能
-- ✅ 添加复制和分享功能
-- ✅ 实现响应式UI设计
-- ✅ 添加颜色代码快速输入器
-
 ### 问题报告
 - 🐛 使用GitHub Issues报告bug
 - 📝 提供详细的重现步骤
-- 📱 包含相关的日志信息
-- 🏷️ 标明Android版本和设备信息
 
 ### 项目地址
 - 🌐 **GitHub仓库**: [najcjbd/tellraw-app](https://github.com/najcjbd/tellraw-app)

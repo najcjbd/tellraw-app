@@ -346,15 +346,30 @@ private fun LandscapeLayout(
             title = { 
                 Text(
                     "Tellraw命令生成器",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.bodyLarge
                 )
             },
+            modifier = Modifier.height(48.dp),
             actions = {
-                IconButton(onClick = { showHistoryDialog.value = true }) {
-                    Icon(Icons.Default.History, contentDescription = "历史记录")
+                IconButton(
+                    onClick = { showHistoryDialog.value = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.History, 
+                        contentDescription = "历史记录",
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                IconButton(onClick = onNavigateToHelp) {
-                    Icon(Icons.Default.Help, contentDescription = "帮助")
+                IconButton(
+                    onClick = onNavigateToHelp,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Help, 
+                        contentDescription = "帮助",
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         )

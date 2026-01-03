@@ -289,20 +289,120 @@ object SelectorConverter {
             // 处理gamemode到m的转换（Java版到基岩版）
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders)
             
-            // 处理sort参数（基岩版不支持）
+            // 处理sort参数和limit参数的联合转换（Java版到基岩版）
             val sortPattern = ",?sort=([^,\\]]+)".toRegex()
-            paramsPart = paramsPart.replace(sortPattern) { match ->
-                val sortValue = match.groupValues[1]
-                conversionReminders.add("Java版sort=" + sortValue + "参数在基岩版中不支持，已移除")
-                ""
-            }
-            
-            // 处理limit到c的转换
             val limitPattern = "limit=([+-]?\\d+)".toRegex()
-            paramsPart = paramsPart.replace(limitPattern) { match ->
-                val limitValue = match.groupValues[1]
-                conversionReminders.add("Java版limit=" + limitValue + "参数已转换为基岩版c=" + limitValue)
-                "c=" + limitValue
+            
+            // 先查找sort和limit参数
+            val sortMatch = sortPattern.find(paramsPart)
+            val limitMatch = limitPattern.find(paramsPart)
+            val sortValue = sortMatch?.groupValues?.get(1)
+            val limitValue = limitMatch?.groupValues?.get(1)
+            
+            if (sortValue != null) {
+                when (sortValue) {
+                    "nearest" -> {
+                        // 当limit=数字,sort=nearest时，基岩版转换为c=数字
+                        // 当只有sort=nearest，没有limit时，基岩版转换为c=9999
+                        val cValue = limitValue ?: "9999"
+                        paramsPart = paramsPart.replace(sortPattern, "")
+                        if (limitValue != null) {
+                            paramsPart = paramsPart.replace(limitPattern, "")
+                        }
+                        // 添加c参数
+                        if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                            paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                        } else {
+                            paramsPart = if (paramsPart.endsWith("[")) {
+                                paramsPart.dropLast(1) + "c=$cValue]"
+                            } else if (paramsPart.endsWith("]")) {
+                                paramsPart.dropLast(1) + ",c=$cValue]"
+                            } else {
+                                paramsPart + "c=$cValue"
+                            }
+                        }
+                        conversionReminders.add("Java版sort=nearest已转换为基岩版c=$cValue")
+                    }
+                    "furthest" -> {
+                        // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
+                        // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
+                        val cValue = if (limitValue != null) "-$limitValue" else "-9999"
+                        paramsPart = paramsPart.replace(sortPattern, "")
+                        if (limitValue != null) {
+                            paramsPart = paramsPart.replace(limitPattern, "")
+                        }
+                        // 添加c参数
+                        if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                            paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                        } else {
+                            paramsPart = if (paramsPart.endsWith("[")) {
+                                paramsPart.dropLast(1) + "c=$cValue]"
+                            } else if (paramsPart.endsWith("]")) {
+                                paramsPart.dropLast(1) + ",c=$cValue]"
+                            } else {
+                                paramsPart + "c=$cValue"
+                            }
+                        }
+                        conversionReminders.add("Java版sort=furthest已转换为基岩版c=$cValue")
+                    }
+                    "arbitrary" -> {
+                        paramsPart = paramsPart.replace(sortPattern, "")
+                        conversionReminders.add("Java版sort=arbitrary在基岩版中不支持，已移除")
+                    }
+                    "random" -> {
+                        // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
+                        // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
+                        val cValue = limitValue ?: "9999"
+                        if (selectorVar == "@a" || selectorVar == "@r") {
+                            paramsPart = paramsPart.replace(sortPattern, "")
+                            if (limitValue != null) {
+                                paramsPart = paramsPart.replace(limitPattern, "")
+                            }
+                            // 添加c参数
+                            if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                                paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                            } else {
+                                paramsPart = if (paramsPart.endsWith("[")) {
+                                    paramsPart.dropLast(1) + "c=$cValue]"
+                                } else if (paramsPart.endsWith("]")) {
+                                    paramsPart.dropLast(1) + ",c=$cValue]"
+                                } else {
+                                    paramsPart + "c=$cValue"
+                                }
+                            }
+                            conversionReminders.add("Java版$selectorVar[sort=random]已转换为基岩版@r[c=$cValue]")
+                        } else {
+                            paramsPart = paramsPart.replace(sortPattern, "")
+                            if (limitValue != null) {
+                                paramsPart = paramsPart.replace(limitPattern, "")
+                            }
+                            // 添加c参数
+                            if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                                paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                            } else {
+                                paramsPart = if (paramsPart.endsWith("[")) {
+                                    paramsPart.dropLast(1) + "c=$cValue]"
+                                } else if (paramsPart.endsWith("]")) {
+                                    paramsPart.dropLast(1) + ",c=$cValue]"
+                                } else {
+                                    paramsPart + "c=$cValue"
+                                }
+                            }
+                            conversionReminders.add("Java版sort=random已转换为基岩版c=$cValue")
+                        }
+                    }
+                    else -> {
+                        paramsPart = paramsPart.replace(sortPattern, "")
+                        conversionReminders.add("Java版sort=$sortValue在基岩版中不支持，已移除")
+                    }
+                }
+            } else {
+                // 没有sort参数，只转换limit
+                if (limitValue != null) {
+                    conversionReminders.add("Java版limit=$limitValue参数已转换为基岩版c=$limitValue")
+                    conversionReminders.add("limit只是限制数量，c当由近到远")
+                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
+                }
             }
         }
         
