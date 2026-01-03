@@ -79,7 +79,6 @@ object TextFormatter {
         "§s" to "§b",  // material_diamond -> aqua
         "§t" to "§1",  // material_lapis -> dark_blue
         "§u" to "§d",  // material_amethyst -> light_purple
-        "§v" to "§6",  # material_resin -> gold
         "§v" to "§6",  // material_resin -> gold
     )
     
