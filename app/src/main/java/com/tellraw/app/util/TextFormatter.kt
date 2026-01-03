@@ -275,7 +275,7 @@ object TextFormatter {
                                 // 在Java版中，§n作为格式化代码是下划线
                                 currentFormat["underlined"] = true
                             } else {
-                                // 在Java版中，§n作为颜色代码是铜色（material_copper），映射到红色
+                                // 在Java版中，§n作为颜色代码是铜色（material_copper），映射到最接近的红色
                                 currentFormat["color"] = "red"
                             }
                         }
@@ -523,6 +523,12 @@ object TextFormatter {
         // 验证选择器
         if (!selector.startsWith("@")) {
             errors.add("选择器必须以@开头")
+        } else {
+            // 验证选择器是否为有效的Minecraft选择器
+            val validSelectors = setOf("@a", "@p", "@r", "@e", "@s")
+            if (selector !in validSelectors) {
+                errors.add("选择器无效，必须是 @a、@p、@r、@e 或 @s 之一")
+            }
         }
         
         // 验证消息格式
