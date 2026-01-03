@@ -1,16 +1,19 @@
 package com.tellraw.app.ui.screens
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,9 @@ fun MainScreen(
     viewModel: TellrawViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
     val javaCommand by viewModel.javaCommand.collectAsState()
@@ -61,6 +67,106 @@ fun MainScreen(
         viewModel.setContext(context)
     }
 
+    // 根据屏幕方向选择布局
+    if (isLandscape) {
+        LandscapeLayout(
+            onNavigateToHelp = onNavigateToHelp,
+            selectorInput = selectorInput,
+            messageInput = messageInput,
+            messageTextFieldValue = messageTextFieldValue,
+            javaCommand = javaCommand,
+            bedrockCommand = bedrockCommand,
+            warnings = warnings,
+            selectorType = selectorType,
+            isLoading = isLoading,
+            showHistoryDialog = showHistoryDialog,
+            commandHistory = commandHistory,
+            viewModel = viewModel
+        )
+    } else {
+        PortraitLayout(
+            onNavigateToHelp = onNavigateToHelp,
+            selectorInput = selectorInput,
+            messageInput = messageInput,
+            messageTextFieldValue = messageTextFieldValue,
+            javaCommand = javaCommand,
+            bedrockCommand = bedrockCommand,
+            warnings = warnings,
+            selectorType = selectorType,
+            isLoading = isLoading,
+            showHistoryDialog = showHistoryDialog,
+            commandHistory = commandHistory,
+            viewModel = viewModel
+        )
+    }
+
+    // 历史记录对话框
+    if (showHistoryDialog.value) {
+        HistoryDialog(
+            historyList = commandHistory,
+            onDismiss = { showHistoryDialog.value = false },
+            onLoadHistory = { history ->
+                viewModel.loadFromHistory(history)
+                showHistoryDialog.value = false
+            },
+            onDeleteHistory = { history ->
+                viewModel.deleteHistoryItem(history)
+            },
+            onClearAll = {
+                viewModel.clearAllHistory()
+                showHistoryDialog.value = false
+            },
+            onSearch = { query -> viewModel.searchHistory(query) }
+        )
+    }
+
+    // §m§n代码处理对话框
+    showMNDialog?.let { codeType ->
+        MNCodeDialog(
+            codeType = codeType,
+            onDismiss = { viewModel.dismissMNDialog() },
+            onUseJavaFontStyle = { useJava ->
+                viewModel.setUseJavaFontStyle(useJava)
+                viewModel.dismissMNDialog()
+            }
+        )
+    }
+    
+    // 更新对话框
+    showUpdateDialog?.let { release ->
+        UpdateDialog(
+            release = release,
+            onDismiss = { viewModel.dismissUpdateDialog() },
+            onOpenUrl = { url -> viewModel.openDownloadUrl(url) },
+            onDisableChecks = { viewModel.showDisableCheckDialog() }
+        )
+    }
+    
+    // 禁用版本检查对话框
+    if (showDisableCheckDialog) {
+        DisableCheckDialog(
+            onConfirm = { viewModel.disableVersionCheck() },
+            onDismiss = { viewModel.dismissDisableCheckDialog() }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PortraitLayout(
+    onNavigateToHelp: () -> Unit,
+    selectorInput: String,
+    messageInput: String,
+    messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
+    javaCommand: String,
+    bedrockCommand: String,
+    warnings: List<String>,
+    selectorType: SelectorType,
+    isLoading: Boolean,
+    showHistoryDialog: MutableState<Boolean>,
+    commandHistory: List<CommandHistory>,
+    viewModel: TellrawViewModel
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -214,54 +320,202 @@ fun MainScreen(
             }
         }
     }
+}
 
-    // 历史记录对话框
-    if (showHistoryDialog.value) {
-        HistoryDialog(
-            historyList = commandHistory,
-            onDismiss = { showHistoryDialog.value = false },
-            onLoadHistory = { history ->
-                viewModel.loadFromHistory(history)
-                showHistoryDialog.value = false
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LandscapeLayout(
+    onNavigateToHelp: () -> Unit,
+    selectorInput: String,
+    messageInput: String,
+    messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
+    javaCommand: String,
+    bedrockCommand: String,
+    warnings: List<String>,
+    selectorType: SelectorType,
+    isLoading: Boolean,
+    showHistoryDialog: MutableState<Boolean>,
+    commandHistory: List<CommandHistory>,
+    viewModel: TellrawViewModel
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // 顶部应用栏（横屏紧凑版）
+        TopAppBar(
+            title = { 
+                Text(
+                    "Tellraw命令生成器",
+                    style = MaterialTheme.typography.titleMedium
+                )
             },
-            onDeleteHistory = { history ->
-                viewModel.deleteHistoryItem(history)
-            },
-            onClearAll = {
-                viewModel.clearAllHistory()
-                showHistoryDialog.value = false
-            },
-            onSearch = { query -> viewModel.searchHistory(query) }
-        )
-    }
-
-    // §m§n代码处理对话框
-    showMNDialog?.let { codeType ->
-        MNCodeDialog(
-            codeType = codeType,
-            onDismiss = { viewModel.dismissMNDialog() },
-            onUseJavaFontStyle = { useJava ->
-                viewModel.setUseJavaFontStyle(useJava)
-                viewModel.dismissMNDialog()
+            actions = {
+                IconButton(onClick = { showHistoryDialog.value = true }) {
+                    Icon(Icons.Default.History, contentDescription = "历史记录")
+                }
+                IconButton(onClick = onNavigateToHelp) {
+                    Icon(Icons.Default.Help, contentDescription = "帮助")
+                }
             }
         )
-    }
-    
-    // 更新对话框
-    showUpdateDialog?.let { release ->
-        UpdateDialog(
-            release = release,
-            onDismiss = { viewModel.dismissUpdateDialog() },
-            onOpenUrl = { url -> viewModel.openDownloadUrl(url) },
-            onDisableChecks = { viewModel.showDisableCheckDialog() }
-        )
-    }
-    
-    // 禁用版本检查对话框
-    if (showDisableCheckDialog) {
-        DisableCheckDialog(
-            onConfirm = { viewModel.disableVersionCheck() },
-            onDismiss = { viewModel.dismissDisableCheckDialog() }
-        )
+
+        // 横屏左右分栏布局
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 左侧：输入区域
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 选择器输入区域
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "目标选择器",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        
+                        OutlinedTextField(
+                            value = selectorInput,
+                            onValueChange = { viewModel.updateSelector(it) },
+                            label = { Text("输入选择器") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            trailingIcon = {
+                                if (selectorType != SelectorType.UNIVERSAL) {
+                                    SelectorTypeBadge(type = selectorType)
+                                }
+                            }
+                        )
+                        
+                        // 选择器类型提示
+                        if (selectorType != SelectorType.UNIVERSAL) {
+                            Text(
+                                text = "检测到${if (selectorType == SelectorType.JAVA) "Java版" else "基岩版"}选择器",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // 消息输入区域
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "文本消息",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        
+                        OutlinedTextField(
+                            value = messageTextFieldValue.value,
+                            onValueChange = { 
+                                messageTextFieldValue.value = it
+                                viewModel.updateMessage(it.text)
+                            },
+                            label = { Text("输入文本") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            maxLines = 5
+                        )
+                        
+                        // 颜色代码快速输入
+                        ColorCodeQuickInput(
+                            onCodeSelected = { code ->
+                                val currentValue = messageTextFieldValue.value
+                                val cursorPosition = currentValue.selection.start
+                                val textBeforeCursor = currentValue.text.substring(0, cursorPosition)
+                                val textAfterCursor = currentValue.text.substring(cursorPosition)
+                                val newText = textBeforeCursor + code + textAfterCursor
+                                val newCursorPosition = cursorPosition + code.length
+                                
+                                val newTextFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = newText,
+                                    selection = androidx.compose.ui.text.TextRange(newCursorPosition)
+                                )
+                                
+                                messageTextFieldValue.value = newTextFieldValue
+                                viewModel.updateMessage(newText)
+                            }
+                        )
+                    }
+                }
+
+                // 操作按钮
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.clearAll() },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("清空")
+                    }
+                    
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
+            }
+
+            // 右侧：输出区域
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 警告信息
+                warnings.forEach { warning ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = warning,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                // 命令结果
+                if (javaCommand.isNotEmpty() || bedrockCommand.isNotEmpty()) {
+                    CommandResults(
+                        javaCommand = javaCommand,
+                        bedrockCommand = bedrockCommand,
+                        onCopyJava = { viewModel.copyToClipboard(javaCommand) },
+                        onCopyBedrock = { viewModel.copyToClipboard(bedrockCommand) },
+                        onShareJava = { viewModel.shareCommand(javaCommand) },
+                        onShareBedrock = { viewModel.shareCommand(bedrockCommand) }
+                    )
+                }
+            }
+        }
     }
 }

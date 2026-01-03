@@ -36,11 +36,11 @@ object TextFormatter {
     private val TEXT_COLOR_CODES = mapOf(
         // 基岩版特有颜色代码（映射到标准代码）
         "§g" to "§6",  // 基岩版minecoin_gold -> 金色
-        "§h" to "§f",  // 基岩版material_quartz -> 白色 
+        "§h" to "§f",  // 基岩版material_quartz -> 白色
         "§i" to "§7",  // 基岩版material_iron -> 灰色
         "§j" to "§8",  // 基岩版material_netherite -> 深灰色
         "§m" to "§4",  // 基岩版material_redstone -> 深红色 (特殊处理)
-        "§n" to "§6",  // 基岩版material_copper -> 金色 (特殊处理)
+        "§n" to "§c",  // 基岩版material_copper -> 红色 (特殊处理)
         "§p" to "§6",  // 基岩版material_gold -> 金色
         "§q" to "§a",  // 基岩版material_emerald -> 绿色
         "§s" to "§b",  // 基岩版material_diamond -> 青色
@@ -69,16 +69,17 @@ object TextFormatter {
     // 基岩版特有颜色代码 (为了保持向后兼容性)
     private val BEDROCK_COLORS = mapOf(
         "§g" to "§6",  // minecoin_gold -> gold
-        "§h" to "§f",  // material_quartz -> white 
+        "§h" to "§f",  // material_quartz -> white
         "§i" to "§7",  // material_iron -> gray
         "§j" to "§8",  // material_netherite -> dark_gray
         "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
-        "§n" to "§6",  // material_copper -> gold (特殊处理)
+        "§n" to "§c",  // material_copper -> red (特殊处理)
         "§p" to "§6",  // material_gold -> gold
         "§q" to "§a",  // material_emerald -> green
         "§s" to "§b",  // material_diamond -> aqua
         "§t" to "§1",  // material_lapis -> dark_blue
         "§u" to "§d",  // material_amethyst -> light_purple
+        "§v" to "§6",  # material_resin -> gold
         "§v" to "§6",  // material_resin -> gold
     )
     
@@ -107,23 +108,19 @@ object TextFormatter {
      */
     fun processMNCodes(text: String, useJavaFontStyle: Boolean): Pair<String, List<String>> {
         val warnings = mutableListOf<String>()
-        var processedText = text
         
         if (containsMNCodes(text)) {
             if (useJavaFontStyle) {
-                // Java版使用字体方式，基岩版使用颜色代码方式
+                // Java版使用字体方式（删除线/下划线），基岩版使用颜色代码方式（深红色/铜色）
                 warnings.add("Java版使用字体方式，基岩版使用颜色代码方式")
-                // 不修改原始文本，保留§m§n代码，在转换时处理
             } else {
                 // Java版和基岩版都使用颜色代码方式
                 warnings.add("Java版和基岩版都使用颜色代码方式")
-                // 将§m§n转换为对应的颜色代码
-                processedText = processedText.replace("§m", "§4") // strikethrough -> dark_red
-                processedText = processedText.replace("§n", "§6") // underline -> gold
             }
+            // 不修改原始文本，保留§m§n代码，在convertToJavaJson和convertToBedrockJson中根据mNHandling参数处理
         }
         
-        return processedText to warnings
+        return text to warnings
     }
     
     /**
@@ -266,19 +263,21 @@ object TextFormatter {
                         "§i" -> currentFormat["color"] = "gray"  // material_iron
                         "§j" -> currentFormat["color"] = "dark_gray"  // material_netherite
                         "§m" -> {
-                            if (mNHandling == "color") {
-                                currentFormat["color"] = "dark_red"  // material_redstone
-                            } else {
-                                // 在Java版中，§m是删除线格式
+                            if (mNHandling == "font") {
+                                // 在Java版中，§m作为格式化代码是删除线
                                 currentFormat["strikethrough"] = true
+                            } else {
+                                // 在Java版中，§m作为颜色代码是深红色（material_redstone）
+                                currentFormat["color"] = "dark_red"
                             }
                         }
                         "§n" -> {
-                            if (mNHandling == "color") {
-                                currentFormat["color"] = "gold"  // material_copper
-                            } else {
-                                // 在Java版中，§n是下划线格式
+                            if (mNHandling == "font") {
+                                // 在Java版中，§n作为格式化代码是下划线
                                 currentFormat["underlined"] = true
+                            } else {
+                                // 在Java版中，§n作为颜色代码是铜色（material_copper），映射到红色
+                                currentFormat["color"] = "red"
                             }
                         }
                         "§p" -> currentFormat["color"] = "gold"  // material_gold
@@ -381,34 +380,36 @@ object TextFormatter {
     fun convertToBedrockJson(text: String, mNHandling: String = "color"): String {
         var processedText = text
         
-        // 首先处理所有基岩版特有颜色代码
-        BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
-            processedText = processedText.replace(bedrockCode, replacement)
-        }
-        
-        // 使用TEXT_COLOR_CODES处理所有颜色代码
-        // 按长度降序排列，确保较长的代码先被处理
-        val sortedCodes = TEXT_COLOR_CODES.entries.sortedByDescending { it.key.length }
-        sortedCodes.forEach { (colorCode, replacement) ->
-            processedText = processedText.replace(colorCode, replacement)
-        }
-        
-        // 根据m_n_handling参数处理§m§n代码（如果需要）
+        // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
+        // 根据mNHandling参数决定是否保留原始颜色代码
         if (mNHandling == "font") {
-            // 基岩版使用默认颜色代码方式
-            // 将基岩版特有颜色代码转换为相似的Java版颜色代码
-            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
-                if (processedText.contains(bedrockCode)) {
-                    processedText = processedText.replace(bedrockCode, replacement)
-                }
-            }
+            // Java版使用字体方式，基岩版使用颜色代码方式
+            // 保留§m/§n作为基岩版特有颜色代码
+            // §m -> material_redstone (深红色)
+            // §n -> material_copper (铜色)
         } else if (mNHandling == "color") {
-            // 同样使用颜色代码方式
-            BEDROCK_COLORS.forEach { (bedrockCode, replacement) ->
-                if (processedText.contains(bedrockCode)) {
-                    processedText = processedText.replace(bedrockCode, replacement)
-                }
-            }
+            // Java版和基岩版都使用颜色代码方式
+            // 将§m/§n转换为标准颜色代码
+            processedText = processedText.replace("§m", "§4") // material_redstone -> dark_red
+            processedText = processedText.replace("§n", "§c") // material_copper -> red
+        }
+        
+        // 处理其他基岩版特有颜色代码
+        val bedrockSpecificCodes = mapOf(
+            "§g" to "§6",  // minecoin_gold -> gold
+            "§h" to "§f",  // material_quartz -> white
+            "§i" to "§7",  // material_iron -> gray
+            "§j" to "§8",  // material_netherite -> dark_gray
+            "§p" to "§6",  // material_gold -> gold
+            "§q" to "§a",  // material_emerald -> green
+            "§s" to "§b",  // material_diamond -> aqua
+            "§t" to "§1",  // material_lapis -> dark_blue
+            "§u" to "§d",  // material_amethyst -> light_purple
+            "§v" to "§6"   // material_resin -> gold
+        )
+        
+        bedrockSpecificCodes.forEach { (bedrockCode, replacement) ->
+            processedText = processedText.replace(bedrockCode, replacement)
         }
         
         // 返回rawtext格式，与Python版本保持一致
