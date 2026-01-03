@@ -446,7 +446,7 @@ object TextFormatter {
     /**
      * 获取颜色名称
      */
-    private fun getColorName(colorCode: String): String {
+    internal fun getColorName(colorCode: String): String {
         val colorNames = mapOf(
             "§0" to "black",
             "§1" to "dark_blue",

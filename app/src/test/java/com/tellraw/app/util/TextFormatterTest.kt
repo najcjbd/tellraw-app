@@ -429,7 +429,7 @@ class TextFormatterTest {
         )
 
         testCases.forEach { (code, expectedColor) ->
-            val json = TextFormatter.convertToJavaJson("$code测试文本", "color")
+            val json = TextFormatter.convertToJavaJson(code + "测试文本", "color")
             println("代码: $code -> 颜色: $expectedColor")
             assertTrue("JSON应该包含$expectedColor", json.contains(expectedColor))
         }
