@@ -237,7 +237,7 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码
-                if (code[1] in "0123456789abcdefg hijpqs tuv") {
+                if (code[1] in "0123456789abcdefghijklmnpqrs tuv") {
                     // 颜色代码
                     when (code) {
                         "§0" -> currentFormat["color"] = "black"
@@ -572,6 +572,7 @@ object TextFormatter {
             }
         }
         
-        return braceCount == 0 && bracketCount == 0 && !inString
+        // 检查括号是否平衡，以及字符串是否正确闭合
+        return braceCount == 0 && bracketCount == 0 && !inString && !escapeNext
     }
 }
