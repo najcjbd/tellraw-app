@@ -285,20 +285,20 @@ object SelectorConverter {
             paramsPart = convertDistanceParameters(paramsPart, conversionReminders)
             paramsPart = convertRotationParameters(paramsPart, conversionReminders)
             paramsPart = convertLevelParameters(paramsPart, conversionReminders)
-            
+
             // 处理gamemode到m的转换（Java版到基岩版）
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders)
-            
+
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
             val sortPattern = ",?sort=([^,\\]]+)".toRegex()
             val limitPattern = "limit=([+-]?\\d+)".toRegex()
-            
+
             // 先查找sort和limit参数
             val sortMatch = sortPattern.find(paramsPart)
             val limitMatch = limitPattern.find(paramsPart)
-            val sortValue = sortMatch?.groupValues?.get(1)
-            val limitValue = limitMatch?.groupValues?.get(1)
-            
+            val sortValue: String? = sortMatch?.groupValues?.get(1)
+            val limitValue: String? = limitMatch?.groupValues?.get(1)
+
             if (sortValue != null) {
                 when (sortValue) {
                     "nearest" -> {
@@ -1249,19 +1249,19 @@ object SelectorConverter {
     
     private fun convertLimitSortToC(paramsPart: String, selectorVar: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        
+
         // 处理sort参数
         val sortPattern = "\\bsort=([^,\\]]+)".toRegex()
         val sortMatch = sortPattern.find(result)
-        
+
         if (sortMatch != null) {
-            val sortValue = sortMatch.groupValues[1]
-            
+            val sortValue: String = sortMatch.groupValues[1]
+
             // 查找limit参数
             val limitPattern = "\\blimit=([+-]?\\d+)".toRegex()
             val limitMatch = limitPattern.find(result)
-            val limitValue = limitMatch?.groupValues?.get(1)
-            
+            val limitValue: String? = limitMatch?.groupValues?.get(1)
+
             when (sortValue) {
                 "nearest" -> {
                     // 当limit=数字,sort=nearest时，基岩版转换为c=数字
