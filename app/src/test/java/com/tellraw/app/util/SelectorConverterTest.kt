@@ -349,6 +349,19 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun `test sortAndLimitConversion - sort=furthest without limit`() {
+        // 测试sort=furthest without limit
+        val result = SelectorConverter.filterSelectorParameters(
+            "@a[sort=furthest]",
+            SelectorType.BEDROCK
+        )
+        
+        // sort=furthest应该转换为c=-9999
+        assertTrue(result.first.contains("c=-9999"))
+        assertFalse(result.first.contains("sort"))
+    }
+
+    @Test
     fun `test sortAndLimitConversion - sort=random with limit`() {
         // 测试sort=random with limit
         val result = SelectorConverter.filterSelectorParameters(
@@ -360,6 +373,19 @@ class SelectorConverterTest {
         assertTrue(result.first.contains("c=5"))
         assertFalse(result.first.contains("sort"))
         assertFalse(result.first.contains("limit"))
+    }
+
+    @Test
+    fun `test sortAndLimitConversion - sort=random without limit`() {
+        // 测试sort=random without limit
+        val result = SelectorConverter.filterSelectorParameters(
+            "@a[sort=random]",
+            SelectorType.BEDROCK
+        )
+        
+        // sort=random应该转换为c=9999
+        assertTrue(result.first.contains("c=9999"))
+        assertFalse(result.first.contains("sort"))
     }
 
     @Test
