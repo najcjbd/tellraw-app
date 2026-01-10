@@ -405,6 +405,14 @@ object SelectorConverter {
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
+        } else if (targetVersion == SelectorType.JAVA) {
+            // 基岩版到Java版的参数转换
+            paramsPart = convertR_RmToDistance(paramsPart, conversionReminders)
+            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders)
+            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders)
+            paramsPart = convertL_LmToLevel(paramsPart, conversionReminders)
+            paramsPart = convertMToGamemode(paramsPart, conversionReminders)
+            paramsPart = convertCToLimitSort(paramsPart, conversionReminders)
         }
         
         // 分割参数，但要处理包含大括号的参数
@@ -910,7 +918,7 @@ object SelectorConverter {
                     val parts = distanceValue.split("..")
                     val rm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
                     val r = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    r to rm
+                    rm to r
                 }
                 distanceValue.startsWith("..") -> {
                     distanceValue.substring(2) to null
@@ -994,41 +1002,83 @@ object SelectorConverter {
     ): String {
         var result = paramsPart
         
-        val minPattern = "\\b$minParam=([^,\\]]+)".toRegex()
-        val maxPattern = "\\b$maxParam=([^,\\]]+)".toRegex()
-        
-        val minMatch = minPattern.find(result)
-        val maxMatch = maxPattern.find(result)
-        
-        if (minMatch != null || maxMatch != null) {
-            val minValue = minMatch?.groupValues?.get(1)
-            val maxValue = maxMatch?.groupValues?.get(1)
+        if (toJava) {
+            // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
+            val minPattern = "\\b$minParam=([^,\\]]+)".toRegex()
+            val maxPattern = "\\b$maxParam=([^,\\]]+)".toRegex()
             
-            val rotationValue = when {
-                minValue != null && maxValue != null -> minValue + ".." + maxValue
-                minValue != null -> minValue + ".."
-                maxValue != null -> "..$maxValue"
-                else -> ""
+            val minMatch = minPattern.find(result)
+            val maxMatch = maxPattern.find(result)
+            
+            if (minMatch != null || maxMatch != null) {
+                val minValue = minMatch?.groupValues?.get(1)
+                val maxValue = maxMatch?.groupValues?.get(1)
+                
+                val rotationValue = when {
+                    minValue != null && maxValue != null -> minValue + ".." + maxValue
+                    minValue != null -> minValue + ".."
+                    maxValue != null -> "..$maxValue"
+                    else -> ""
+                }
+                
+                if (rotationValue.isNotEmpty()) {
+                    when {
+                        minValue != null && maxValue != null -> 
+                            reminders.add("基岩版" + minParam + "=" + minValue + "," + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                        minValue != null -> 
+                            reminders.add("基岩版" + minParam + "=" + minValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                        maxValue != null -> 
+                            reminders.add("基岩版" + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                    }
+                    
+                    // 移除原有参数
+                    result = result.replace(minPattern, "")
+                    result = result.replace(maxPattern, "")
+                    
+                    // 添加新参数
+                    result = addParameterToResult(result, paramName + "=" + rotationValue)
+                }
             }
+        } else {
+            // 从Java版转基岩版：将 paramName 拆分为 minParam 和 maxParam
+            val paramPattern = "\\b$paramName=([^,\\]]+)".toRegex()
+            val paramMatch = paramPattern.find(result)
             
-            if (rotationValue.isNotEmpty()) {
-                val fromParam = if (toJava) minParam + "/" + maxParam else paramName
-                        val toParam = if (toJava) paramName else minParam + "/" + maxParam                
+            if (paramMatch != null) {
+                val paramValue = paramMatch.groupValues[1]
+                
+                // 解析范围值
+                val rotationParts = if (".." in paramValue) {
+                    paramValue.split("..")
+                } else {
+                    listOf(paramValue, paramValue)
+                }
+                
+                val minValue = rotationParts.getOrNull(0)?.takeIf { it.isNotEmpty() }
+                val maxValue = rotationParts.getOrNull(1)?.takeIf { it.isNotEmpty() }
+                
+                // 添加提醒信息
                 when {
                     minValue != null && maxValue != null -> 
-                        reminders.add("基岩版" + minParam + "=" + minValue + "," + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + minParam + "=" + minValue + "," + maxParam + "=" + maxValue)
                     minValue != null -> 
-                        reminders.add("基岩版" + minParam + "=" + minValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + minParam + "=" + minValue)
                     maxValue != null -> 
-                        reminders.add("基岩版" + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + maxParam + "=" + maxValue)
                 }
                 
                 // 移除原有参数
-                result = result.replace(minPattern, "")
-                result = result.replace(maxPattern, "")
+                result = result.replace(paramPattern, "")
                 
                 // 添加新参数
-                result = addParameterToResult(result, paramName + "=" + rotationValue)
+                if (minValue != null && maxValue != null) {
+                    result = addParameterToResult(result, minParam + "=" + minValue)
+                    result = addParameterToResult(result, maxParam + "=" + maxValue)
+                } else if (minValue != null) {
+                    result = addParameterToResult(result, minParam + "=" + minValue)
+                } else if (maxValue != null) {
+                    result = addParameterToResult(result, maxParam + "=" + maxValue)
+                }
             }
         }
         
@@ -1089,7 +1139,7 @@ object SelectorConverter {
                     val parts = levelValue.split("..")
                     val lm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
                     val l = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    l to lm
+                    lm to l
                 }
                 levelValue.startsWith("..") -> {
                     levelValue.substring(2) to null
@@ -1329,8 +1379,6 @@ object SelectorConverter {
     }
     
     private fun addParameterToResult(paramsPart: String, newParam: String): String {
-        val result = StringBuilder()
-        
         if (paramsPart.isEmpty()) {
             return newParam
         }
@@ -1338,27 +1386,14 @@ object SelectorConverter {
         // 清理参数
         var cleanParams = paramsPart
         cleanParams = cleanParams.replace(",,", ",")
-        cleanParams = cleanParams.replace("\\[,".toRegex(), "[")
-        cleanParams = cleanParams.replace(",\\]".toRegex(), "]")
-        cleanParams = cleanParams.replace("\\[\\]".toRegex(), "")
+        cleanParams = cleanParams.replace("^,".toRegex(), "")
+        cleanParams = cleanParams.replace(",$".toRegex(), "")
         
         if (cleanParams.isEmpty()) {
             return newParam
         }
         
-        if (cleanParams.endsWith("[")) {
-            result.append(cleanParams.dropLast(1))
-            result.append(newParam)
-            result.append("]")
-        } else if (cleanParams.endsWith("]")) {
-            result.append(cleanParams.dropLast(1))
-            result.append(",$newParam]")
-        } else {
-            result.append(cleanParams)
-            result.append(",$newParam]")
-        }
-        
-        return result.toString()
+        return cleanParams + "," + newParam
     }
     
     // hasitem和nbt转换的完善实现，与Python版本一致
