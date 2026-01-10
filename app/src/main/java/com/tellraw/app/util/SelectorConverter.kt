@@ -918,13 +918,13 @@ object SelectorConverter {
                     val parts = distanceValue.split("..")
                     val rm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
                     val r = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    rm to r
+                    r to rm
                 }
                 distanceValue.startsWith("..") -> {
-                    distanceValue.substring(2) to null
+                    null to distanceValue.substring(2)
                 }
                 distanceValue.endsWith("..") -> {
-                    null to distanceValue.substring(0, distanceValue.length - 2)
+                    distanceValue.substring(0, distanceValue.length - 2) to null
                 }
                 else -> {
                     distanceValue to distanceValue
@@ -963,9 +963,9 @@ object SelectorConverter {
     private fun convertXRotationToRx_Rxm(paramsPart: String, reminders: MutableList<String>): String {
         return convertRotationParameter(
             paramsPart = paramsPart,
-            paramName = "rx",
-            minParam = "x_rotation",
-            maxParam = "x_rotation",
+            paramName = "x_rotation",
+            minParam = "rxm",
+            maxParam = "rx",
             reminders = reminders,
             toJava = false
         )
@@ -984,9 +984,9 @@ object SelectorConverter {
     private fun convertYRotationToRy_Rym(paramsPart: String, reminders: MutableList<String>): String {
         return convertRotationParameter(
             paramsPart = paramsPart,
-            paramName = "ry",
-            minParam = "y_rotation",
-            maxParam = "y_rotation",
+            paramName = "y_rotation",
+            minParam = "rym",
+            maxParam = "ry",
             reminders = reminders,
             toJava = false
         )
@@ -1139,13 +1139,13 @@ object SelectorConverter {
                     val parts = levelValue.split("..")
                     val lm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
                     val l = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    lm to l
+                    l to lm
                 }
                 levelValue.startsWith("..") -> {
-                    levelValue.substring(2) to null
+                    null to levelValue.substring(2)
                 }
                 levelValue.endsWith("..") -> {
-                    null to levelValue.substring(0, levelValue.length - 2)
+                    levelValue.substring(0, levelValue.length - 2) to null
                 }
                 else -> {
                     levelValue to levelValue

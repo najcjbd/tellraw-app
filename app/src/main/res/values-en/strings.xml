@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tellraw Generator</string>
+    
+    <!-- Main Interface -->
+    <string name="selector_input_hint">Enter selector (e.g., @a, @p, @e[type=player])</string>
+    <string name="message_input_hint">Enter message (supports color codes: §agreen§r)</string>
+    <string name="generate_command">Generate</string>
+    <string name="clear_all">Clear</string>
+    <string name="copy_java">Copy Java</string>
+    <string name="copy_bedrock">Copy Bedrock</string>
+    <string name="share_java">Share Java</string>
+    <string name="share_bedrock">Share Bedrock</string>
+    
+    <!-- Selector Types -->
+    <string name="selector_type_java">Java</string>
+    <string name="selector_type_bedrock">Bedrock</string>
+    <string name="selector_type_universal">Universal</string>
+    <string name="detected_selector_type">Detected %s selector</string>
+    
+    <!-- Command Results -->
+    <string name="java_command">Java Edition</string>
+    <string name="bedrock_command">Bedrock Edition</string>
+    <string name="generated_commands">Generated Commands</string>
+    
+    <!-- Warnings and Tips -->
+    <string name="conversion_warnings">Warnings</string>
+    <string name="mn_code_detected">§m§n code found</string>
+    <string name="mn_code_dialog_message">§m§n code found. Choose how to handle:
+
+1. Java: font style, Bedrock: color codes
+2. Both: color codes</string>
+    <string name="mn_code_option_1">Option 1</string>
+    <string name="mn_code_option_2">Option 2</string>
+    
+    <!-- Color Codes -->
+    <string name="color_black">Black</string>
+    <string name="color_dark_blue">Dark Blue</string>
+    <string name="color_dark_green">Dark Green</string>
+    <string name="color_dark_aqua">Dark Aqua</string>
+    <string name="color_dark_red">Dark Red</string>
+    <string name="color_dark_purple">Dark Purple</string>
+    <string name="color_gold">Gold</string>
+    <string name="color_gray">Gray</string>
+    <string name="color_dark_gray">Dark Gray</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_green">Green</string>
+    <string name="color_aqua">Aqua</string>
+    <string name="color_red">Red</string>
+    <string name="color_light_purple">Light Purple</string>
+    <string name="color_yellow">Yellow</string>
+    <string name="color_white">White</string>
+    
+    <!-- Format Codes -->
+    <string name="format_bold">Bold</string>
+    <string name="format_strikethrough">Strike</string>
+    <string name="format_underline">Underline</string>
+    <string name="format_italic">Italic</string>
+    <string name="format_obfuscated">Random</string>
+    <string name="format_reset">Reset</string>
+    
+    <!-- Help Interface -->
+    <string name="help_title">Help</string>
+    <string name="help_about">About</string>
+    <string name="help_about_content">Tellraw Command Generator helps Minecraft players create tellraw commands.
+
+Supports Java and Bedrock selector conversion, and text formatting.</string>
+    <string name="help_selector_input">Selectors</string>
+    <string name="help_selector_content">Selectors pick command targets:
+
+• @a - All players
+• @p - Nearest player
+• @r - Random player
+• @e - All entities
+• @s - Command executor
+
+Use filters like:
+• @a[gamemode=survival] - All survival players
+• @e[type=cow] - All cows
+• @p[distance=..10] - Nearest player in 10 blocks</string>
+    <string name="help_text_formatting">Text Colors</string>
+    <string name="help_text_formatting_content">Use Minecraft color and format codes:
+
+Colors:
+• §0 - Black    §1 - Dark Blue   §2 - Dark Green
+• §3 - Dark Aqua §4 - Dark Red    §5 - Dark Purple
+• §6 - Gold     §7 - Gray        §8 - Dark Gray
+• §9 - Blue     §a - Green       §b - Aqua
+• §c - Red      §d - Light Purple §e - Yellow
+• §f - White
+
+Formats:
+• §l - Bold     §m - Strike      §n - Underline
+• §o - Italic   §k - Random      §r - Reset</string>
+    <string name="help_version_differences">Version Differences</string>
+    <string name="help_version_differences_content">Java and Bedrock use different selectors:
+
+• Java: distance, Bedrock: r/rm
+• Java: gamemode, Bedrock: m
+• Java: nbt, Bedrock: hasitem
+
+Text formats:
+• §m§n codes work differently
+• Some colors have special meanings in Bedrock</string>
+    <string name="help_usage_tips">How to Use</string>
+    <string name="help_usage_tips_content">1. Enter selector and message
+2. App detects selector type
+3. Generate Java and Bedrock commands
+4. Copy or share commands
+
+For §m§n codes:
+• Font style: Java keeps format, Bedrock uses colors
+• Color style: Both use colors</string>
+    <string name="help_conversion_warning">Selector conversion is not perfect. Check manually.</string>
+    
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="help">Help</string>
+    <string name="copy">Copy</string>
+    <string name="share">Share</string>
+    <string name="copied_to_clipboard">Copied</string>
+    <string name="error">Error</string>
+    <string name="loading">Loading...</string>
+</resources>
