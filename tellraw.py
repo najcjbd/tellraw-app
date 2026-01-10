@@ -21,7 +21,8 @@ def load_prompts():
         # 如果提示文件不存在，返回默认提示
         return {
             "prompts": {
-                "m_n_choice": "检测到§m§n代码，选择处理方式：\n1. Java版使用字体方式，基岩版使用颜色代码方式\n2. Java版和基岩版都使用颜色代码方式",
+                "m_n_choice": "检测到§m§n代码，选择处理方式：\n1. Java版使用字体方式，基岩版使用颜色代码方式\n2. Java版和基岩版都使用颜色代码方式\n3. 混合模式：每次遇到§m§n都询问（默认为字体方式）",
+                "m_n_mixed_choice": "遇到 {} 代码，请选择：\n1. 字体方式（格式代码）\n2. 颜色代码方式",
                 "selector_input": "请输入目标选择器:",
                 "message_input": "请输入文本消息:",
                 "selector_type": "检测到目标选择器类型: {}",
@@ -60,19 +61,19 @@ JAVA_COLORS = {
 
 # 从文本中直接提取的颜色代码
 TEXT_COLOR_CODES = {
-    # 基岩版特有颜色代码（映射到标准代码）
-    '§g': '§6',  # 基岩版minecoin_gold -> 金色
-    '§h': '§f',  # 基岩版material_quartz -> 白色 
-    '§i': '§7',  # 基岩版material_iron -> 灰色
-    '§j': '§8',  # 基岩版material_netherite -> 深灰色
-    '§m': '§4',  # 基岩版material_redstone -> 深红色 (特殊处理)
-    '§n': '§6',  # 基岩版material_copper -> 金色 (特殊处理)
-    '§p': '§6',  # 基岩版material_gold -> 金色
-    '§q': '§a',  # 基岩版material_emerald -> 绿色
-    '§s': '§b',  # 基岩版material_diamond -> 青色
-    '§t': '§1',  # 基岩版material_lapis -> 深蓝色
-    '§u': '§d',  # 基岩版material_amethyst -> 粉色
-    '§v': '§6',  # 基岩版material_resin -> 金色
+    # 基岩版特有颜色代码（基岩版保持原样，不进行替换）
+    '§g': '§g',  # 基岩版minecoin_gold
+    '§h': '§h',  # 基岩版material_quartz
+    '§i': '§i',  # 基岩版material_iron
+    '§j': '§j',  # 基岩版material_netherite
+    '§m': '§m',  # 基岩版material_redstone (基岩版保持原样)
+    '§n': '§n',  # 基岩版material_copper (基岩版保持原样)
+    '§p': '§p',  # 基岩版material_gold
+    '§q': '§q',  # 基岩版material_emerald
+    '§s': '§s',  # 基岩版material_diamond
+    '§t': '§t',  # 基岩版material_lapis
+    '§u': '§u',  # 基岩版material_amethyst
+    '§v': '§v',  # 基岩版material_resin
     # 标准单字符颜色代码
     '§a': '§a',  # 绿色
     '§b': '§b',  # 青色
@@ -92,20 +93,20 @@ TEXT_COLOR_CODES = {
     '§9': '§9',  # 蓝色
 }
 
-# 基岩版特有颜色代码 (为了保持向后兼容性)
+# 基岩版特有颜色代码 (用于Java版转换，基岩版保持原样)
 BEDROCK_COLORS = {
-    '§g': '§6',  # minecoin_gold -> gold
-    '§h': '§f',  # material_quartz -> white 
-    '§i': '§7',  # material_iron -> gray
-    '§j': '§8',  # material_netherite -> dark_gray
-    '§m': '§4',  # material_redstone -> dark_red (特殊处理)
-    '§n': '§6',  # material_copper -> gold (特殊处理)
-    '§p': '§6',  # material_gold -> gold
-    '§q': '§a',  # material_emerald -> green
-    '§s': '§b',  # material_diamond -> aqua
-    '§t': '§1',  # material_lapis -> dark_blue
-    '§u': '§d',  # material_amethyst -> light_purple
-    '§v': '§6',  # material_resin -> gold
+    '§g': '§6',  # minecoin_gold -> gold (仅Java版转换时使用)
+    '§h': '§f',  # material_quartz -> white (仅Java版转换时使用)
+    '§i': '§7',  # material_iron -> gray (仅Java版转换时使用)
+    '§j': '§8',  # material_netherite -> dark_gray (仅Java版转换时使用)
+    '§m': '§4',  # material_redstone -> dark_red (仅Java版转换时使用)
+    '§n': '§c',  # material_copper -> red (仅Java版转换时使用)
+    '§p': '§6',  # material_gold -> gold (仅Java版转换时使用)
+    '§q': '§a',  # material_emerald -> green (仅Java版转换时使用)
+    '§s': '§b',  # material_diamond -> aqua (仅Java版转换时使用)
+    '§t': '§1',  # material_lapis -> dark_blue (仅Java版转换时使用)
+    '§u': '§d',  # material_amethyst -> light_purple (仅Java版转换时使用)
+    '§v': '§6',  # material_resin -> gold (仅Java版转换时使用)
 }
 
 # 格式代码映射
@@ -1987,18 +1988,30 @@ def convert_colors_to_bedrock(text):
     
     return result
 
-def convert_text_to_java(text, m_n_handling="color"):
-    """将文本转换为Java版tellraw格式，支持复杂颜色格式"""
+def convert_text_to_java(text, m_n_handling="color", m_n_callback=None):
+    """将文本转换为Java版tellraw格式，支持复杂颜色格式
+    
+    Args:
+        text: 要转换的文本
+        m_n_handling: §m§n的处理模式 ("color", "font", "mixed", "none")
+        m_n_callback: 在混合模式下，遇到§m§n时调用的回调函数
+    """
     import re
     
     # 使用正则表达式解析颜色代码和文本
     # 匹配§+字符的模式，然后处理后续的文本
-    result = parse_minecraft_formatting(text, m_n_handling)
+    result = parse_minecraft_formatting(text, m_n_handling, m_n_callback)
     
     return result
 
-def parse_minecraft_formatting(text, m_n_handling="color"):
-    """解析Minecraft颜色和格式代码，按Java版逻辑合并相同格式的文本"""
+def parse_minecraft_formatting(text, m_n_handling="color", m_n_callback=None):
+    """解析Minecraft颜色和格式代码，按Java版逻辑合并相同格式的文本
+    
+    Args:
+        text: 要解析的文本
+        m_n_handling: §m§n的处理模式 ("color", "font", "mixed", "none")
+        m_n_callback: 在混合模式下，遇到§m§n时调用的回调函数，返回"color"或"font"
+    """
     import re
     
     # 使用正则表达式找到所有格式代码和文本部分
@@ -2027,8 +2040,42 @@ def parse_minecraft_formatting(text, m_n_handling="color"):
     for token_type, token_value in tokens:
         if token_type == 'format_code':
             code = token_value
+            # 特殊处理§m和§n：根据m_n_handling参数决定是作为颜色代码还是格式代码
+            if code in ['§m', '§n']:
+                if m_n_handling == "color":
+                    # 作为颜色代码处理
+                    if code == '§m':
+                        current_format['color'] = 'dark_red'  # material_redstone
+                    elif code == '§n':
+                        current_format['color'] = 'red'  # material_copper -> red
+                elif m_n_handling == "mixed":
+                    # 混合模式：调用回调函数让用户选择
+                    if m_n_callback:
+                        choice = m_n_callback(code)
+                        if choice == "color":
+                            if code == '§m':
+                                current_format['color'] = 'dark_red'
+                            elif code == '§n':
+                                current_format['color'] = 'red'
+                        else:  # font
+                            if code == '§m':
+                                current_format['strikethrough'] = True
+                            elif code == '§n':
+                                current_format['underlined'] = True
+                    else:
+                        # 如果没有回调函数，默认使用格式代码
+                        if code == '§m':
+                            current_format['strikethrough'] = True  # 删除线
+                        elif code == '§n':
+                            current_format['underlined'] = True  # 下划线
+                else:
+                    # 作为格式代码处理（font模式或none模式）
+                    if code == '§m':
+                        current_format['strikethrough'] = True  # 删除线
+                    elif code == '§n':
+                        current_format['underlined'] = True  # 下划线
             # 颜色代码
-            if code[1] in '0123456789abcdefg hijpqs tuv':
+            elif code[1] in '0123456789abcdefg hijpqs tuv':
                 # 颜色代码
                 if code == '§0': 
                     current_format['color'] = 'black'
@@ -2071,18 +2118,6 @@ def parse_minecraft_formatting(text, m_n_handling="color"):
                     current_format['color'] = 'gray'  # material_iron
                 elif code == '§j':
                     current_format['color'] = 'dark_gray'  # material_netherite
-                elif code == '§m':
-                    if m_n_handling == "color":
-                        current_format['color'] = 'dark_red'  # material_redstone
-                    else:
-                        # 在Java版中，§m是删除线格式
-                        current_format['strikethrough'] = True
-                elif code == '§n':
-                    if m_n_handling == "color":
-                        current_format['color'] = 'gold'  # material_copper
-                    else:
-                        # 在Java版中，§n是下划线格式
-                        current_format['underlined'] = True
                 elif code == '§p':
                     current_format['color'] = 'gold'  # material_gold
                 elif code == '§q':
@@ -2095,7 +2130,20 @@ def parse_minecraft_formatting(text, m_n_handling="color"):
                     current_format['color'] = 'light_purple'  # material_amethyst
                 elif code == '§v':
                     current_format['color'] = 'gold'  # material_resin
-            # 格式代码
+                # 颜色代码
+                if code == '§0': 
+                    current_format['color'] = 'black'
+                elif code == '§1': 
+                    current_format['color'] = 'dark_blue'
+                elif code == '§2': 
+                    current_format['color'] = 'dark_green'
+                elif code == '§3': 
+                    current_format['color'] = 'dark_aqua'
+                elif code == '§4': 
+                    current_format['color'] = 'dark_red'
+                elif code == '§5': 
+                    current_format['color'] = 'dark_purple'
+                # 格式代码
             elif code[1] in 'klmnor':
                 if code == '§k':
                     current_format['obfuscated'] = True  # 随机字符（混淆）
@@ -2173,32 +2221,9 @@ def parse_minecraft_formatting(text, m_n_handling="color"):
 
 def convert_text_to_bedrock(text, m_n_handling="color"):
     """将文本转换为基岩版tellraw格式"""
-    # 首先处理所有基岩版特有颜色代码
-    processed_text = text
-    for bedrock_code, replacement in BEDROCK_COLORS.items():
-        processed_text = processed_text.replace(bedrock_code, replacement)
-    
-    # 使用TEXT_COLOR_CODES处理所有颜色代码
-    # 按长度降序排列，确保较长的代码先被处理
-    sorted_codes = sorted(TEXT_COLOR_CODES.items(), key=lambda x: len(x[0]), reverse=True)
-    for color_code, replacement in sorted_codes:
-        processed_text = processed_text.replace(color_code, replacement)
-    
-    # 根据m_n_handling参数处理§m§n代码（如果需要）
-    if m_n_handling == "font":
-        # 基岩版使用默认颜色代码方式
-        # 将基岩版特有颜色代码转换为相似的Java版颜色代码
-        for bedrock_code in BEDROCK_COLORS:
-            if bedrock_code in processed_text:
-                processed_text = processed_text.replace(bedrock_code, BEDROCK_COLORS[bedrock_code])
-    elif m_n_handling == "color":
-        # 同样使用颜色代码方式
-        for bedrock_code in BEDROCK_COLORS:
-            if bedrock_code in processed_text:
-                processed_text = processed_text.replace(bedrock_code, BEDROCK_COLORS[bedrock_code])
-    
-    # 返回rawtext格式
-    return {"rawtext": [{"text": processed_text}]}
+    # 基岩版保持所有颜色代码原样，不进行替换
+    # 直接返回原始文本
+    return {"rawtext": [{"text": text}]}
 
 def generate_tellraw_commands(selector, message, m_n_handling="none"):
     """生成Java版和基岩版的tellraw命令"""
@@ -3092,7 +3117,24 @@ def generate_tellraw_commands(selector, message, m_n_handling="none"):
     all_bedrock_reminders = bedrock_gamemode_reminders + bedrock_reminders
     
     # 生成Java版命令
-    java_json = convert_text_to_java(message, m_n_handling)
+    if m_n_handling == "mixed":
+        # 混合模式：定义回调函数
+        def m_n_callback(code):
+            code_name = "§m(删除线)" if code == '§m' else "§n(下划线)"
+            print(PROMPTS["prompts"]["m_n_mixed_choice"].format(code_name))
+            choice = input("请选择 (1/2): ").strip()
+            if choice == '1':
+                return "font"
+            elif choice == '2':
+                return "color"
+            else:
+                print("无效选择，默认使用字体方式")
+                return "font"
+        
+        java_json = convert_text_to_java(message, m_n_handling, m_n_callback)
+    else:
+        java_json = convert_text_to_java(message, m_n_handling)
+    
     java_command = f'tellraw {java_selector_filtered} {json.dumps(java_json, ensure_ascii=False)}'
     
     # 生成基岩版命令
@@ -3106,22 +3148,26 @@ def handle_m_n_codes(message):
     处理§m§n代码，询问用户选择
     选项1: Java版使用字体方式，基岩版使用颜色代码方式
     选项2: Java版和基岩版都使用颜色代码方式
+    选项3: 混合模式：每次遇到§m§n都询问
     """
     if '§m' in message or '§n' in message:
         print(PROMPTS["prompts"]["m_n_choice"])
         
-        choice = input("请选择 (1/2): ").strip()
+        choice = input("请选择 (1/2/3): ").strip()
         if choice == '1':
             # Java版使用字体，基岩版使用颜色代码
-            return message, "font"
+            return message, "font", None
         elif choice == '2':
             # 都使用颜色代码
-            return message, "color"
+            return message, "color", None
+        elif choice == '3':
+            # 混合模式
+            return message, "mixed", None
         else:
             print("无效选择，默认使用选项1")
-            return message, "font"
+            return message, "font", None
     
-    return message, "none"
+    return message, "none", None
 
 def get_user_input():
     """获取用户交互式输入"""
@@ -3138,7 +3184,7 @@ def get_user_input():
     message = input(PROMPTS["prompts"]["message_input"] + " ").strip()
     
     # 处理§m§n代码
-    message, m_n_option = handle_m_n_codes(message)
+    message, m_n_option, _ = handle_m_n_codes(message)
     
     return selector, message, m_n_option
 

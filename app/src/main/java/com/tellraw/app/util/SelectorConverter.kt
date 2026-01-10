@@ -47,7 +47,7 @@ object SelectorConverter {
         "§i" to "§7",  // material_iron -> gray
         "§j" to "§8",  // material_netherite -> dark_gray
         "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
-        "§n" to "§6",  // material_copper -> gold (特殊处理)
+        "§n" to "§c",  // material_copper -> red (特殊处理)
         "§p" to "§6",  // material_gold -> gold
         "§q" to "§a",  // material_emerald -> green
         "§s" to "§b",  // material_diamond -> aqua
