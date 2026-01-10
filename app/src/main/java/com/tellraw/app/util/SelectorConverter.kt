@@ -394,13 +394,13 @@ object SelectorConverter {
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add("Java版sort=$sortValue在基岩版中不支持，已移除")
+                        conversionReminders.add("Java版sort=${sortValue}在基岩版中不支持，已移除")
                     }
                 }
             } else {
                 // 没有sort参数，只转换limit
                 if (limitValue != null) {
-                    conversionReminders.add("Java版limit=$limitValue参数已转换为基岩版c=$limitValue")
+                    conversionReminders.add("Java版limit=${limitValue}参数已转换为基岩版c=${limitValue}")
                     conversionReminders.add("limit只是限制数量，c当由近到远")
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
