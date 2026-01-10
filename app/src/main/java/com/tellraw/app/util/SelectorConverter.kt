@@ -299,6 +299,7 @@ object SelectorConverter {
             val sortValue: String? = sortMatch?.groupValues?.get(1)
             val limitValue: String? = limitMatch?.groupValues?.get(1)
 
+            // 处理sort和limit参数
             if (sortValue != null) {
                 when (sortValue) {
                     "nearest" -> {
@@ -393,15 +394,17 @@ object SelectorConverter {
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add("Java版sort=$sortValue在基岩版中不支持，已移除")
+                        val sortValueForMessage = sortValue
+                        conversionReminders.add("Java版sort=$sortValueForMessage在基岩版中不支持，已移除")
                     }
                 }
             } else {
                 // 没有sort参数，只转换limit
                 if (limitValue != null) {
-                    conversionReminders.add("Java版limit=$limitValue参数已转换为基岩版c=$limitValue")
+                    val limitValueForMessage = limitValue
+                    conversionReminders.add("Java版limit=$limitValueForMessage参数已转换为基岩版c=$limitValueForMessage")
                     conversionReminders.add("limit只是限制数量，c当由近到远")
-                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
+                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValueForMessage")
                 }
             }
         }
@@ -1307,7 +1310,8 @@ object SelectorConverter {
                 }
                 else -> {
                     result = result.replace(sortPattern, "")
-                    reminders.add("Java版sort=" + sortValue + "在基岩版中不支持，已移除")
+                    val sortValueForMessage = sortValue
+                    reminders.add("Java版sort=" + sortValueForMessage + "在基岩版中不支持，已移除")
                 }
             }
         } else {
