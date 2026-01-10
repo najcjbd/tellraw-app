@@ -394,17 +394,15 @@ object SelectorConverter {
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        val sortValueForMessage = sortValue
-                        conversionReminders.add("Java版sort=$sortValueForMessage在基岩版中不支持，已移除")
+                        conversionReminders.add("Java版sort=$sortValue在基岩版中不支持，已移除")
                     }
                 }
             } else {
                 // 没有sort参数，只转换limit
                 if (limitValue != null) {
-                    val limitValueForMessage = limitValue
-                    conversionReminders.add("Java版limit=$limitValueForMessage参数已转换为基岩版c=$limitValueForMessage")
+                    conversionReminders.add("Java版limit=$limitValue参数已转换为基岩版c=$limitValue")
                     conversionReminders.add("limit只是限制数量，c当由近到远")
-                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValueForMessage")
+                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
         }
@@ -496,9 +494,10 @@ object SelectorConverter {
                     removedParams.add(paramName)
                     when (paramName) {
                         "team" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有队伍系统的直接对应功能")
-                                        "predicate" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有谓词系统")
-                                        "advancements" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有进度系统")
-                                        else -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除")                    }
+                        "predicate" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有谓词系统")
+                        "advancements" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有进度系统")
+                        else -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除")
+                    }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
