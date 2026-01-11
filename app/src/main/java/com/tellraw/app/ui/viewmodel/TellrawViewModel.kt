@@ -907,10 +907,10 @@ class TellrawViewModel @Inject constructor(
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent = Intent(DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+            val createIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = mimeType
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
+                putExtra(Intent.EXTRA_INITIAL_URI, directoryUri)
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
 
