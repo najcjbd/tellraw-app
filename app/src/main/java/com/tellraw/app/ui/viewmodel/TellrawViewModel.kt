@@ -522,7 +522,7 @@ class TellrawViewModel @Inject constructor(
         context?.let { ctx ->
             val shareIntent = Intent().apply {
                 action = Intent.ACTION_SEND
-                setType("text/plain")
+                type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, command)
                 putExtra(Intent.EXTRA_SUBJECT, "Minecraft Tellraw Command")
             }
@@ -907,9 +907,9 @@ class TellrawViewModel @Inject constructor(
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent: Intent = Intent(DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+            val createIntent = Intent(DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
-                setType(mimeType)
+                type = mimeType
                 putExtra(DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
