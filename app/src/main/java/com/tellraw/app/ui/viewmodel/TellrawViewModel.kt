@@ -904,11 +904,11 @@ class TellrawViewModel @Inject constructor(
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent: android.content.Intent = android.content.Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            val createIntent: Intent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
                 setType(mimeType)
                 putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
-                putExtra(android.content.Intent.EXTRA_TITLE, filename)
+                putExtra(Intent.EXTRA_TITLE, filename)
             }
 
             // 注意：这里需要通过Activity启动，返回结果后才能创建文件
