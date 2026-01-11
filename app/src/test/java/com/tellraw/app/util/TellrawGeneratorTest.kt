@@ -1,5 +1,6 @@
 package com.tellraw.app.util
 
+import com.tellraw.app.model.SelectorType
 import org.junit.Test
 import org.junit.Assert.*
 
@@ -138,7 +139,7 @@ class TellrawGeneratorTest {
      */
     @Test
     fun testSelectorTypeDetectionAndConversion() {
-        val testCases = listOf(
+        val testCases: List<Pair<String, SelectorType>> = listOf(
             "@a[distance=10]" to SelectorType.JAVA,
             "@a[r=10]" to SelectorType.BEDROCK,
             "@a[x=10,y=20,z=30]" to SelectorType.UNIVERSAL,

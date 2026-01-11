@@ -34,7 +34,7 @@ class TextFormatterTest {
         )
         
         for ((code, name) in colorCodes) {
-            val message = "$code测试文字"
+            val message = "${code}测试文字"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
@@ -503,7 +503,7 @@ class TextFormatterTest {
         val formatCodes = listOf("§k", "§l", "§m", "§n", "§o", "§r")
         
         for (code in formatCodes) {
-            val message = "$code测试"
+            val message = "${code}测试"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             

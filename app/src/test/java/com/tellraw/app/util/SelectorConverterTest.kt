@@ -1,5 +1,6 @@
 package com.tellraw.app.util
 
+import com.tellraw.app.model.SelectorType
 import org.junit.Test
 import org.junit.Assert.*
 
