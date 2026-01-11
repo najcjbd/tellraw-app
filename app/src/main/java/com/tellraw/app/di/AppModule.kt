@@ -60,11 +60,25 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        // 使用外部存储的Android/data沙盒目录
+        val databasePath = context.getExternalFilesDir(null)?.absolutePath
+        val databaseFile = if (databasePath != null) {
+            java.io.File(databasePath, "tellraw_database")
+        } else {
+            // 如果外部存储不可用，回退到内部存储
+            context.getDatabasePath("tellraw_database")
+        }
+        
+        // 确保目录存在
+        databaseFile.parentFile?.mkdirs()
+        
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
-            "tellraw_database"
-        ).build()
+            databaseFile.absolutePath
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
     
     @Provides

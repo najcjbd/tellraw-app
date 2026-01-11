@@ -4,10 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -191,7 +195,9 @@ private fun CommandDisplay(
 fun MNCodeDialog(
     codeType: String?,
     onDismiss: () -> Unit,
-    onUseJavaFontStyle: (Boolean) -> Unit
+    onUseJavaFontStyle: (Boolean) -> Unit,
+    onMixedModeChoice: (String, String) -> Unit = { _, _ -> },
+    mnMixedMode: Boolean = false
 ) {
     val codeName = when (codeType) {
         "§m" -> "§m（删除线）"
@@ -199,21 +205,61 @@ fun MNCodeDialog(
         else -> "§m§n"
     }
     
+    var rememberChoice by remember { mutableStateOf(false) }
+    
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            // 点击空白区域取消时，默认使用字体方式
+            if (mnMixedMode) {
+                onMixedModeChoice(codeType ?: "§m", "font")
+            } else {
+                onUseJavaFontStyle(true)
+            }
+            onDismiss()
+        },
         title = {
             Text("检测到$codeName 代码")
         },
         text = {
-            Text("""检测到$codeName 格式代码，请选择处理方式：
+            Column {
+                if (mnMixedMode) {
+                    Text(
+                        text = """检测到$codeName 格式代码，请选择处理方式：
+
+1. 字体方式（格式代码）
+2. 颜色代码方式"""
+                    )
+                } else {
+                    Text(
+                        text = """检测到$codeName 格式代码，请选择处理方式：
 
 1. Java版使用字体方式，基岩版使用颜色代码方式
-2. Java版和基岩版都使用颜色代码方式""")
+2. Java版和基岩版都使用颜色代码方式"""
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = rememberChoice,
+                        onCheckedChange = { rememberChoice = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("记住我的选择")
+                }
+            }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    onUseJavaFontStyle(true)
+                    if (mnMixedMode) {
+                        onMixedModeChoice(codeType ?: "§m", "font")
+                    } else {
+                        onUseJavaFontStyle(true)
+                    }
                 }
             ) {
                 Text("方式1")
@@ -222,10 +268,145 @@ fun MNCodeDialog(
         dismissButton = {
             TextButton(
                 onClick = {
-                    onUseJavaFontStyle(false)
+                    if (mnMixedMode) {
+                        onMixedModeChoice(codeType ?: "§m", "color")
+                    } else {
+                        onUseJavaFontStyle(false)
+                    }
                 }
             ) {
                 Text("方式2")
+            }
+        }
+    )
+}
+
+@Composable
+fun SettingsDialog(
+    useJavaFontStyle: Boolean,
+    mnMixedMode: Boolean,
+    mnCFEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onUseJavaFontStyleChanged: (Boolean) -> Unit,
+    onMNMixedModeChanged: (Boolean) -> Unit,
+    onMNCFEnabledChanged: (Boolean) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("设置")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "§m§n混合模式配置",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                // 混合模式开关
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Switch(
+                        checked = mnMixedMode,
+                        onCheckedChange = onMNMixedModeChanged
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "混合模式",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "未选择时默认使用字体方式",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                if (!mnMixedMode) {
+                    // 非混合模式时显示字体/颜色选择
+                    Text(
+                        text = "选择§m（删除线）和§n（下划线）代码的处理方式：",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = useJavaFontStyle,
+                                onClick = { onUseJavaFontStyleChanged(true) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "字体方式",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Java版使用删除线/下划线，基岩版使用颜色代码",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = !useJavaFontStyle,
+                                onClick = { onUseJavaFontStyleChanged(false) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "颜色代码方式",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Java版和基岩版都使用颜色代码",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // §m/§n_c/f设置
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Switch(
+                        checked = mnCFEnabled,
+                        onCheckedChange = onMNCFEnabledChanged
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "启用§m/§n_c/f",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "使用§m_f/§m_c/§n_f/§n_c指定处理方式",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("确定")
             }
         }
     )
@@ -238,7 +419,8 @@ fun HistoryDialog(
     onLoadHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
     onDeleteHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
     onClearAll: () -> Unit,
-    onSearch: (String) -> Unit = {}
+    onSearch: (String) -> Unit = {},
+    onShowStorageSettings: () -> Unit = {}
 ) {
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -251,7 +433,7 @@ fun HistoryDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("命令历史记录")
-                if (historyList.isNotEmpty()) {
+                Row {
                     IconButton(
                         onClick = onClearAll
                     ) {
@@ -259,6 +441,14 @@ fun HistoryDialog(
                             Icons.Default.Clear,
                             contentDescription = "清空历史",
                             tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    IconButton(
+                        onClick = onShowStorageSettings
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "存储设置"
                         )
                     }
                 }
@@ -405,4 +595,247 @@ private fun HistoryItem(
             }
         }
     }
+}
+
+@Composable
+fun HistoryStorageSettingsDialog(
+    storageUri: String?,
+    filename: String,
+    onDismiss: () -> Unit,
+    onSelectDirectory: () -> Unit,
+    onEditFilename: () -> Unit,
+    onClearSettings: () -> Unit,
+    onWriteToFile: () -> Unit,
+    isWriting: Boolean = false,
+    writeMessage: String? = null
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("历史记录存储设置")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "存储历史记录的位置",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                // 存储目录
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "存储目录",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                text = if (storageUri != null) "已选择存储目录" else "未设置存储目录",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (storageUri != null) 
+                                    MaterialTheme.colorScheme.onSurface 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = onSelectDirectory) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "选择目录"
+                            )
+                        }
+                    }
+                }
+                
+                // 文件名
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "文件名",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                text = filename,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = onEditFilename) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "编辑文件名"
+                            )
+                        }
+                    }
+                }
+                
+                // 写入状态消息
+                if (writeMessage != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (writeMessage.contains("成功"))
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = writeMessage,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (writeMessage.contains("成功"))
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+                
+                // 清除设置按钮
+                if (storageUri != null) {
+                    OutlinedButton(
+                        onClick = onClearSettings,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("清除存储设置")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = onWriteToFile,
+                    enabled = storageUri != null && !isWriting
+                ) {
+                    if (isWriting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(if (isWriting) "写入中..." else "写入文件")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun FilenameInputDialog(
+    currentFilename: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var filename by remember { mutableStateOf(currentFilename) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("设置文件名")
+        },
+        text = {
+            Column {
+                Text(
+                    text = "请输入历史记录存储的文件名：",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = filename,
+                    onValueChange = { filename = it },
+                    label = { Text("文件名") },
+                    placeholder = { Text("TellrawCommand.txt") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (filename.isNotBlank()) {
+                        onConfirm(filename.trim())
+                    }
+                },
+                enabled = filename.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+fun FileExistsDialog(
+    filename: String,
+    onDismiss: () -> Unit,
+    onUseExisting: () -> Unit,
+    onCustomize: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("文件已存在")
+        },
+        text = {
+            Text(
+                text = "文件 \"$filename\" 已存在。\n\n是否使用此文件追加历史记录？\n\n如果选择"否"，您需要自定义一个新的文件名。",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onUseExisting) {
+                Text("是，使用此文件")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCustomize) {
+                Text("否，自定义文件名")
+            }
+        }
+    )
 }

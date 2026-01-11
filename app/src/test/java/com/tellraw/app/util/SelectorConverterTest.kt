@@ -1,1399 +1,1001 @@
 package com.tellraw.app.util
 
-import com.tellraw.app.model.SelectorType
-import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Assert.*
 
 /**
- * Android版本全面测试
- * 测试范围：
- * 1. 基本选择器变量
- * 2. 通用选择器参数
- * 3. 多个通用参数组合
- * 4. Java版特有参数
- * 5. 基岩版特有参数
- * 6. 特殊参数
- * 7. 特殊组合
- * 8. 文本格式化测试
- * 9. §m§n混合测试
- * 10. 基岩版特有颜色代码
- * 11. 复杂文本组合
+ * 选择器转换和命令生成测试
+ * 测试各种选择器参数的组合和转换
  */
 class SelectorConverterTest {
-
-    // ============================================
-    // 1. 基本选择器变量测试（5个测试）
-    // ============================================
+    
+    /**
+     * 测试组1：通用选择器参数（8~9个参数）
+     * 测试Java版和基岩版都支持的参数
+     */
+    @Test
+    fun testUniversalParameters_1() {
+        val selector = "@e[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={test=10},tag=player,name=Steve,type=zombie]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
     
     @Test
-    fun testSelector_a() {
+    fun testUniversalParameters_2() {
+        val selector = "@a[x=0,y=64,z=0,dx=100,dy=50,dz=100,scores={kills=5..10},tag=team_red,name=\"\",type=player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_3() {
+        val selector = "@p[x=100,y=70,z=100,dx=20,dy=10,dz=20,scores={health=20},tag=!enemy,name=Alex,type=player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_4() {
+        val selector = "@e[x=50,y=50,z=50,dx=30,dy=30,dz=30,scores={score=0..},tag=,name=!Boss,type=!zombie]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_5() {
+        val selector = "@a[x=~10,y=~10,z=~10,dx=15,dy=15,dz=15,scores={money=100},tag=shop,name=Trader,type=villager]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_6() {
+        val selector = "@e[x=0,y=0,z=0,dx=10,dy=256,dz=10,scores={level=30},tag=admin,name=Admin,type=player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_7() {
+        val selector = "@p[x=100,y=100,z=100,dx=5,dy=5,dz=5,scores={xp=50..100},tag=friend,name=Friend,type=player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_8() {
+        val selector = "@a[x=-100,y=-50,z=-100,dx=50,dy=100,dz=50,scores={rank=1},tag=vip,name=VIP,type=player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testUniversalParameters_9() {
+        val selector = "@e[x=10.5,y=20.3,z=30.7,dx=5.2,dy=5.8,dz=5.1,scores={test=10..20},tag=a,tag=b,name=Test,type=!player]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    /**
+     * 测试组2：通用选择器参数（5~6个）+ Java版选择器参数（3~4个）
+     */
+    @Test
+    fun testUniversalWithJavaParameters_1() {
+        val selector = "@e[x=10,y=20,z=30,dx=5,dy=5,dz=5,distance=10,team=red,gamemode=survival,sort=nearest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testUniversalWithJavaParameters_2() {
+        val selector = "@a[x=0,y=64,z=0,dx=100,dy=50,dz=100,distance=5..20,team=blue,gamemode=creative,sort=random]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testUniversalWithJavaParameters_3() {
+        val selector = "@p[x=100,y=70,z=100,dx=20,dy=10,dz=20,distance=..15,team=!enemy,gamemode=adventure,sort=furthest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testUniversalWithJavaParameters_4() {
+        val selector = "@e[x=50,y=50,z=50,dx=30,dy=30,dz=30,distance=10..,team=,gamemode=spectator,limit=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testUniversalWithJavaParameters_5() {
+        val selector = "@a[x=~10,y=~10,z=~10,dx=15,dy=15,dz=15,distance=..50,team=!red,gamemode=survival,sort=arbitrary]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testUniversalWithJavaParameters_6() {
+        val selector = "@e[x=0,y=0,z=0,dx=10,dy=256,dz=10,distance=1..100,team=green,gamemode=!survival,limit=10,sort=random]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    /**
+     * 测试组3：通用选择器参数（5~6个）+ 基岩版选择器参数（3~4个）
+     */
+    @Test
+    fun testUniversalWithBedrockParameters_1() {
+        val selector = "@e[x=10,y=20,z=30,dx=5,dy=5,dz=5,r=10,m=0,c=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testUniversalWithBedrockParameters_2() {
+        val selector = "@a[x=0,y=64,z=0,dx=100,dy=50,dz=100,rm=5,r=20,m=1,c=3]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testUniversalWithBedrockParameters_3() {
+        val selector = "@p[x=100,y=70,z=100,dx=20,dy=10,dz=20,r=15,m=2,c=1]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testUniversalWithBedrockParameters_4() {
+        val selector = "@e[x=50,y=50,z=50,dx=30,dy=30,dz=30,rm=10,r=50,m=s,c=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testUniversalWithBedrockParameters_5() {
+        val selector = "@a[x=~10,y=~10,z=~10,dx=15,dy=15,dz=15,r=0,m=!0,c=-5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testUniversalWithBedrockParameters_6() {
+        val selector = "@e[x=0,y=0,z=0,dx=10,dy=256,dz=10,rm=1,r=100,m=survival,c=8]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    /**
+     * 测试组4：Java版独有参数组合
+     */
+    @Test
+    fun testJavaOnlyParameters_1() {
+        val selector = "@a[distance=10,team=red,gamemode=survival,level=5..10,sort=nearest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testJavaOnlyParameters_2() {
+        val selector = "@e[x_rotation=0..45,y_rotation=-90..90,nbt={CustomName:\"Steve\"},limit=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testJavaOnlyParameters_3() {
+        val selector = "@a[advancements={story/form_obsidian=true},predicate=test:test,gamemode=adventure]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testJavaOnlyParameters_4() {
+        val selector = "@e[distance=..50,x_rotation=-30..30,y_rotation=0..180,limit=10,sort=furthest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testJavaOnlyParameters_5() {
+        val selector = "@a[team=!red,team=!blue,gamemode=!survival,level=10..,sort=random]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testJavaOnlyParameters_6() {
+        val selector = "@e[distance=5..15,x_rotation=-45..45,y_rotation=-90..90,nbt={Tags:[\"a\",\"b\"]},limit=3,sort=arbitrary]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    /**
+     * 测试组5：基岩版独有参数组合
+     */
+    @Test
+    fun testBedrockOnlyParameters_1() {
+        val selector = "@a[r=10,m=0,c=5,l=5..10,lm=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testBedrockOnlyParameters_2() {
+        val selector = "@e[family=zombie,hasitem={item=diamond_sword},rx=-45..45,ry=0..90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testBedrockOnlyParameters_3() {
+        val selector = "@a[haspermission={movement=enabled},m=1,c=3,l=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testBedrockOnlyParameters_4() {
+        val selector = "@e[family=!monster,hasitem=[{item=apple,quantity=5..}],rxm=-90,rx=90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testBedrockOnlyParameters_5() {
+        val selector = "@a[has_property={minecraft:has_nectar=true},m=2,c=1,lm=20]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testBedrockOnlyParameters_6() {
+        val selector = "@e[family=undead,hasitem={item=diamond,quantity=10},rxm=-30,rx=30,rym=0,ry=180]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    /**
+     * 测试组6：特殊组合和边界情况
+     */
+    @Test
+    fun testSpecialCases_1() {
+        // 空选择器
+        val selector = ""
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_2() {
+        // 只有变量
         val selector = "@a"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSelector_p() {
-        val selector = "@p"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSelector_r() {
-        val selector = "@r"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSelector_e() {
-        val selector = "@e"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSelector_s() {
-        val selector = "@s"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 2. 通用参数测试（14个测试）
-    // ============================================
-
-    @Test
-    fun testParam_x() {
-        val selector = "@a[x=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_y() {
-        val selector = "@a[y=20]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_z() {
-        val selector = "@a[z=30]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_dx() {
-        val selector = "@a[dx=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_dy() {
-        val selector = "@a[dy=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_dz() {
-        val selector = "@a[dz=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_scores_exact() {
-        val selector = "@a[scores={myscore=10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_scores_range() {
-        val selector = "@a[scores={myscore=5..10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_scores_min() {
-        val selector = "@a[scores={myscore=5..}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_scores_max() {
-        val selector = "@a[scores={myscore=..10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_tag() {
-        val selector = "@a[tag=mytag]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_name() {
-        val selector = "@a[name=Player]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_type() {
-        val selector = "@a[type=zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testParam_scoresMultiple() {
-        val selector = "@a[scores={score1=5,score2=10..20}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 3. 多个通用参数组合测试（3个测试）
-    // ============================================
-
-    @Test
-    fun testMultipleParams_coordinates_tag_scores() {
-        val selector = "@a[x=10,y=20,z=30,tag=mytag,scores={myscore=10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testMultipleParams_type_box_name() {
-        val selector = "@a[type=zombie,dx=5,dy=5,dz=5,name=Player]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testMultipleParams_box_scores() {
-        val selector = "@a[dx=10,dy=10,dz=10,scores={myscore=5..10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 4. Java版特有参数测试（20个测试）
-    // ============================================
-
-    @Test
-    fun testJavaParam_distance_exact() {
-        val selector = "@a[distance=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_distance_range() {
-        val selector = "@a[distance=5..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_distance_min() {
-        val selector = "@a[distance=5..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_distance_max() {
-        val selector = "@a[distance=..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_x_rotation_exact() {
-        val selector = "@a[x_rotation=45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_x_rotation_range() {
-        val selector = "@a[x_rotation=-45..45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_x_rotation_min() {
-        val selector = "@a[x_rotation=-45..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_x_rotation_max() {
-        val selector = "@a[x_rotation=..45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_y_rotation_exact() {
-        val selector = "@a[y_rotation=90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_y_rotation_range() {
-        val selector = "@a[y_rotation=-90..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_y_rotation_min() {
-        val selector = "@a[y_rotation=-90..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_y_rotation_max() {
-        val selector = "@a[y_rotation=..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_level_exact() {
-        val selector = "@a[level=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_level_range() {
-        val selector = "@a[level=5..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_level_min() {
-        val selector = "@a[level=5..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_level_max() {
-        val selector = "@a[level=..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_gamemode_survival() {
-        val selector = "@a[gamemode=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_gamemode_creative() {
-        val selector = "@a[gamemode=creative]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_gamemode_adventure() {
-        val selector = "@a[gamemode=adventure]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_gamemode_spectator() {
-        val selector = "@a[gamemode=spectator]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_gamemode_not() {
-        val selector = "@a[gamemode=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_limit_sort_nearest() {
-        val selector = "@a[limit=4,sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_sort_furthest() {
-        val selector = "@a[sort=furthest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_sort_arbitrary() {
-        val selector = "@a[sort=arbitrary]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testJavaParam_sort_random() {
-        val selector = "@a[sort=random]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    // ============================================
-    // 5. 基岩版特有参数测试（19个测试）
-    // ============================================
-
-    @Test
-    fun testBedrockParam_r() {
-        val selector = "@a[r=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_rm() {
-        val selector = "@a[rm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_r_rm() {
-        val selector = "@a[r=10,rm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_rx() {
-        val selector = "@a[rx=45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_rxm() {
-        val selector = "@a[rxm=-45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_rx_rxm() {
-        val selector = "@a[rx=45,rxm=-45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_ry() {
-        val selector = "@a[ry=90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_rym() {
-        val selector = "@a[rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_ry_rym() {
-        val selector = "@a[ry=90,rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_l() {
-        val selector = "@a[l=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_lm() {
-        val selector = "@a[lm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_l_lm() {
-        val selector = "@a[l=10,lm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_m_survival() {
-        val selector = "@a[m=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_m_creative() {
-        val selector = "@a[m=creative]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_m_adventure() {
-        val selector = "@a[m=adventure]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_m_not() {
-        val selector = "@a[m=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_c_positive() {
-        val selector = "@a[c=4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_c_negative() {
-        val selector = "@a[c=-4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_hasitem() {
-        val selector = "@a[hasitem={item=diamond}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_family() {
-        val selector = "@a[family=zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_haspermission() {
-        val selector = "@a[haspermission={permission=level}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockParam_has_property() {
-        val selector = "@a[has_property={property=value}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 6. 特殊参数测试（12个测试）
-    // ============================================
-
-    @Test
-    fun testSpecialParam_nbt() {
-        val selector = "@a[nbt={CustomName:\"Test\"}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_team() {
-        val selector = "@a[team=red]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_predicate() {
-        val selector = "@a[predicate=my_predicate]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_advancements() {
-        val selector = "@a[advancements={story/root=true}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_attributes() {
-        val selector = "@a[attributes={generic.movement_speed={base:0.1}}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_multiple_nbt() {
-        val selector = "@a[nbt={CustomName:\"Test\",Health:20}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_team_not() {
-        val selector = "@a[team=!red]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_advancements_complex() {
-        val selector = "@a[advancements={story/root=true,adventure/adventuring_time={criteria:{minecraft:plains:true}}}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialParam_hasitem_complex() {
-        val selector = "@a[hasitem={item=diamond,quantity=1,location=slot.weapon.mainhand}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSpecialParam_family_multiple() {
-        val selector = "@a[family=zombie,skeleton]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSpecialParam_haspermission_complex() {
-        val selector = "@a[haspermission={permission=level,level=4}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSpecialParam_has_property_complex() {
-        val selector = "@a[has_property={property=has_saddle,value=true}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 7. 特殊组合测试（10个测试）
-    // ============================================
-
-    @Test
-    fun testSpecialCombination_limit_sort_nearest() {
-        val selector = "@a[limit=4,sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_limit_sort_furthest() {
-        val selector = "@a[limit=4,sort=furthest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_limit_sort_random() {
-        val selector = "@a[limit=4,sort=random]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_sort_only() {
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_3() {
+        // 嵌套选择器（基岩版）
+        val selector = "@e[type=player,m=0,r=10,c=1]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testSpecialCases_4() {
+        // 多个否定参数
+        val selector = "@e[type=!zombie,type=!skeleton,tag=!enemy,name=!Boss]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_5() {
+        // 范围参数组合
+        val selector = "@a[scores={test=1..10,foo=5..,bar=..20},level=5..15,distance=10..50]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSpecialCases_6() {
+        // 负值坐标
+        val selector = "@e[x=-100,y=-50,z=-100,dx=50,dy=100,dz=50]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_7() {
+        // 小数坐标
+        val selector = "@e[x=10.5,y=20.3,z=30.7,dx=5.2,dy=5.8,dz=5.1]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_8() {
+        // 波浪号坐标
+        val selector = "@e[x=~10,y=~-5,z=~20,dx=10,dy=10,dz=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_9() {
+        // 空标签
+        val selector = "@e[tag=,name=]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testSpecialCases_10() {
+        // 多个标签
+        val selector = "@e[tag=a,tag=b,tag=c]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    /**
+     * 测试组7：选择器变量测试
+     */
+    @Test
+    fun testSelectorVariables() {
+        val selectors = listOf("@p", "@r", "@a", "@e", "@s", "@n", "@c", "@v", "@initiator")
+        for (selector in selectors) {
+            val type = SelectorConverter.detectSelectorType(selector)
+            assertEquals(SelectorType.UNIVERSAL, type)
+        }
+    }
+    
+    /**
+     * 测试组8：参数值测试
+     */
+    @Test
+    fun testParameterValues_1() {
+        // 游戏模式值测试
+        val modes = listOf("survival", "creative", "adventure", "spectator")
+        for (mode in modes) {
+            val selector = "@a[gamemode=$mode]"
+            val type = SelectorConverter.detectSelectorType(selector)
+            assertEquals(SelectorType.JAVA, type)
+        }
+    }
+    
+    @Test
+    fun testParameterValues_2() {
+        // 基岩版游戏模式值测试
+        val modes = listOf("0", "1", "2", "5", "s", "c", "a", "d", "survival", "creative", "adventure", "default")
+        for (mode in modes) {
+            val selector = "@a[m=$mode]"
+            val type = SelectorConverter.detectSelectorType(selector)
+            assertEquals(SelectorType.BEDROCK, type)
+        }
+    }
+    
+    @Test
+    fun testParameterValues_3() {
+        // 排序值测试
+        val sorts = listOf("nearest", "furthest", "random", "arbitrary")
+        for (sort in sorts) {
+            val selector = "@e[limit=5,sort=$sort]"
+            val type = SelectorConverter.detectSelectorType(selector)
+            assertEquals(SelectorType.JAVA, type)
+        }
+    }
+    
+    /**
+     * 测试组9：sort和limit的所有组合
+     */
+    @Test
+    fun testSortAndLimitCombinations_1() {
+        // sort=nearest + limit=正数
+        val selector = "@a[limit=5,sort=nearest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_2() {
+        // sort=nearest（无limit）
         val selector = "@a[sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_distance_scores() {
-        val selector = "@a[distance=5..10,scores={myscore=10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_distance_type() {
-        val selector = "@a[distance=5..10,type=zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_distance_rotations() {
-        val selector = "@a[distance=5..10,x_rotation=-45..45,y_rotation=-90..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_level_gamemode() {
-        val selector = "@a[level=5..10,gamemode=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_c_r_rm() {
-        val selector = "@a[c=4,r=10,rm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSpecialCombination_c_lm_l() {
-        val selector = "@a[c=4,lm=5,l=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testSpecialCombination_complex() {
-        val selector = "@a[x=10,y=20,z=30,distance=5..10,scores={myscore=10},tag=mytag]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testSpecialCombination_complex_bedrock() {
-        val selector = "@a[type=zombie,dx=10,dy=10,dz=10,rx=45,rxm=-45,ry=90,rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 8. 基岩版特有选择器变量测试
-    // ============================================
-
-    @Test
-    fun testBedrockSelector_initiator() {
-        val selector = "@initiator"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockSelector_c() {
-        val selector = "@c"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testBedrockSelector_v() {
-        val selector = "@v"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 9. 参数转换测试
-    // ============================================
-
-    @Test
-    fun testConversion_distance_to_r_rm() {
-        val javaSelector = "@a[distance=5..10]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("rm=5"))
-        assertTrue(result.bedrockSelector.contains("r=10"))
-    }
-
-    @Test
-    fun testConversion_x_rotation_to_rx_rxm() {
-        val javaSelector = "@a[x_rotation=-45..45]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("rxm=-45"))
-        assertTrue(result.bedrockSelector.contains("rx=45"))
-    }
-
-    @Test
-    fun testConversion_y_rotation_to_ry_rym() {
-        val javaSelector = "@a[y_rotation=-90..90]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("rym=-90"))
-        assertTrue(result.bedrockSelector.contains("ry=90"))
-    }
-
-    @Test
-    fun testConversion_level_to_l_lm() {
-        val javaSelector = "@a[level=5..10]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("lm=5"))
-        assertTrue(result.bedrockSelector.contains("l=10"))
-    }
-
-    @Test
-    fun testConversion_gamemode_to_m() {
-        val javaSelector = "@a[gamemode=survival]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("m=survival"))
-    }
-
-    @Test
-    fun testConversion_limit_sort_nearest_to_c() {
-        val javaSelector = "@a[limit=4,sort=nearest]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("c=4"))
-    }
-
-    @Test
-    fun testConversion_limit_sort_furthest_to_c_negative() {
-        val javaSelector = "@a[limit=4,sort=furthest]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("c=-4"))
-    }
-
-    @Test
-    fun testConversion_sort_random_to_c() {
-        val javaSelector = "@a[sort=random]"
-        val result = SelectorConverter.convertJavaToBedrock(javaSelector)
-        assertTrue(result.bedrockSelector.contains("c=9999"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_r_rm_to_distance() {
-        val bedrockSelector = "@a[r=10,rm=5]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("distance=5..10"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_rx_rxm_to_x_rotation() {
-        val bedrockSelector = "@a[rx=45,rxm=-45]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("x_rotation=-45..45"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_ry_rym_to_y_rotation() {
-        val bedrockSelector = "@a[ry=90,rym=-90]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("y_rotation=-90..90"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_l_lm_to_level() {
-        val bedrockSelector = "@a[l=10,lm=5]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("level=5..10"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_m_to_gamemode() {
-        val bedrockSelector = "@a[m=survival]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("gamemode=survival"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_c_to_limit_sort() {
-        val bedrockSelector = "@a[c=4]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("limit=4"))
-        assertTrue(result.javaSelector.contains("sort=nearest"))
-    }
-
-    @Test
-    fun testConversion_bedrock_to_java_c_negative_to_limit_sort() {
-        val bedrockSelector = "@a[c=-4]"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.contains("limit=4"))
-        assertTrue(result.javaSelector.contains("sort=furthest"))
-    }
-
-    @Test
-    fun testConversion_bedrock_selector_initiator_to_a() {
-        val bedrockSelector = "@initiator"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.startsWith("@a"))
-    }
-
-    @Test
-    fun testConversion_bedrock_selector_c_to_a() {
-        val bedrockSelector = "@c"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.startsWith("@a"))
-    }
-
-    @Test
-    fun testConversion_bedrock_selector_v_to_a() {
-        val bedrockSelector = "@v"
-        val result = SelectorConverter.convertBedrockToJava(bedrockSelector)
-        assertTrue(result.javaSelector.startsWith("@a"))
-    }
-
-    // ============================================
-    // 10. 参数过滤测试
-    // ============================================
-
-    @Test
-    fun testFilter_java_to_bedrock_remove_java_params() {
-        val javaSelector = "@a[distance=5..10,team=red,predicate=my_predicate]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
-        assertFalse(filtered.contains("team"))
-        assertFalse(filtered.contains("predicate"))
-        assertTrue(filtered.contains("rm=5"))
-        assertTrue(filtered.contains("r=10"))
-    }
-
-    @Test
-    fun testFilter_bedrock_to_java_remove_bedrock_params() {
-        val bedrockSelector = "@a[r=10,rm=5,hasitem={item=diamond},family=zombie]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA)
-        assertFalse(filtered.contains("hasitem"))
-        assertFalse(filtered.contains("family"))
-        assertTrue(filtered.contains("distance=5..10"))
-    }
-
-    @Test
-    fun testFilter_remove_team() {
-        val selector = "@a[team=red]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
-        assertFalse(filtered.contains("team"))
-        assertTrue(reminders.any { it.contains("team") })
-    }
-
-    @Test
-    fun testFilter_remove_predicate() {
-        val selector = "@a[predicate=my_predicate]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
-        assertFalse(filtered.contains("predicate"))
-        assertTrue(reminders.any { it.contains("predicate") })
-    }
-
-    @Test
-    fun testFilter_remove_advancements() {
-        val selector = "@a[advancements={story/root=true}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
-        assertFalse(filtered.contains("advancements"))
-        assertTrue(reminders.any { it.contains("advancements") })
-    }
-
-    @Test
-    fun testFilter_remove_hasitem() {
-        val selector = "@a[hasitem={item=diamond}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
-        assertFalse(filtered.contains("hasitem"))
-    }
-
-    @Test
-    fun testFilter_remove_family() {
-        val selector = "@a[family=zombie]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
-        assertFalse(filtered.contains("family"))
-        assertTrue(reminders.any { it.contains("family") })
-    }
-
-    @Test
-    fun testFilter_remove_haspermission() {
-        val selector = "@a[haspermission={permission=level}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
-        assertFalse(filtered.contains("haspermission"))
-        assertTrue(reminders.any { it.contains("haspermission") })
-    }
-
-    @Test
-    fun testFilter_remove_has_property() {
-        val selector = "@a[has_property={property=value}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
-        assertFalse(filtered.contains("has_property"))
-        assertTrue(reminders.any { it.contains("has_property") })
-    }
-
-    // ============================================
-    // 11. §n映射验证测试
-    // ============================================
-
-    @Test
-    fun testSectionNMappingToRed() {
-        // 验证§n映射为§c（红色）
-        val message = "§n测试文本"
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, "color")
-        // 基岩版JSON中§n应该被转换为§c
-        val expectedContains = "§c"
-        assertTrue("§n应该映射为§c（红色）", bedrockJson.contains(expectedContains))
-    }
-
-    @Test
-    fun testSectionNMappingInJava() {
-        // 验证§n在Java版中的处理
-        val message = "§n测试文本"
-        val javaJson = TextFormatter.convertToJavaJson(message, "color")
-        // Java版JSON中§n应该被正确处理
-        assertTrue("§n应该被正确处理", javaJson.isNotEmpty())
-    }
-
-    @Test
-    fun testSectionNFontMode() {
-        // 验证§n在font模式下的处理
-        val message = "§n测试文本"
-        val javaJson = TextFormatter.convertToJavaJson(message, "font")
-        // font模式下§n应该作为字体样式处理
-        assertTrue("font模式下§n应该作为字体样式处理", javaJson.isNotEmpty())
-    }
-
-    // ============================================
-    // 12. 多种通用选择器参数组合测试
-    // ============================================
-
-    @Test
-    fun testCommonParams_all_coordinates() {
-        val selector = "@a[x=10,y=20,z=30]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_all_box() {
-        val selector = "@a[dx=10,dy=10,dz=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_coordinates_and_box() {
-        val selector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_scores_and_tag() {
-        val selector = "@a[scores={myscore=10},tag=mytag]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_name_and_type() {
-        val selector = "@a[name=Player,type=zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_multiple_scores() {
-        val selector = "@a[scores={score1=5,score2=10,score3=15}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_scores_range_and_tag() {
-        val selector = "@a[scores={myscore=5..10},tag=mytag]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_all_common_params() {
-        val selector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={myscore=10},tag=mytag,name=Player,type=zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 13. 通用选择器参数 + Java版参数组合测试
-    // ============================================
-
-    @Test
-    fun testCommonParams_java_distance_exact() {
-        val selector = "@a[x=10,y=20,distance=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_distance_range() {
-        val selector = "@a[tag=mytag,type=zombie,distance=5..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_x_rotation() {
-        val selector = "@a[scores={myscore=10},x_rotation=-45..45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_y_rotation() {
-        val selector = "@a[name=Player,y_rotation=-90..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_level() {
-        val selector = "@a[tag=mytag,level=5..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_gamemode() {
-        val selector = "@a[type=zombie,gamemode=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_limit_sort() {
-        val selector = "@a[scores={myscore=10},limit=4,sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_distance_and_rotation() {
-        val selector = "@a[x=10,y=20,z=30,distance=5..10,x_rotation=-45..45,y_rotation=-90..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_level_and_gamemode() {
-        val selector = "@a[tag=mytag,name=Player,level=5..10,gamemode=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_distance_level_rotation() {
-        val selector = "@a[type=zombie,scores={myscore=10},distance=5..10,level=5..10,x_rotation=-45..45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    @Test
-    fun testCommonParams_java_all_java_params() {
-        val selector = "@a[x=10,y=20,z=30,tag=mytag,distance=5..10,level=5..10,gamemode=survival,limit=4,sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
-    }
-
-    // ============================================
-    // 14. 通用选择器参数 + 基岩版参数组合测试
-    // ============================================
-
-    @Test
-    fun testCommonParams_bedrock_r() {
-        val selector = "@a[x=10,y=20,r=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_rm() {
-        val selector = "@a[tag=mytag,type=zombie,rm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_r_rm() {
-        val selector = "@a[scores={myscore=10},r=10,rm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_rx() {
-        val selector = "@a[name=Player,rx=45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_rxm() {
-        val selector = "@a[tag=mytag,rxm=-45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_rx_rxm() {
-        val selector = "@a[type=zombie,rx=45,rxm=-45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_ry() {
-        val selector = "@a[scores={myscore=10},ry=90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_rym() {
-        val selector = "@a[name=Player,rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_ry_rym() {
-        val selector = "@a[tag=mytag,ry=90,rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_l() {
-        val selector = "@a[type=zombie,l=10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_lm() {
-        val selector = "@a[scores={myscore=10},lm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_l_lm() {
-        val selector = "@a[name=Player,l=10,lm=5]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_m() {
-        val selector = "@a[tag=mytag,m=survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_c() {
-        val selector = "@a[type=zombie,c=4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_r_rm_rotation() {
-        val selector = "@a[x=10,y=20,z=30,r=10,rm=5,rx=45,rxm=-45,ry=90,rym=-90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_l_lm_m_c() {
-        val selector = "@a[tag=mytag,name=Player,l=10,lm=5,m=survival,c=4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    @Test
-    fun testCommonParams_bedrock_all_bedrock_params() {
-        val selector = "@a[x=10,y=20,z=30,tag=mytag,r=10,rm=5,rx=45,rxm=-45,ry=90,rym=-90,l=10,lm=5,m=survival,c=4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
-    }
-
-    // ============================================
-    // 15. 特殊情况和边界测试
-    // ============================================
-
-    @Test
-    fun testSpecialCase_distance_min_only() {
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_3() {
+        // sort=furthest + limit=正数
+        val selector = "@a[limit=10,sort=furthest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_4() {
+        // sort=furthest（无limit）
+        val selector = "@a[sort=furthest]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_5() {
+        // sort=random + limit=正数
+        val selector = "@a[limit=3,sort=random]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_6() {
+        // sort=random（无limit）
+        val selector = "@a[sort=random]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_7() {
+        // sort=arbitrary + limit=正数
+        val selector = "@a[limit=7,sort=arbitrary]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_8() {
+        // sort=arbitrary（无limit）
+        val selector = "@a[sort=arbitrary]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_9() {
+        // limit=正数（无sort）
+        val selector = "@a[limit=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_10() {
+        // c=正数（基岩版）
+        val selector = "@a[c=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testSortAndLimitCombinations_11() {
+        // c=负数（基岩版）
+        val selector = "@a[c=-5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    /**
+     * 测试组10：范围参数的所有可能
+     */
+    @Test
+    fun testRangeParameters_distance_1() {
+        // distance=单个值
+        val selector = "@a[distance=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_distance_2() {
+        // distance=5..10
+        val selector = "@a[distance=5..10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_distance_3() {
+        // distance=5..
         val selector = "@a[distance=5..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_distance_max_only() {
+    fun testRangeParameters_distance_4() {
+        // distance=..10
         val selector = "@a[distance=..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_x_rotation_min_only() {
+    fun testRangeParameters_x_rotation_1() {
+        // x_rotation=单个值
+        val selector = "@a[x_rotation=45]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_x_rotation_2() {
+        // x_rotation=-45..45
+        val selector = "@a[x_rotation=-45..45]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_x_rotation_3() {
+        // x_rotation=-45..
         val selector = "@a[x_rotation=-45..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_x_rotation_max_only() {
+    fun testRangeParameters_x_rotation_4() {
+        // x_rotation=..45
         val selector = "@a[x_rotation=..45]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_y_rotation_min_only() {
+    fun testRangeParameters_y_rotation_1() {
+        // y_rotation=单个值
+        val selector = "@a[y_rotation=90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_y_rotation_2() {
+        // y_rotation=-90..90
+        val selector = "@a[y_rotation=-90..90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_y_rotation_3() {
+        // y_rotation=-90..
         val selector = "@a[y_rotation=-90..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_y_rotation_max_only() {
+    fun testRangeParameters_y_rotation_4() {
+        // y_rotation=..90
         val selector = "@a[y_rotation=..90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_level_min_only() {
+    fun testRangeParameters_level_1() {
+        // level=单个值
+        val selector = "@a[level=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_level_2() {
+        // level=5..10
+        val selector = "@a[level=5..10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testRangeParameters_level_3() {
+        // level=5..
         val selector = "@a[level=5..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_level_max_only() {
+    fun testRangeParameters_level_4() {
+        // level=..10
         val selector = "@a[level=..10]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_gamemode_not() {
+    fun testRangeParameters_r_rm_1() {
+        // r=10
+        val selector = "@a[r=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_r_rm_2() {
+        // rm=5
+        val selector = "@a[rm=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_r_rm_3() {
+        // rm=5,r=10
+        val selector = "@a[rm=5,r=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_rx_rxm_1() {
+        // rx=45
+        val selector = "@a[rx=45]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_rx_rxm_2() {
+        // rxm=-45
+        val selector = "@a[rxm=-45]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_rx_rxm_3() {
+        // rxm=-45,rx=45
+        val selector = "@a[rxm=-45,rx=45]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_ry_rym_1() {
+        // ry=90
+        val selector = "@a[ry=90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_ry_rym_2() {
+        // rym=-90
+        val selector = "@a[rym=-90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_ry_rym_3() {
+        // rym=-90,ry=90
+        val selector = "@a[rym=-90,ry=90]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_l_lm_1() {
+        // l=10
+        val selector = "@a[l=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_l_lm_2() {
+        // lm=5
+        val selector = "@a[lm=5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_l_lm_3() {
+        // lm=5,l=10
+        val selector = "@a[lm=5,l=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
+    }
+    
+    @Test
+    fun testRangeParameters_scores_1() {
+        // scores={test=10}
+        val selector = "@a[scores={test=10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testRangeParameters_scores_2() {
+        // scores={test=5..10}
+        val selector = "@a[scores={test=5..10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testRangeParameters_scores_3() {
+        // scores={test=5..}
+        val selector = "@a[scores={test=5..}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testRangeParameters_scores_4() {
+        // scores={test=..10}
+        val selector = "@a[scores={test=..10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testRangeParameters_scores_5() {
+        // 多个scores参数
+        val selector = "@a[scores={test=10,foo=5..10,bar=5..,baz=..20}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    /**
+     * 测试组11：否定参数测试
+     */
+    @Test
+    fun testNegationParameters_1() {
+        // type=!zombie
+        val selector = "@e[type=!zombie]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testNegationParameters_2() {
+        // tag=!enemy
+        val selector = "@e[tag=!enemy]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testNegationParameters_3() {
+        // name=!Boss
+        val selector = "@e[name=!Boss]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testNegationParameters_4() {
+        // gamemode=!survival
         val selector = "@a[gamemode=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_m_not() {
-        val selector = "@a[m=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testNegationParameters_5() {
+        // m=!0
+        val selector = "@a[m=!0]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
     @Test
-    fun testSpecialCase_c_negative() {
-        val selector = "@a[c=-4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testNegationParameters_6() {
+        // team=!red
+        val selector = "@a[team=!red]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testSpecialCase_scores_min_only() {
-        val selector = "@a[scores={myscore=5..}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testNegationParameters_7() {
+        // family=!monster
+        val selector = "@e[family=!monster]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
+    /**
+     * 测试组12：hasitem参数测试
+     */
     @Test
-    fun testSpecialCase_scores_max_only() {
-        val selector = "@a[scores={myscore=..10}]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testHasitemParameters_1() {
+        // 简单hasitem
+        val selector = "@a[hasitem={item=diamond}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
     @Test
-    fun testSpecialCase_tag_not() {
-        val selector = "@a[tag=!mytag]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testHasitemParameters_2() {
+        // hasitem with quantity
+        val selector = "@a[hasitem={item=diamond,quantity=5}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
     @Test
-    fun testSpecialCase_name_not() {
-        val selector = "@a[name=!Player]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testHasitemParameters_3() {
+        // hasitem with quantity range
+        val selector = "@a[hasitem={item=diamond,quantity=5..10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
     @Test
-    fun testSpecialCase_type_not() {
-        val selector = "@a[type=!zombie]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testHasitemParameters_4() {
+        // hasitem with location
+        val selector = "@a[hasitem={item=diamond,location=slot.weapon.mainhand}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
-    // ============================================
-    // 16. 复杂组合测试
-    // ============================================
-
+    
     @Test
-    fun testComplex_all_java_params_with_common() {
-        val selector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={score1=5,score2=10},tag=mytag,name=Player,type=zombie,distance=5..10,x_rotation=-45..45,y_rotation=-90..90,level=5..10,gamemode=survival,limit=4,sort=nearest]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+    fun testHasitemParameters_5() {
+        // hasitem array
+        val selector = "@a[hasitem=[{item=diamond,quantity=5..},{item=iron,quantity=10..}]]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
     @Test
-    fun testComplex_all_bedrock_params_with_common() {
-        val selector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={score1=5,score2=10},tag=mytag,name=Player,type=zombie,r=10,rm=5,rx=45,rxm=-45,ry=90,rym=-90,l=10,lm=5,m=survival,c=4]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testHasitemParameters_6() {
+        // hasitem with negation
+        val selector = "@a[hasitem={item=diamond,quantity=!5}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.BEDROCK, type)
     }
-
+    
+    /**
+     * 测试组13：nbt参数测试
+     */
     @Test
-    fun testComplex_mixed_java_params_edge_cases() {
-        val selector = "@a[tag=mytag,distance=5..,level=..10,x_rotation=..45,y_rotation=-90..]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+    fun testNbtParameters_1() {
+        // 简单nbt
+        val selector = "@a[nbt={CustomName:\"Steve\"}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testComplex_mixed_bedrock_params_edge_cases() {
-        val selector = "@a[tag=mytag,rm=5,l=10,rxm=-45,ry=90]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testNbtParameters_2() {
+        // nbt with Inventory
+        val selector = "@a[nbt={Inventory:[{id:\"minecraft:diamond\",Count:5b,Slot:0b}]}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testComplex_all_not_conditions() {
-        val selector = "@a[tag=!mytag,name=!Player,type=!zombie,gamemode=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.JAVA, result)
+    fun testNbtParameters_3() {
+        // nbt with SelectedItem
+        val selector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",Count:1b}}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
     }
-
+    
     @Test
-    fun testComplex_all_not_conditions_bedrock() {
-        val selector = "@a[tag=!mytag,name=!Player,type=!zombie,m=!survival]"
-        val result = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.BEDROCK, result)
+    fun testNbtParameters_4() {
+        // nbt with Tags
+        val selector = "@a[nbt={Tags:[\"a\",\"b\"]}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    @Test
+    fun testNbtParameters_5() {
+        // nbt with multiple fields
+        val selector = "@a[nbt={CustomName:\"Steve\",Tags:[\"vip\"],Health:20f}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.JAVA, type)
+    }
+    
+    /**
+     * 测试组14：选择器转换测试
+     */
+    @Test
+    fun testSelectorConversion_1() {
+        // 基岩版到Java版：r/rm -> distance
+        val bedrockSelector = "@a[r=10]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
+        assertTrue("Java版选择器应包含distance", conversion.javaSelector.contains("distance"))
+    }
+    
+    @Test
+    fun testSelectorConversion_2() {
+        // Java版到基岩版：distance -> r/rm
+        val javaSelector = "@a[distance=10]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertTrue("基岩版选择器应包含r", conversion.bedrockSelector.contains("r"))
+    }
+    
+    @Test
+    fun testSelectorConversion_3() {
+        // 基岩版到Java版：m -> gamemode
+        val bedrockSelector = "@a[m=0]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        assertTrue("Java版选择器应包含gamemode", conversion.javaSelector.contains("gamemode"))
+    }
+    
+    @Test
+    fun testSelectorConversion_4() {
+        // Java版到基岩版：gamemode -> m
+        val javaSelector = "@a[gamemode=survival]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertTrue("基岩版选择器应包含m", conversion.bedrockSelector.contains("m"))
+    }
+    
+    @Test
+    fun testSelectorConversion_5() {
+        // 基岩版到Java版：c -> limit/sort
+        val bedrockSelector = "@a[c=5]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        assertTrue("Java版选择器应包含limit", conversion.javaSelector.contains("limit"))
+        assertTrue("Java版选择器应包含sort", conversion.javaSelector.contains("sort"))
+    }
+    
+    @Test
+    fun testSelectorConversion_6() {
+        // Java版到基岩版：limit/sort -> c
+        val javaSelector = "@a[limit=5,sort=nearest]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertTrue("基岩版选择器应包含c", conversion.bedrockSelector.contains("c"))
+    }
+    
+    /**
+     * 测试组15：参数过滤测试
+     */
+    @Test
+    fun testParameterFiltering_1() {
+        // 过滤Java版独有参数到基岩版
+        val javaSelector = "@a[distance=10,team=red,gamemode=survival]"
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        assertTrue("应移除team参数", removed.contains("team"))
+        assertFalse("不应包含team参数", filtered.contains("team"))
+    }
+    
+    @Test
+    fun testParameterFiltering_2() {
+        // 过滤基岩版独有参数到Java版
+        val bedrockSelector = "@a[r=10,m=0,haspermission={movement=enabled}]"
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA)
+        assertTrue("应移除haspermission参数", removed.contains("haspermission"))
+        assertFalse("不应包含haspermission参数", filtered.contains("haspermission"))
+    }
+    
+    @Test
+    fun testParameterFiltering_3() {
+        // 过滤family参数到Java版
+        val bedrockSelector = "@e[family=zombie]"
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA)
+        assertTrue("应移除family参数", removed.contains("family"))
+        assertFalse("不应包含family参数", filtered.contains("family"))
+    }
+    
+    @Test
+    fun testParameterFiltering_4() {
+        // 过滤predicate参数到基岩版
+        val javaSelector = "@a[predicate=test:test]"
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        assertTrue("应移除predicate参数", removed.contains("predicate"))
+        assertFalse("不应包含predicate参数", filtered.contains("predicate"))
+    }
+    
+    @Test
+    fun testParameterFiltering_5() {
+        // 过滤advancements参数到基岩版
+        val javaSelector = "@a[advancements={story/form_obsidian=true}]"
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        assertTrue("应移除advancements参数", removed.contains("advancements"))
+        assertFalse("不应包含advancements参数", filtered.contains("advancements"))
     }
 }

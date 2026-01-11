@@ -39,11 +39,44 @@ interface CommandHistoryDao {
     fun searchByQuery(query: String): Flow<List<CommandHistory>>
 }
 
+@Entity(tableName = "app_settings")
+data class AppSettings(
+    @PrimaryKey
+    val key: String,
+    val value: String
+)
+
+@Dao
+interface AppSettingsDao {
+    
+    @Query("SELECT * FROM app_settings WHERE key = :key")
+    suspend fun getByKey(key: String): AppSettings?
+    
+    @Query("SELECT * FROM app_settings")
+    fun getAll(): Flow<List<AppSettings>>
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(settings: AppSettings)
+    
+    @Update
+    suspend fun update(settings: AppSettings)
+    
+    @Delete
+    suspend fun delete(settings: AppSettings)
+    
+    @Query("DELETE FROM app_settings WHERE key = :key")
+    suspend fun deleteByKey(key: String)
+    
+    @Query("DELETE FROM app_settings")
+    suspend fun deleteAll()
+}
+
 @Database(
-    entities = [CommandHistory::class],
-    version = 1,
+    entities = [CommandHistory::class, AppSettings::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun commandHistoryDao(): CommandHistoryDao
+    abstract fun appSettingsDao(): AppSettingsDao
 }

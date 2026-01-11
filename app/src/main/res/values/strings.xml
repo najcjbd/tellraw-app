@@ -33,6 +33,20 @@
     <string name="mn_code_option_1">方式1</string>
     <string name="mn_code_option_2">方式2</string>
     
+    <!-- 混合模式和§m/§n_c/f设置 -->
+    <string name="settings_title">设置</string>
+    <string name="mn_mixed_mode_config">§m§n混合模式配置</string>
+    <string name="mn_mixed_mode">混合模式</string>
+    <string name="mn_mixed_mode_description">未选择时默认使用字体方式</string>
+    <string name="mn_font_style">字体方式</string>
+    <string name="mn_font_style_description">Java版使用删除线/下划线，基岩版使用颜色代码</string>
+    <string name="mn_color_style">颜色代码方式</string>
+    <string name="mn_color_style_description">Java版和基岩版都使用颜色代码</string>
+    <string name="mn_cf_enabled">启用§m/§n_c/f</string>
+    <string name="mn_cf_enabled_description">使用§m_f/§m_c/§n_f/§n_c指定处理方式</string>
+    <string name="mn_handling_method">选择§m（删除线）和§n（下划线）代码的处理方式：</string>
+    <string name="remember_choice">记住我的选择</string>
+    
     <!-- 颜色代码 -->
     <string name="color_black">黑色</string>
     <string name="color_dark_blue">深蓝</string>
@@ -62,57 +76,15 @@
     <!-- 帮助界面 -->
     <string name="help_title">帮助</string>
     <string name="help_about">关于应用</string>
-    <string name="help_about_content">Tellraw命令生成器是一个帮助Minecraft玩家生成tellraw命令的工具。
-
-支持Java版和基岩版的选择器转换，以及文本格式化功能。</string>
+    <string name="help_about_content">Tellraw命令生成器是一个帮助Minecraft玩家生成tellraw命令的工具。\n\n支持Java版和基岩版的选择器转换，以及文本格式化功能。</string>
     <string name="help_selector_input">选择器输入</string>
-    <string name="help_selector_content">选择器用于指定命令的目标：
-
-• @a - 所有玩家
-• @p - 最近的玩家
-• @r - 随机玩家
-• @e - 所有实体
-• @s - 命令执行者
-
-支持参数过滤，如：
-• @a[gamemode=survival] - 生存模式的所有玩家
-• @e[type=cow] - 所有牛
-• @p[distance=..10] - 10格内的最近玩家</string>
+    <string name="help_selector_content">选择器用于指定命令的目标：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 随机玩家\n• @e - 所有实体\n• @s - 命令执行者\n\n支持参数过滤，如：\n• @a[gamemode=survival] - 生存模式的所有玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格内的最近玩家</string>
     <string name="help_text_formatting">文本格式化</string>
-    <string name="help_text_formatting_content">支持Minecraft颜色代码和格式代码：
-
-颜色代码：
-• §0 - 黑色    §1 - 深蓝色   §2 - 深绿色
-• §3 - 深青色   §4 - 深红色   §5 - 深紫色
-• §6 - 金色    §7 - 灰色     §8 - 深灰色
-• §9 - 蓝色    §a - 绿色     §b - 青色
-• §c - 红色    §d - 粉色     §e - 黄色
-• §f - 白色
-
-格式代码：
-• §l - 粗体    §m - 删除线   §n - 下划线
-• §o - 斜体    §k - 混乱字   §r - 重置</string>
+    <string name="help_text_formatting_content">支持Minecraft颜色代码和格式代码：\n\n颜色代码：\n• §0 - 黑色    §1 - 深蓝色   §2 - 深绿色\n• §3 - 深青色   §4 - 深红色   §5 - 深紫色\n• §6 - 金色    §7 - 灰色     §8 - 深灰色\n• §9 - 蓝色    §a - 绿色     §b - 青色\n• §c - 红色    §d - 粉色     §e - 黄色\n• §f - 白色\n\n格式代码：\n• §l - 粗体    §m - 删除线   §n - 下划线\n• §o - 斜体    §k - 混乱字   §r - 重置</string>
     <string name="help_version_differences">版本差异</string>
-    <string name="help_version_differences_content">Java版和基岩版在选择器和格式化方面存在差异：
-
-选择器差异：
-• Java版使用distance参数，基岩版使用r/rm参数
-• Java版使用gamemode参数，基岩版使用m参数
-• Java版支持nbt参数，基岩版支持hasitem参数
-
-格式化差异：
-• §m§n代码在两个版本中的处理方式不同
-• 某些颜色代码在基岩版中有特殊含义</string>
+    <string name="help_version_differences_content">Java版和基岩版在选择器和格式化方面存在差异：\n\n选择器差异：\n• Java版使用distance参数，基岩版使用r/rm参数\n• Java版使用gamemode参数，基岩版使用m参数\n• Java版支持nbt参数，基岩版支持hasitem参数\n\n格式化差异：\n• §m§n代码在两个版本中的处理方式不同\n• 某些颜色代码在基岩版中有特殊含义</string>
     <string name="help_usage_tips">使用提示</string>
-    <string name="help_usage_tips_content">1. 输入选择器和消息内容
-2. 应用会自动检测选择器类型
-3. 生成Java版和基岩版命令
-4. 可以复制命令或分享给他人
-5. 选择器参数的转换并非完美，需要人工检查
-
-如果遇到§m§n代码，应用会询问处理方式：
-• Java版字体方式：Java版保持原样，基岩版转换为颜色代码
-• 颜色代码方式：两个版本都转换为颜色代码</string>
+    <string name="help_usage_tips_content">1. 输入选择器和消息内容\n2. 应用会自动检测选择器类型\n3. 生成Java版和基岩版命令\n4. 可以复制命令或分享给他人\n5. 选择器参数的转换并非完美，需要人工检查\n\n如果遇到§m§n代码，应用会询问处理方式：\n• Java版字体方式：Java版保持原样，基岩版转换为颜色代码\n• 颜色代码方式：两个版本都转换为颜色代码</string>
     <string name="help_conversion_warning">选择器参数的转换并非完美，需要人工检查</string>
     
     <!-- 通用 -->

@@ -26,7 +26,8 @@ import javax.inject.Inject
 @HiltViewModel
 class TellrawViewModel @Inject constructor(
     private val tellrawRepository: TellrawRepository,
-    private val versionCheckRepository: VersionCheckRepository
+    private val versionCheckRepository: VersionCheckRepository,
+    private val settingsRepository: com.tellraw.app.data.repository.SettingsRepository
 ) : ViewModel() {
     
     private val _selectorInput = MutableStateFlow("")
@@ -40,8 +41,9 @@ class TellrawViewModel @Inject constructor(
      */
     fun setContext(context: Context) {
         this.context = context
-        // 设置Context后初始化版本检查
+        // 设置Context后初始化版本检查和加载设置
         initializeVersionCheck()
+        loadSettings()
     }
     
     private val _messageInput = MutableStateFlow("")
@@ -62,6 +64,32 @@ class TellrawViewModel @Inject constructor(
     private val _useJavaFontStyle = MutableStateFlow(true)
     val useJavaFontStyle: StateFlow<Boolean> = _useJavaFontStyle.asStateFlow()
     
+    private val _mnMixedMode = MutableStateFlow(false)
+    val mnMixedMode: StateFlow<Boolean> = _mnMixedMode.asStateFlow()
+    
+    private val _mnCFEnabled = MutableStateFlow(false)
+    val mnCFEnabled: StateFlow<Boolean> = _mnCFEnabled.asStateFlow()
+    
+    /**
+     * 加载用户设置
+     */
+    private suspend fun loadSettings() {
+        val mnHandlingMode = settingsRepository.getMNHandlingMode()
+        _useJavaFontStyle.value = mnHandlingMode
+        
+        val mixedMode = settingsRepository.getMNMixedMode()
+        _mnMixedMode.value = mixedMode
+        
+        val cfEnabled = settingsRepository.getMNCFEnabled()
+        _mnCFEnabled.value = cfEnabled
+        
+        // 如果启用了_c/_f后缀，自动关闭混合模式
+        if (cfEnabled && mixedMode) {
+            settingsRepository.setMNMixedMode(false)
+            _mnMixedMode.value = false
+        }
+    }
+    
     private val _showMNDialog = MutableStateFlow<String?>(null)
     val showMNDialog: StateFlow<String?> = _showMNDialog.asStateFlow()
     
@@ -78,6 +106,9 @@ class TellrawViewModel @Inject constructor(
     // 上一次的消息内容，用于检测新增的§m和§n
     private var lastMessageContent = ""
     
+    // 后台存储的消息（混合模式下转换为§m_f/§m_c/§n_f/§n_c）
+    private var backendMessageContent = ""
+    
     // 版本检查相关状态
     private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
     val showUpdateDialog: StateFlow<GithubRelease?> = _showUpdateDialog.asStateFlow()
@@ -91,6 +122,28 @@ class TellrawViewModel @Inject constructor(
     // 搜索结果状态
     private val _searchResults = MutableStateFlow<List<CommandHistory>>(emptyList())
     val searchResults: StateFlow<List<CommandHistory>> = _searchResults.asStateFlow()
+    
+    // SAF相关状态
+    private val _historyStorageUri = MutableStateFlow<String?>(null)
+    val historyStorageUri: StateFlow<String?> = _historyStorageUri.asStateFlow()
+    
+    private val _historyStorageFilename = MutableStateFlow("TellrawCommand.txt")
+    val historyStorageFilename: StateFlow<String> = _historyStorageFilename.asStateFlow()
+    
+    private val _showStorageSettingsDialog = MutableStateFlow(false)
+    val showStorageSettingsDialog: StateFlow<Boolean> = _showStorageSettingsDialog.asStateFlow()
+    
+    private val _showFilenameDialog = MutableStateFlow<String?>(null)
+    val showFilenameDialog: StateFlow<String?> = _showFilenameDialog.asStateFlow()
+    
+    private val _showFileExistsDialog = MutableStateFlow<String?>(null)
+    val showFileExistsDialog: StateFlow<String?> = _showFileExistsDialog.asStateFlow()
+    
+    private val _isWritingToFile = MutableStateFlow(false)
+    val isWritingToFile: StateFlow<Boolean> = _isWritingToFile.asStateFlow()
+    
+    private val _writeFileMessage = MutableStateFlow<String?>(null)
+    val writeFileMessage: StateFlow<String?> = _writeFileMessage.asStateFlow()
     
     fun updateSelector(selector: String) {
         _selectorInput.value = selector
@@ -112,6 +165,14 @@ class TellrawViewModel @Inject constructor(
      * 检测并计数§m和§n代码的使用
      */
     private fun detectAndCountMNCodes(message: String) {
+        // 如果启用了_c/_f后缀，不检测普通的§m§n
+        if (_mnCFEnabled.value) {
+            // 更新上一次的消息内容
+            lastMessageContent = message
+            backendMessageContent = message
+            return
+        }
+        
         // 统计当前消息中所有的§m和§n数量
         val currentMCount = countOccurrences(message, "§m")
         val currentNCount = countOccurrences(message, "§n")
@@ -134,6 +195,53 @@ class TellrawViewModel @Inject constructor(
         
         // 更新上一次的消息内容
         lastMessageContent = message
+        
+        // 在混合模式下，更新后台存储
+        if (_mnMixedMode.value) {
+            updateBackendMessage(message)
+        } else {
+            backendMessageContent = message
+        }
+    }
+    
+    /**
+     * 更新后台消息（混合模式下将§m/§n转换为§m_f/§m_c/§n_f/§n_c）
+     */
+    private fun updateBackendMessage(frontendMessage: String) {
+        // 将§m/§n转换为§m_f/§m_c/§n_f/§n_c
+        // 这里暂时全部转换为§m_f/§n_f（字体方式），用户选择后会更新
+        var result = frontendMessage
+        result = result.replace("§m", "§m_f")
+        result = result.replace("§n", "§n_f")
+        backendMessageContent = result
+    }
+    
+    /**
+     * 处理混合模式下的§m/§n选择
+     * @param codeType §m或§n
+     * @param choice "font"或"color"
+     */
+    fun handleMixedModeChoice(codeType: String, choice: String) {
+        if (_mnMixedMode.value) {
+            // 找到第一个未选择的§m_f/§n_f并更新为§m_c/§n_c
+            val targetCode = if (codeType == "§m") "§m_f" else "§n_f"
+            val replacementCode = if (choice == "color") {
+                if (codeType == "§m") "§m_c" else "§n_c"
+            } else {
+                targetCode
+            }
+            
+            if (choice == "font") {
+                // 选择字体方式，不需要修改
+                return
+            }
+            
+            // 找到第一个§m_f/§n_f并替换为§m_c/§n_c
+            val index = backendMessageContent.indexOf(targetCode)
+            if (index != -1) {
+                backendMessageContent = backendMessageContent.substring(0, index) + replacementCode + backendMessageContent.substring(index + 3)
+            }
+        }
     }
     
     /**
@@ -156,6 +264,33 @@ class TellrawViewModel @Inject constructor(
     
     fun setUseJavaFontStyle(useJavaFont: Boolean) {
         _useJavaFontStyle.value = useJavaFont
+        // 保存设置到数据库
+        viewModelScope.launch {
+            settingsRepository.setMNHandlingMode(useJavaFont)
+        }
+        generateCommands()
+    }
+    
+    fun setMNMixedMode(enabled: Boolean) {
+        _mnMixedMode.value = enabled
+        // 保存设置到数据库
+        viewModelScope.launch {
+            settingsRepository.setMNMixedMode(enabled)
+        }
+        generateCommands()
+    }
+    
+    fun setMNCFEnabled(enabled: Boolean) {
+        _mnCFEnabled.value = enabled
+        // 保存设置到数据库
+        viewModelScope.launch {
+            settingsRepository.setMNCFEnabled(enabled)
+            // 如果启用了_c/_f后缀，自动关闭混合模式
+            if (enabled && _mnMixedMode.value) {
+                settingsRepository.setMNMixedMode(false)
+                _mnMixedMode.value = false
+            }
+        }
         generateCommands()
     }
     
@@ -177,7 +312,8 @@ class TellrawViewModel @Inject constructor(
     private fun generateTellrawCommands(
         selector: String, 
         message: String, 
-        mNHandling: String = "none"
+        mNHandling: String = "none",
+        mnCFEnabled: Boolean = false
     ): TellrawCommand {
         val allWarnings = mutableListOf<String>()
         
@@ -229,11 +365,11 @@ class TellrawViewModel @Inject constructor(
         allBedrockReminders.addAll(bedrockRemovedParams)
         
         // 生成Java版命令
-        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling)
+        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
         val javaCommand = "tellraw $javaSelectorFiltered $javaJson"
         
         // 生成基岩版命令
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling)
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
         val bedrockCommand = "tellraw $bedrockSelectorFiltered $bedrockJson"
         
         // 处理提醒信息显示
@@ -303,11 +439,18 @@ class TellrawViewModel @Inject constructor(
             }
             
             try {
-                // 确定m_n_handling参数（与Python版本一致）
-                val mNHandling = if (_useJavaFontStyle.value) "font" else "color"
+                // 确定要使用的消息（混合模式下使用后台存储）
+                val messageToUse = if (_mnMixedMode.value) backendMessageContent else message
+                
+                // 确定m_n_handling参数
+                val mNHandling = when {
+                    _mnMixedMode.value -> "font"  // 混合模式下使用font模式，因为已经转换为§m_f/§m_c/§n_f/§n_c
+                    _useJavaFontStyle.value -> "font"
+                    else -> "color"
+                }
                 
                 // 使用统一的命令生成函数
-                val result = generateTellrawCommands(selector, message, mNHandling)
+                val result = generateTellrawCommands(selector, messageToUse, mNHandling, true)
                 
                 _javaCommand.value = result.javaCommand
                 _bedrockCommand.value = result.bedrockCommand
@@ -334,13 +477,14 @@ class TellrawViewModel @Inject constructor(
     private fun generateJavaCommand(
         selector: String,
         message: String,
-        mNHandling: String
+        mNHandling: String,
+        mnCFEnabled: Boolean = false
     ): String {
         // 过滤Java版不支持的参数
         val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
         
         // 转换文本为Java版JSON格式
-        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling)
+        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
         return "tellraw $filteredSelector $javaJson"
     }
     
@@ -350,13 +494,14 @@ class TellrawViewModel @Inject constructor(
     private fun generateBedrockCommand(
         selector: String,
         message: String,
-        mNHandling: String
+        mNHandling: String,
+        mnCFEnabled: Boolean = false
     ): String {
         // 过滤基岩版不支持的参数
         val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
         
         // 转换文本为基岩版JSON格式
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling)
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
         return "tellraw $filteredSelector $bedrockJson"
     }
     
@@ -564,5 +709,229 @@ class TellrawViewModel @Inject constructor(
      */
     fun isVersionCheckDisabled(): Boolean {
         return versionCheckRepository.isVersionCheckDisabled()
+    }
+    
+    // SAF相关方法
+    
+    /**
+     * 加载历史记录存储设置
+     */
+    private suspend fun loadHistoryStorageSettings() {
+        _historyStorageUri.value = settingsRepository.getHistoryStorageUri()
+        _historyStorageFilename.value = settingsRepository.getHistoryStorageFilename()
+    }
+    
+    /**
+     * 显示存储设置对话框
+     */
+    fun showStorageSettings() {
+        viewModelScope.launch {
+            loadHistoryStorageSettings()
+            _showStorageSettingsDialog.value = true
+        }
+    }
+    
+    /**
+     * 隐藏存储设置对话框
+     */
+    fun hideStorageSettingsDialog() {
+        _showStorageSettingsDialog.value = false
+    }
+    
+    /**
+     * 设置历史记录存储目录URI
+     */
+    fun setHistoryStorageUri(uri: String) {
+        viewModelScope.launch {
+            settingsRepository.setHistoryStorageUri(uri)
+            _historyStorageUri.value = uri
+        }
+    }
+    
+    /**
+     * 显示文件名对话框
+     */
+    fun showFilenameDialog() {
+        _showFilenameDialog.value = _historyStorageFilename.value
+    }
+    
+    /**
+     * 隐藏文件名对话框
+     */
+    fun hideFilenameDialog() {
+        _showFilenameDialog.value = null
+    }
+    
+    /**
+     * 设置历史记录存储文件名
+     */
+    fun setHistoryStorageFilename(filename: String) {
+        viewModelScope.launch {
+            settingsRepository.setHistoryStorageFilename(filename)
+            _historyStorageFilename.value = filename
+        }
+    }
+    
+    /**
+     * 显示文件已存在对话框
+     */
+    fun showFileExistsDialog(filename: String) {
+        _showFileExistsDialog.value = filename
+    }
+    
+    /**
+     * 隐藏文件已存在对话框
+     */
+    fun hideFileExistsDialog() {
+        _showFileExistsDialog.value = null
+    }
+    
+    /**
+     * 清除历史记录存储设置
+     */
+    fun clearHistoryStorageSettings() {
+        viewModelScope.launch {
+            settingsRepository.setHistoryStorageUri("")
+            settingsRepository.setHistoryStorageFilename("TellrawCommand.txt")
+            _historyStorageUri.value = null
+            _historyStorageFilename.value = "TellrawCommand.txt"
+        }
+    }
+    
+    /**
+     * 将历史记录写入文件
+     */
+    fun writeHistoryToFile(context: Context, historyList: List<CommandHistory>) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val uriString = settingsRepository.getHistoryStorageUri()
+                val filename = settingsRepository.getHistoryStorageFilename()
+                
+                if (uriString == null) {
+                    _writeFileMessage.value = "请先设置存储目录"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                val uri = Uri.parse(uriString)
+                val contentResolver = context.contentResolver
+                
+                // 检查文件是否存在
+                val existingUri = findFileInDirectory(contentResolver, uri, filename)
+                
+                val fileUri = if (existingUri != null) {
+                    // 文件已存在，追加内容
+                    existingUri
+                } else {
+                    // 文件不存在，创建新文件
+                    createFileInDirectory(contentResolver, uri, filename)
+                }
+                
+                if (fileUri == null) {
+                    _writeFileMessage.value = "创建文件失败"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 生成历史记录内容
+                val content = buildHistoryContent(historyList)
+                
+                // 写入文件
+                contentResolver.openOutputStream(fileUri, if (existingUri != null) "wa" else "w")?.use { outputStream ->
+                    outputStream.write(content.toByteArray())
+                }
+                
+                _writeFileMessage.value = "成功写入${historyList.size}条历史记录"
+            } catch (e: Exception) {
+                _writeFileMessage.value = "写入文件失败: ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
+            }
+        }
+    }
+    
+    /**
+     * 在目录中查找文件
+     */
+    private suspend fun findFileInDirectory(
+        contentResolver: android.content.ContentResolver,
+        directoryUri: Uri,
+        filename: String
+    ): Uri? {
+        return try {
+            val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+                directoryUri,
+                android.provider.DocumentsContract.getDocumentId(directoryUri)
+            )
+            
+            val projection = arrayOf(
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME
+            )
+            
+            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val docIdIndex = cursor.getColumnIndex(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIndex = cursor.getColumnIndex(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(docIdIndex)
+                    val name = cursor.getString(nameIndex)
+                    
+                    if (name == filename) {
+                        return android.provider.DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
+                    }
+                }
+            }
+            
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * 在目录中创建文件
+     */
+    private suspend fun createFileInDirectory(
+        contentResolver: android.content.ContentResolver,
+        directoryUri: Uri,
+        filename: String
+    ): Uri? {
+        return try {
+            val mimeType = "text/plain"
+            val createIntent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = mimeType
+                putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
+                putExtra(Intent.EXTRA_TITLE, filename)
+            }
+            
+            // 注意：这里需要通过Activity启动，返回结果后才能创建文件
+            // 这个方法只是准备，实际创建需要通过Activity的回调
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * 构建历史记录内容
+     */
+    private fun buildHistoryContent(historyList: List<CommandHistory>): String {
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        
+        return buildString {
+            historyList.forEach { history ->
+                val timeText = dateFormat.format(java.util.Date(history.timestamp))
+                append("命令：${history.selector} ${history.message}\n")
+                append("Java版命令：${history.javaCommand}\n")
+                append("基岩版命令：${history.bedrockCommand}\n")
+                append("时间：$timeText\n")
+                append("========================================\n")
+            }
+        }
     }
 }

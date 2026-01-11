@@ -34,6 +34,7 @@ fun MainScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val activity = context as? MainActivity
     
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
@@ -42,10 +43,21 @@ fun MainScreen(
     val warnings by viewModel.warnings.collectAsState()
     val selectorType by viewModel.selectorType.collectAsState()
     val useJavaFontStyle by viewModel.useJavaFontStyle.collectAsState()
+    val mnMixedMode by viewModel.mnMixedMode.collectAsState()
+    val mnCFEnabled by viewModel.mnCFEnabled.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
+    
+    // SAF相关状态
+    val showStorageSettingsDialog by viewModel.showStorageSettingsDialog.collectAsState()
+    val showFilenameDialog by viewModel.showFilenameDialog.collectAsState()
+    val showFileExistsDialog by viewModel.showFileExistsDialog.collectAsState()
+    val historyStorageUri by viewModel.historyStorageUri.collectAsState()
+    val historyStorageFilename by viewModel.historyStorageFilename.collectAsState()
+    val isWritingToFile by viewModel.isWritingToFile.collectAsState()
+    val writeFileMessage by viewModel.writeFileMessage.collectAsState()
     
     // 用于跟踪光标位置的状态
     val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
@@ -60,6 +72,7 @@ fun MainScreen(
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }
+    val showSettingsDialog = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     
     // 设置Context到ViewModel
@@ -116,7 +129,8 @@ fun MainScreen(
                 viewModel.clearAllHistory()
                 showHistoryDialog.value = false
             },
-            onSearch = { query -> viewModel.searchHistory(query) }
+            onSearch = { query -> viewModel.searchHistory(query) },
+            onShowStorageSettings = { viewModel.showStorageSettings() }
         )
     }
 
@@ -128,6 +142,30 @@ fun MainScreen(
             onUseJavaFontStyle = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
                 viewModel.dismissMNDialog()
+            },
+            onMixedModeChoice = { code, choice ->
+                viewModel.handleMixedModeChoice(code, choice)
+                viewModel.dismissMNDialog()
+            },
+            mnMixedMode = mnMixedMode
+        )
+    }
+    
+    // 设置对话框
+    if (showSettingsDialog.value) {
+        SettingsDialog(
+            useJavaFontStyle = useJavaFontStyle,
+            mnMixedMode = mnMixedMode,
+            mnCFEnabled = mnCFEnabled,
+            onDismiss = { showSettingsDialog.value = false },
+            onUseJavaFontStyleChanged = { useJava ->
+                viewModel.setUseJavaFontStyle(useJava)
+            },
+            onMNMixedModeChanged = { mixed ->
+                viewModel.setMNMixedMode(mixed)
+            },
+            onMNCFEnabledChanged = { cfEnabled ->
+                viewModel.setMNCFEnabled(cfEnabled)
             }
         )
     }
@@ -147,6 +185,57 @@ fun MainScreen(
         DisableCheckDialog(
             onConfirm = { viewModel.disableVersionCheck() },
             onDismiss = { viewModel.dismissDisableCheckDialog() }
+        )
+    }
+    
+    // 历史记录存储设置对话框
+    if (showStorageSettingsDialog) {
+        HistoryStorageSettingsDialog(
+            storageUri = historyStorageUri,
+            filename = historyStorageFilename,
+            onDismiss = { viewModel.hideStorageSettingsDialog() },
+            onSelectDirectory = { 
+                activity?.checkAndRequestStoragePermission {
+                    activity?.launchDirectoryPicker { uri ->
+                        viewModel.setHistoryStorageUri(uri)
+                    }
+                }
+            },
+            onEditFilename = { viewModel.showFilenameDialog() },
+            onClearSettings = { viewModel.clearHistoryStorageSettings() },
+            onWriteToFile = { 
+                viewModel.writeHistoryToFile(context, commandHistory.toList()) 
+            },
+            isWriting = isWritingToFile,
+            writeMessage = writeFileMessage
+        )
+    }
+    
+    // 文件名输入对话框
+    showFilenameDialog?.let { currentFilename ->
+        FilenameInputDialog(
+            currentFilename = currentFilename,
+            onDismiss = { viewModel.hideFilenameDialog() },
+            onConfirm = { filename ->
+                viewModel.setHistoryStorageFilename(filename)
+                viewModel.hideFilenameDialog()
+            }
+        )
+    }
+    
+    // 文件已存在对话框
+    showFileExistsDialog?.let { filename ->
+        FileExistsDialog(
+            filename = filename,
+            onDismiss = { viewModel.hideFileExistsDialog() },
+            onUseExisting = {
+                // TODO: 使用现有文件
+                viewModel.hideFileExistsDialog()
+            },
+            onCustomize = {
+                viewModel.showFilenameDialog()
+                viewModel.hideFileExistsDialog()
+            }
         )
     }
 }
@@ -180,6 +269,9 @@ private fun PortraitLayout(
             actions = {
                 IconButton(onClick = { showHistoryDialog.value = true }) {
                     Icon(Icons.Default.History, contentDescription = "历史记录")
+                }
+                IconButton(onClick = { showSettingsDialog.value = true }) {
+                    Icon(Icons.Default.Settings, contentDescription = "设置")
                 }
                 IconButton(onClick = onNavigateToHelp) {
                     Icon(Icons.Default.Help, contentDescription = "帮助")
@@ -342,37 +434,44 @@ private fun LandscapeLayout(
         modifier = Modifier.fillMaxSize()
     ) {
         // 顶部应用栏（横屏紧凑版）
-        TopAppBar(
-            title = { 
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     "Tellraw命令生成器",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(end = 12.dp)
                 )
-            },
-            modifier = Modifier.height(48.dp),
-            actions = {
                 IconButton(
                     onClick = { showHistoryDialog.value = true },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         Icons.Default.History, 
                         contentDescription = "历史记录",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 IconButton(
                     onClick = onNavigateToHelp,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         Icons.Default.Help, 
                         contentDescription = "帮助",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
-        )
+        }
 
         // 横屏左右分栏布局
         Row(

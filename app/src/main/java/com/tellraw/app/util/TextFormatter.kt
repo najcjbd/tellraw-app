@@ -167,7 +167,7 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "color"): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
         var jsonText = text
         val components = mutableListOf<Map<String, Any>>()
         var currentText = ""
@@ -178,7 +178,9 @@ object TextFormatter {
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9",
             "§a", "§b", "§c", "§d", "§e", "§f",
             "§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v",
-            "§k", "§l", "§m", "§n", "§o", "§r"
+            "§k", "§l", "§m", "§n", "§o", "§r",
+            "§m_f", "§m_c", "§n_f", "§n_c",
+            "§m_", "§n_"
         )
         
         // 检测未知的§组合
@@ -210,9 +212,17 @@ object TextFormatter {
         i = 0
         while (i < jsonText.length) {
             if (jsonText[i] == '§' && i + 1 < jsonText.length) {
-                val code = jsonText.substring(i, i + 2)
-                tokens.add("format_code" to code)
-                i += 2
+                // 检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
+                // 混合模式下总是识别这些格式
+                if (i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
+                    val code = jsonText.substring(i, i + 4)
+                    tokens.add("format_code" to code)
+                    i += 4
+                } else {
+                    val code = jsonText.substring(i, i + 2)
+                    tokens.add("format_code" to code)
+                    i += 2
+                }
             } else if (jsonText[i] == '§') {
                 // 单独的§符号，跳过不处理
                 i++
@@ -301,6 +311,15 @@ object TextFormatter {
                         }
                     }
                 }
+                // §m_f/§m_c/§n_f/§n_c格式
+                else if (code.startsWith("§m_") || code.startsWith("§n_")) {
+                    when (code) {
+                        "§m_f" -> currentFormat["strikethrough"] = true  // 删除线（字体方式）
+                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式）
+                        "§n_f" -> currentFormat["underlined"] = true  // 下划线（字体方式）
+                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式）
+                    }
+                }
             } else {  // token_type == 'text'
                 val textContent = tokenValue
                 
@@ -376,7 +395,7 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "color"): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
@@ -392,6 +411,8 @@ object TextFormatter {
             processedText = processedText.replace("§m", "§4") // material_redstone -> dark_red
             processedText = processedText.replace("§n", "§c") // material_copper -> red
         }
+        
+        // 基岩版不转换§m_f/§m_c/§n_f/§n_c，保持原样
         
         // 处理其他基岩版特有颜色代码
         val bedrockSpecificCodes = mapOf(
@@ -474,7 +495,8 @@ object TextFormatter {
     fun generateTellrawCommand(
         selector: String,
         message: String,
-        useJavaFontStyle: Boolean = true
+        useJavaFontStyle: Boolean = true,
+        mnCFEnabled: Boolean = false
     ): TellrawCommand {
         val warnings = mutableListOf<String>()
         
@@ -486,11 +508,11 @@ object TextFormatter {
         val mNHandling = if (useJavaFontStyle) "font" else "color"
         
         // 转换为Java版JSON格式
-        val javaMessage = convertToJavaJson(processedMessage, mNHandling)
+        val javaMessage = convertToJavaJson(processedMessage, mNHandling, mnCFEnabled)
         val javaCommand = "tellraw $selector $javaMessage"
         
         // 转换为基岩版JSON格式，与Python版本保持一致
-        val bedrockMessage = convertToBedrockJson(processedMessage, mNHandling)
+        val bedrockMessage = convertToBedrockJson(processedMessage, mNHandling, mnCFEnabled)
         val bedrockCommand = "tellraw $selector $bedrockMessage"
         
         return TellrawCommand(

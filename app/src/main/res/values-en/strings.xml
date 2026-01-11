@@ -33,6 +33,20 @@
     <string name="mn_code_option_1">Option 1</string>
     <string name="mn_code_option_2">Option 2</string>
     
+    <!-- Mixed Mode and §m/§n_c/f Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="mn_mixed_mode_config">§m§n Mixed Mode Config</string>
+    <string name="mn_mixed_mode">Mixed Mode</string>
+    <string name="mn_mixed_mode_description">Default to font style when not selected</string>
+    <string name="mn_font_style">Font Style</string>
+    <string name="mn_font_style_description">Java: strikethrough/underline, Bedrock: color codes</string>
+    <string name="mn_color_style">Color Code Style</string>
+    <string name="mn_color_style_description">Both Java and Bedrock use color codes</string>
+    <string name="mn_cf_enabled">Enable §m/§n_c/f</string>
+    <string name="mn_cf_enabled_description">Use §m_f/§m_c/§n_f/§n_c to specify handling</string>
+    <string name="mn_handling_method">Choose how to handle §m (strikethrough) and §n (underline) codes:</string>
+    <string name="remember_choice">Remember my choice</string>
+    
     <!-- Color Codes -->
     <string name="color_black">Black</string>
     <string name="color_dark_blue">Dark Blue</string>
