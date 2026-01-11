@@ -136,7 +136,7 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun getHistoryStorageUri(): String? {
         val settings = appSettingsDao.getByKey(KEY_HISTORY_STORAGE_URI)
-        return settings?.value.takeIf { it.isNotEmpty() }
+        return settings?.value?.takeIf { it.isNotEmpty() }
     }
     
     /**
@@ -161,7 +161,7 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun getHistoryStorageFilename(): String {
         val settings = appSettingsDao.getByKey(KEY_HISTORY_STORAGE_FILENAME)
-        return settings?.value.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
+        return settings?.value?.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
     }
     
     /**

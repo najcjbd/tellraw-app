@@ -519,7 +519,7 @@ class TellrawViewModel @Inject constructor(
         context?.let { ctx ->
             val shareIntent = Intent().apply {
                 action = Intent.ACTION_SEND
-                type = "text/plain"
+                setType("text/plain")
                 putExtra(Intent.EXTRA_TEXT, command)
                 putExtra(Intent.EXTRA_SUBJECT, "Minecraft Tellraw Command")
             }
@@ -904,11 +904,11 @@ class TellrawViewModel @Inject constructor(
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent: Intent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = mimeType
+            val createIntent: android.content.Intent = android.content.Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                setType(mimeType)
                 putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
-                putExtra(Intent.EXTRA_TITLE, filename)
+                putExtra(android.content.Intent.EXTRA_TITLE, filename)
             }
 
             // 注意：这里需要通过Activity启动，返回结果后才能创建文件
