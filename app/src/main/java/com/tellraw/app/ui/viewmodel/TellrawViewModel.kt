@@ -2,13 +2,16 @@ package com.tellraw.app.ui.viewmodel
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tellraw.app.data.local.CommandHistory
 import com.tellraw.app.data.remote.GithubRelease
+import com.tellraw.app.data.repository.SettingsRepository
 import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.model.SelectorType
@@ -27,7 +30,7 @@ import javax.inject.Inject
 class TellrawViewModel @Inject constructor(
     private val tellrawRepository: TellrawRepository,
     private val versionCheckRepository: VersionCheckRepository,
-    private val settingsRepository: com.tellraw.app.data.repository.SettingsRepository
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
     
     private val _selectorInput = MutableStateFlow("")
@@ -859,31 +862,31 @@ class TellrawViewModel @Inject constructor(
      * 在目录中查找文件
      */
     private suspend fun findFileInDirectory(
-        contentResolver: android.content.ContentResolver,
+        contentResolver: ContentResolver,
         directoryUri: Uri,
         filename: String
     ): Uri? {
         return try {
-            val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
                 directoryUri,
-                android.provider.DocumentsContract.getDocumentId(directoryUri)
+                DocumentsContract.getDocumentId(directoryUri)
             )
             
             val projection = arrayOf(
-                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME
             )
             
             contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val docIdIndex = cursor.getColumnIndex(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIndex = cursor.getColumnIndex(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val docIdIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 
                 while (cursor.moveToNext()) {
                     val docId = cursor.getString(docIdIndex)
                     val name = cursor.getString(nameIndex)
                     
                     if (name == filename) {
-                        return android.provider.DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
+                        return DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
                     }
                 }
             }
@@ -898,16 +901,16 @@ class TellrawViewModel @Inject constructor(
      * 在目录中创建文件
      */
     private suspend fun createFileInDirectory(
-        contentResolver: android.content.ContentResolver,
+        contentResolver: ContentResolver,
         directoryUri: Uri,
         filename: String
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent: Intent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+            val createIntent: Intent = Intent(DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 setType(mimeType)
-                putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
 
