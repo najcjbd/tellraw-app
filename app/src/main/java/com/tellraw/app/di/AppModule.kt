@@ -83,6 +83,12 @@ object AppModule {
     
     @Provides
     @Singleton
+    fun provideAppSettingsDao(database: AppDatabase): com.tellraw.app.data.local.AppSettingsDao {
+        return database.appSettingsDao()
+    }
+    
+    @Provides
+    @Singleton
     fun provideTellrawRepository(
         database: AppDatabase
     ): TellrawRepository {

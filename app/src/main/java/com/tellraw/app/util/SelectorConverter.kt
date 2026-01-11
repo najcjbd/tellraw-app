@@ -772,7 +772,7 @@ object SelectorConverter {
         
         val protectedResult = StringBuffer()
         while (matcher.find()) {
-            strings.add(matcher.group(0))
+            strings.add(matcher.group(0)!!)
             matcher.appendReplacement(protectedResult, "__STRING_${strings.size - 1}__")
         }
         matcher.appendTail(protectedResult)
