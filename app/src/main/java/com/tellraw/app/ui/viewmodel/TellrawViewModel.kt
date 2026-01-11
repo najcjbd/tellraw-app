@@ -910,7 +910,7 @@ class TellrawViewModel @Inject constructor(
             val createIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = mimeType
-                putExtra(Intent.EXTRA_INITIAL_URI, directoryUri)
+                putExtra("android.provider.extra.INITIAL_URI", directoryUri)
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
 
