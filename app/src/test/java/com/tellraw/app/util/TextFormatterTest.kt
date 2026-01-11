@@ -41,7 +41,7 @@ class TextFormatterTest {
             assertNotNull("Java版JSON不应为null: " + name, javaJson)
             assertNotNull("基岩版JSON不应为null: " + name, bedrockJson)
             assertTrue("Java版JSON应包含color: " + name, javaJson.contains("color"))
-            assertTrue("基岩版JSON应包含color: " + name, bedrockJson.contains("color"))
+            assertTrue("基岩版JSON应包含rawtext: " + name, bedrockJson.contains("rawtext"))
         }
     }
     

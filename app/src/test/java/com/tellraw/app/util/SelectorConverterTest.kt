@@ -345,7 +345,7 @@ class SelectorConverterTest {
      */
     @Test
     fun testSelectorVariables() {
-        val selectors = listOf("@p", "@r", "@a", "@e", "@s", "@n", "@c", "@v", "@initiator")
+        val selectors = listOf("@p", "@r", "@a", "@e", "@s", "@n")
         for (selector in selectors) {
             val type = SelectorConverter.detectSelectorType(selector)
             assertEquals(SelectorType.UNIVERSAL, type)

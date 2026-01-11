@@ -212,7 +212,7 @@ class TellrawGeneratorTest {
         )
         
         for ((javaSelector, expectedBedrockParam) in testCases) {
-            val conversion = SelectorConverter.convertBedrockToJava(javaSelector)
+            val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
             // Java版选择器转换后，基岩版选择器应该包含对应的参数
             assertNotNull("转换后的基岩版选择器不应为null: $javaSelector", conversion.bedrockSelector)
         }

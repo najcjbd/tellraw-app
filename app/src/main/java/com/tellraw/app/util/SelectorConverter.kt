@@ -145,6 +145,11 @@ object SelectorConverter {
         // 进一步转换参数格式
         val javaSelector = convertBedrockParametersToJava(convertedSelector, reminders)
         
+        // 如果参数发生了变化，也认为发生了转换
+        if (javaSelector != newSelector) {
+            wasConverted = true
+        }
+        
         return SelectorConversionResult(
             javaSelector = javaSelector,
             bedrockSelector = selector,
@@ -531,7 +536,7 @@ object SelectorConverter {
             .replace(",\\]".toRegex(), "]")
             .replace("\\[".toRegex(), "[")
         
-        return finalSelector to conversionReminders
+        return finalSelector to removedParams
     }
     
     /**
