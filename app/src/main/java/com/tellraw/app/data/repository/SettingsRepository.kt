@@ -180,4 +180,56 @@ class SettingsRepository @Inject constructor(
             setting?.value?.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
         }
     }
+    
+    /**
+     * 导出配置为 JSON 字符串
+     */
+    suspend fun exportSettingsAsJson(): String {
+        val settings = appSettingsDao.getAll().map { it.key to it.value }.toMap()
+        
+        val json = StringBuilder()
+        json.append("{\n")
+        json.append("  \"mn_handling_mode\": \"${settings[KEY_MN_HANDLING_MODE] ?: VALUE_MODE_FONT}\",\n")
+        json.append("  \"mn_mixed_mode\": ${settings[KEY_MN_MIXED_MODE] == "true"},\n")
+        json.append("  \"mn_cf_enabled\": ${settings[KEY_MN_CF_ENABLED] == "true"},\n")
+        json.append("  \"history_storage_uri\": \"${settings[KEY_HISTORY_STORAGE_URI] ?: ""}\",\n")
+        json.append("  \"history_storage_filename\": \"${settings[KEY_HISTORY_STORAGE_FILENAME] ?: "TellrawCommand.txt"}\"\n")
+        json.append("}")
+        
+        return json.toString()
+    }
+    
+    /**
+     * 从 JSON 字符串导入配置
+     */
+    suspend fun importSettingsFromJson(jsonString: String): Boolean {
+        return try {
+            // 简单的 JSON 解析（不使用外部库）
+            val mnHandlingMode = extractJsonValue(jsonString, "mn_handling_mode") ?: VALUE_MODE_FONT
+            val mnMixedMode = extractJsonValue(jsonString, "mn_mixed_mode") == "true"
+            val mnCfEnabled = extractJsonValue(jsonString, "mn_cf_enabled") == "true"
+            val historyStorageUri = extractJsonValue(jsonString, "history_storage_uri") ?: ""
+            val historyStorageFilename = extractJsonValue(jsonString, "history_storage_filename") ?: "TellrawCommand.txt"
+            
+            // 保存配置
+            appSettingsDao.insert(AppSettings(KEY_MN_HANDLING_MODE, mnHandlingMode))
+            appSettingsDao.insert(AppSettings(KEY_MN_MIXED_MODE, mnMixedMode.toString()))
+            appSettingsDao.insert(AppSettings(KEY_MN_CF_ENABLED, mnCfEnabled.toString()))
+            appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_URI, historyStorageUri))
+            appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_FILENAME, historyStorageFilename))
+            
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 从 JSON 字符串中提取值
+     */
+    private fun extractJsonValue(jsonString: String, key: String): String? {
+        val pattern = "\"$key\"\\s*:\\s*\"?([^,}\\n]+)\"?".toRegex()
+        val match = pattern.find(jsonString)
+        return match?.groupValues?.get(1)?.trim()
+    }
 }

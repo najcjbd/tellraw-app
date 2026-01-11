@@ -952,6 +952,38 @@ class SelectorConverterTest {
         assertTrue("基岩版选择器应包含c", conversion.bedrockSelector.contains("c"))
     }
     
+    @Test
+    fun testSelectorConversion_7() {
+        // Java版到基岩版：sort=random (无limit) - @a转换为@r
+        val javaSelector = "@a[sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
+    }
+    
+    @Test
+    fun testSelectorConversion_8() {
+        // Java版到基岩版：sort=random + limit - @a转换为@r
+        val javaSelector = "@a[limit=5,sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertEquals("基岩版选择器应为@r[c=5]", "@r[c=5]", conversion.bedrockSelector)
+    }
+    
+    @Test
+    fun testSelectorConversion_9() {
+        // Java版到基岩版：sort=random - @r保持@r
+        val javaSelector = "@r[sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
+    }
+    
+    @Test
+    fun testSelectorConversion_10() {
+        // Java版到基岩版：sort=random - @e转换为c参数
+        val javaSelector = "@e[sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        assertEquals("基岩版选择器应为@e[c=9999]", "@e[c=9999]", conversion.bedrockSelector)
+    }
+    
     /**
      * 测试组15：参数过滤测试
      */

@@ -57,6 +57,22 @@ object SelectorConverter {
     )
     
     /**
+     * 检测 scores 参数中是否有反选
+     * 例如：[scores={m=!5}] 包含反选，返回 true
+     */
+    private fun hasScoresNegation(paramsPart: String): Boolean {
+        val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
+        val scoresMatch = scoresPattern.find(paramsPart)
+        if (scoresMatch != null) {
+            val scoresContent = scoresMatch.groupValues[1]
+            // 检查是否有反选模式（!= 或 ! 在值部分）
+            val negationPattern = "\\w+\\s*=\\s*!".toRegex()
+            return negationPattern.containsMatchIn(scoresContent)
+        }
+        return false
+    }
+    
+    /**
      * 检测目标选择器是Java版还是基岩版
      */
     fun detectSelectorType(selector: String): SelectorType {
@@ -73,6 +89,12 @@ object SelectorConverter {
             
             var javaCount = 0
             var bedrockCount = 0
+            
+            // 检查是否有 scores 反选
+            val hasScoresNegation = hasScoresNegation(paramsPart)
+            if (hasScoresNegation) {
+                bedrockCount++
+            }
             
             for (param in params) {
                 if ('=' in param) {
@@ -99,6 +121,9 @@ object SelectorConverter {
                     if (javaCount == 0 && bedrockCount == 0 && '[' in selector && ']' in selector) {
                         // 只有通用参数，返回UNIVERSAL
                         SelectorType.UNIVERSAL
+                    } else if (hasScoresNegation) {
+                        // 如果有 scores 反选，识别为基岩版
+                        SelectorType.BEDROCK
                     } else {
                         // 默认返回bedrock
                         SelectorType.BEDROCK
@@ -258,24 +283,24 @@ object SelectorConverter {
             conversionReminders.addAll(nbtToHasitemReminders)
         }
         
-        // 处理scores参数中的level参数
-        if (targetVersion == SelectorType.BEDROCK && "scores=" in paramsPart) {
+        // 注意：scores 参数内部的记分项不应该被当作选择器参数处理
+        // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
+        // 只有独立的 level 参数（不在 scores 内部）才需要转换
+        // 因此这里不需要处理 scores 参数内部的 level
+        
+        // 处理 scores 参数的反选（基岩版特有功能）
+        if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
             val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
             paramsPart = paramsPart.replace(scoresPattern) { match ->
                 val fullMatch = match.value
                 val scoresContent = match.groupValues[1]
                 
-                // 处理level参数
-                val levelPattern = "level=([^,\\}]+)".toRegex()
-                val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
-                    val levelValue = levelMatch.groupValues[1]
-                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + levelValue + ",l=" + levelValue)
-                    "lm=$levelValue,l=$levelValue"
-                }
-                
-                // 如果scores内容发生了变化，返回新的scores参数
-                if (newScoresContent != scoresContent) {
-                    "scores={$newScoresContent}"
+                // 检查是否有反选模式（!= 或 ! 在值部分）
+                val negationPattern = "\\w+\\s*=\\s*!".toRegex()
+                if (negationPattern.containsMatchIn(scoresContent)) {
+                    // Java版不支持scores反选，直接移除整个scores参数
+                    conversionReminders.add("基岩版scores反选参数" + fullMatch + "在Java版中不支持，已移除")
+                    ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
                 }
@@ -546,7 +571,8 @@ object SelectorConverter {
         var result = paramsPart
         
         // 处理distance参数
-        val distancePattern = "distance=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val distancePattern = "(?<!scores=\\{[^}]*)distance=([^,\\]]+)".toRegex()
         
         result = result.replace(distancePattern) { match ->
             val distanceValue = match.groupValues[1]
@@ -595,7 +621,8 @@ object SelectorConverter {
         var result = paramsPart
         
         // 处理x_rotation参数
-        val xRotationPattern = "x_rotation=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val xRotationPattern = "(?<!scores=\\{[^}]*)x_rotation=([^,\\]]+)".toRegex()
         
         result = result.replace(xRotationPattern) { match ->
             val rotationValue = match.groupValues[1]
@@ -631,7 +658,8 @@ object SelectorConverter {
         }
         
         // 处理y_rotation参数
-        val yRotationPattern = "y_rotation=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val yRotationPattern = "(?<!scores=\\{[^}]*)y_rotation=([^,\\]]+)".toRegex()
         
         result = result.replace(yRotationPattern) { match ->
             val rotationValue = match.groupValues[1]
@@ -680,7 +708,8 @@ object SelectorConverter {
         var result = paramsPart
         
         // 处理level参数
-        val levelPattern = "level=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val levelPattern = "(?<!scores=\\{[^}]*)level=([^,\\]]+)".toRegex()
         
         result = result.replace(levelPattern) { match ->
             val levelValue = match.groupValues[1]
@@ -737,7 +766,8 @@ object SelectorConverter {
         )
         
         // 从gamemode到m的转换（Java版到基岩版）
-        val gamemodePattern = "gamemode=(!?)([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val gamemodePattern = "(?<!scores=\\{[^}]*)gamemode=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(gamemodePattern) { match ->
             val negation = match.groupValues[1]  // ! 或空
@@ -862,15 +892,26 @@ object SelectorConverter {
         // 转换limit/sort参数到c参数
         paramsPart = convertLimitSortToC(paramsPart, selectorVar, reminders)
         
-        return selectorVar + "[" + paramsPart + "]"
+        // 检查是否需要修改选择器变量（用于 sort=random 的 @a/@r 转换）
+        var finalSelectorVar = selectorVar
+        if (paramsPart.startsWith("__SELECTOR_VAR_CHANGE_TO__")) {
+            val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__(\\w+)__").find(paramsPart)
+            if (matchResult != null) {
+                finalSelectorVar = matchResult.groupValues[1]
+                paramsPart = paramsPart.substringAfter("__")
+            }
+        }
+        
+        return finalSelectorVar + "[" + paramsPart + "]"
     }
     
     // 以下是各种参数转换的具体实现
     
     private fun convertR_RmToDistance(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        val rPattern = "\\br=([^,\\]]+)".toRegex()
-        val rmPattern = "\\brm=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val rPattern = "(?<!scores=\\{[^}]*)\\br=([^,\\]]+)".toRegex()
+        val rmPattern = "(?<!scores=\\{[^}]*)\\brm=([^,\\]]+)".toRegex()
         
         val rMatch = rPattern.find(result)
         val rmMatch = rmPattern.find(result)
@@ -910,7 +951,8 @@ object SelectorConverter {
     
     private fun convertDistanceToR_Rm(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        val distancePattern = "\\bdistance=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val distancePattern = "(?<!scores=\\{[^}]*)\\bdistance=([^,\\]]+)".toRegex()
         
         val match = distancePattern.find(result)
         if (match != null) {
@@ -1007,8 +1049,9 @@ object SelectorConverter {
         
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
-            val minPattern = "\\b$minParam=([^,\\]]+)".toRegex()
-            val maxPattern = "\\b$maxParam=([^,\\]]+)".toRegex()
+            // 使用负向先行断言来排除 scores 参数内部的记分项名字
+            val minPattern = "(?<!scores=\\{[^}]*)\\b$minParam=([^,\\]]+)".toRegex()
+            val maxPattern = "(?<!scores=\\{[^}]*)\\b$maxParam=([^,\\]]+)".toRegex()
             
             val minMatch = minPattern.find(result)
             val maxMatch = maxPattern.find(result)
@@ -1044,7 +1087,8 @@ object SelectorConverter {
             }
         } else {
             // 从Java版转基岩版：将 paramName 拆分为 minParam 和 maxParam
-            val paramPattern = "\\b$paramName=([^,\\]]+)".toRegex()
+            // 使用负向先行断言来排除 scores 参数内部的记分项名字
+            val paramPattern = "(?<!scores=\\{[^}]*)\\b$paramName=([^,\\]]+)".toRegex()
             val paramMatch = paramPattern.find(result)
             
             if (paramMatch != null) {
@@ -1090,8 +1134,9 @@ object SelectorConverter {
     
     private fun convertL_LmToLevel(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        val lPattern = "\\bl=([^,\\]]+)".toRegex()
-        val lmPattern = "\\blm=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val lPattern = "(?<!scores=\\{[^}]*)\\bl=([^,\\]]+)".toRegex()
+        val lmPattern = "(?<!scores=\\{[^}]*)\\blm=([^,\\]]+)".toRegex()
         
         val lMatch = lPattern.find(result)
         val lmMatch = lmPattern.find(result)
@@ -1131,7 +1176,8 @@ object SelectorConverter {
     
     private fun convertLevelToL_Lm(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        val levelPattern = "\\blevel=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val levelPattern = "(?<!scores=\\{[^}]*)\\blevel=([^,\\]]+)".toRegex()
         
         val match = levelPattern.find(result)
         if (match != null) {
@@ -1188,7 +1234,8 @@ object SelectorConverter {
         )
         
         // 从m到gamemode的转换（基岩版到Java版）
-        val mPattern = "\\bm=(!?)([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val mPattern = "(?<!scores=\\{[^}]*)\\bm=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(mPattern) { match ->
             val negation = match.groupValues[1]  // ! 或空
@@ -1272,7 +1319,8 @@ object SelectorConverter {
     
     private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>): String {
         var result = paramsPart
-        val cPattern = "\\bc=([+-]?\\d+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val cPattern = "(?<!scores=\\{[^}]*)\\bc=([+-]?\\d+)".toRegex()
         
         val match = cPattern.find(result)
         if (match != null) {
@@ -1306,14 +1354,16 @@ object SelectorConverter {
         var result = paramsPart
 
         // 处理sort参数
-        val sortPattern = "\\bsort=([^,\\]]+)".toRegex()
+        // 使用负向先行断言来排除 scores 参数内部的记分项名字
+        val sortPattern = "(?<!scores=\\{[^}]*)\\bsort=([^,\\]]+)".toRegex()
         val sortMatch = sortPattern.find(result)
 
         if (sortMatch != null) {
             val sortValue: String = sortMatch.groupValues[1]
 
             // 查找limit参数
-            val limitPattern = "\\blimit=([+-]?\\d+)".toRegex()
+            // 使用负向先行断言来排除 scores 参数内部的记分项名字
+            val limitPattern = "(?<!scores=\\{[^}]*)\\blimit=([+-]?\\d+)".toRegex()
             val limitMatch = limitPattern.find(result)
             val limitValue: String? = limitMatch?.groupValues?.get(1)
 
@@ -1350,7 +1400,8 @@ object SelectorConverter {
                     val cValue = limitValue ?: "9999"
                     if (selectorVar == "@a" || selectorVar == "@r") {
                         reminders.add("Java版" + selectorVar + "[sort=random]已转换为基岩版@r[c=" + cValue + "]")
-                        result = result.replace(selectorVar, "@r")
+                        // 在 result 开头添加特殊标记，表示需要修改选择器变量
+                        result = "__SELECTOR_VAR_CHANGE_TO__@r__" + result
                     } else {
                         reminders.add("Java版sort=random已转换为基岩版c=" + cValue)
                     }
@@ -1368,7 +1419,8 @@ object SelectorConverter {
             }
         } else {
             // 没有sort参数，只转换limit
-            val limitPattern = "\\blimit=([+-]?\\d+)".toRegex()
+            // 使用负向先行断言来排除 scores 参数内部的记分项名字
+            val limitPattern = "(?<!scores=\\{[^}]*)\\blimit=([+-]?\\d+)".toRegex()
             val limitMatch = limitPattern.find(result)
             if (limitMatch != null) {
                 val limitValue = limitMatch.groupValues[1]

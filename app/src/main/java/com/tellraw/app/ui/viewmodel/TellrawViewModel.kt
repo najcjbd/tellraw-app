@@ -832,7 +832,7 @@ class TellrawViewModel @Inject constructor(
                     existingUri
                 } else {
                     // 文件不存在，创建新文件
-                    createFileInDirectory(uri, filename)
+                    createFileInDirectory(contentResolver, uri, filename)
                 }
                 
                 if (fileUri == null) {
@@ -901,13 +901,18 @@ class TellrawViewModel @Inject constructor(
      * 在目录中创建文件
      */
     private suspend fun createFileInDirectory(
+        contentResolver: ContentResolver,
         directoryUri: Uri,
         filename: String
     ): Uri? {
         return try {
-            // 注意：这里需要通过Activity启动，返回结果后才能创建文件
-            // 这个方法只是准备，实际创建需要通过Activity的回调
-            null
+            // 使用 DocumentsContract.createDocument 创建文件
+            DocumentsContract.createDocument(
+                contentResolver,
+                directoryUri,
+                "text/plain",
+                filename
+            )
         } catch (e: Exception) {
             null
         }
@@ -927,6 +932,116 @@ class TellrawViewModel @Inject constructor(
                 append("基岩版命令：${history.bedrockCommand}\n")
                 append("时间：$timeText\n")
                 append("========================================\n")
+            }
+        }
+    }
+    
+    /**
+     * 导出配置到文件
+     */
+    fun exportConfigToFile(context: Context) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val uriString = settingsRepository.getHistoryStorageUri()
+                
+                if (uriString == null) {
+                    _writeFileMessage.value = "请先设置存储目录"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                val uri = Uri.parse(uriString)
+                val contentResolver = context.contentResolver
+                
+                // 查找或创建 config.json 文件
+                val existingUri = findFileInDirectory(contentResolver, uri, "config.json")
+                
+                val fileUri = if (existingUri != null) {
+                    existingUri
+                } else {
+                    createFileInDirectory(contentResolver, uri, "config.json")
+                }
+                
+                if (fileUri == null) {
+                    _writeFileMessage.value = "创建配置文件失败"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 导出配置为 JSON
+                val configJson = settingsRepository.exportSettingsAsJson()
+                
+                // 写入文件
+                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
+                    outputStream.write(configJson.toByteArray())
+                }
+                
+                _writeFileMessage.value = "成功导出配置"
+            } catch (e: Exception) {
+                _writeFileMessage.value = "导出配置失败: ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
+            }
+        }
+    }
+    
+    /**
+     * 从文件导入配置
+     */
+    fun importConfigFromFile(context: Context) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val uriString = settingsRepository.getHistoryStorageUri()
+                
+                if (uriString == null) {
+                    _writeFileMessage.value = "请先设置存储目录"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                val uri = Uri.parse(uriString)
+                val contentResolver = context.contentResolver
+                
+                // 查找 config.json 文件
+                val fileUri = findFileInDirectory(contentResolver, uri, "config.json")
+                
+                if (fileUri == null) {
+                    _writeFileMessage.value = "未找到配置文件 config.json"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 读取文件内容
+                val jsonString = contentResolver.openInputStream(fileUri)?.use { inputStream ->
+                    inputStream.bufferedReader().readText()
+                } ?: ""
+                
+                if (jsonString.isEmpty()) {
+                    _writeFileMessage.value = "配置文件为空"
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 导入配置
+                val success = settingsRepository.importSettingsFromJson(jsonString)
+                
+                if (success) {
+                    _writeFileMessage.value = "成功导入配置"
+                    // 重新加载设置
+                    loadSettings()
+                } else {
+                    _writeFileMessage.value = "导入配置失败：配置文件格式错误"
+                }
+            } catch (e: Exception) {
+                _writeFileMessage.value = "导入配置失败: ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
             }
         }
     }

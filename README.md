@@ -1,5 +1,7 @@
 # Tellraw Generator Android App
 
+**中文** | [English](README.en.md)
+
 ## 项目简介
 
 这是一个将原Python版tellraw.py转换为Android应用程序的项目，完整实现了所有原版功能，包括选择器转换、文本格式化、命令生成等。应用支持自动检查GitHub仓库的新版本发布，提供完整的版本管理体验。

@@ -203,6 +203,12 @@ fun MainScreen(
             onWriteToFile = { 
                 viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>()) 
             },
+            onExportConfig = { 
+                viewModel.exportConfigToFile(context) 
+            },
+            onImportConfig = { 
+                viewModel.importConfigFromFile(context) 
+            },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
         )
@@ -261,16 +267,16 @@ private fun PortraitLayout(
     ) {
         // 顶部应用栏
         TopAppBar(
-            title = { Text("Tellraw命令生成器") },
+            title = { Text(stringResource(R.string.app_title)) },
             actions = {
                 IconButton(onClick = { showHistoryDialog.value = true }) {
-                    Icon(Icons.Default.History, contentDescription = "历史记录")
+                    Icon(Icons.Default.History, contentDescription = stringResource(R.string.history))
                 }
                 IconButton(onClick = { showSettingsDialog.value = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = "设置")
+                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
                 }
                 IconButton(onClick = onNavigateToHelp) {
-                    Icon(Icons.Default.Help, contentDescription = "帮助")
+                    Icon(Icons.Default.Help, contentDescription = stringResource(R.string.help))
                 }
             }
         )
@@ -284,14 +290,14 @@ private fun PortraitLayout(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "目标选择器",
+                    text = stringResource(R.string.target_selector),
                     style = MaterialTheme.typography.titleMedium
                 )
                 
                 OutlinedTextField(
                     value = selectorInput,
                     onValueChange = { viewModel.updateSelector(it) },
-                    label = { Text("输入选择器") },
+                    label = { Text(stringResource(R.string.input_selector)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     trailingIcon = {
@@ -304,7 +310,7 @@ private fun PortraitLayout(
                 // 选择器类型提示
                 if (selectorType != SelectorType.UNIVERSAL) {
                     Text(
-                        text = "检测到${if (selectorType == SelectorType.JAVA) "Java版" else "基岩版"}选择器",
+                        text = stringResource(R.string.detected_selector_type, if (selectorType == SelectorType.JAVA) stringResource(R.string.selector_type_java) else stringResource(R.string.selector_type_bedrock)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -321,7 +327,7 @@ private fun PortraitLayout(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "文本消息",
+                    text = stringResource(R.string.message_input_hint).substring(0, 4),
                     style = MaterialTheme.typography.titleMedium
                 )
                 
@@ -331,7 +337,7 @@ private fun PortraitLayout(
                         messageTextFieldValue.value = it
                         viewModel.updateMessage(it.text)
                     },
-                    label = { Text("输入文本") },
+                    label = { Text(stringResource(R.string.input_text)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
@@ -397,7 +403,7 @@ private fun PortraitLayout(
                 onClick = { viewModel.clearAll() },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("清空")
+                Text(stringResource(R.string.clear_all))
             }
             
             if (isLoading) {
@@ -441,7 +447,7 @@ private fun LandscapeLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Tellraw命令生成器",
+                    stringResource(R.string.app_title),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(end = 12.dp)
                 )
@@ -451,7 +457,7 @@ private fun LandscapeLayout(
                 ) {
                     Icon(
                         Icons.Default.History, 
-                        contentDescription = "历史记录",
+                        contentDescription = stringResource(R.string.history),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -461,7 +467,7 @@ private fun LandscapeLayout(
                 ) {
                     Icon(
                         Icons.Default.Help, 
-                        contentDescription = "帮助",
+                        contentDescription = stringResource(R.string.help),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -492,14 +498,14 @@ private fun LandscapeLayout(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "目标选择器",
+                            text = stringResource(R.string.target_selector),
                             style = MaterialTheme.typography.titleMedium
                         )
                         
                         OutlinedTextField(
                             value = selectorInput,
                             onValueChange = { viewModel.updateSelector(it) },
-                            label = { Text("输入选择器") },
+                            label = { Text(stringResource(R.string.input_selector)) },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             trailingIcon = {
@@ -512,7 +518,7 @@ private fun LandscapeLayout(
                         // 选择器类型提示
                         if (selectorType != SelectorType.UNIVERSAL) {
                             Text(
-                                text = "检测到${if (selectorType == SelectorType.JAVA) "Java版" else "基岩版"}选择器",
+                                text = stringResource(R.string.detected_selector_type, if (selectorType == SelectorType.JAVA) stringResource(R.string.selector_type_java) else stringResource(R.string.selector_type_bedrock)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -529,7 +535,7 @@ private fun LandscapeLayout(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "文本消息",
+                            text = stringResource(R.string.text_message),
                             style = MaterialTheme.typography.titleMedium
                         )
                         
@@ -539,7 +545,7 @@ private fun LandscapeLayout(
                                 messageTextFieldValue.value = it
                                 viewModel.updateMessage(it.text)
                             },
-                            label = { Text("输入文本") },
+                            label = { Text(stringResource(R.string.input_text)) },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             maxLines = 5
@@ -576,7 +582,7 @@ private fun LandscapeLayout(
                         onClick = { viewModel.clearAll() },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("清空")
+                        Text(stringResource(R.string.clear_all))
                     }
                     
                     if (isLoading) {

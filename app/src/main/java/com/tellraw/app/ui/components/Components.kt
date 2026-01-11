@@ -219,23 +219,17 @@ fun MNCodeDialog(
             onDismiss()
         },
         title = {
-            Text("检测到$codeName 代码")
+            Text(stringResource(R.string.detected_code, codeName))
         },
         text = {
             Column {
                 if (mnMixedMode) {
                     Text(
-                        text = """检测到$codeName 格式代码，请选择处理方式：
-
-1. 字体方式（格式代码）
-2. 颜色代码方式"""
+                        text = stringResource(R.string.code_dialog_message_mixed, codeName)
                     )
                 } else {
                     Text(
-                        text = """检测到$codeName 格式代码，请选择处理方式：
-
-1. Java版使用字体方式，基岩版使用颜色代码方式
-2. Java版和基岩版都使用颜色代码方式"""
+                        text = stringResource(R.string.code_dialog_message_full, codeName)
                     )
                 }
                 
@@ -249,7 +243,7 @@ fun MNCodeDialog(
                         onCheckedChange = { rememberChoice = it }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("记住我的选择")
+                    Text(stringResource(R.string.remember_choice))
                 }
             }
         },
@@ -263,7 +257,7 @@ fun MNCodeDialog(
                     }
                 }
             ) {
-                Text("方式1")
+                Text(stringResource(R.string.code_option_1))
             }
         },
         dismissButton = {
@@ -276,7 +270,7 @@ fun MNCodeDialog(
                     }
                 }
             ) {
-                Text("方式2")
+                Text(stringResource(R.string.code_option_2))
             }
         }
     )
@@ -295,14 +289,14 @@ fun SettingsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("设置")
+            Text(stringResource(R.string.settings_title))
         },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "§m§n混合模式配置",
+                    text = stringResource(R.string.mn_mixed_mode_config),
                     style = MaterialTheme.typography.titleMedium
                 )
                 
@@ -317,11 +311,11 @@ fun SettingsDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "混合模式",
+                            text = stringResource(R.string.mn_mixed_mode),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "未选择时默认使用字体方式",
+                            text = stringResource(R.string.mn_mixed_mode_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -331,7 +325,7 @@ fun SettingsDialog(
                 if (!mnMixedMode) {
                     // 非混合模式时显示字体/颜色选择
                     Text(
-                        text = "选择§m（删除线）和§n（下划线）代码的处理方式：",
+                        text = stringResource(R.string.mn_handling_method_title),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     
@@ -348,11 +342,11 @@ fun SettingsDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "字体方式",
+                                    text = stringResource(R.string.mn_font_style),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = "Java版使用删除线/下划线，基岩版使用颜色代码",
+                                    text = stringResource(R.string.mn_font_style_description),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -369,11 +363,11 @@ fun SettingsDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "颜色代码方式",
+                                    text = stringResource(R.string.mn_color_style),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = "Java版和基岩版都使用颜色代码",
+                                    text = stringResource(R.string.mn_color_style_description),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -393,11 +387,11 @@ fun SettingsDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "启用§m/§n_c/f",
+                            text = stringResource(R.string.mn_cf_enabled),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "使用§m_f/§m_c/§n_f/§n_c指定处理方式",
+                            text = stringResource(R.string.mn_cf_enabled_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -407,7 +401,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("确定")
+                Text(stringResource(R.string.ok))
             }
         }
     )
@@ -432,25 +426,14 @@ fun HistoryDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("命令历史记录")
-                Row {
-                    IconButton(
-                        onClick = onClearAll
-                    ) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "清空历史",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    IconButton(
-                        onClick = onShowStorageSettings
-                    ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "存储设置"
-                        )
-                    }
+                Text(stringResource(R.string.command_history))
+                IconButton(
+                    onClick = onShowStorageSettings
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.settings_title)
+                    )
                 }
             }
         },
@@ -465,7 +448,7 @@ fun HistoryDialog(
                         searchQuery = it
                         onSearch(it)
                     },
-                    label = { Text("搜索历史记录") },
+                    label = { Text(stringResource(R.string.search_history)) },
                     modifier = Modifier.fillMaxWidth(),
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
@@ -473,7 +456,7 @@ fun HistoryDialog(
                                 searchQuery = ""
                                 onSearch("")
                             }) {
-                                Icon(Icons.Default.Clear, contentDescription = "清除搜索")
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_history))
                             }
                         }
                     }
@@ -497,7 +480,7 @@ fun HistoryDialog(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (searchQuery.isEmpty()) "暂无历史记录" else "没有找到匹配的历史记录",
+                                text = if (searchQuery.isEmpty()) stringResource(R.string.no_history) else stringResource(R.string.no_search_results),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -521,7 +504,7 @@ fun HistoryDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("关闭")
+                Text(stringResource(R.string.close))
             }
         }
     )
@@ -606,13 +589,15 @@ fun HistoryStorageSettingsDialog(
     onEditFilename: () -> Unit,
     onClearSettings: () -> Unit,
     onWriteToFile: () -> Unit,
+    onExportConfig: () -> Unit = {},
+    onImportConfig: () -> Unit = {},
     isWriting: Boolean = false,
     writeMessage: String? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("历史记录存储设置")
+            Text(stringResource(R.string.storage_settings))
         },
         text = {
             Column(
@@ -623,7 +608,7 @@ fun HistoryStorageSettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "存储历史记录的位置",
+                    text = stringResource(R.string.storage_location),
                     style = MaterialTheme.typography.titleMedium
                 )
                 
@@ -647,11 +632,11 @@ fun HistoryStorageSettingsDialog(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "存储目录",
+                                text = stringResource(R.string.storage_directory),
                                 style = MaterialTheme.typography.labelMedium
                             )
                             Text(
-                                text = if (storageUri != null) "已选择存储目录" else "未设置存储目录",
+                                text = if (storageUri != null) stringResource(R.string.storage_directory_selected) else stringResource(R.string.storage_directory_not_set),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (storageUri != null) 
                                     MaterialTheme.colorScheme.onSurface 
@@ -662,7 +647,7 @@ fun HistoryStorageSettingsDialog(
                         IconButton(onClick = onSelectDirectory) {
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "选择目录"
+                                contentDescription = stringResource(R.string.select_directory)
                             )
                         }
                     }
@@ -683,7 +668,7 @@ fun HistoryStorageSettingsDialog(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "文件名",
+                                text = stringResource(R.string.storage_filename),
                                 style = MaterialTheme.typography.labelMedium
                             )
                             Text(
@@ -695,7 +680,7 @@ fun HistoryStorageSettingsDialog(
                         IconButton(onClick = onEditFilename) {
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "编辑文件名"
+                                contentDescription = stringResource(R.string.set_filename)
                             )
                         }
                     }
@@ -730,7 +715,30 @@ fun HistoryStorageSettingsDialog(
                         onClick = onClearSettings,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("清除存储设置")
+                        Text(stringResource(R.string.clear_storage_settings))
+                    }
+                }
+                
+                // 配置管理按钮
+                if (storageUri != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onExportConfig,
+                            modifier = Modifier.weight(1f),
+                            enabled = !isWriting
+                        ) {
+                            Text(stringResource(R.string.export_config))
+                        }
+                        OutlinedButton(
+                            onClick = onImportConfig,
+                            modifier = Modifier.weight(1f),
+                            enabled = !isWriting
+                        ) {
+                            Text(stringResource(R.string.import_config))
+                        }
                     }
                 }
             }
@@ -740,7 +748,7 @@ fun HistoryStorageSettingsDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(stringResource(R.string.cancel))
                 }
                 Button(
                     onClick = onWriteToFile,
@@ -753,7 +761,7 @@ fun HistoryStorageSettingsDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(if (isWriting) "写入中..." else "写入文件")
+                    Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
                 }
             }
         }
@@ -771,20 +779,20 @@ fun FilenameInputDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("设置文件名")
+            Text(stringResource(R.string.set_filename))
         },
         text = {
             Column {
                 Text(
-                    text = "请输入历史记录存储的文件名：",
+                    text = stringResource(R.string.enter_filename),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = filename,
                     onValueChange = { filename = it },
-                    label = { Text("文件名") },
-                    placeholder = { Text("TellrawCommand.txt") },
+                    label = { Text(stringResource(R.string.storage_filename)) },
+                    placeholder = { Text(stringResource(R.string.filename_placeholder)) },
                     singleLine = true
                 )
             }
@@ -798,12 +806,12 @@ fun FilenameInputDialog(
                 },
                 enabled = filename.isNotBlank()
             ) {
-                Text("确定")
+                Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -819,7 +827,7 @@ fun FileExistsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("文件已存在")
+            Text(stringResource(R.string.file_exists))
         },
         text = {
             Text(
@@ -829,12 +837,12 @@ fun FileExistsDialog(
         },
         confirmButton = {
             TextButton(onClick = onUseExisting) {
-                Text("是，使用此文件")
+                Text(stringResource(R.string.use_existing_file))
             }
         },
         dismissButton = {
             TextButton(onClick = onCustomize) {
-                Text("否，自定义文件名")
+                Text(stringResource(R.string.customize_filename))
             }
         }
     )

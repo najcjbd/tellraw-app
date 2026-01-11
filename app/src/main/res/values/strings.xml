@@ -3,6 +3,9 @@
     <string name="app_name">Tellraw生成器</string>
     
     <!-- 主界面 -->
+    <string name="app_title">Tellraw命令生成器</string>
+    <string name="target_selector">目标选择器</string>
+    <string name="text_message">文本消息</string>
     <string name="selector_input_hint">输入选择器 (如: @a, @p, @e[type=player])</string>
     <string name="message_input_hint">输入消息内容 (支持颜色代码: §a绿色§r)</string>
     <string name="generate_command">生成命令</string>
@@ -11,6 +14,10 @@
     <string name="copy_bedrock">复制基岩版</string>
     <string name="share_java">分享Java版</string>
     <string name="share_bedrock">分享基岩版</string>
+    <string name="input_selector">输入选择器</string>
+    <string name="input_text">输入文本</string>
+    <string name="history">历史记录</string>
+    <string name="settings">设置</string>
     
     <!-- 选择器类型 -->
     <string name="selector_type_java">Java版</string>
@@ -97,4 +104,70 @@
     <string name="copied_to_clipboard">已复制到剪贴板</string>
     <string name="error">错误</string>
     <string name="loading">加载中...</string>
+    
+    <!-- 历史记录 -->
+    <string name="command_history">命令历史记录</string>
+    <string name="search_history">搜索历史记录</string>
+    <string name="no_history">暂无历史记录</string>
+    <string name="no_search_results">没有找到匹配的历史记录</string>
+    <string name="close">关闭</string>
+    <string name="load">加载</string>
+    <string name="delete">删除</string>
+    <string name="clear_history">清空历史</string>
+    
+    <!-- 存储设置 -->
+    <string name="storage_settings">历史记录存储设置</string>
+    <string name="storage_location">存储历史记录的位置</string>
+    <string name="storage_directory">存储目录</string>
+    <string name="storage_directory_selected">已选择存储目录</string>
+    <string name="storage_directory_not_set">未设置存储目录</string>
+    <string name="storage_filename">文件名</string>
+    <string name="set_filename">设置文件名</string>
+    <string name="select_directory">选择目录</string>
+    <string name="clear_storage_settings">清除存储设置</string>
+    <string name="export_config">导出配置</string>
+    <string name="import_config">导入配置</string>
+    <string name="write_to_file">写入文件</string>
+    <string name="writing">写入中...</string>
+    <string name="file_exists">文件已存在</string>
+    <string name="use_existing_file">是，使用此文件</string>
+    <string name="customize_filename">否，自定义文件名</string>
+    
+    <!-- 文件名输入对话框 -->
+    <string name="enter_filename">请输入历史记录存储的文件名：</string>
+    <string name="filename_placeholder">TellrawCommand.txt</string>
+    
+    <!-- 代码对话框 -->
+    <string name="detected_code">检测到%s 代码</string>
+    <string name="code_dialog_message">检测到%s 格式代码，请选择处理方式：
+
+1. 字体方式（格式代码）
+2. 颜色代码方式</string>
+    <string name="code_dialog_message_mixed">检测到%s 格式代码，请选择处理方式：
+
+1. 字体方式（格式代码）
+2. 颜色代码方式</string>
+    <string name="code_dialog_message_full">检测到%s 格式代码，请选择处理方式：
+
+1. Java版使用字体方式，基岩版使用颜色代码方式
+2. Java版和基岩版都使用颜色代码方式</string>
+    <string name="code_option_1">方式1</string>
+    <string name="code_option_2">方式2</string>
+    
+    <!-- 设置对话框 -->
+    <string name="mn_handling_method_title">选择§m（删除线）和§n（下划线）代码的处理方式：</string>
+    
+    <!-- 更新对话框 -->
+    <string name="new_version_found">发现新版本</string>
+    <string name="new_version">新版本: %s</string>
+    <string name="version_number">版本号: %s</string>
+    <string name="release_date">发布日期: %s</string>
+    <string name="download_url">下载地址:</string>
+    <string name="update_notes">更新说明:</string>
+    <string name="open">打开</string>
+    <string name="remind_later">稍后提醒</string>
+    
+    <!-- 禁用检查对话框 -->
+    <string name="disable_version_check">禁用版本检查</string>
+    <string name="disable_version_check_message">确定要禁用版本检查功能吗？\n\n禁用后将不再自动检查新版本，您可以在设置中重新启用。</string>
 </resources>

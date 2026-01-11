@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -22,7 +23,7 @@ fun UpdateDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "发现新版本",
+                text = stringResource(R.string.new_version_found),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -32,19 +33,19 @@ fun UpdateDialog(
             ) {
                 // 版本信息
                 Text(
-                    text = "新版本: ${release.name}",
+                    text = stringResource(R.string.new_version, release.name),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
                 
                 Text(
-                    text = "版本号: ${release.tag_name}",
+                    text = stringResource(R.string.version_number, release.tag_name),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
                 // 发布日期
                 Text(
-                    text = "发布日期: ${formatDate(release.published_at)}",
+                    text = stringResource(R.string.release_date, formatDate(release.published_at)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -52,7 +53,7 @@ fun UpdateDialog(
                 // 下载链接
                 SelectionContainer {
                     Text(
-                        text = "下载地址:",
+                        text = stringResource(R.string.download_url),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -75,7 +76,7 @@ fun UpdateDialog(
                         }
                         
                         Text(
-                            text = "更新说明:",
+                            text = stringResource(R.string.update_notes),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         
@@ -92,12 +93,12 @@ fun UpdateDialog(
         },
         confirmButton = {
             TextButton(onClick = { onOpenUrl(release.html_url) }) {
-                Text("打开")
+                Text(stringResource(R.string.open))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("稍后提醒")
+                Text(stringResource(R.string.remind_later))
             }
         },
         modifier = Modifier.padding(16.dp)
@@ -113,24 +114,24 @@ fun DisableCheckDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "禁用版本检查",
+                text = stringResource(R.string.disable_version_check),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
         text = {
             Text(
-                text = "确定要禁用版本检查功能吗？\n\n禁用后将不再自动检查新版本，您可以在设置中重新启用。",
+                text = stringResource(R.string.disable_version_check_message),
                 style = MaterialTheme.typography.bodyMedium
             )
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("确定")
+                Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
