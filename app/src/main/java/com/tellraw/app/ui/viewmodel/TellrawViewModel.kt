@@ -351,12 +351,12 @@ class TellrawViewModel @Inject constructor(
                 Pair(selector, javaSelectorConverted)
             }
         }
-        
+
         // 过滤Java版参数，移除基岩版特有的参数（完全不支持）
-        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorConversion.javaSelector, SelectorType.JAVA)
-        
+        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorFinal, SelectorType.JAVA)
+
         // 过滤基岩版参数，移除Java版特有的参数（完全不支持）
-        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorConversion.bedrockSelector, SelectorType.BEDROCK)
+        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(bedrockSelectorFinal, SelectorType.BEDROCK)
         
         // 合并所有Java版提醒信息并去重
         val allJavaReminders = mutableListOf<String>()
@@ -832,7 +832,7 @@ class TellrawViewModel @Inject constructor(
                     existingUri
                 } else {
                     // 文件不存在，创建新文件
-                    createFileInDirectory(contentResolver, uri, filename)
+                    createFileInDirectory(uri, filename)
                 }
                 
                 if (fileUri == null) {
@@ -901,19 +901,10 @@ class TellrawViewModel @Inject constructor(
      * 在目录中创建文件
      */
     private suspend fun createFileInDirectory(
-        contentResolver: ContentResolver,
         directoryUri: Uri,
         filename: String
     ): Uri? {
         return try {
-            val mimeType = "text/plain"
-            val createIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = mimeType
-                putExtra("android.provider.extra.INITIAL_URI", directoryUri)
-                putExtra(Intent.EXTRA_TITLE, filename)
-            }
-
             // 注意：这里需要通过Activity启动，返回结果后才能创建文件
             // 这个方法只是准备，实际创建需要通过Activity的回调
             null

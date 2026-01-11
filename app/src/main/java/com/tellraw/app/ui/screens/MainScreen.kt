@@ -74,8 +74,7 @@ fun MainScreen(
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }
     val showSettingsDialog = remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-    
+
     // 设置Context到ViewModel
     LaunchedEffect(context) {
         viewModel.setContext(context)
@@ -86,7 +85,6 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             selectorInput = selectorInput,
-            messageInput = messageInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
             bedrockCommand = bedrockCommand,
@@ -95,14 +93,12 @@ fun MainScreen(
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
             showSettingsDialog = showSettingsDialog,
-            commandHistory = commandHistory,
             viewModel = viewModel
         )
     } else {
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             selectorInput = selectorInput,
-            messageInput = messageInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
             bedrockCommand = bedrockCommand,
@@ -111,7 +107,6 @@ fun MainScreen(
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
             showSettingsDialog = showSettingsDialog,
-            commandHistory = commandHistory,
             viewModel = viewModel
         )
     }
@@ -178,8 +173,7 @@ fun MainScreen(
         UpdateDialog(
             release = release,
             onDismiss = { viewModel.dismissUpdateDialog() },
-            onOpenUrl = { url -> viewModel.openDownloadUrl(url) },
-            onDisableChecks = { viewModel.showDisableCheckDialog() }
+            onOpenUrl = { url -> viewModel.openDownloadUrl(url) }
         )
     }
     
@@ -248,7 +242,6 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     selectorInput: String,
-    messageInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
     bedrockCommand: String,
@@ -257,7 +250,6 @@ private fun PortraitLayout(
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
     showSettingsDialog: MutableState<Boolean>,
-    commandHistory: List<CommandHistory>,
     viewModel: TellrawViewModel
 ) {
     Column(
@@ -423,7 +415,6 @@ private fun PortraitLayout(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     selectorInput: String,
-    messageInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
     bedrockCommand: String,
@@ -432,7 +423,6 @@ private fun LandscapeLayout(
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
     showSettingsDialog: MutableState<Boolean>,
-    commandHistory: List<CommandHistory>,
     viewModel: TellrawViewModel
 ) {
     Column(

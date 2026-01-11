@@ -97,10 +97,8 @@ object SelectorConverter {
                     // 当Java参数和基岩参数数量相等时，尝试使用其他启发式方法
                     // 如果参数完全相等或只有通用参数，使用更细致的判断
                     if (javaCount == 0 && bedrockCount == 0 && '[' in selector && ']' in selector) {
-                        // 只有通用参数，根据社区使用习惯，Java版更常使用scores等参数
-                        // 所以如果只有通用参数，更可能认为是Java版
-                        // 但为了保持与Python版本的一致性，这里仍然返回bedrock
-                        SelectorType.BEDROCK
+                        // 只有通用参数，返回UNIVERSAL
+                        SelectorType.UNIVERSAL
                     } else {
                         // 默认返回bedrock
                         SelectorType.BEDROCK
@@ -109,7 +107,7 @@ object SelectorConverter {
             }
         }
         
-        return SelectorType.BEDROCK // 默认返回基岩版
+        return SelectorType.UNIVERSAL // 默认返回通用版
     }
     
     /**
@@ -1408,15 +1406,15 @@ object SelectorConverter {
             val fullMatch = match.value  // 完整的匹配，如 hasitem=[{...}]
             val content = match.groupValues[1]
             val nbtResult = parseHasitemComplex(content)
-            
+
             if (nbtResult.isNotEmpty()) {
                 reminders.add("hasitem参数已转换为nbt格式，可能无法完全保留原意")
                 reminders.add("注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
                 nbtResult
             } else {
-                // 转换失败，移除参数并添加提醒
-                reminders.add("hasitem参数转换失败，已移除")
-                ""
+                // 转换失败，保留原始hasitem参数并添加提醒
+                reminders.add("hasitem参数转换失败，保留原始hasitem参数")
+                fullMatch
             }
         }
         

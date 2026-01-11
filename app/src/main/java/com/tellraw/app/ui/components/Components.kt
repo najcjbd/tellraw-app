@@ -423,7 +423,6 @@ fun HistoryDialog(
     onSearch: (String) -> Unit = {},
     onShowStorageSettings: () -> Unit = {}
 ) {
-    var showClearConfirmDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,

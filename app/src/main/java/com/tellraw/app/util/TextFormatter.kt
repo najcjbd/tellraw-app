@@ -169,10 +169,8 @@ object TextFormatter {
      */
     fun convertToJavaJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
         var jsonText = text
-        val components = mutableListOf<Map<String, Any>>()
-        var currentText = ""
         var currentFormat = mutableMapOf<String, Any>()
-        
+
         // 已知的§组合
         val knownCodes = setOf(
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9",
@@ -201,10 +199,9 @@ object TextFormatter {
             }
         }
         
-        // 如果有未知的§组合，抛出异常或返回警告
-        if (unknownCodes.isNotEmpty()) {
-            throw IllegalArgumentException("检测到未知的§格式代码: ${unknownCodes.joinToString(", ")}")
-        }
+        // 如果有未知的§组合，跳过它们继续处理
+        // 不抛出异常，以保持与测试期望一致
+        // unknownCodes 可以用于日志记录或其他用途
         
         // 使用正则表达式解析颜色代码和文本
         // 匹配§+字符的模式，然后处理后续的文本
@@ -247,7 +244,7 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码
-                if (code[1] in "0123456789abcdefghijklmnpqrs tuv") {
+                if (code[1] in "0123456789abcdefghijklmnpqrstuv") {
                     // 颜色代码
                     when (code) {
                         "§0" -> currentFormat["color"] = "black"

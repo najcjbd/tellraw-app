@@ -16,8 +16,7 @@ import com.tellraw.app.data.remote.GithubRelease
 fun UpdateDialog(
     release: GithubRelease,
     onDismiss: () -> Unit,
-    onOpenUrl: (String) -> Unit,
-    onDisableChecks: () -> Unit
+    onOpenUrl: (String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
