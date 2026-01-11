@@ -34,14 +34,14 @@ class TextFormatterTest {
         )
         
         for ((code, name) in colorCodes) {
-            val message = "${code}测试文字"
+            val message = code + "测试文字"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
-            assertNotNull("Java版JSON不应为null: $name", javaJson)
-            assertNotNull("基岩版JSON不应为null: $name", bedrockJson)
-            assertTrue("Java版JSON应包含color: $name", javaJson.contains("color"))
-            assertTrue("基岩版JSON应包含color: $name", bedrockJson.contains("color"))
+            assertNotNull("Java版JSON不应为null: " + name, javaJson)
+            assertNotNull("基岩版JSON不应为null: " + name, bedrockJson)
+            assertTrue("Java版JSON应包含color: " + name, javaJson.contains("color"))
+            assertTrue("基岩版JSON应包含color: " + name, bedrockJson.contains("color"))
         }
     }
     
@@ -58,12 +58,12 @@ class TextFormatterTest {
         )
         
         for ((code, name) in formatCodes) {
-            val message = "$code测试文字"
+            val message = code + "测试文字"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
-            assertNotNull("Java版JSON不应为null: $name", javaJson)
-            assertNotNull("基岩版JSON不应为null: $name", bedrockJson)
+            assertNotNull("Java版JSON不应为null: " + name, javaJson)
+            assertNotNull("基岩版JSON不应为null: " + name, bedrockJson)
         }
     }
     
@@ -355,7 +355,7 @@ class TextFormatterTest {
         )
         
         for (code in bedrockColors) {
-            val message = "$code基岩版颜色"
+            val message = code + "基岩版颜色"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
@@ -484,14 +484,14 @@ class TextFormatterTest {
         )
         
         for (code in colorCodes) {
-            val message = "$code测试"
+            val message = code + "测试"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
-            assertNotNull("Java版JSON不应为null: $code", javaJson)
-            assertNotNull("基岩版JSON不应为null: $code", bedrockJson)
-            assertTrue("Java版JSON应包含text: $code", javaJson.contains("text"))
-            assertTrue("基岩版JSON应包含text: $code", bedrockJson.contains("text"))
+            assertNotNull("Java版JSON不应为null: " + code, javaJson)
+            assertNotNull("基岩版JSON不应为null: " + code, bedrockJson)
+            assertTrue("Java版JSON应包含text: " + code, javaJson.contains("text"))
+            assertTrue("基岩版JSON应包含text: " + code, bedrockJson.contains("text"))
         }
     }
     
@@ -503,12 +503,12 @@ class TextFormatterTest {
         val formatCodes = listOf("§k", "§l", "§m", "§n", "§o", "§r")
         
         for (code in formatCodes) {
-            val message = "${code}测试"
+            val message = code + "测试"
             val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
             
-            assertNotNull("Java版JSON不应为null: $code", javaJson)
-            assertNotNull("基岩版JSON不应为null: $code", bedrockJson)
+            assertNotNull("Java版JSON不应为null: " + code, javaJson)
+            assertNotNull("基岩版JSON不应为null: " + code, bedrockJson)
         }
     }
     
@@ -532,8 +532,8 @@ class TextFormatterTest {
             val javaJsonFont = TextFormatter.convertToJavaJson(message, "font", false)
             val javaJsonColor = TextFormatter.convertToJavaJson(message, "color", false)
             
-            assertNotNull("Java版字体方式JSON不应为null: $message", javaJsonFont)
-            assertNotNull("Java版颜色代码方式JSON不应为null: $message", javaJsonColor)
+            assertNotNull("Java版字体方式JSON不应为null: " + message, javaJsonFont)
+            assertNotNull("Java版颜色代码方式JSON不应为null: " + message, javaJsonColor)
         }
     }
     
@@ -557,8 +557,8 @@ class TextFormatterTest {
             val javaJsonFont = TextFormatter.convertToJavaJson(message, "font", false)
             val javaJsonColor = TextFormatter.convertToJavaJson(message, "color", false)
             
-            assertNotNull("Java版字体方式JSON不应为null: $message", javaJsonFont)
-            assertNotNull("Java版颜色代码方式JSON不应为null: $message", javaJsonColor)
+            assertNotNull("Java版字体方式JSON不应为null: " + message, javaJsonFont)
+            assertNotNull("Java版颜色代码方式JSON不应为null: " + message, javaJsonColor)
         }
     }
     
@@ -584,8 +584,8 @@ class TextFormatterTest {
             val javaJson = TextFormatter.convertToJavaJson(message, "font", true)
             val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", true)
             
-            assertNotNull("Java版JSON不应为null: $message", javaJson)
-            assertNotNull("基岩版JSON不应为null: $message", bedrockJson)
+            assertNotNull("Java版JSON不应为null: " + message, javaJson)
+            assertNotNull("基岩版JSON不应为null: " + message, bedrockJson)
         }
     }
 }
