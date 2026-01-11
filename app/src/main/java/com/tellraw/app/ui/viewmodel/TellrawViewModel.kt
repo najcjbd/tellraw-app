@@ -43,7 +43,9 @@ class TellrawViewModel @Inject constructor(
         this.context = context
         // 设置Context后初始化版本检查和加载设置
         initializeVersionCheck()
-        loadSettings()
+        viewModelScope.launch {
+            loadSettings()
+        }
     }
     
     private val _messageInput = MutableStateFlow("")
@@ -902,13 +904,13 @@ class TellrawViewModel @Inject constructor(
     ): Uri? {
         return try {
             val mimeType = "text/plain"
-            val createIntent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
+            val createIntent: Intent = Intent(android.provider.DocumentsContract.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = mimeType
                 putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, directoryUri)
                 putExtra(Intent.EXTRA_TITLE, filename)
             }
-            
+
             // 注意：这里需要通过Activity启动，返回结果后才能创建文件
             // 这个方法只是准备，实际创建需要通过Activity的回调
             null

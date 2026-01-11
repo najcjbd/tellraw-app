@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -823,7 +824,7 @@ fun FileExistsDialog(
         },
         text = {
             Text(
-                text = "文件 \"$filename\" 已存在。\n\n是否使用此文件追加历史记录？\n\n如果选择"否"，您需要自定义一个新的文件名。",
+                text = "文件 \"$filename\" 已存在。\n\n是否使用此文件追加历史记录？\n\n如果选择\"否\"，您需要自定义一个新的文件名。",
                 style = MaterialTheme.typography.bodyMedium
             )
         },

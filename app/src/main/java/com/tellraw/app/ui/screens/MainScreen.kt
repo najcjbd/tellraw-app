@@ -2,6 +2,7 @@ package com.tellraw.app.ui.screens
 
 import android.content.Context
 import android.content.res.Configuration
+import com.tellraw.app.MainActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -93,6 +94,7 @@ fun MainScreen(
             selectorType = selectorType,
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
+            showSettingsDialog = showSettingsDialog,
             commandHistory = commandHistory,
             viewModel = viewModel
         )
@@ -108,6 +110,7 @@ fun MainScreen(
             selectorType = selectorType,
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
+            showSettingsDialog = showSettingsDialog,
             commandHistory = commandHistory,
             viewModel = viewModel
         )
@@ -204,7 +207,7 @@ fun MainScreen(
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
             onWriteToFile = { 
-                viewModel.writeHistoryToFile(context, commandHistory.toList()) 
+                viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>()) 
             },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
@@ -253,6 +256,7 @@ private fun PortraitLayout(
     selectorType: SelectorType,
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
+    showSettingsDialog: MutableState<Boolean>,
     commandHistory: List<CommandHistory>,
     viewModel: TellrawViewModel
 ) {
@@ -427,6 +431,7 @@ private fun LandscapeLayout(
     selectorType: SelectorType,
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
+    showSettingsDialog: MutableState<Boolean>,
     commandHistory: List<CommandHistory>,
     viewModel: TellrawViewModel
 ) {

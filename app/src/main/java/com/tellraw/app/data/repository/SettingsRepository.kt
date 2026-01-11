@@ -152,7 +152,7 @@ class SettingsRepository @Inject constructor(
     fun getHistoryStorageUriFlow(): Flow<String?> {
         return appSettingsDao.getAll().map { settings ->
             val setting = settings.find { it.key == KEY_HISTORY_STORAGE_URI }
-            setting?.value.takeIf { it.isNotEmpty() }
+            setting?.value?.takeIf { it.isNotEmpty() }
         }
     }
     
@@ -177,7 +177,7 @@ class SettingsRepository @Inject constructor(
     fun getHistoryStorageFilenameFlow(): Flow<String> {
         return appSettingsDao.getAll().map { settings ->
             val setting = settings.find { it.key == KEY_HISTORY_STORAGE_FILENAME }
-            setting?.value.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
+            setting?.value?.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
         }
     }
 }

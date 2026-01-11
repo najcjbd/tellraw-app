@@ -148,11 +148,4 @@ class MainActivity : ComponentActivity() {
     fun launchFileCreator(filename: String) {
         fileCreatorLauncher.launch(filename)
     }
-    
-    /**
-     * 启动文件创建器
-     */
-    fun launchFileCreator(filename: String) {
-        fileCreatorLauncher.launch(filename)
-    }
 }
