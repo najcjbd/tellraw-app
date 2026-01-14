@@ -185,8 +185,8 @@ class SettingsRepository @Inject constructor(
      * 导出配置为 JSON 字符串
      */
     suspend fun exportSettingsAsJson(): String {
-        val settings = appSettingsDao.getAll().map { it.key to it.value }.toMap()
-        
+        val settings = appSettingsDao.getAll().first().associate { it.key to it.value }
+
         val json = StringBuilder()
         json.append("{\n")
         json.append("  \"mn_handling_mode\": \"${settings[KEY_MN_HANDLING_MODE] ?: VALUE_MODE_FONT}\",\n")
@@ -195,7 +195,7 @@ class SettingsRepository @Inject constructor(
         json.append("  \"history_storage_uri\": \"${settings[KEY_HISTORY_STORAGE_URI] ?: ""}\",\n")
         json.append("  \"history_storage_filename\": \"${settings[KEY_HISTORY_STORAGE_FILENAME] ?: "TellrawCommand.txt"}\"\n")
         json.append("}")
-        
+
         return json.toString()
     }
     
