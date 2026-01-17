@@ -435,6 +435,7 @@ fun HistoryDialog(
     onDismiss: () -> Unit,
     onLoadHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
     onDeleteHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
+    onClearAll: () -> Unit = {},
     onSearch: (String) -> Unit = {},
     onShowStorageSettings: () -> Unit = {}
 ) {
@@ -524,8 +525,22 @@ fun HistoryDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (historyList.isNotEmpty()) {
+                    TextButton(
+                        onClick = {
+                            onClearAll()
+                            onDismiss()
+                        }
+                    ) {
+                        Text(stringResource(R.string.clear_history))
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.close))
+                }
             }
         }
     )
