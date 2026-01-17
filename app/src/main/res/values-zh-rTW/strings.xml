@@ -146,7 +146,7 @@
     <!-- TextFormatter 錯誤和警告 -->
     <string name="java_font_bedrock_color">Java版用字體，基岩版用顏色代碼</string>
     <string name="both_color_mode">兩版都用顏色代碼</string>
-    <string name="command_must_start_with_tellraw">指令必須以 &apos;tellraw &apos; 開頭</string>
+    <string name="command_must_start_with_tellraw">指令必須以 \'tellraw \' 開頭</string>
     <string name="command_format_incorrect">格式錯誤，應為: tellraw &lt;選擇器&gt; &lt;訊息&gt;</string>
     <string name="selector_must_start_with_at">選擇器必須以 @ 開頭</string>
     <string name="selector_invalid">選擇器無效，必須是 @a、@p、@r、@e 或 @s</string>
