@@ -895,7 +895,7 @@ object SelectorConverter {
         // 检查是否需要修改选择器变量（用于 sort=random 的 @a/@r 转换）
         var finalSelectorVar = selectorVar
         if (paramsPart.startsWith("__SELECTOR_VAR_CHANGE_TO__")) {
-            val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__(\\w+)__").find(paramsPart)
+            val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__([@\\w]+)__").find(paramsPart)
             if (matchResult != null) {
                 finalSelectorVar = matchResult.groupValues[1]
                 paramsPart = paramsPart.replace(matchResult.value, "")
