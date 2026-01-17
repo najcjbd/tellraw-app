@@ -262,7 +262,6 @@
     <string name="selector_type_universal_short">通用</string>
     
     <!-- 警告和结果 -->
-    <string name="generated_commands">生成的命令</string>
     <string name="command_title_java">Java版</string>
     <string name="command_title_bedrock">基岩版</string>
     <string name="action_copy">复制</string>
@@ -296,8 +295,6 @@
 
 1. Java版使用字体方式，基岩版使用颜色代码方式
 2. Java版和基岩版都使用颜色代码方式</string>
-    <string name="code_option_1">方式1</string>
-    <string name="code_option_2">方式2</string>
     
     <!-- 设置对话框 -->
     <string name="mn_handling_method_title">选择§m（删除线）和§n（下划线）代码的处理方式：</string>

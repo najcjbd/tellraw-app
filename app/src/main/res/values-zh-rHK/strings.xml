@@ -262,7 +262,6 @@
     <string name="selector_type_universal_short">通用</string>
     
     <!-- 警告和結果 -->
-    <string name="generated_commands">生成的指令</string>
     <string name="command_title_java">Java版</string>
     <string name="command_title_bedrock">基岩版</string>
     <string name="action_copy">複製</string>
@@ -287,8 +286,6 @@
     <string name="code_dialog_message">偵測到%s 格式代碼，請選擇處理方式：\n\n1. 字體方式（格式代碼）\n2. 顏色代碼方式</string>
     <string name="code_dialog_message_mixed">偵測到%s 格式代碼，請選擇處理方式：\n\n1. 字體方式（格式代碼）\n2. 顏色代碼方式</string>
     <string name="code_dialog_message_full">偵測到%s 格式代碼，請選擇處理方式：\n\n1. Java版使用字體方式，基岩版使用顏色代碼方式\n2. Java版和基岩版都使用顏色代碼方式</string>
-    <string name="code_option_1">方式1</string>
-    <string name="code_option_2">方式2</string>
     
     <!-- 設定對話框 -->
     <string name="mn_handling_method_title">選擇§m（刪除線）和§n（底線）代碼的處理方式：</string>
