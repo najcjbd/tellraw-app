@@ -1398,6 +1398,11 @@ object SelectorConverter {
                     // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
                     // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
                     val cValue = limitValue ?: "9999"
+                    result = result.replace(sortPattern, "")
+                    if (limitValue != null) {
+                        result = result.replace(limitPattern, "")
+                    }
+                    result = addParameterToResult(result, "c=$cValue")
                     if (selectorVar == "@a" || selectorVar == "@r") {
                         reminders.add("Java版" + selectorVar + "[sort=random]已转换为基岩版@r[c=" + cValue + "]")
                         // 在 result 开头添加特殊标记，表示需要修改选择器变量
@@ -1405,11 +1410,6 @@ object SelectorConverter {
                     } else {
                         reminders.add("Java版sort=random已转换为基岩版c=" + cValue)
                     }
-                    result = result.replace(sortPattern, "")
-                    if (limitValue != null) {
-                        result = result.replace(limitPattern, "")
-                    }
-                    result = addParameterToResult(result, "c=$cValue")
                 }
                 else -> {
                     result = result.replace(sortPattern, "")
