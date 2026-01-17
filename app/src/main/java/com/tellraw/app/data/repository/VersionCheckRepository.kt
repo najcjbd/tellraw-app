@@ -2,6 +2,7 @@ package com.tellraw.app.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.tellraw.app.R
 import com.tellraw.app.data.remote.GithubApiService
 import com.tellraw.app.data.remote.GithubRelease
 import kotlinx.coroutines.flow.Flow

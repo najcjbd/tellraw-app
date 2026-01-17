@@ -7,7 +7,7 @@
     <string name="target_selector">Target Selector</string>
     <string name="text_message">Message</string>
     <string name="selector_input_hint">Enter selector (like @a, @p, @e[type=player])</string>
-    <string name="message_input_hint">Enter message (use color codes: §agreen§r)</string>
+    <string name="message_input_hint">Enter message (color codes: §agreen§r)</string>
     <string name="generate_command">Generate</string>
     <string name="clear_all">Clear</string>
     <string name="copy_java">Copy Java</string>
@@ -52,7 +52,7 @@
     <string name="mn_cf_enabled">Enable §m/§n_c/f</string>
     <string name="mn_cf_enabled_description">Use §m_f/§m_c/§n_f/§n_c to choose style</string>
     <string name="mn_handling_method">Choose how to use §m (strikethrough) and §n (underline) codes:</string>
-    <string name="remember_choice">Remember my choice</string>
+    <string name="remember_choice">Remember choice</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>
@@ -83,9 +83,9 @@
     <!-- Help Interface -->
     <string name="help_title">Help</string>
     <string name="help_about">About</string>
-    <string name="help_about_content">Tellraw Command Generator helps you make tellraw commands.
+    <string name="help_about_content">Tellraw Generator helps create tellraw commands.
 
-It works for Java and Bedrock.</string>
+Supports Java and Bedrock selector conversion and text formatting.</string>
     <string name="help_selector_input">Selectors</string>
     <string name="help_selector_content">Selectors pick targets:
 
@@ -103,16 +103,16 @@ Use filters like:
     <string name="help_text_formatting_content">Use Minecraft color and format codes:
 
 Colors:
-• §0 - Black    §1 - Dark Blue   §2 - Dark Green
-• §3 - Dark Aqua §4 - Dark Red    §5 - Dark Purple
-• §6 - Gold     §7 - Gray        §8 - Dark Gray
-• §9 - Blue     §a - Green       §b - Aqua
-• §c - Red      §d - Light Purple §e - Yellow
-• §f - White
+• §0 Black    §1 Dark Blue   §2 Dark Green
+• §3 Dark Aqua §4 Dark Red    §5 Dark Purple
+• §6 Gold     §7 Gray        §8 Dark Gray
+• §9 Blue     §a Green       §b Aqua
+• §c Red      §d Light Purple §e Yellow
+• §f White
 
 Formats:
-• §l - Bold     §m - Strike      §n - Underline
-• §o - Italic   §k - Random      §r - Reset</string>
+• §l Bold     §m Strike      §n Underline
+• §o Italic   §k Random      §r Reset</string>
     <string name="help_version_differences">Version Differences</string>
     <string name="help_version_differences_content">Java and Bedrock use different selectors:
 
@@ -125,14 +125,14 @@ Text formats:
 • Some colors mean different things in Bedrock</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message
-2. App detects selector type
+2. Auto-detects selector type
 3. Generate Java and Bedrock commands
 4. Copy or share commands
 
 For §m§n codes:
 • Font style: Java keeps format, Bedrock uses colors
 • Color style: Both use colors</string>
-    <string name="help_conversion_warning">Check the converted commands manually.</string>
+    <string name="help_conversion_warning">Check converted commands manually.</string>
     
     <!-- Common -->
     <string name="ok">OK</string>
@@ -156,11 +156,11 @@ For §m§n codes:
     <string name="clear_history">Clear history</string>
     
     <!-- Storage Settings -->
-    <string name="storage_settings">History Storage</string>
+    <string name="storage_settings">Storage Settings</string>
     <string name="storage_location">Save history to</string>
     <string name="storage_directory">Folder</string>
     <string name="storage_directory_selected">Folder selected</string>
-    <string name="storage_directory_not_set">No folder (will save to app sandbox)</string>
+    <string name="storage_directory_not_set">No folder (saves to app sandbox)</string>
     <string name="storage_filename">File name</string>
     <string name="set_filename">Set file name</string>
     <string name="select_directory">Select folder</string>
@@ -168,112 +168,116 @@ For §m§n codes:
     <string name="write_to_file">Write to file</string>
     <string name="writing">Writing...</string>
     <string name="file_exists">File exists</string>
-    <string name="use_existing_file">Yes, use this file</string>
-    <string name="customize_filename">No, choose new name</string>
+    <string name="use_existing_file">Use this file</string>
+    <string name="customize_filename">Choose new name</string>
     <string name="append_to_file">Append to file</string>
-    <string name="file_exists_message">File \"%s\" already exists.\n\nDo you want to use this file to append history?\n\nIf you choose \"No\", you need to customize a new file name.</string>
+    <string name="file_exists_message">File "%s" already exists.
+
+Append history to this file?
+
+Choose "No" to enter a new file name.</string>
     <string name="create_file_failed">Failed to create file</string>
-    <string name="append_file_failed">Failed to append to file</string>
-    <string name="write_success">Successfully wrote %d history records</string>
-    <string name="append_success">Successfully appended %d history records</string>
+    <string name="append_file_failed">Failed to append</string>
+    <string name="write_success">Wrote %d records</string>
+    <string name="append_success">Appended %d records</string>
     <string name="file_not_found">File not found</string>
-    <string name="please_set_directory">Please set storage directory first</string>
+    <string name="please_set_directory">Set storage directory first</string>
     <string name="permission_denied">Permission denied</string>
-    <string name="clear_settings_confirm">Are you sure you want to clear storage settings?</string>
-    <string name="sandbox_storage_hint">History will be saved to app sandbox when no folder is selected</string>
+    <string name="clear_settings_confirm">Clear storage settings?</string>
+    <string name="sandbox_storage_hint">History saves to app sandbox when no folder selected</string>
     <string name="success">Success</string>
     
-    <!-- TextFormatter Error and Warning Messages -->
-    <string name="java_font_bedrock_color">Java Edition uses font style, Bedrock Edition uses color code</string>
-    <string name="both_color_mode">Both Java and Bedrock Editions use color code mode</string>
+    <!-- TextFormatter Errors and Warnings -->
+    <string name="java_font_bedrock_color">Java uses font style, Bedrock uses color codes</string>
+    <string name="both_color_mode">Both use color codes</string>
     <string name="command_must_start_with_tellraw">Command must start with \'tellraw \'</string>
-    <string name="command_format_incorrect">Command format incorrect, should be: tellraw &lt;selector&gt; &lt;message&gt;</string>
+    <string name="command_format_incorrect">Format incorrect, should be: tellraw &lt;selector&gt; &lt;message&gt;</string>
     <string name="selector_must_start_with_at">Selector must start with @</string>
-    <string name="selector_invalid">Invalid selector, must be one of @a, @p, @r, @e or @s</string>
-    <string name="message_json_invalid">Message JSON format invalid</string>
-    <string name="message_json_invalid_with_error">Message JSON format invalid: %s</string>
+    <string name="selector_invalid">Invalid selector, must be @a, @p, @r, @e or @s</string>
+    <string name="message_json_invalid">Message JSON invalid</string>
+    <string name="message_json_invalid_with_error">Message JSON invalid: %s</string>
     
-    <!-- TellrawViewModel Error and Warning Messages -->
-    <string name="note_java_unsupported_params">Note: Java Edition does not support the following parameters, removed from Java command: %s</string>
+    <!-- TellrawViewModel Errors and Warnings -->
+    <string name="note_java_unsupported_params">Note: Java doesn\'t support these, removed: %s</string>
     <string name="note_java_specific">Note: %s</string>
-    <string name="note_bedrock_unsupported_params">Note: Bedrock Edition does not support the following parameters, removed from Bedrock command: %s</string>
-    <string name="note_bedrock_selector_converted">Note: Bedrock selector %s is not supported in Java Edition, converted to %s</string>
+    <string name="note_bedrock_unsupported_params">Note: Bedrock doesn\'t support these, removed: %s</string>
+    <string name="note_bedrock_selector_converted">Note: Bedrock selector %s not supported in Java, converted to %s</string>
     <string name="command_generation_error">Command generation error</string>
     <string name="command_generation_error_with_message">Command generation error: %s</string>
     <string name="share_tellraw_command">Share Tellraw Command</string>
     <string name="history_command">Command: %s</string>
-    <string name="history_java_command">Java Command: %s</string>
-    <string name="history_bedrock_command">Bedrock Command: %s</string>
+    <string name="history_java_command">Java: %s</string>
+    <string name="history_bedrock_command">Bedrock: %s</string>
     <string name="history_time">Time: %s</string>
     
-    <!-- VersionCheckRepository Error Messages -->
+    <!-- VersionCheckRepository Errors -->
     <string name="network_error">Network error: %s</string>
     <string name="server_error">Server error: %s</string>
     
-    <!-- SelectorConverter Conversion Reminder Messages -->
-    <string name="bedrock_selector_converted">Bedrock selector %s is not supported in Java Edition, converted to %s</string>
-    <string name="bedrock_scores_negation_removed">Bedrock scores negation parameter %s is not supported in Java Edition, removed</string>
+    <!-- SelectorConverter Conversion Warnings -->
+    <string name="bedrock_selector_converted">Bedrock selector %s not supported in Java, converted to %s</string>
+    <string name="bedrock_scores_negation_removed">Bedrock scores negation %s not supported in Java, removed</string>
     <string name="java_sort_nearest_converted">Java sort=nearest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
-    <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary is not supported in Bedrock Edition, removed</string>
+    <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary not supported in Bedrock, removed</string>
     <string name="java_sort_random_converted">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
     <string name="java_sort_random_to_c">Java sort=random converted to Bedrock c=%s</string>
-    <string name="java_sort_not_supported">Java sort=%s is not supported in Bedrock Edition, removed</string>
-    <string name="java_limit_converted">Java limit=%s parameter converted to Bedrock c=%s</string>
-    <string name="limit_description">limit is just a quantity limit, c is from near to far</string>
-    <string name="bedrock_param_not_supported">Warning: Bedrock %s parameter is not supported in Java Edition, removed</string>
-    <string name="bedrock_param_no_equivalent">Warning: Bedrock %s parameter has no equivalent function in Java Edition, removed</string>
-    <string name="bedrock_family_param_not_supported">Warning: Bedrock %s parameter has no direct equivalent in Java Edition, removed. Consider using type parameter to specify entity type as an alternative</string>
-    <string name="java_nbt_param_not_supported">Warning: Java nbt parameter is not supported in Bedrock Edition, attempted to convert to hasitem parameter, if conversion failed then removed</string>
-    <string name="java_team_param_not_supported">Warning: Java %s parameter is not supported in Bedrock Edition, removed. Bedrock Edition has no direct equivalent for team system</string>
-    <string name="java_predicate_param_not_supported">Warning: Java %s parameter is not supported in Bedrock Edition, removed. Bedrock Edition has no predicate system</string>
-    <string name="java_advancements_param_not_supported">Warning: Java %s parameter is not supported in Bedrock Edition, removed. Bedrock Edition has no advancement system</string>
-    <string name="java_param_not_supported">Warning: Java %s parameter is not supported in Bedrock Edition, removed</string>
-    <string name="java_distance_converted">Java distance=%s parameter converted to Bedrock rm=%s,r=%s</string>
-    <string name="java_distance_to_rm">Java distance=%s parameter converted to Bedrock rm=%s</string>
-    <string name="java_distance_to_r">Java distance=%s parameter converted to Bedrock r=%s</string>
-    <string name="java_distance_exact">Java distance=%s parameter converted to Bedrock rm=%s,r=%s</string>
-    <string name="java_x_rotation_converted">Java x_rotation=%s parameter converted to Bedrock rxm=%s,rx=%s</string>
-    <string name="java_x_rotation_to_rxm">Java x_rotation=%s parameter converted to Bedrock rxm=%s</string>
-    <string name="java_x_rotation_to_rx">Java x_rotation=%s parameter converted to Bedrock rx=%s</string>
-    <string name="java_x_rotation_exact">Java x_rotation=%s parameter converted to Bedrock rxm=%s,rx=%s</string>
-    <string name="java_y_rotation_converted">Java y_rotation=%s parameter converted to Bedrock rym=%s,ry=%s</string>
-    <string name="java_y_rotation_to_rym">Java y_rotation=%s parameter converted to Bedrock rym=%s</string>
-    <string name="java_y_rotation_to_ry">Java y_rotation=%s parameter converted to Bedrock ry=%s</string>
-    <string name="java_y_rotation_exact">Java y_rotation=%s parameter converted to Bedrock rym=%s,ry=%s</string>
-    <string name="java_level_converted">Java level=%s parameter converted to Bedrock lm=%s,l=%s</string>
-    <string name="java_level_to_lm">Java level=%s parameter converted to Bedrock lm=%s</string>
-    <string name="java_level_to_l">Java level=%s parameter converted to Bedrock l=%s</string>
-    <string name="java_level_exact">Java level=%s parameter converted to Bedrock lm=%s,l=%s</string>
-    <string name="java_negation_spectator_converted">Java negation spectator mode (gamemode=!) is not supported in Bedrock Edition, converted to negation survival mode</string>
-    <string name="java_spectator_converted">Java spectator mode (gamemode=%s) is not supported in Bedrock Edition, converted to survival mode</string>
-    <string name="java_gamemode_converted">Java gamemode=%s parameter converted to Bedrock m=%s</string>
-    <string name="bedrock_rm_r_converted">Bedrock rm=%s,r=%s parameter converted to Java distance=%s</string>
-    <string name="bedrock_rm_converted">Bedrock rm=%s parameter converted to Java distance=%s</string>
-    <string name="bedrock_r_converted">Bedrock r=%s parameter converted to Java distance=%s</string>
-    <string name="java_distance_to_bedrock">Java distance=%s parameter converted to Bedrock %s</string>
-    <string name="bedrock_rotation_converted">Bedrock %s=%s,%s=%s parameter converted to Java %s=%s</string>
-    <string name="bedrock_rotation_min_converted">Bedrock %s=%s parameter converted to Java %s=%s</string>
-    <string name="bedrock_rotation_max_converted">Bedrock %s=%s parameter converted to Java %s=%s</string>
-    <string name="java_rotation_converted">Java %s=%s parameter converted to Bedrock %s=%s,%s=%s</string>
-    <string name="java_rotation_to_min">Java %s=%s parameter converted to Bedrock %s=%s</string>
-    <string name="java_rotation_to_max">Java %s=%s parameter converted to Bedrock %s=%s</string>
-    <string name="bedrock_lm_l_converted">Bedrock lm=%s,l=%s parameter converted to Java level=%s</string>
-    <string name="bedrock_lm_converted">Bedrock lm=%s parameter converted to Java level=%s</string>
-    <string name="bedrock_l_converted">Bedrock l=%s parameter converted to Java level=%s</string>
-    <string name="java_level_to_bedrock">Java level=%s parameter converted to Bedrock %s</string>
-    <string name="bedrock_negation_default_converted">Bedrock negation default mode (m=!) is not supported in Java Edition, converted to negation survival mode</string>
-    <string name="bedrock_default_converted">Bedrock default mode (m=%s) is not supported in Java Edition, converted to survival mode</string>
-    <string name="java_level_in_scores_converted">Java level=%s parameter converted to Bedrock lm=%s,l=%s</string>
-    <string name="bedrock_c_negative_converted">Bedrock c=%s parameter converted to Java limit=%s,sort=furthest</string>
-    <string name="bedrock_c_converted">Bedrock c=%s parameter converted to Java limit=%s,sort=nearest</string>
-    <string name="hasitem_converted">hasitem parameter converted to nbt format, may not fully retain original meaning</string>
-    <string name="hasitem_count_note">Note: Java NBT does not require Count value, hasitem quantity parameter was not converted to NBT Count field</string>
-    <string name="hasitem_conversion_failed">hasitem parameter conversion failed, keeping original hasitem parameter</string>
-    <string name="nbt_converted">nbt parameter converted to hasitem format, may not fully retain original meaning</string>
+    <string name="java_sort_not_supported">Java sort=%s not supported in Bedrock, removed</string>
+    <string name="java_limit_converted">Java limit=%s converted to Bedrock c=%s</string>
+    <string name="limit_description">limit limits count, c sorts by distance</string>
+    <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
+    <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no equivalent in Java, removed</string>
+    <string name="bedrock_family_param_not_supported">Warning: Bedrock %s has no equivalent in Java, removed. Use type parameter instead</string>
+    <string name="java_nbt_param_not_supported">Warning: Java nbt not supported in Bedrock, attempted conversion to hasitem, removed if failed</string>
+    <string name="java_team_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no team system</string>
+    <string name="java_predicate_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no predicate system</string>
+    <string name="java_advancements_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no advancement system</string>
+    <string name="java_param_not_supported">Warning: Java %s not supported in Bedrock, removed</string>
+    <string name="java_distance_converted">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
+    <string name="java_distance_to_rm">Java distance=%s converted to Bedrock rm=%s</string>
+    <string name="java_distance_to_r">Java distance=%s converted to Bedrock r=%s</string>
+    <string name="java_distance_exact">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
+    <string name="java_x_rotation_converted">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
+    <string name="java_x_rotation_to_rxm">Java x_rotation=%s converted to Bedrock rxm=%s</string>
+    <string name="java_x_rotation_to_rx">Java x_rotation=%s converted to Bedrock rx=%s</string>
+    <string name="java_x_rotation_exact">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
+    <string name="java_y_rotation_converted">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
+    <string name="java_y_rotation_to_rym">Java y_rotation=%s converted to Bedrock rym=%s</string>
+    <string name="java_y_rotation_to_ry">Java y_rotation=%s converted to Bedrock ry=%s</string>
+    <string name="java_y_rotation_exact">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
+    <string name="java_level_converted">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="java_level_to_lm">Java level=%s converted to Bedrock lm=%s</string>
+    <string name="java_level_to_l">Java level=%s converted to Bedrock l=%s</string>
+    <string name="java_level_exact">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="java_negation_spectator_converted">Java negation spectator mode (gamemode=!) not supported in Bedrock, converted to negation survival</string>
+    <string name="java_spectator_converted">Java spectator mode (gamemode=%s) not supported in Bedrock, converted to survival</string>
+    <string name="java_gamemode_converted">Java gamemode=%s converted to Bedrock m=%s</string>
+    <string name="bedrock_rm_r_converted">Bedrock rm=%s,r=%s converted to Java distance=%s</string>
+    <string name="bedrock_rm_converted">Bedrock rm=%s converted to Java distance=%s</string>
+    <string name="bedrock_r_converted">Bedrock r=%s converted to Java distance=%s</string>
+    <string name="java_distance_to_bedrock">Java distance=%s converted to Bedrock %s</string>
+    <string name="bedrock_rotation_converted">Bedrock %s=%s,%s=%s converted to Java %s=%s</string>
+    <string name="bedrock_rotation_min_converted">Bedrock %s=%s converted to Java %s=%s</string>
+    <string name="bedrock_rotation_max_converted">Bedrock %s=%s converted to Java %s=%s</string>
+    <string name="java_rotation_converted">Java %s=%s converted to Bedrock %s=%s,%s=%s</string>
+    <string name="java_rotation_to_min">Java %s=%s converted to Bedrock %s=%s</string>
+    <string name="java_rotation_to_max">Java %s=%s converted to Bedrock %s=%s</string>
+    <string name="bedrock_lm_l_converted">Bedrock lm=%s,l=%s converted to Java level=%s</string>
+    <string name="bedrock_lm_converted">Bedrock lm=%s converted to Java level=%s</string>
+    <string name="bedrock_l_converted">Bedrock l=%s converted to Java level=%s</string>
+    <string name="java_level_to_bedrock">Java level=%s converted to Bedrock %s</string>
+    <string name="bedrock_negation_default_converted">Bedrock negation default mode (m=!) not supported in Java, converted to negation survival</string>
+    <string name="bedrock_default_converted">Bedrock default mode (m=%s) not supported in Java, converted to survival</string>
+    <string name="java_level_in_scores_converted">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="bedrock_c_negative_converted">Bedrock c=%s converted to Java limit=%s,sort=furthest</string>
+    <string name="bedrock_c_converted">Bedrock c=%s converted to Java limit=%s,sort=nearest</string>
+    <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
+    <string name="hasitem_count_note">Note: Java NBT doesn\'t need Count value, hasitem quantity not converted</string>
+    <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>
+    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
     
     <!-- Filename Input Dialog -->
-    <string name="enter_filename">Enter file name for history:</string>
+    <string name="enter_filename">Enter history file name:</string>
     <string name="filename_placeholder">TellrawCommand.txt</string>
     
     <!-- Code Dialog -->
@@ -308,5 +312,53 @@ For §m§n codes:
     
     <!-- Disable Check Dialog -->
     <string name="disable_version_check">Disable version check</string>
-    <string name="disable_version_check_message">Do you want to disable version check?\n\nAfter disabling, the app will not check for new versions automatically. You can re-enable it in settings.</string>
+    <string name="disable_version_check_message">Disable version check?
+
+Will not auto-check for updates. Re-enable in settings.</string>
+    
+    <!-- Color Code Names -->
+    <string name="color_code_black">Black</string>
+    <string name="color_code_dark_blue">Dark Blue</string>
+    <string name="color_code_dark_green">Dark Green</string>
+    <string name="color_code_dark_aqua">Dark Aqua</string>
+    <string name="color_code_dark_red">Dark Red</string>
+    <string name="color_code_dark_purple">Dark Purple</string>
+    <string name="color_code_gold">Gold</string>
+    <string name="color_code_gray">Gray</string>
+    <string name="color_code_dark_gray">Dark Gray</string>
+    <string name="color_code_blue">Blue</string>
+    <string name="color_code_green">Green</string>
+    <string name="color_code_aqua">Aqua</string>
+    <string name="color_code_red">Red</string>
+    <string name="color_code_light_purple">Light Purple</string>
+    <string name="color_code_yellow">Yellow</string>
+    <string name="color_code_white">White</string>
+    
+    <!-- Format Code Names -->
+    <string name="format_code_bold">Bold</string>
+    <string name="format_code_strikethrough">Strike</string>
+    <string name="format_code_underline">Underline</string>
+    <string name="format_code_italic">Italic</string>
+    <string name="format_code_obfuscated">Random</string>
+    <string name="format_code_reset">Reset</string>
+    
+    <!-- Selector Types -->
+    <string name="selector_type_bedrock_short">Bedrock</string>
+    <string name="selector_type_universal_short">Universal</string>
+    
+    <!-- Warnings and Results -->
+    <string name="command_title_java">Java Edition</string>
+    <string name="command_title_bedrock">Bedrock Edition</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_load">Load</string>
+    <string name="action_delete">Delete</string>
+    
+    <!-- History Items -->
+    <string name="history_item_selector">Selector: %s</string>
+    <string name="history_item_message">Message: %s</string>
+    
+    <!-- §m§n Codes -->
+    <string name="code_strikethrough">§m (strikethrough)</string>
+    <string name="code_underline">§n (underline)</string>
 </resources>

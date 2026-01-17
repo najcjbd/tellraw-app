@@ -1,6 +1,7 @@
 package com.tellraw.app.util
 
 import android.content.Context
+import com.tellraw.app.R
 import com.tellraw.app.model.*
 import java.util.regex.Pattern
 

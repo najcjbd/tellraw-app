@@ -7,8 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tellraw.app.R
 import com.tellraw.app.data.local.CommandHistory
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.data.repository.SettingsRepository
@@ -121,11 +123,11 @@ class TellrawViewModel @Inject constructor(
         } else {
             // Android 10及以下需要检查存储权限
             context?.let { ctx ->
-                android.content.ContextCompat.checkSelfPermission(
+                ContextCompat.checkSelfPermission(
                     ctx,
                     android.Manifest.permission.READ_EXTERNAL_STORAGE
                 ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                android.content.ContextCompat.checkSelfPermission(
+                ContextCompat.checkSelfPermission(
                     ctx,
                     android.Manifest.permission.WRITE_EXTERNAL_STORAGE
                 ) == android.content.pm.PackageManager.PERMISSION_GRANTED
