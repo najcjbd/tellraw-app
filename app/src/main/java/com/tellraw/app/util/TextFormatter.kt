@@ -146,7 +146,7 @@ object TextFormatter {
     /**
      * 处理空格转换
      */
-    fun convertSpaces(text: String, targetVersion: MinecraftVersion): String {
+    fun convertSpaces(text: String): String {
         // 在某些情况下，不同版本对空格的处理可能不同
         // 目前保持一致，但保留此函数以备将来扩展
         return text
@@ -169,7 +169,7 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "color"): String {
         var jsonText = text
         var currentFormat = mutableMapOf<String, Any>()
 
@@ -394,7 +394,7 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "color"): String {
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
@@ -495,7 +495,6 @@ object TextFormatter {
         selector: String,
         message: String,
         useJavaFontStyle: Boolean = true,
-        mnCFEnabled: Boolean = false,
         context: Context
     ): TellrawCommand {
         val warnings = mutableListOf<String>()
@@ -506,13 +505,13 @@ object TextFormatter {
         
         // 确定m_n_handling参数
         val mNHandling = if (useJavaFontStyle) "font" else "color"
-        
+
         // 转换为Java版JSON格式
-        val javaMessage = convertToJavaJson(processedMessage, mNHandling, mnCFEnabled)
+        val javaMessage = convertToJavaJson(processedMessage, mNHandling)
         val javaCommand = "tellraw $selector $javaMessage"
-        
+
         // 转换为基岩版JSON格式，与Python版本保持一致
-        val bedrockMessage = convertToBedrockJson(processedMessage, mNHandling, mnCFEnabled)
+        val bedrockMessage = convertToBedrockJson(processedMessage, mNHandling)
         val bedrockCommand = "tellraw $selector $bedrockMessage"
         
         return TellrawCommand(

@@ -1085,13 +1085,7 @@ class TellrawViewModel @Inject constructor(
                 android.util.Log.e("TellrawViewModel", "Invalid directory URI")
                 return null
             }
-            
-            // 检查目录是否存在
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                directoryUri,
-                docId
-            )
-            
+
             // 尝试创建文件
             val fileUri = DocumentsContract.createDocument(
                 contentResolver,

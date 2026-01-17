@@ -435,7 +435,6 @@ fun HistoryDialog(
     onDismiss: () -> Unit,
     onLoadHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
     onDeleteHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
-    onClearAll: () -> Unit,
     onSearch: (String) -> Unit = {},
     onShowStorageSettings: () -> Unit = {}
 ) {

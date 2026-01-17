@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -94,7 +95,6 @@ fun MainScreen(
             selectorType = selectorType,
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
-            showSettingsDialog = showSettingsDialog,
             viewModel = viewModel
         )
     } else {
@@ -193,10 +193,10 @@ fun MainScreen(
             storageUri = historyStorageUri,
             filename = historyStorageFilename,
             onDismiss = { viewModel.hideStorageSettingsDialog() },
-            onSelectDirectory = { 
-                activity?.checkAndRequestStoragePermission(
+            onSelectDirectory = {
+                activity.checkAndRequestStoragePermission(
                     onGranted = {
-                        activity?.launchDirectoryPicker { uri ->
+                        activity.launchDirectoryPicker { uri ->
                             viewModel.setHistoryStorageUri(uri)
                         }
                     },
@@ -278,7 +278,7 @@ private fun PortraitLayout(
                     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
                 }
                 IconButton(onClick = onNavigateToHelp) {
-                    Icon(Icons.Default.Help, contentDescription = stringResource(R.string.help))
+                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.help))
                 }
             }
         )
@@ -430,7 +430,6 @@ private fun LandscapeLayout(
     selectorType: SelectorType,
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
-    showSettingsDialog: MutableState<Boolean>,
     viewModel: TellrawViewModel
 ) {
     Column(
@@ -468,7 +467,7 @@ private fun LandscapeLayout(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        Icons.Default.Help, 
+                        Icons.AutoMirrored.Filled.Help,
                         contentDescription = stringResource(R.string.help),
                         modifier = Modifier.size(18.dp)
                     )

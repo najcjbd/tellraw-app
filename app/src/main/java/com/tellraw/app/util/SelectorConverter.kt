@@ -1815,43 +1815,9 @@ object SelectorConverter {
         
         // 提取物品信息
         val itemName = params["item"]?.trim('"') ?: return ""
-        val quantity = params["quantity"] ?: "1.."
         val location = params["location"]
         val slot = params["slot"]
-        
-        // 解析数量范围
-        var countValue = 1
-        val hasQuantity = "quantity" in params
-        
-        if (quantity.isNotEmpty()) {
-            if (".." in quantity) {
-                // 根据要求：hasitem如果有数量范围则取中间值(整数)
-                val rangeParts = quantity.split("..")
-                try {
-                    if (rangeParts[0].isNotEmpty() && rangeParts[1].isNotEmpty()) {
-                        // 两个数字都存在：取中间值
-                        val start = rangeParts[0].toInt()
-                        val end = rangeParts[1].toInt()
-                        countValue = kotlin.math.round((start + end).toDouble() / 2.0).toInt()
-                    } else if (rangeParts[0].isNotEmpty()) {
-                        // 只有下限：使用下限值
-                        countValue = rangeParts[0].toInt()
-                    } else if (rangeParts[1].isNotEmpty()) {
-                        // 只有上限：使用上限值
-                        countValue = rangeParts[1].toInt()
-                    }
-                } catch (e: NumberFormatException) {
-                    countValue = 1
-                }
-            } else {
-                try {
-                    countValue = quantity.toInt()
-                } catch (e: NumberFormatException) {
-                    countValue = 1
-                }
-            }
-        }
-        
+
         // 构建nbt参数
         if (itemName.isNotEmpty()) {
             // Java版NBT不需要Count值，有了反而会让检测失效
@@ -1946,45 +1912,9 @@ object SelectorConverter {
             
             // 提取物品信息
             val itemName = params["item"]?.trim('"') ?: continue
-            val quantity = params["quantity"] ?: "1.."
             val location = params["location"]
             val slot = params["slot"]
-            
-            // 解析数量范围 - 根据需求取中间值（整数）
-            var countValue = 1
-            val hasQuantity = "quantity" in params
-            
-            if (quantity.isNotEmpty()) {
-                if (".." in quantity) {
-                    val rangeParts = quantity.split("..")
-                    try {
-                        if (rangeParts[0].isNotEmpty() && rangeParts[1].isNotEmpty()) {
-                            // 两个数字都存在：取中间值
-                            val start = rangeParts[0].toInt()
-                            val end = rangeParts[1].toInt()
-                            countValue = kotlin.math.round((start + end).toDouble() / 2.0).toInt()
-                        } else if (rangeParts[0].isNotEmpty()) {
-                            // 只有下限：使用下限值
-                            countValue = rangeParts[0].toInt()
-                        } else if (rangeParts[1].isNotEmpty()) {
-                            // 只有上限：使用上限值
-                            countValue = rangeParts[1].toInt()
-                        }
-                    } catch (e: NumberFormatException) {
-                        countValue = 1
-                    }
-                } else if (quantity.startsWith("!")) {
-                    // 处理反选情况
-                    countValue = 1
-                } else {
-                    try {
-                        countValue = quantity.toInt()
-                    } catch (e: NumberFormatException) {
-                        countValue = 1
-                    }
-                }
-            }
-            
+
             // 添加minecraft:前缀（如果需要）
             val fullItemName = if (!itemName.startsWith("minecraft:")) {
                 "minecraft:$itemName"

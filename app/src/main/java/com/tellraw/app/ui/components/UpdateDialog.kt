@@ -68,26 +68,25 @@ fun UpdateDialog(
                 }
                 
                 // 更新说明（截取前200个字符）
-                release.body?.let { body ->
-                    if (body.isNotEmpty()) {
-                        val truncatedBody = if (body.length > 200) {
-                            body.take(200) + "..."
-                        } else {
-                            body
-                        }
-                        
+                val body = release.body
+                if (body.isNotEmpty()) {
+                    val truncatedBody = if (body.length > 200) {
+                        body.take(200) + "..."
+                    } else {
+                        body
+                    }
+
+                    Text(
+                        text = stringResource(R.string.update_notes),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    SelectionContainer {
                         Text(
-                            text = stringResource(R.string.update_notes),
-                            style = MaterialTheme.typography.bodyMedium
+                            text = truncatedBody,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        
-                        SelectionContainer {
-                            Text(
-                                text = truncatedBody,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
             }
