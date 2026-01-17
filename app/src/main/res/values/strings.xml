@@ -131,7 +131,7 @@
     <string name="use_existing_file">使用此文件</string>
     <string name="customize_filename">自定义文件名</string>
     <string name="append_to_file">追加到文件</string>
-    <string name="file_exists_message">文件 "%s" 已存在。\n\n是否追加历史记录？\n\n选择"否"需自定义新文件名。</string>
+    <string name="file_exists_message">文件 "%1$s" 已存在。\n\n是否追加历史记录？\n\n选择"否"需自定义新文件名。</string>
     <string name="create_file_failed">创建失败</string>
     <string name="append_file_failed">追加失败</string>
     <string name="write_success">成功写入 %d 条记录</string>
@@ -176,7 +176,7 @@
     <string name="java_sort_nearest_converted">Java版sort=nearest已转换为基岩版c=%s</string>
     <string name="java_sort_furthest_converted">Java版sort=furthest已转换为基岩版c=%s</string>
     <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版不支持，已移除</string>
-    <string name="java_sort_random_converted">Java版%s[sort=random]已转换为基岩版@r[c=%s]</string>
+<string name="java_sort_random_converted">Java版%1$s[sort=random]已转换为基岩版@r[c=%2$s]</string>
     <string name="java_sort_random_to_c">Java版sort=random已转换为基岩版c=%s</string>
     <string name="java_sort_not_supported">Java版sort=%s在基岩版不支持，已移除</string>
     <string name="java_limit_converted">Java版limit=%s已转换为基岩版c=%s</string>
@@ -207,10 +207,10 @@
     <string name="java_level_exact">Java版level=%s已转换为基岩版lm=%s,l=%s</string>
     <string name="java_negation_spectator_converted">Java版反选旁观模式(gamemode=!)在基岩版不支持，已转换为反选生存模式</string>
     <string name="java_spectator_converted">Java版旁观模式(gamemode=%s)在基岩版不支持，已转换为生存模式</string>
-    <string name="java_gamemode_converted">Java版gamemode=%s已转换为基岩版m=%s</string>
-    <string name="bedrock_rm_r_converted">基岩版rm=%s,r=%s已转换为Java版distance=%s</string>
-    <string name="bedrock_rm_converted">基岩版rm=%s已转换为Java版distance=%s</string>
-    <string name="bedrock_r_converted">基岩版r=%s已转换为Java版distance=%s</string>
+    <string name="java_gamemode_converted">Java版gamemode=%1$s已转换为基岩版m=%2$s</string>
+    <string name="bedrock_rm_r_converted">基岩版rm=%1$s,r=%2$s已转换为Java版distance=%3$s</string>
+    <string name="bedrock_rm_converted">基岩版rm=%1$s已转换为Java版distance=%2$s</string>
+    <string name="bedrock_r_converted">基岩版r=%1$s已转换为Java版distance=%2$s</string>
     <string name="java_distance_to_bedrock">Java版distance=%s已转换为基岩版%s</string>
     <string name="bedrock_rotation_converted">基岩版%s=%s,%s=%s已转换为Java版%s=%s</string>
     <string name="bedrock_rotation_min_converted">基岩版%s=%s已转换为Java版%s=%s</string>

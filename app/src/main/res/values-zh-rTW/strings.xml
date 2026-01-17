@@ -207,10 +207,10 @@
     <string name="java_level_exact">Java版level=%s已轉換為基岩版lm=%s,l=%s</string>
     <string name="java_negation_spectator_converted">Java版反選旁觀模式(gamemode=!)在基岩版不支援，已轉換為反選生存模式</string>
     <string name="java_spectator_converted">Java版旁觀模式(gamemode=%s)在基岩版不支援，已轉換為生存模式</string>
-    <string name="java_gamemode_converted">Java版gamemode=%s已轉換為基岩版m=%s</string>
-    <string name="bedrock_rm_r_converted">基岩版rm=%s,r=%s已轉換為Java版distance=%s</string>
-    <string name="bedrock_rm_converted">基岩版rm=%s已轉換為Java版distance=%s</string>
-    <string name="bedrock_r_converted">基岩版r=%s已轉換為Java版distance=%s</string>
+    <string name="java_gamemode_converted">Java版gamemode=%1$s已轉換為基岩版m=%2$s</string>
+    <string name="bedrock_rm_r_converted">基岩版rm=%1$s,r=%2$s已轉換為Java版distance=%3$s</string>
+    <string name="bedrock_rm_converted">基岩版rm=%1$s已轉換為Java版distance=%2$s</string>
+    <string name="bedrock_r_converted">基岩版r=%1$s已轉換為Java版distance=%2$s</string>
     <string name="java_distance_to_bedrock">Java版distance=%s已轉換為基岩版%s</string>
     <string name="bedrock_rotation_converted">基岩版%s=%s,%s=%s已轉換為Java版%s=%s</string>
     <string name="bedrock_rotation_min_converted">基岩版%s=%s已轉換為Java版%s=%s</string>

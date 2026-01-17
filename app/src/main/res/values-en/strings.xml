@@ -251,10 +251,10 @@ Choose "No" to enter a new file name.</string>
     <string name="java_level_exact">Java level=%s converted to Bedrock lm=%s,l=%s</string>
     <string name="java_negation_spectator_converted">Java negation spectator mode (gamemode=!) not supported in Bedrock, converted to negation survival</string>
     <string name="java_spectator_converted">Java spectator mode (gamemode=%s) not supported in Bedrock, converted to survival</string>
-    <string name="java_gamemode_converted">Java gamemode=%s converted to Bedrock m=%s</string>
-    <string name="bedrock_rm_r_converted">Bedrock rm=%s,r=%s converted to Java distance=%s</string>
-    <string name="bedrock_rm_converted">Bedrock rm=%s converted to Java distance=%s</string>
-    <string name="bedrock_r_converted">Bedrock r=%s converted to Java distance=%s</string>
+    <string name="java_gamemode_converted">Java gamemode=%1$s converted to Bedrock m=%2$s</string>
+    <string name="bedrock_rm_r_converted">Bedrock rm=%1$s,r=%2$s converted to Java distance=%3$s</string>
+    <string name="bedrock_rm_converted">Bedrock rm=%1$s converted to Java distance=%2$s</string>
+    <string name="bedrock_r_converted">Bedrock r=%1$s converted to Java distance=%2$s</string>
     <string name="java_distance_to_bedrock">Java distance=%s converted to Bedrock %s</string>
     <string name="bedrock_rotation_converted">Bedrock %s=%s,%s=%s converted to Java %s=%s</string>
     <string name="bedrock_rotation_min_converted">Bedrock %s=%s converted to Java %s=%s</string>
