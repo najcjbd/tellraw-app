@@ -262,7 +262,6 @@
     <string name="selector_type_universal_short">通用</string>
     
     <!-- 警告和结果 -->
-    <string name="conversion_warnings">转换提醒</string>
     <string name="generated_commands">生成的命令</string>
     <string name="command_title_java">Java版</string>
     <string name="command_title_bedrock">基岩版</string>
