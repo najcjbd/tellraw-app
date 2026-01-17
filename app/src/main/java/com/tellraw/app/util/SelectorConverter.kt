@@ -898,7 +898,7 @@ object SelectorConverter {
             val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__(\\w+)__").find(paramsPart)
             if (matchResult != null) {
                 finalSelectorVar = matchResult.groupValues[1]
-                paramsPart = paramsPart.replaceFirst(Regex("__SELECTOR_VAR_CHANGE_TO__(\\w+)__"), "")
+                paramsPart = paramsPart.replace(matchResult.value, "")
             }
         }
         
