@@ -14,7 +14,7 @@ import androidx.test.core.app.ApplicationProvider
  * 测试各种选择器参数的组合和转换
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], application = TestApplication::class)
 class SelectorConverterTest {
     private val context: Context = ApplicationProvider.getApplicationContext<android.app.Application>()
     
