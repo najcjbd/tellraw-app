@@ -15,7 +15,12 @@ import androidx.test.core.app.ApplicationProvider
  * 测试选择器转换和命令生成的完整流程
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], application = TestApplication::class)
+@Config(
+    sdk = [28],
+    application = TestApplication::class,
+    manifest = "app/src/main/AndroidManifest.xml",
+    packageName = "com.tellraw.app"
+)
 class TellrawGeneratorTest {
     private val context: Context = ApplicationProvider.getApplicationContext<android.app.Application>()
     
