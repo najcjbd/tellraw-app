@@ -3,12 +3,20 @@ package com.tellraw.app.util
 import com.tellraw.app.model.SelectorType
 import org.junit.Test
 import org.junit.Assert.*
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * Tellraw命令生成器综合测试
  * 测试选择器转换和命令生成的完整流程
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class TellrawGeneratorTest {
+    private val context: Context = ApplicationProvider.getApplicationContext<android.app.Application>()
     
     /**
      * 测试组1：通用选择器参数命令生成测试
@@ -184,7 +192,7 @@ class TellrawGeneratorTest {
         )
         
         for ((bedrockSelector, expectedJavaParam) in testCases) {
-            val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+            val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
             assertTrue("应该检测到基岩版选择器: $bedrockSelector", conversion.wasConverted)
             assertNotNull("转换后的Java选择器不应为null: $bedrockSelector", conversion.javaSelector)
         }
@@ -212,7 +220,7 @@ class TellrawGeneratorTest {
         )
         
         for ((javaSelector, expectedBedrockParam) in testCases) {
-            val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+            val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
             // Java版选择器转换后，基岩版选择器应该包含对应的参数
             assertNotNull("转换后的基岩版选择器不应为null: $javaSelector", conversion.bedrockSelector)
         }
@@ -389,7 +397,7 @@ class TellrawGeneratorTest {
         
         for ((selector, expectedTypes) in testCases) {
             val type = SelectorConverter.detectSelectorType(selector)
-            val conversion = SelectorConverter.convertBedrockToJava(selector)
+            val conversion = SelectorConverter.convertBedrockToJava(selector, context)
             
             assertNotNull("选择器类型不应为null: $selector", type)
             assertNotNull("转换结果不应为null: $selector", conversion)

@@ -3,12 +3,20 @@ package com.tellraw.app.util
 import com.tellraw.app.model.SelectorType
 import org.junit.Test
 import org.junit.Assert.*
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * 选择器转换和命令生成测试
  * 测试各种选择器参数的组合和转换
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class SelectorConverterTest {
+    private val context: Context = ApplicationProvider.getApplicationContext<android.app.Application>()
     
     /**
      * 测试组1：通用选择器参数（8~9个参数）
@@ -906,7 +914,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_1() {
         // 基岩版到Java版：r/rm -> distance
         val bedrockSelector = "@a[r=10]"
-        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
         assertTrue("Java版选择器应包含distance", conversion.javaSelector.contains("distance"))
     }
@@ -915,7 +923,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_2() {
         // Java版到基岩版：distance -> r/rm
         val javaSelector = "@a[distance=10]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含r", conversion.bedrockSelector.contains("r"))
     }
     
@@ -923,7 +931,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_3() {
         // 基岩版到Java版：m -> gamemode
         val bedrockSelector = "@a[m=0]"
-        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("Java版选择器应包含gamemode", conversion.javaSelector.contains("gamemode"))
     }
     
@@ -931,7 +939,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_4() {
         // Java版到基岩版：gamemode -> m
         val javaSelector = "@a[gamemode=survival]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含m", conversion.bedrockSelector.contains("m"))
     }
     
@@ -939,7 +947,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_5() {
         // 基岩版到Java版：c -> limit/sort
         val bedrockSelector = "@a[c=5]"
-        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector)
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("Java版选择器应包含limit", conversion.javaSelector.contains("limit"))
         assertTrue("Java版选择器应包含sort", conversion.javaSelector.contains("sort"))
     }
@@ -948,7 +956,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_6() {
         // Java版到基岩版：limit/sort -> c
         val javaSelector = "@a[limit=5,sort=nearest]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含c", conversion.bedrockSelector.contains("c"))
     }
     
@@ -956,7 +964,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_7() {
         // Java版到基岩版：sort=random (无limit) - @a转换为@r
         val javaSelector = "@a[sort=random]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
     }
     
@@ -964,7 +972,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_8() {
         // Java版到基岩版：sort=random + limit - @a转换为@r
         val javaSelector = "@a[limit=5,sort=random]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=5]", "@r[c=5]", conversion.bedrockSelector)
     }
     
@@ -972,7 +980,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_9() {
         // Java版到基岩版：sort=random - @r保持@r
         val javaSelector = "@r[sort=random]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
     }
     
@@ -980,7 +988,7 @@ class SelectorConverterTest {
     fun testSelectorConversion_10() {
         // Java版到基岩版：sort=random - @e转换为c参数
         val javaSelector = "@e[sort=random]"
-        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector)
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@e[c=9999]", "@e[c=9999]", conversion.bedrockSelector)
     }
     
@@ -991,7 +999,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_1() {
         // 过滤Java版独有参数到基岩版
         val javaSelector = "@a[distance=10,team=red,gamemode=survival]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK, context)
         assertTrue("应移除team参数", removed.contains("team"))
         assertFalse("不应包含team参数", filtered.contains("team"))
     }
@@ -1000,7 +1008,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_2() {
         // 过滤基岩版独有参数到Java版
         val bedrockSelector = "@a[r=10,m=0,haspermission={movement=enabled}]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA)
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
         assertTrue("应移除haspermission参数", removed.contains("haspermission"))
         assertFalse("不应包含haspermission参数", filtered.contains("haspermission"))
     }
@@ -1009,7 +1017,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_3() {
         // 过滤family参数到Java版
         val bedrockSelector = "@e[family=zombie]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA)
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
         assertTrue("应移除family参数", removed.contains("family"))
         assertFalse("不应包含family参数", filtered.contains("family"))
     }
@@ -1018,7 +1026,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_4() {
         // 过滤predicate参数到基岩版
         val javaSelector = "@a[predicate=test:test]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK, context)
         assertTrue("应移除predicate参数", removed.contains("predicate"))
         assertFalse("不应包含predicate参数", filtered.contains("predicate"))
     }
@@ -1027,7 +1035,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_5() {
         // 过滤advancements参数到基岩版
         val javaSelector = "@a[advancements={story/form_obsidian=true}]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK)
+        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK, context)
         assertTrue("应移除advancements参数", removed.contains("advancements"))
         assertFalse("不应包含advancements参数", filtered.contains("advancements"))
     }
