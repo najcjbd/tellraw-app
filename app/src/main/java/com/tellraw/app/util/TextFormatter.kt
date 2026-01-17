@@ -169,7 +169,7 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "color"): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
         var jsonText = text
         var currentFormat = mutableMapOf<String, Any>()
 

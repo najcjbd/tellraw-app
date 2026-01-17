@@ -194,9 +194,9 @@ fun MainScreen(
             filename = historyStorageFilename,
             onDismiss = { viewModel.hideStorageSettingsDialog() },
             onSelectDirectory = {
-                activity.checkAndRequestStoragePermission(
+                activity?.checkAndRequestStoragePermission(
                     onGranted = {
-                        activity.launchDirectoryPicker { uri ->
+                        activity?.launchDirectoryPicker { uri ->
                             viewModel.setHistoryStorageUri(uri)
                         }
                     },
@@ -208,8 +208,8 @@ fun MainScreen(
             },
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
-            onWriteToFile = { 
-                viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>()) 
+            onWriteToFile = {
+                viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>())
             },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
