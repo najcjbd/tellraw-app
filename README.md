@@ -198,6 +198,18 @@ TEXT_COLOR_CODES = mapOf(
 ./gradlew jacocoTestReport
 ```
 
+### 文件访问
+应用集成了 MTDataFilesProvider，允许 MT 管理器访问应用私有目录文件：
+
+**使用方式**：
+1. 编译并安装应用（debug 版本已自动集成）
+2. 打开 MT 管理器
+3. 在侧拉栏点击「添加本地存储」
+4. 在应用列表中找到并选中此应用
+5. 点击「选择」即可访问应用私有目录
+
+**注意**：文件提供器仅在 debug 版本中注入。如需在 release 版本中也注入，在 `app/build.gradle` 中将 `debugImplementation` 改为 `implementation`。
+
 ### 云端构建配置
 项目支持GitHub Actions云端构建：
 

@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tellraw生成器</string>
+    
+    <!-- 主界面 -->
+    <string name="app_title">Tellraw指令生成器</string>
+    <string name="target_selector">目標選擇器</string>
+    <string name="text_message">文字訊息</string>
+    <string name="selector_input_hint">輸入選擇器 (如: @a, @p, @e[type=player])</string>
+    <string name="message_input_hint">輸入訊息內容 (支援顏色代碼: §a綠色§r)</string>
+    <string name="generate_command">生成指令</string>
+    <string name="clear_all">清空</string>
+    <string name="copy_java">複製Java版</string>
+    <string name="copy_bedrock">複製基岩版</string>
+    <string name="share_java">分享Java版</string>
+    <string name="share_bedrock">分享基岩版</string>
+    <string name="input_selector">輸入選擇器</string>
+    <string name="input_text">輸入文字</string>
+    <string name="history">歷史紀錄</string>
+    <string name="settings">設定</string>
+    
+    <!-- 選擇器類型 -->
+    <string name="selector_type_java">Java版</string>
+    <string name="selector_type_bedrock">基岩版</string>
+    <string name="selector_type_universal">通用</string>
+    <string name="detected_selector_type">偵測到%s選擇器</string>
+    
+    <!-- 指令結果 -->
+    <string name="java_command">Java版</string>
+    <string name="bedrock_command">基岩版</string>
+    <string name="generated_commands">生成的指令</string>
+    
+    <!-- 警告和提示 -->
+    <string name="conversion_warnings">轉換提醒</string>
+    <string name="mn_code_detected">偵測到§m§n代碼</string>
+    <string name="mn_code_dialog_message">偵測到§m§n代碼，請選擇處理方式：
+
+1. Java版使用字體方式，基岩版使用顏色代碼方式
+2. Java版和基岩版都使用顏色代碼方式</string>
+    <string name="mn_code_option_1">方式1</string>
+    <string name="mn_code_option_2">方式2</string>
+    
+    <!-- 混合模式和§m/§n_c/f設定 -->
+    <string name="settings_title">設定</string>
+    <string name="mn_mixed_mode_config">§m§n混合模式設定</string>
+    <string name="mn_mixed_mode">混合模式</string>
+    <string name="mn_mixed_mode_description">未選擇時預設使用字體方式</string>
+    <string name="mn_font_style">字體方式</string>
+    <string name="mn_font_style_description">Java版使用刪除線/底線，基岩版使用顏色代碼</string>
+    <string name="mn_color_style">顏色代碼方式</string>
+    <string name="mn_color_style_description">Java版和基岩版都使用顏色代碼</string>
+    <string name="mn_cf_enabled">啟用§m/§n_c/f</string>
+    <string name="mn_cf_enabled_description">使用§m_f/§m_c/§n_f/§n_c指定處理方式</string>
+    <string name="mn_handling_method">選擇§m（刪除線）和§n（底線）代碼的處理方式：</string>
+    <string name="remember_choice">記住我的選擇</string>
+    
+    <!-- 顏色代碼 -->
+    <string name="color_black">黑色</string>
+    <string name="color_dark_blue">深藍</string>
+    <string name="color_dark_green">深綠</string>
+    <string name="color_dark_aqua">深青</string>
+    <string name="color_dark_red">深紅</string>
+    <string name="color_dark_purple">深紫</string>
+    <string name="color_gold">金色</string>
+    <string name="color_gray">灰色</string>
+    <string name="color_dark_gray">深灰</string>
+    <string name="color_blue">藍色</string>
+    <string name="color_green">綠色</string>
+    <string name="color_aqua">青色</string>
+    <string name="color_red">紅色</string>
+    <string name="color_light_purple">粉色</string>
+    <string name="color_yellow">黃色</string>
+    <string name="color_white">白色</string>
+    
+    <!-- 格式代碼 -->
+    <string name="format_bold">粗體</string>
+    <string name="format_strikethrough">刪除</string>
+    <string name="format_underline">底線</string>
+    <string name="format_italic">斜體</string>
+    <string name="format_obfuscated">混亂</string>
+    <string name="format_reset">重置</string>
+    
+    <!-- 說明介面 -->
+    <string name="help_title">說明</string>
+    <string name="help_about">關於應用程式</string>
+    <string name="help_about_content">Tellraw指令生成器是一個協助Minecraft玩家生成tellraw指令的工具。\n\n支援Java版和基岩版的選擇器轉換，以及文字格式化功能。</string>
+    <string name="help_selector_input">選擇器輸入</string>
+    <string name="help_selector_content">選擇器用於指定指令的目標：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 隨機玩家\n• @e - 所有實體\n• @s - 指令執行者\n\n支援參數過濾，如：\n• @a[gamemode=survival] - 生存模式的所有玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格內的最近玩家</string>
+    <string name="help_text_formatting">文字格式化</string>
+    <string name="help_text_formatting_content">支援Minecraft顏色代碼和格式代碼：\n\n顏色代碼：\n• §0 - 黑色    §1 - 深藍色   §2 - 深綠色\n• §3 - 深青色   §4 - 深紅色   §5 - 深紫色\n• §6 - 金色    §7 - 灰色     §8 - 深灰色\n• §9 - 藍色    §a - 綠色     §b - 青色\n• §c - 紅色    §d - 粉色     §e - 黃色\n• §f - 白色\n\n格式代碼：\n• §l - 粗體    §m - 刪除線   §n - 底線\n• §o - 斜體    §k - 混亂字   §r - 重置</string>
+    <string name="help_version_differences">版本差異</string>
+    <string name="help_version_differences_content">Java版和基岩版在選擇器和格式化方面存在差異：\n\n選擇器差異：\n• Java版使用distance參數，基岩版使用r/rm參數\n• Java版使用gamemode參數，基岩版使用m參數\n• Java版支援nbt參數，基岩版支援hasitem參數\n\n格式化差異：\n• §m§n代碼在兩個版本中的處理方式不同\n• 某些顏色代碼在基岩版中有特殊含義</string>
+    <string name="help_usage_tips">使用提示</string>
+    <string name="help_usage_tips_content">1. 輸入選擇器和訊息內容\n2. 應用程式會自動偵測選擇器類型\n3. 生成Java版和基岩版指令\n4. 可以複製指令或分享給他人\n5. 選擇器參數的轉換並非完美，需要人工檢查\n\n如果遇到§m§n代碼，應用程式會詢問處理方式：\n• Java版字體方式：Java版保持原樣，基岩版轉換為顏色代碼\n• 顏色代碼方式：兩個版本都轉換為顏色代碼</string>
+    <string name="help_conversion_warning">選擇器參數的轉換並非完美，需要人工檢查</string>
+    
+    <!-- 通用 -->
+    <string name="ok">確定</string>
+    <string name="cancel">取消</string>
+    <string name="back">返回</string>
+    <string name="help">說明</string>
+    <string name="copy">複製</string>
+    <string name="share">分享</string>
+    <string name="copied_to_clipboard">已複製到剪貼簿</string>
+    <string name="error">錯誤</string>
+    <string name="loading">載入中...</string>
+    
+    <!-- 歷史紀錄 -->
+    <string name="command_history">指令歷史紀錄</string>
+    <string name="search_history">搜尋歷史紀錄</string>
+    <string name="no_history">暫無歷史紀錄</string>
+    <string name="no_search_results">沒有找到符合的歷史紀錄</string>
+    <string name="close">關閉</string>
+    <string name="load">載入</string>
+    <string name="delete">刪除</string>
+    <string name="clear_history">清空歷史</string>
+    
+    <!-- 儲存設定 -->
+    <string name="storage_settings">歷史紀錄儲存設定</string>
+    <string name="storage_location">儲存歷史紀錄的位置</string>
+    <string name="storage_directory">儲存目錄</string>
+    <string name="storage_directory_selected">已選擇儲存目錄</string>
+    <string name="storage_directory_not_set">未設定儲存目錄（將儲存在應用程式沙盒中）</string>
+    <string name="storage_filename">檔名</string>
+    <string name="set_filename">設定檔名</string>
+    <string name="select_directory">選擇目錄</string>
+    <string name="clear_storage_settings">清除儲存設定</string>
+    <string name="write_to_file">寫入檔案</string>
+    <string name="writing">寫入中...</string>
+    <string name="file_exists">檔案已存在</string>
+    <string name="use_existing_file">是，使用此檔案</string>
+    <string name="customize_filename">否，自訂檔名</string>
+    <string name="append_to_file">附加到檔案</string>
+    <string name="file_exists_message">檔案 "%s" 已存在。\n\n是否使用此檔案附加歷史紀錄？\n\n如果選擇"否"，您需要自訂一個新的檔名。</string>
+    <string name="create_file_failed">建立檔案失敗</string>
+    <string name="append_file_failed">附加檔案失敗</string>
+    <string name="write_success">成功寫入 %d 筆歷史紀錄</string>
+    <string name="append_success">成功附加 %d 筆歷史紀錄</string>
+    <string name="file_not_found">檔案不存在</string>
+    <string name="please_set_directory">請先設定儲存目錄</string>
+    <string name="permission_denied">權限被拒絕</string>
+    <string name="clear_settings_confirm">確定要清除儲存設定嗎？</string>
+    <string name="sandbox_storage_hint">未選擇儲存目錄時，歷史紀錄將儲存在應用程式沙盒中</string>
+    <string name="success">成功</string>
+    
+    <!-- TextFormatter 錯誤和警告資訊 -->
+    <string name="java_font_bedrock_color">Java版使用字體方式，基岩版使用顏色代碼方式</string>
+    <string name="both_color_mode">Java版和基岩版都使用顏色代碼方式</string>
+    <string name="command_must_start_with_tellraw">指令必須以 \'tellraw \' 開頭</string>
+    <string name="command_format_incorrect">指令格式不正確，應為: tellraw &lt;選擇器&gt; &lt;訊息&gt;</string>
+    <string name="selector_must_start_with_at">選擇器必須以 @ 開頭</string>
+    <string name="selector_invalid">選擇器無效，必須是 @a、@p、@r、@e 或 @s 之一</string>
+    <string name="message_json_invalid">訊息 JSON 格式無效</string>
+    <string name="message_json_invalid_with_error">訊息 JSON 格式無效: %s</string>
+    
+    <!-- TellrawViewModel 錯誤和警告資訊 -->
+    <string name="note_java_unsupported_params">注意: Java版不支援以下參數，已從Java版指令中移除: %s</string>
+    <string name="note_java_specific">注意: %s</string>
+    <string name="note_bedrock_unsupported_params">注意: 基岩版不支援以下參數，已從基岩版指令中移除: %s</string>
+    <string name="note_bedrock_selector_converted">注意: 基岩版選擇器 %s 在Java版中不支援，已轉換為 %s</string>
+    <string name="command_generation_error">指令生成錯誤</string>
+    <string name="command_generation_error_with_message">指令生成錯誤: %s</string>
+    <string name="share_tellraw_command">分享Tellraw指令</string>
+    <string name="history_command">指令：%s</string>
+    <string name="history_java_command">Java版指令：%s</string>
+    <string name="history_bedrock_command">基岩版指令：%s</string>
+    <string name="history_time">時間：%s</string>
+    
+    <!-- VersionCheckRepository 錯誤資訊 -->
+    <string name="network_error">網絡錯誤: %s</string>
+    <string name="server_error">伺服器錯誤: %s</string>
+    
+    <!-- SelectorConverter 轉換提醒資訊 -->
+    <string name="bedrock_selector_converted">基岩版選擇器 %s 在Java版中不支援，已轉換為 %s</string>
+    <string name="bedrock_scores_negation_removed">基岩版scores反選參數%s在Java版中不支援，已移除</string>
+    <string name="java_sort_nearest_converted">Java版sort=nearest已轉換為基岩版c=%s</string>
+    <string name="java_sort_furthest_converted">Java版sort=furthest已轉換為基岩版c=%s</string>
+    <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版中不支援，已移除</string>
+    <string name="java_sort_random_converted">Java版%s[sort=random]已轉換為基岩版@r[c=%s]</string>
+    <string name="java_sort_random_to_c">Java版sort=random已轉換為基岩版c=%s</string>
+    <string name="java_sort_not_supported">Java版sort=%s在基岩版中不支援，已移除</string>
+    <string name="java_limit_converted">Java版limit=%s參數已轉換為基岩版c=%s</string>
+    <string name="limit_description">limit只是限制數量，c當由近到遠</string>
+    <string name="bedrock_param_not_supported">警告：基岩版%s參數在Java版中不支援，已移除</string>
+    <string name="bedrock_param_no_equivalent">警告：基岩版%s參數在Java版中沒有對應的功能，已移除</string>
+    <string name="bedrock_family_param_not_supported">警告：基岩版%s參數在Java版中沒有直接對應的功能，已移除。建議使用type參數指定實體類型作為替代</string>
+    <string name="java_nbt_param_not_supported">警告：Java版nbt參數在基岩版中不支援，已嘗試轉換為hasitem參數，如果轉換失敗則已移除</string>
+    <string name="java_team_param_not_supported">警告：Java版%s參數在基岩版中不支援，已移除。基岩版中沒有隊伍系統的直接對應功能</string>
+    <string name="java_predicate_param_not_supported">警告：Java版%s參數在基岩版中不支援，已移除。基岩版中沒有謂詞系統</string>
+    <string name="java_advancements_param_not_supported">警告：Java版%s參數在基岩版中不支援，已移除。基岩版中沒有進度系統</string>
+    <string name="java_param_not_supported">警告：Java版%s參數在基岩版中不支援，已移除</string>
+    <string name="java_distance_converted">Java版distance=%s參數已轉換為基岩版rm=%s,r=%s</string>
+    <string name="java_distance_to_rm">Java版distance=%s參數已轉換為基岩版rm=%s</string>
+    <string name="java_distance_to_r">Java版distance=%s參數已轉換為基岩版r=%s</string>
+    <string name="java_distance_exact">Java版distance=%s參數已轉換為基岩版rm=%s,r=%s</string>
+    <string name="java_x_rotation_converted">Java版x_rotation=%s參數已轉換為基岩版rxm=%s,rx=%s</string>
+    <string name="java_x_rotation_to_rxm">Java版x_rotation=%s參數已轉換為基岩版rxm=%s</string>
+    <string name="java_x_rotation_to_rx">Java版x_rotation=%s參數已轉換為基岩版rx=%s</string>
+    <string name="java_x_rotation_exact">Java版x_rotation=%s參數已轉換為基岩版rxm=%s,rx=%s</string>
+    <string name="java_y_rotation_converted">Java版y_rotation=%s參數已轉換為基岩版rym=%s,ry=%s</string>
+    <string name="java_y_rotation_to_rym">Java版y_rotation=%s參數已轉換為基岩版rym=%s</string>
+    <string name="java_y_rotation_to_ry">Java版y_rotation=%s參數已轉換為基岩版ry=%s</string>
+    <string name="java_y_rotation_exact">Java版y_rotation=%s參數已轉換為基岩版rym=%s,ry=%s</string>
+    <string name="java_level_converted">Java版level=%s參數已轉換為基岩版lm=%s,l=%s</string>
+    <string name="java_level_to_lm">Java版level=%s參數已轉換為基岩版lm=%s</string>
+    <string name="java_level_to_l">Java版level=%s參數已轉換為基岩版l=%s</string>
+    <string name="java_level_exact">Java版level=%s參數已轉換為基岩版lm=%s,l=%s</string>
+    <string name="java_negation_spectator_converted">Java版反選旁觀模式(gamemode=!)在基岩版中不支援，已轉換為反選生存模式</string>
+    <string name="java_spectator_converted">Java版旁觀模式(gamemode=%s)在基岩版中不支援，已轉換為生存模式</string>
+    <string name="java_gamemode_converted">Java版gamemode=%s參數已轉換為基岩版m=%s</string>
+    <string name="bedrock_rm_r_converted">基岩版rm=%s,r=%s參數已轉換為Java版distance=%s</string>
+    <string name="bedrock_rm_converted">基岩版rm=%s參數已轉換為Java版distance=%s</string>
+    <string name="bedrock_r_converted">基岩版r=%s參數已轉換為Java版distance=%s</string>
+    <string name="java_distance_to_bedrock">Java版distance=%s參數已轉換為基岩版%s</string>
+    <string name="bedrock_rotation_converted">基岩版%s=%s,%s=%s參數已轉換為Java版%s=%s</string>
+    <string name="bedrock_rotation_min_converted">基岩版%s=%s參數已轉換為Java版%s=%s</string>
+    <string name="bedrock_rotation_max_converted">基岩版%s=%s參數已轉換為Java版%s=%s</string>
+    <string name="java_rotation_converted">Java版%s=%s參數已轉換為基岩版%s=%s,%s=%s</string>
+    <string name="java_rotation_to_min">Java版%s=%s參數已轉換為基岩版%s=%s</string>
+    <string name="java_rotation_to_max">Java版%s=%s參數已轉換為基岩版%s=%s</string>
+    <string name="bedrock_lm_l_converted">基岩版lm=%s,l=%s參數已轉換為Java版level=%s</string>
+    <string name="bedrock_lm_converted">基岩版lm=%s參數已轉換為Java版level=%s</string>
+    <string name="bedrock_l_converted">基岩版l=%s參數已轉換為Java版level=%s</string>
+    <string name="java_level_to_bedrock">Java版level=%s參數已轉換為基岩版%s</string>
+    <string name="bedrock_negation_default_converted">基岩版反選預設模式(m=!)在Java版中不支援，已轉換為反選生存模式</string>
+    <string name="bedrock_default_converted">基岩版預設模式(m=%s)在Java版中不支援，已轉換為生存模式</string>
+    <string name="java_level_in_scores_converted">Java版level=%s參數已轉換為基岩版lm=%s,l=%s</string>
+    <string name="bedrock_c_negative_converted">基岩版c=%s參數已轉換為Java版limit=%s,sort=furthest</string>
+    <string name="bedrock_c_converted">基岩版c=%s參數已轉換為Java版limit=%s,sort=nearest</string>
+    <string name="hasitem_converted">hasitem參數已轉換為nbt格式，可能無法完全保留原意</string>
+    <string name="hasitem_count_note">注意：Java版NBT不需要Count值，hasitem的quantity參數未轉換為NBT的Count欄位</string>
+    <string name="hasitem_conversion_failed">hasitem參數轉換失敗，保留原始hasitem參數</string>
+    <string name="nbt_converted">nbt參數已轉換為hasitem格式，可能無法完全保留原意</string>    
+    <!-- 顏色代碼名稱 -->
+    <string name="color_code_black">黑色</string>
+    <string name="color_code_dark_blue">深藍</string>
+    <string name="color_code_dark_green">深綠</string>
+    <string name="color_code_dark_aqua">深青</string>
+    <string name="color_code_dark_red">深紅</string>
+    <string name="color_code_dark_purple">深紫</string>
+    <string name="color_code_gold">金色</string>
+    <string name="color_code_gray">灰色</string>
+    <string name="color_code_dark_gray">深灰</string>
+    <string name="color_code_blue">藍色</string>
+    <string name="color_code_green">綠色</string>
+    <string name="color_code_aqua">青色</string>
+    <string name="color_code_red">紅色</string>
+    <string name="color_code_light_purple">粉色</string>
+    <string name="color_code_yellow">黃色</string>
+    <string name="color_code_white">白色</string>
+    
+    <!-- 格式代碼名稱 -->
+    <string name="format_code_bold">粗體</string>
+    <string name="format_code_strikethrough">刪除</string>
+    <string name="format_code_underline">底線</string>
+    <string name="format_code_italic">斜體</string>
+    <string name="format_code_obfuscated">混亂</string>
+    <string name="format_code_reset">重置</string>
+    
+    <!-- 選擇器類型 -->
+    <string name="selector_type_bedrock_short">基岩</string>
+    <string name="selector_type_universal_short">通用</string>
+    
+    <!-- 警告和結果 -->
+    <string name="conversion_warnings">轉換提醒</string>
+    <string name="generated_commands">生成的指令</string>
+    <string name="command_title_java">Java版</string>
+    <string name="command_title_bedrock">基岩版</string>
+    <string name="action_copy">複製</string>
+    <string name="action_share">分享</string>
+    <string name="action_load">載入</string>
+    <string name="action_delete">刪除</string>
+    
+    <!-- 歷史紀錄項 -->
+    <string name="history_item_selector">選擇器: %s</string>
+    <string name="history_item_message">訊息: %s</string>
+    
+    <!-- §m§n代碼 -->
+    <string name="code_strikethrough">§m（刪除線）</string>
+    <string name="code_underline">§n（底線）</string>
+    
+    <!-- 檔名輸入對話框 -->
+    <string name="enter_filename">請輸入歷史紀錄儲存的檔名：</string>
+    <string name="filename_placeholder">TellrawCommand.txt</string>
+    
+    <!-- 代碼對話框 -->
+    <string name="detected_code">偵測到%s 代碼</string>
+    <string name="code_dialog_message">偵測到%s 格式代碼，請選擇處理方式：\n\n1. 字體方式（格式代碼）\n2. 顏色代碼方式</string>
+    <string name="code_dialog_message_mixed">偵測到%s 格式代碼，請選擇處理方式：\n\n1. 字體方式（格式代碼）\n2. 顏色代碼方式</string>
+    <string name="code_dialog_message_full">偵測到%s 格式代碼，請選擇處理方式：\n\n1. Java版使用字體方式，基岩版使用顏色代碼方式\n2. Java版和基岩版都使用顏色代碼方式</string>
+    <string name="code_option_1">方式1</string>
+    <string name="code_option_2">方式2</string>
+    
+    <!-- 設定對話框 -->
+    <string name="mn_handling_method_title">選擇§m（刪除線）和§n（底線）代碼的處理方式：</string>
+    
+    <!-- 更新對話框 -->
+    <string name="new_version_found">發現新版本</string>
+    <string name="new_version">新版本: %s</string>
+    <string name="version_number">版本號: %s</string>
+    <string name="release_date">發布日期: %s</string>
+    <string name="download_url">下載網址:</string>
+    <string name="update_notes">更新說明:</string>
+    <string name="open">開啟</string>
+    <string name="remind_later">稍後提醒</string>
+    
+    <!-- 禁用檢查對話框 -->
+    <string name="disable_version_check">停用版本檢查</string>
+    <string name="disable_version_check_message">確定要停用版本檢查功能嗎？\n\n停用後將不再自動檢查新版本，您可以在設定中重新啟用。</string>
+</resources>

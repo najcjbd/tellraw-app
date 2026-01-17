@@ -80,18 +80,56 @@ class TellrawViewModel @Inject constructor(
      */
     private suspend fun loadSettings() {
         val mnHandlingMode = settingsRepository.getMNHandlingMode()
-        _useJavaFontStyle.value = mnHandlingMode
-        
         val mixedMode = settingsRepository.getMNMixedMode()
-        _mnMixedMode.value = mixedMode
-        
         val cfEnabled = settingsRepository.getMNCFEnabled()
-        _mnCFEnabled.value = cfEnabled
         
-        // 如果启用了_c/_f后缀，自动关闭混合模式
-        if (cfEnabled && mixedMode) {
+        // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
+        val historyStorageUri = settingsRepository.getHistoryStorageUri()
+        if (historyStorageUri != null && !hasStoragePermission()) {
+            settingsRepository.setHistoryStorageUri("")
+            _historyStorageUri.value = null
+        }
+        
+        // 处理配置文件中的互斥逻辑
+        if (mixedMode && cfEnabled) {
+            // 同时开启混合模式和§m/§n_c/f，都改为false，保持原有的mn_handling_mode
             settingsRepository.setMNMixedMode(false)
+            settingsRepository.setMNCFEnabled(false)
             _mnMixedMode.value = false
+            _mnCFEnabled.value = false
+            _useJavaFontStyle.value = mnHandlingMode
+        } else if (mixedMode || cfEnabled) {
+            // 有一个开启时，mn_handling_mode为空（不显示选项）
+            _mnMixedMode.value = mixedMode
+            _mnCFEnabled.value = cfEnabled
+            _useJavaFontStyle.value = true // 默认值，但UI中不显示
+        } else {
+            // 都没开启时，使用原有的mn_handling_mode
+            _mnMixedMode.value = false
+            _mnCFEnabled.value = false
+            _useJavaFontStyle.value = mnHandlingMode
+        }
+    }
+    
+    /**
+     * 检查是否有存储权限
+     */
+    private fun hasStoragePermission(): Boolean {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            // Android 11+ 不需要传统存储权限
+            true
+        } else {
+            // Android 10及以下需要检查存储权限
+            context?.let { ctx ->
+                android.content.ContextCompat.checkSelfPermission(
+                    ctx,
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                android.content.ContextCompat.checkSelfPermission(
+                    ctx,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } ?: false
         }
     }
     
@@ -186,16 +224,20 @@ class TellrawViewModel @Inject constructor(
         val newMCount = currentMCount - countOccurrences(lastMessageContent, "§m")
         if (newMCount > 0) {
             _mCodeCount.value += newMCount
-            // 每次使用§m时弹出单独的提醒对话框
-            _showMNDialog.value = "§m"
+            // 只在混合模式下弹出对话框
+            if (_mnMixedMode.value) {
+                _showMNDialog.value = "§m"
+            }
         }
         
         // 检测新增的§n代码
         val newNCount = currentNCount - countOccurrences(lastMessageContent, "§n")
         if (newNCount > 0) {
             _nCodeCount.value += newNCount
-            // 每次使用§n时弹出单独的提醒对话框
-            _showMNDialog.value = "§n"
+            // 只在混合模式下弹出对话框
+            if (_mnMixedMode.value) {
+                _showMNDialog.value = "§n"
+            }
         }
         
         // 更新上一次的消息内容
@@ -281,6 +323,11 @@ class TellrawViewModel @Inject constructor(
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNMixedMode(enabled)
+            // 如果开启混合模式，清空mn_handling_mode（设置为默认值）
+            if (enabled) {
+                settingsRepository.setMNHandlingMode(true)
+                _useJavaFontStyle.value = true
+            }
         }
         generateCommands()
     }
@@ -294,6 +341,11 @@ class TellrawViewModel @Inject constructor(
             if (enabled && _mnMixedMode.value) {
                 settingsRepository.setMNMixedMode(false)
                 _mnMixedMode.value = false
+            }
+            // 如果开启§m/§n_c/f，清空mn_handling_mode（设置为默认值）
+            if (enabled) {
+                settingsRepository.setMNHandlingMode(true)
+                _useJavaFontStyle.value = true
             }
         }
         generateCommands()
@@ -326,7 +378,7 @@ class TellrawViewModel @Inject constructor(
         val detectedType = SelectorConverter.detectSelectorType(selector)
         
         // 将基岩版选择器转换为Java版（如果需要）
-        val javaSelectorConversion = SelectorConverter.convertBedrockToJava(selector)
+        val javaSelectorConversion = SelectorConverter.convertBedrockToJava(selector, context ?: return TellrawCommand("", "", emptyList()))
         val wasConverted = javaSelectorConversion.wasConverted
         val originalSelector = if (wasConverted) selector else null
         val convertedSelector = if (wasConverted) javaSelectorConversion.javaSelector else null
@@ -353,10 +405,10 @@ class TellrawViewModel @Inject constructor(
         }
 
         // 过滤Java版参数，移除基岩版特有的参数（完全不支持）
-        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorFinal, SelectorType.JAVA)
+        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorFinal, SelectorType.JAVA, context ?: return TellrawCommand("", "", emptyList()))
 
         // 过滤基岩版参数，移除Java版特有的参数（完全不支持）
-        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(bedrockSelectorFinal, SelectorType.BEDROCK)
+        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(bedrockSelectorFinal, SelectorType.BEDROCK, context ?: return TellrawCommand("", "", emptyList()))
         
         // 合并所有Java版提醒信息并去重
         val allJavaReminders = mutableListOf<String>()
@@ -402,27 +454,37 @@ class TellrawViewModel @Inject constructor(
         
         // 添加Java版参数剔除提醒
         if (javaNonReminders.isNotEmpty()) {
-            allWarnings.add("注意: Java版不支持以下参数，已从Java版命令中移除: ${javaNonReminders.joinToString(", ")}")
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.note_java_unsupported_params, javaNonReminders.joinToString(", ")))
+            }
         }
         
         // 添加Java版特殊提醒
         javaSpecificReminders.forEach { reminder ->
-            allWarnings.add("注意: $reminder")
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.note_java_specific, reminder))
+            }
         }
         
         // 添加基岩版参数剔除提醒
         if (bedrockNonReminders.isNotEmpty()) {
-            allWarnings.add("注意: 基岩版不支持以下参数，已从基岩版命令中移除: ${bedrockNonReminders.joinToString(", ")}")
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.note_bedrock_unsupported_params, bedrockNonReminders.joinToString(", ")))
+            }
         }
         
         // 添加基岩版特殊提醒
         bedrockSpecificReminders.forEach { reminder ->
-            allWarnings.add("注意: $reminder")
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.note_java_specific, reminder))
+            }
         }
         
         // 添加选择器转换提醒
         if (wasConverted && originalSelector != null && convertedSelector != null) {
-            allWarnings.add("注意: 基岩版选择器 $originalSelector 在Java版中不支持，已转换为 $convertedSelector")
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.note_bedrock_selector_converted, originalSelector, convertedSelector))
+            }
         }
         
         return TellrawCommand(javaCommand, bedrockCommand, allWarnings)
@@ -464,12 +526,12 @@ class TellrawViewModel @Inject constructor(
                 // 处理未知§组合的异常
                 _javaCommand.value = ""
                 _bedrockCommand.value = ""
-                _warnings.value = listOf(e.message ?: "命令生成出错")
+                _warnings.value = listOf(e.message ?: context?.getString(R.string.command_generation_error) ?: "Command generation error")
             } catch (e: Exception) {
                 // 处理其他可能的异常，防止卡死
                 _javaCommand.value = ""
                 _bedrockCommand.value = ""
-                _warnings.value = listOf("命令生成出错: ${e.message}")
+                _warnings.value = listOf(context?.getString(R.string.command_generation_error_with_message, e.message ?: "") ?: "Command generation error: ${e.message}")
             } finally {
                 _isLoading.value = false
             }
@@ -486,7 +548,7 @@ class TellrawViewModel @Inject constructor(
         mnCFEnabled: Boolean = false
     ): String {
         // 过滤Java版不支持的参数
-        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA)
+        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context ?: return "")
         
         // 转换文本为Java版JSON格式
         val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
@@ -503,7 +565,7 @@ class TellrawViewModel @Inject constructor(
         mnCFEnabled: Boolean = false
     ): String {
         // 过滤基岩版不支持的参数
-        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK)
+        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, context ?: return "")
         
         // 转换文本为基岩版JSON格式
         val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
@@ -526,7 +588,7 @@ class TellrawViewModel @Inject constructor(
                 putExtra(Intent.EXTRA_TEXT, command)
                 putExtra(Intent.EXTRA_SUBJECT, "Minecraft Tellraw Command")
             }
-            ctx.startActivity(Intent.createChooser(shareIntent, "分享Tellraw命令"))
+            ctx.startActivity(Intent.createChooser(shareIntent, ctx.getString(R.string.share_tellraw_command)))
         }
     }
     
@@ -816,8 +878,8 @@ class TellrawViewModel @Inject constructor(
                 val filename = settingsRepository.getHistoryStorageFilename()
                 
                 if (uriString == null) {
-                    _writeFileMessage.value = "请先设置存储目录"
-                    _isWritingToFile.value = false
+                    // 未选择文件夹，存储在Android/data沙盒中
+                    writeToFileInSandbox(context, filename, historyList)
                     return@launch
                 }
                 
@@ -827,16 +889,18 @@ class TellrawViewModel @Inject constructor(
                 // 检查文件是否存在
                 val existingUri = findFileInDirectory(contentResolver, uri, filename)
                 
-                val fileUri = if (existingUri != null) {
-                    // 文件已存在，追加内容
-                    existingUri
-                } else {
-                    // 文件不存在，创建新文件
-                    createFileInDirectory(contentResolver, uri, filename)
+                if (existingUri != null) {
+                    // 文件已存在，询问用户是否使用现有文件
+                    _showFileExistsDialog.value = filename
+                    _isWritingToFile.value = false
+                    return@launch
                 }
                 
+                // 文件不存在，直接创建新文件
+                val fileUri = createFileInDirectory(contentResolver, uri, filename)
+                
                 if (fileUri == null) {
-                    _writeFileMessage.value = "创建文件失败"
+                    _writeFileMessage.value = context.getString(R.string.create_file_failed)
                     _isWritingToFile.value = false
                     return@launch
                 }
@@ -845,16 +909,105 @@ class TellrawViewModel @Inject constructor(
                 val content = buildHistoryContent(historyList)
                 
                 // 写入文件
-                contentResolver.openOutputStream(fileUri, if (existingUri != null) "wa" else "w")?.use { outputStream ->
+                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
                     outputStream.write(content.toByteArray())
                 }
                 
-                _writeFileMessage.value = "成功写入${historyList.size}条历史记录"
+                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
             } catch (e: Exception) {
-                _writeFileMessage.value = "写入文件失败: ${e.message}"
+                _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {
                 _isWritingToFile.value = false
             }
+        }
+    }
+    
+    /**
+     * 将历史记录写入应用沙盒
+     */
+    private suspend fun writeToFileInSandbox(context: Context, filename: String, historyList: List<CommandHistory>) {
+        try {
+            val file = java.io.File(context.filesDir, filename)
+            
+            // 生成历史记录内容
+            val content = buildHistoryContent(historyList)
+            
+            // 写入文件
+            file.writeText(content)
+            
+            _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+        } catch (e: Exception) {
+            _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
+        } finally {
+            _isWritingToFile.value = false
+        }
+    }
+    
+    /**
+     * 使用现有文件追加历史记录
+     */
+    fun appendToExistingFile(context: Context, historyList: List<CommandHistory>) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val uriString = settingsRepository.getHistoryStorageUri()
+                val filename = settingsRepository.getHistoryStorageFilename()
+                
+                if (uriString == null) {
+                    // 未选择文件夹，在沙盒中追加
+                    appendToFileInSandbox(context, filename, historyList)
+                    return@launch
+                }
+                
+                val uri = Uri.parse(uriString)
+                val contentResolver = context.contentResolver
+                
+                // 查找文件
+                val fileUri = findFileInDirectory(contentResolver, uri, filename)
+                
+                if (fileUri == null) {
+                    _writeFileMessage.value = context.getString(R.string.file_not_found)
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 生成历史记录内容
+                val content = buildHistoryContent(historyList)
+                
+                // 追加写入文件
+                contentResolver.openOutputStream(fileUri, "wa")?.use { outputStream ->
+                    outputStream.write(content.toByteArray())
+                }
+                
+                _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
+            } catch (e: Exception) {
+                _writeFileMessage.value = context.getString(R.string.append_file_failed) + ": ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
+            }
+        }
+    }
+    
+    /**
+     * 在应用沙盒中追加历史记录
+     */
+    private suspend fun appendToFileInSandbox(context: Context, filename: String, historyList: List<CommandHistory>) {
+        try {
+            val file = java.io.File(context.filesDir, filename)
+            
+            // 生成历史记录内容
+            val content = buildHistoryContent(historyList)
+            
+            // 追加写入文件
+            file.appendText(content)
+            
+            _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
+        } catch (e: Exception) {
+            _writeFileMessage.value = context.getString(R.string.append_file_failed) + ": ${e.message}"
+        } finally {
+            _isWritingToFile.value = false
         }
     }
     
@@ -867,9 +1020,15 @@ class TellrawViewModel @Inject constructor(
         filename: String
     ): Uri? {
         return try {
+            val docId = DocumentsContract.getDocumentId(directoryUri)
+            if (docId.isNullOrEmpty()) {
+                android.util.Log.e("TellrawViewModel", "Invalid directory URI")
+                return null
+            }
+            
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
                 directoryUri,
-                DocumentsContract.getDocumentId(directoryUri)
+                docId
             )
             
             val projection = arrayOf(
@@ -881,18 +1040,30 @@ class TellrawViewModel @Inject constructor(
                 val docIdIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 
+                if (docIdIndex == -1 || nameIndex == -1) {
+                    android.util.Log.e("TellrawViewModel", "Invalid cursor indices")
+                    return@use null
+                }
+                
                 while (cursor.moveToNext()) {
-                    val docId = cursor.getString(docIdIndex)
+                    val currentDocId = cursor.getString(docIdIndex)
                     val name = cursor.getString(nameIndex)
                     
-                    if (name == filename) {
-                        return DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
+                    if (name == filename && currentDocId != null) {
+                        return DocumentsContract.buildDocumentUriUsingTree(directoryUri, currentDocId)
                     }
                 }
             }
             
             null
+        } catch (e: SecurityException) {
+            android.util.Log.e("TellrawViewModel", "SecurityException when finding file: ${e.message}")
+            null
+        } catch (e: IllegalArgumentException) {
+            android.util.Log.e("TellrawViewModel", "IllegalArgumentException when finding file: ${e.message}")
+            null
         } catch (e: Exception) {
+            android.util.Log.e("TellrawViewModel", "Exception when finding file: ${e.message}", e)
             null
         }
     }
@@ -906,14 +1077,40 @@ class TellrawViewModel @Inject constructor(
         filename: String
     ): Uri? {
         return try {
-            // 使用 DocumentsContract.createDocument 创建文件
-            DocumentsContract.createDocument(
+            // 检查目录URI是否有效
+            val docId = DocumentsContract.getDocumentId(directoryUri)
+            if (docId.isNullOrEmpty()) {
+                android.util.Log.e("TellrawViewModel", "Invalid directory URI")
+                return null
+            }
+            
+            // 检查目录是否存在
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                directoryUri,
+                docId
+            )
+            
+            // 尝试创建文件
+            val fileUri = DocumentsContract.createDocument(
                 contentResolver,
                 directoryUri,
                 "text/plain",
                 filename
             )
+            
+            if (fileUri == null) {
+                android.util.Log.e("TellrawViewModel", "Failed to create document: $filename")
+            }
+            
+            fileUri
+        } catch (e: SecurityException) {
+            android.util.Log.e("TellrawViewModel", "SecurityException when creating file: ${e.message}")
+            null
+        } catch (e: IllegalArgumentException) {
+            android.util.Log.e("TellrawViewModel", "IllegalArgumentException when creating file: ${e.message}")
+            null
         } catch (e: Exception) {
+            android.util.Log.e("TellrawViewModel", "Exception when creating file: ${e.message}", e)
             null
         }
     }
@@ -927,122 +1124,15 @@ class TellrawViewModel @Inject constructor(
         return buildString {
             historyList.forEach { history ->
                 val timeText = dateFormat.format(java.util.Date(history.timestamp))
-                append("命令：${history.selector} ${history.message}\n")
-                append("Java版命令：${history.javaCommand}\n")
-                append("基岩版命令：${history.bedrockCommand}\n")
-                append("时间：$timeText\n")
+                context?.let { ctx ->
+                    append(ctx.getString(R.string.history_command, "${history.selector} ${history.message}") + "\n")
+                    append(ctx.getString(R.string.history_java_command, history.javaCommand) + "\n")
+                    append(ctx.getString(R.string.history_bedrock_command, history.bedrockCommand) + "\n")
+                    append(ctx.getString(R.string.history_time, timeText) + "\n")
+                }
                 append("========================================\n")
             }
         }
     }
     
-    /**
-     * 导出配置到文件
-     */
-    fun exportConfigToFile(context: Context) {
-        viewModelScope.launch {
-            _isWritingToFile.value = true
-            _writeFileMessage.value = null
-            
-            try {
-                val uriString = settingsRepository.getHistoryStorageUri()
-                
-                if (uriString == null) {
-                    _writeFileMessage.value = "请先设置存储目录"
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                val uri = Uri.parse(uriString)
-                val contentResolver = context.contentResolver
-                
-                // 查找或创建 config.json 文件
-                val existingUri = findFileInDirectory(contentResolver, uri, "config.json")
-                
-                val fileUri = if (existingUri != null) {
-                    existingUri
-                } else {
-                    createFileInDirectory(contentResolver, uri, "config.json")
-                }
-                
-                if (fileUri == null) {
-                    _writeFileMessage.value = "创建配置文件失败"
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                // 导出配置为 JSON
-                val configJson = settingsRepository.exportSettingsAsJson()
-                
-                // 写入文件
-                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
-                    outputStream.write(configJson.toByteArray())
-                }
-                
-                _writeFileMessage.value = "成功导出配置"
-            } catch (e: Exception) {
-                _writeFileMessage.value = "导出配置失败: ${e.message}"
-            } finally {
-                _isWritingToFile.value = false
-            }
-        }
     }
-    
-    /**
-     * 从文件导入配置
-     */
-    fun importConfigFromFile(context: Context) {
-        viewModelScope.launch {
-            _isWritingToFile.value = true
-            _writeFileMessage.value = null
-            
-            try {
-                val uriString = settingsRepository.getHistoryStorageUri()
-                
-                if (uriString == null) {
-                    _writeFileMessage.value = "请先设置存储目录"
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                val uri = Uri.parse(uriString)
-                val contentResolver = context.contentResolver
-                
-                // 查找 config.json 文件
-                val fileUri = findFileInDirectory(contentResolver, uri, "config.json")
-                
-                if (fileUri == null) {
-                    _writeFileMessage.value = "未找到配置文件 config.json"
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                // 读取文件内容
-                val jsonString = contentResolver.openInputStream(fileUri)?.use { inputStream ->
-                    inputStream.bufferedReader().readText()
-                } ?: ""
-                
-                if (jsonString.isEmpty()) {
-                    _writeFileMessage.value = "配置文件为空"
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                // 导入配置
-                val success = settingsRepository.importSettingsFromJson(jsonString)
-                
-                if (success) {
-                    _writeFileMessage.value = "成功导入配置"
-                    // 重新加载设置
-                    loadSettings()
-                } else {
-                    _writeFileMessage.value = "导入配置失败：配置文件格式错误"
-                }
-            } catch (e: Exception) {
-                _writeFileMessage.value = "导入配置失败: ${e.message}"
-            } finally {
-                _isWritingToFile.value = false
-            }
-        }
-    }
-}

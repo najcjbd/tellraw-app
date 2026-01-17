@@ -105,16 +105,16 @@ object TextFormatter {
      * @param useJavaFontStyle Java版是否使用字体方式，true=字体方式，false=颜色代码方式
      * @return 处理后的文本和警告信息
      */
-    fun processMNCodes(text: String, useJavaFontStyle: Boolean): Pair<String, List<String>> {
+    fun processMNCodes(text: String, useJavaFontStyle: Boolean, context: Context): Pair<String, List<String>> {
         val warnings = mutableListOf<String>()
         
         if (containsMNCodes(text)) {
             if (useJavaFontStyle) {
                 // Java版使用字体方式（删除线/下划线），基岩版使用颜色代码方式（深红色/铜色）
-                warnings.add("Java版使用字体方式，基岩版使用颜色代码方式")
+                warnings.add(context.getString(R.string.java_font_bedrock_color))
             } else {
                 // Java版和基岩版都使用颜色代码方式
-                warnings.add("Java版和基岩版都使用颜色代码方式")
+                warnings.add(context.getString(R.string.both_color_mode))
             }
             // 不修改原始文本，保留§m§n代码，在convertToJavaJson和convertToBedrockJson中根据mNHandling参数处理
         }
@@ -493,12 +493,13 @@ object TextFormatter {
         selector: String,
         message: String,
         useJavaFontStyle: Boolean = true,
-        mnCFEnabled: Boolean = false
+        mnCFEnabled: Boolean = false,
+        context: Context
     ): TellrawCommand {
         val warnings = mutableListOf<String>()
         
         // 处理§m§n代码
-        val (processedMessage, mnWarnings) = processMNCodes(message, useJavaFontStyle)
+        val (processedMessage, mnWarnings) = processMNCodes(message, useJavaFontStyle, context)
         warnings.addAll(mnWarnings)
         
         // 确定m_n_handling参数
@@ -522,17 +523,17 @@ object TextFormatter {
     /**
      * 验证tellraw命令格式
      */
-    fun validateTellrawCommand(command: String): List<String> {
+    fun validateTellrawCommand(command: String, context: Context): List<String> {
         val errors = mutableListOf<String>()
         
         if (!command.startsWith("tellraw ")) {
-            errors.add("命令必须以'tellraw '开头")
+            errors.add(context.getString(R.string.command_must_start_with_tellraw))
             return errors
         }
         
         val parts = command.split(" ", limit = 3)
         if (parts.size < 3) {
-            errors.add("命令格式不正确，应为: tellraw <选择器> <消息>")
+            errors.add(context.getString(R.string.command_format_incorrect))
             return errors
         }
         
@@ -541,12 +542,12 @@ object TextFormatter {
         
         // 验证选择器
         if (!selector.startsWith("@")) {
-            errors.add("选择器必须以@开头")
+            errors.add(context.getString(R.string.selector_must_start_with_at))
         } else {
             // 验证选择器是否为有效的Minecraft选择器
             val validSelectors = setOf("@a", "@p", "@r", "@e", "@s")
             if (selector !in validSelectors) {
-                errors.add("选择器无效，必须是 @a、@p、@r、@e 或 @s 之一")
+                errors.add(context.getString(R.string.selector_invalid))
             }
         }
         
@@ -556,10 +557,10 @@ object TextFormatter {
             try {
                 // 简单的JSON验证
                 if (!isValidJson(message)) {
-                    errors.add("消息JSON格式无效")
+                    errors.add(context.getString(R.string.message_json_invalid))
                 }
             } catch (e: Exception) {
-                errors.add("消息JSON格式无效: ${e.message}")
+                errors.add(context.getString(R.string.message_json_invalid_with_error, e.message ?: ""))
             }
         }
         

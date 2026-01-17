@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
     
     // 权限请求回调
     private var onPermissionGranted: (() -> Unit)? = null
+    private var onPermissionDenied: (() -> Unit)? = null
     
     // 存储权限请求器
     private val storagePermissionLauncher = registerForActivityResult(
@@ -30,6 +31,8 @@ class MainActivity : ComponentActivity() {
         val allGranted = permissions.entries.all { it.value }
         if (allGranted) {
             onPermissionGranted?.invoke()
+        } else {
+            onPermissionDenied?.invoke()
         }
     }
     
@@ -82,11 +85,15 @@ class MainActivity : ComponentActivity() {
     /**
      * 检查并请求存储权限
      */
-    fun checkAndRequestStoragePermission(onGranted: () -> Unit) {
+    fun checkAndRequestStoragePermission(
+        onGranted: () -> Unit,
+        onDenied: () -> Unit = {}
+    ) {
         if (hasStoragePermission()) {
             onGranted()
         } else {
             onPermissionGranted = onGranted
+            onPermissionDenied = onDenied
             requestStoragePermission()
         }
     }

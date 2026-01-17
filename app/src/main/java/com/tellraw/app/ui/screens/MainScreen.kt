@@ -194,22 +194,22 @@ fun MainScreen(
             filename = historyStorageFilename,
             onDismiss = { viewModel.hideStorageSettingsDialog() },
             onSelectDirectory = { 
-                activity?.checkAndRequestStoragePermission {
-                    activity?.launchDirectoryPicker { uri ->
-                        viewModel.setHistoryStorageUri(uri)
+                activity?.checkAndRequestStoragePermission(
+                    onGranted = {
+                        activity?.launchDirectoryPicker { uri ->
+                            viewModel.setHistoryStorageUri(uri)
+                        }
+                    },
+                    onDenied = {
+                        // 权限被拒绝，清空历史记录存储设置
+                        viewModel.clearHistoryStorageSettings()
                     }
-                }
+                )
             },
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
             onWriteToFile = { 
                 viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>()) 
-            },
-            onExportConfig = { 
-                viewModel.exportConfigToFile(context) 
-            },
-            onImportConfig = { 
-                viewModel.importConfigFromFile(context) 
             },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
@@ -234,7 +234,7 @@ fun MainScreen(
             filename = filename,
             onDismiss = { viewModel.hideFileExistsDialog() },
             onUseExisting = {
-                // TODO: 使用现有文件
+                viewModel.appendToExistingFile(context, commandHistory.toList())
                 viewModel.hideFileExistsDialog()
             },
             onCustomize = {

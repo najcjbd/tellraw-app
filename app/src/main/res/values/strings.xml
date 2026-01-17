@@ -120,18 +120,164 @@
     <string name="storage_location">存储历史记录的位置</string>
     <string name="storage_directory">存储目录</string>
     <string name="storage_directory_selected">已选择存储目录</string>
-    <string name="storage_directory_not_set">未设置存储目录</string>
+    <string name="storage_directory_not_set">未设置存储目录（将保存在应用沙盒中）</string>
     <string name="storage_filename">文件名</string>
     <string name="set_filename">设置文件名</string>
     <string name="select_directory">选择目录</string>
     <string name="clear_storage_settings">清除存储设置</string>
-    <string name="export_config">导出配置</string>
-    <string name="import_config">导入配置</string>
     <string name="write_to_file">写入文件</string>
     <string name="writing">写入中...</string>
     <string name="file_exists">文件已存在</string>
     <string name="use_existing_file">是，使用此文件</string>
     <string name="customize_filename">否，自定义文件名</string>
+    <string name="append_to_file">追加到文件</string>
+    <string name="file_exists_message">文件 \"%s\" 已存在。\n\n是否使用此文件追加历史记录？\n\n如果选择\"否\"，您需要自定义一个新的文件名。</string>
+    <string name="create_file_failed">创建文件失败</string>
+    <string name="append_file_failed">追加文件失败</string>
+    <string name="write_success">成功写入 %d 条历史记录</string>
+        <string name="append_success">成功追加 %d 条历史记录</string>
+        <string name="file_not_found">文件不存在</string>
+        <string name="please_set_directory">请先设置存储目录</string>
+        <string name="permission_denied">权限被拒绝</string>
+        <string name="clear_settings_confirm">确定要清除存储设置吗？</string>
+        <string name="sandbox_storage_hint">未选择存储目录时，历史记录将保存在应用沙盒中</string>
+        <string name="success">成功</string>
+    
+    <!-- TextFormatter 错误和警告信息 -->
+    <string name="java_font_bedrock_color">Java版使用字体方式，基岩版使用颜色代码方式</string>
+    <string name="both_color_mode">Java版和基岩版都使用颜色代码方式</string>
+    <string name="command_must_start_with_tellraw">命令必须以 \'tellraw \' 开头</string>
+    <string name="command_format_incorrect">命令格式不正确，应为: tellraw &lt;选择器&gt; &lt;消息&gt;</string>
+    <string name="selector_must_start_with_at">选择器必须以 @ 开头</string>
+    <string name="selector_invalid">选择器无效，必须是 @a、@p、@r、@e 或 @s 之一</string>
+    <string name="message_json_invalid">消息 JSON 格式无效</string>
+    <string name="message_json_invalid_with_error">消息 JSON 格式无效: %s</string>
+    
+    <!-- TellrawViewModel 错误和警告信息 -->
+    <string name="note_java_unsupported_params">注意: Java版不支持以下参数，已从Java版命令中移除: %s</string>
+    <string name="note_java_specific">注意: %s</string>
+    <string name="note_bedrock_unsupported_params">注意: 基岩版不支持以下参数，已从基岩版命令中移除: %s</string>
+    <string name="note_bedrock_selector_converted">注意: 基岩版选择器 %s 在Java版中不支持，已转换为 %s</string>
+    <string name="command_generation_error">命令生成出错</string>
+    <string name="command_generation_error_with_message">命令生成出错: %s</string>
+    <string name="share_tellraw_command">分享Tellraw命令</string>
+    <string name="history_command">命令：%s</string>
+    <string name="history_java_command">Java版命令：%s</string>
+    <string name="history_bedrock_command">基岩版命令：%s</string>
+    <string name="history_time">时间：%s</string>
+    
+    <!-- VersionCheckRepository 错误信息 -->
+    <string name="network_error">网络错误: %s</string>
+    <string name="server_error">服务器错误: %s</string>
+    
+    <!-- SelectorConverter 转换提醒信息 -->
+    <string name="bedrock_selector_converted">基岩版选择器 %s 在Java版中不支持，已转换为 %s</string>
+    <string name="bedrock_scores_negation_removed">基岩版scores反选参数%s在Java版中不支持，已移除</string>
+    <string name="java_sort_nearest_converted">Java版sort=nearest已转换为基岩版c=%s</string>
+    <string name="java_sort_furthest_converted">Java版sort=furthest已转换为基岩版c=%s</string>
+    <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版中不支持，已移除</string>
+    <string name="java_sort_random_converted">Java版%s[sort=random]已转换为基岩版@r[c=%s]</string>
+    <string name="java_sort_random_to_c">Java版sort=random已转换为基岩版c=%s</string>
+    <string name="java_sort_not_supported">Java版sort=%s在基岩版中不支持，已移除</string>
+    <string name="java_limit_converted">Java版limit=%s参数已转换为基岩版c=%s</string>
+    <string name="limit_description">limit只是限制数量，c当由近到远</string>
+    <string name="bedrock_param_not_supported">警告：基岩版%s参数在Java版中不支持，已移除</string>
+    <string name="bedrock_param_no_equivalent">警告：基岩版%s参数在Java版中没有对应的功能，已移除</string>
+    <string name="bedrock_family_param_not_supported">警告：基岩版%s参数在Java版中没有直接对应的功能，已移除。建议使用type参数指定实体类型作为替代</string>
+    <string name="java_nbt_param_not_supported">警告：Java版nbt参数在基岩版中不支持，已尝试转换为hasitem参数，如果转换失败则已移除</string>
+    <string name="java_team_param_not_supported">警告：Java版%s参数在基岩版中不支持，已移除。基岩版中没有队伍系统的直接对应功能</string>
+    <string name="java_predicate_param_not_supported">警告：Java版%s参数在基岩版中不支持，已移除。基岩版中没有谓词系统</string>
+    <string name="java_advancements_param_not_supported">警告：Java版%s参数在基岩版中不支持，已移除。基岩版中没有进度系统</string>
+    <string name="java_param_not_supported">警告：Java版%s参数在基岩版中不支持，已移除</string>
+    <string name="java_distance_converted">Java版distance=%s参数已转换为基岩版rm=%s,r=%s</string>
+    <string name="java_distance_to_rm">Java版distance=%s参数已转换为基岩版rm=%s</string>
+    <string name="java_distance_to_r">Java版distance=%s参数已转换为基岩版r=%s</string>
+    <string name="java_distance_exact">Java版distance=%s参数已转换为基岩版rm=%s,r=%s</string>
+    <string name="java_x_rotation_converted">Java版x_rotation=%s参数已转换为基岩版rxm=%s,rx=%s</string>
+    <string name="java_x_rotation_to_rxm">Java版x_rotation=%s参数已转换为基岩版rxm=%s</string>
+    <string name="java_x_rotation_to_rx">Java版x_rotation=%s参数已转换为基岩版rx=%s</string>
+    <string name="java_x_rotation_exact">Java版x_rotation=%s参数已转换为基岩版rxm=%s,rx=%s</string>
+    <string name="java_y_rotation_converted">Java版y_rotation=%s参数已转换为基岩版rym=%s,ry=%s</string>
+    <string name="java_y_rotation_to_rym">Java版y_rotation=%s参数已转换为基岩版rym=%s</string>
+    <string name="java_y_rotation_to_ry">Java版y_rotation=%s参数已转换为基岩版ry=%s</string>
+    <string name="java_y_rotation_exact">Java版y_rotation=%s参数已转换为基岩版rym=%s,ry=%s</string>
+    <string name="java_level_converted">Java版level=%s参数已转换为基岩版lm=%s,l=%s</string>
+    <string name="java_level_to_lm">Java版level=%s参数已转换为基岩版lm=%s</string>
+    <string name="java_level_to_l">Java版level=%s参数已转换为基岩版l=%s</string>
+    <string name="java_level_exact">Java版level=%s参数已转换为基岩版lm=%s,l=%s</string>
+    <string name="java_negation_spectator_converted">Java版反选旁观模式(gamemode=!)在基岩版中不支持，已转换为反选生存模式</string>
+    <string name="java_spectator_converted">Java版旁观模式(gamemode=%s)在基岩版中不支持，已转换为生存模式</string>
+    <string name="java_gamemode_converted">Java版gamemode=%s参数已转换为基岩版m=%s</string>
+    <string name="bedrock_rm_r_converted">基岩版rm=%s,r=%s参数已转换为Java版distance=%s</string>
+    <string name="bedrock_rm_converted">基岩版rm=%s参数已转换为Java版distance=%s</string>
+    <string name="bedrock_r_converted">基岩版r=%s参数已转换为Java版distance=%s</string>
+    <string name="java_distance_to_bedrock">Java版distance=%s参数已转换为基岩版%s</string>
+    <string name="bedrock_rotation_converted">基岩版%s=%s,%s=%s参数已转换为Java版%s=%s</string>
+    <string name="bedrock_rotation_min_converted">基岩版%s=%s参数已转换为Java版%s=%s</string>
+    <string name="bedrock_rotation_max_converted">基岩版%s=%s参数已转换为Java版%s=%s</string>
+    <string name="java_rotation_converted">Java版%s=%s参数已转换为基岩版%s=%s,%s=%s</string>
+    <string name="java_rotation_to_min">Java版%s=%s参数已转换为基岩版%s=%s</string>
+    <string name="java_rotation_to_max">Java版%s=%s参数已转换为基岩版%s=%s</string>
+    <string name="bedrock_lm_l_converted">基岩版lm=%s,l=%s参数已转换为Java版level=%s</string>
+    <string name="bedrock_lm_converted">基岩版lm=%s参数已转换为Java版level=%s</string>
+    <string name="bedrock_l_converted">基岩版l=%s参数已转换为Java版level=%s</string>
+    <string name="java_level_to_bedrock">Java版level=%s参数已转换为基岩版%s</string>
+    <string name="bedrock_negation_default_converted">基岩版反选默认模式(m=!)在Java版中不支持，已转换为反选生存模式</string>
+    <string name="bedrock_default_converted">基岩版默认模式(m=%s)在Java版中不支持，已转换为生存模式</string>
+    <string name="java_level_in_scores_converted">Java版level=%s参数已转换为基岩版lm=%s,l=%s</string>
+    <string name="bedrock_c_negative_converted">基岩版c=%s参数已转换为Java版limit=%s,sort=furthest</string>
+    <string name="bedrock_c_converted">基岩版c=%s参数已转换为Java版limit=%s,sort=nearest</string>
+    <string name="hasitem_converted">hasitem参数已转换为nbt格式，可能无法完全保留原意</string>
+    <string name="hasitem_count_note">注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段</string>
+    <string name="hasitem_conversion_failed">hasitem参数转换失败，保留原始hasitem参数</string>
+    <string name="nbt_converted">nbt参数已转换为hasitem格式，可能无法完全保留原意</string>    
+    <!-- 颜色代码名称 -->
+    <string name="color_code_black">黑色</string>
+    <string name="color_code_dark_blue">深蓝</string>
+    <string name="color_code_dark_green">深绿</string>
+    <string name="color_code_dark_aqua">深青</string>
+    <string name="color_code_dark_red">深红</string>
+    <string name="color_code_dark_purple">深紫</string>
+    <string name="color_code_gold">金色</string>
+    <string name="color_code_gray">灰色</string>
+    <string name="color_code_dark_gray">深灰</string>
+    <string name="color_code_blue">蓝色</string>
+    <string name="color_code_green">绿色</string>
+    <string name="color_code_aqua">青色</string>
+    <string name="color_code_red">红色</string>
+    <string name="color_code_light_purple">粉色</string>
+    <string name="color_code_yellow">黄色</string>
+    <string name="color_code_white">白色</string>
+    
+    <!-- 格式代码名称 -->
+    <string name="format_code_bold">粗体</string>
+    <string name="format_code_strikethrough">删除</string>
+    <string name="format_code_underline">下划</string>
+    <string name="format_code_italic">斜体</string>
+    <string name="format_code_obfuscated">混乱</string>
+    <string name="format_code_reset">重置</string>
+    
+    <!-- 选择器类型 -->
+    <string name="selector_type_bedrock_short">基岩</string>
+    <string name="selector_type_universal_short">通用</string>
+    
+    <!-- 警告和结果 -->
+    <string name="conversion_warnings">转换提醒</string>
+    <string name="generated_commands">生成的命令</string>
+    <string name="command_title_java">Java版</string>
+    <string name="command_title_bedrock">基岩版</string>
+    <string name="action_copy">复制</string>
+    <string name="action_share">分享</string>
+    <string name="action_load">加载</string>
+    <string name="action_delete">删除</string>
+    
+    <!-- 历史记录项 -->
+    <string name="history_item_selector">选择器: %s</string>
+    <string name="history_item_message">消息: %s</string>
+    
+    <!-- §m§n代码 -->
+    <string name="code_strikethrough">§m（删除线）</string>
+    <string name="code_underline">§n（下划线）</string>
     
     <!-- 文件名输入对话框 -->
     <string name="enter_filename">请输入历史记录存储的文件名：</string>

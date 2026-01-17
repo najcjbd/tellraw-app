@@ -32,8 +32,8 @@ import java.util.*
 fun SelectorTypeBadge(type: com.tellraw.app.model.SelectorType) {
     val (text, color) = when (type) {
         com.tellraw.app.model.SelectorType.JAVA -> "Java" to MaterialTheme.colorScheme.primary
-        com.tellraw.app.model.SelectorType.BEDROCK -> "基岩" to MaterialTheme.colorScheme.secondary
-        com.tellraw.app.model.SelectorType.UNIVERSAL -> "通用" to MaterialTheme.colorScheme.tertiary
+        com.tellraw.app.model.SelectorType.BEDROCK -> stringResource(R.string.selector_type_bedrock_short) to MaterialTheme.colorScheme.secondary
+        com.tellraw.app.model.SelectorType.UNIVERSAL -> stringResource(R.string.selector_type_universal_short) to MaterialTheme.colorScheme.tertiary
     }
     
     SuggestionChip(
@@ -51,12 +51,28 @@ fun ColorCodeQuickInput(
     onCodeSelected: (String) -> Unit
 ) {
     val colorCodes = listOf(
-        "§0" to "黑色", "§1" to "深蓝", "§2" to "深绿", "§3" to "深青",
-        "§4" to "深红", "§5" to "深紫", "§6" to "金色", "§7" to "灰色",
-        "§8" to "深灰", "§9" to "蓝色", "§a" to "绿色", "§b" to "青色",
-        "§c" to "红色", "§d" to "粉色", "§e" to "黄色", "§f" to "白色",
-        "§l" to "粗体", "§m" to "删除", "§n" to "下划", "§o" to "斜体",
-        "§k" to "混乱", "§r" to "重置"
+        "§0" to stringResource(R.string.color_code_black),
+        "§1" to stringResource(R.string.color_code_dark_blue),
+        "§2" to stringResource(R.string.color_code_dark_green),
+        "§3" to stringResource(R.string.color_code_dark_aqua),
+        "§4" to stringResource(R.string.color_code_dark_red),
+        "§5" to stringResource(R.string.color_code_dark_purple),
+        "§6" to stringResource(R.string.color_code_gold),
+        "§7" to stringResource(R.string.color_code_gray),
+        "§8" to stringResource(R.string.color_code_dark_gray),
+        "§9" to stringResource(R.string.color_code_blue),
+        "§a" to stringResource(R.string.color_code_green),
+        "§b" to stringResource(R.string.color_code_aqua),
+        "§c" to stringResource(R.string.color_code_red),
+        "§d" to stringResource(R.string.color_code_light_purple),
+        "§e" to stringResource(R.string.color_code_yellow),
+        "§f" to stringResource(R.string.color_code_white),
+        "§l" to stringResource(R.string.format_code_bold),
+        "§m" to stringResource(R.string.format_code_strikethrough),
+        "§n" to stringResource(R.string.format_code_underline),
+        "§o" to stringResource(R.string.format_code_italic),
+        "§k" to stringResource(R.string.format_code_obfuscated),
+        "§r" to stringResource(R.string.format_code_reset)
     )
     
     LazyRow(
@@ -90,7 +106,7 @@ fun WarningCard(warnings: List<String>) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = "转换提醒",
+                text = stringResource(R.string.conversion_warnings),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
@@ -123,13 +139,13 @@ fun CommandResults(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "生成的命令",
+                text = stringResource(R.string.generated_commands),
                 style = MaterialTheme.typography.titleMedium
             )
             
             // Java版命令
             CommandDisplay(
-                title = "Java版",
+                title = stringResource(R.string.command_title_java),
                 command = javaCommand,
                 onCopy = onCopyJava,
                 onShare = onShareJava
@@ -137,7 +153,7 @@ fun CommandResults(
             
             // 基岩版命令
             CommandDisplay(
-                title = "基岩版",
+                title = stringResource(R.string.command_title_bedrock),
                 command = bedrockCommand,
                 onCopy = onCopyBedrock,
                 onShare = onShareBedrock
@@ -180,14 +196,14 @@ private fun CommandDisplay(
             IconButton(onClick = onCopy) {
                 Icon(
                     Icons.Default.ContentCopy,
-                    contentDescription = "复制"
+                    contentDescription = stringResource(R.string.action_copy)
                 )
             }
             
             IconButton(onClick = onShare) {
                 Icon(
                     Icons.Default.Share,
-                    contentDescription = "分享"
+                    contentDescription = stringResource(R.string.action_share)
                 )
             }
         }
@@ -203,8 +219,8 @@ fun MNCodeDialog(
     mnMixedMode: Boolean = false
 ) {
     val codeName = when (codeType) {
-        "§m" -> "§m（删除线）"
-        "§n" -> "§n（下划线）"
+        "§m" -> stringResource(R.string.code_strikethrough)
+        "§n" -> stringResource(R.string.code_underline)
         else -> "§m§n"
     }
     
@@ -308,13 +324,15 @@ fun SettingsDialog(
                 ) {
                     Switch(
                         checked = mnMixedMode,
-                        onCheckedChange = onMNMixedModeChanged
+                        onCheckedChange = onMNMixedModeChanged,
+                        enabled = !mnCFEnabled
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = stringResource(R.string.mn_mixed_mode),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (mnCFEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = stringResource(R.string.mn_mixed_mode_description),
@@ -324,8 +342,8 @@ fun SettingsDialog(
                     }
                 }
                 
-                if (!mnMixedMode) {
-                    // 非混合模式时显示字体/颜色选择
+                // 只有当混合模式和§m/§n_c/f都关闭时，才显示字体/颜色选择
+                if (!mnMixedMode && !mnCFEnabled) {
                     Text(
                         text = stringResource(R.string.mn_handling_method_title),
                         style = MaterialTheme.typography.bodyMedium
@@ -384,13 +402,15 @@ fun SettingsDialog(
                 ) {
                     Switch(
                         checked = mnCFEnabled,
-                        onCheckedChange = onMNCFEnabledChanged
+                        onCheckedChange = onMNCFEnabledChanged,
+                        enabled = !mnMixedMode
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = stringResource(R.string.mn_cf_enabled),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (mnMixedMode) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = stringResource(R.string.mn_cf_enabled_description),
@@ -543,12 +563,13 @@ private fun HistoryItem(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "选择器: ${history.selector}",
+                        text = stringResource(R.string.history_item_selector, history.selector),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1
                     )
                     Text(
-                        text = "消息: ${history.message.take(30)}${if (history.message.length > 30) "..." else ""}",
+                        text = stringResource(R.string.history_item_message, 
+                            history.message.take(30) + if (history.message.length > 30) "..." else ""),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1
                     )
@@ -561,7 +582,7 @@ private fun HistoryItem(
                     ) {
                         Icon(
                             Icons.Default.History,
-                            contentDescription = "加载",
+                            contentDescription = stringResource(R.string.action_load),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -571,7 +592,7 @@ private fun HistoryItem(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "删除",
+                            contentDescription = stringResource(R.string.action_delete),
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
@@ -591,8 +612,6 @@ fun HistoryStorageSettingsDialog(
     onEditFilename: () -> Unit,
     onClearSettings: () -> Unit,
     onWriteToFile: () -> Unit,
-    onExportConfig: () -> Unit = {},
-    onImportConfig: () -> Unit = {},
     isWriting: Boolean = false,
     writeMessage: String? = null
 ) {
@@ -688,12 +707,21 @@ fun HistoryStorageSettingsDialog(
                     }
                 }
                 
+                // 提示信息
+                if (storageUri == null) {
+                    Text(
+                        text = stringResource(R.string.sandbox_storage_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
                 // 写入状态消息
                 if (writeMessage != null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (writeMessage.contains("成功"))
+                            containerColor = if (writeMessage.contains(stringResource(R.string.success)))
                                 MaterialTheme.colorScheme.primaryContainer
                             else
                                 MaterialTheme.colorScheme.errorContainer
@@ -703,7 +731,7 @@ fun HistoryStorageSettingsDialog(
                             text = writeMessage,
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (writeMessage.contains("成功"))
+                            color = if (writeMessage.contains(stringResource(R.string.success)))
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             else
                                 MaterialTheme.colorScheme.onErrorContainer
@@ -720,29 +748,6 @@ fun HistoryStorageSettingsDialog(
                         Text(stringResource(R.string.clear_storage_settings))
                     }
                 }
-                
-                // 配置管理按钮
-                if (storageUri != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onExportConfig,
-                            modifier = Modifier.weight(1f),
-                            enabled = !isWriting
-                        ) {
-                            Text(stringResource(R.string.export_config))
-                        }
-                        OutlinedButton(
-                            onClick = onImportConfig,
-                            modifier = Modifier.weight(1f),
-                            enabled = !isWriting
-                        ) {
-                            Text(stringResource(R.string.import_config))
-                        }
-                    }
-                }
             }
         },
         confirmButton = {
@@ -754,7 +759,7 @@ fun HistoryStorageSettingsDialog(
                 }
                 Button(
                     onClick = onWriteToFile,
-                    enabled = storageUri != null && !isWriting
+                    enabled = !isWriting
                 ) {
                     if (isWriting) {
                         CircularProgressIndicator(
@@ -802,11 +807,13 @@ fun FilenameInputDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (filename.isNotBlank()) {
-                        onConfirm(filename.trim())
+                    val finalFilename = if (filename.isBlank()) {
+                        "TellrawCommand.txt"
+                    } else {
+                        filename.trim()
                     }
-                },
-                enabled = filename.isNotBlank()
+                    onConfirm(finalFilename)
+                }
             ) {
                 Text(stringResource(R.string.ok))
             }
@@ -833,7 +840,7 @@ fun FileExistsDialog(
         },
         text = {
             Text(
-                text = "文件 \"$filename\" 已存在。\n\n是否使用此文件追加历史记录？\n\n如果选择\"否\"，您需要自定义一个新的文件名。",
+                text = stringResource(R.string.file_exists_message, filename),
                 style = MaterialTheme.typography.bodyMedium
             )
         },

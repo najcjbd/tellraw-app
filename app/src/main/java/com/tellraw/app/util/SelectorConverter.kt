@@ -1,5 +1,6 @@
 package com.tellraw.app.util
 
+import android.content.Context
 import com.tellraw.app.model.*
 import java.util.regex.Pattern
 
@@ -138,7 +139,7 @@ object SelectorConverter {
     /**
      * 将基岩版选择器转换为Java版
      */
-    fun convertBedrockToJava(selector: String): SelectorConversionResult {
+    fun convertBedrockToJava(selector: String, context: android.content.Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
         
         // 基岩版特有选择器变量到Java版的映射
@@ -159,16 +160,16 @@ object SelectorConverter {
         // 转换选择器变量
         if (selectorVar in selectorMapping) {
             newSelector = selectorMapping[selectorVar] + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
-            reminders.add("基岩版选择器 " + selectorVar + " 在Java版中不支持，已转换为 " + selectorMapping[selectorVar])
+            reminders.add(context.getString(R.string.bedrock_selector_converted, selectorVar, selectorMapping[selectorVar]!!))
             wasConverted = true
         }
         
         // 转换参数
-        val (convertedSelector, paramReminders) = convertSelectorParameters(newSelector, SelectorType.JAVA)
+        val (convertedSelector, paramReminders) = convertSelectorParameters(newSelector, SelectorType.JAVA, context)
         reminders.addAll(paramReminders)
         
         // 进一步转换参数格式
-        val javaSelector = convertBedrockParametersToJava(convertedSelector, reminders)
+        val javaSelector = convertBedrockParametersToJava(convertedSelector, reminders, context)
         
         // 如果参数发生了变化，也认为发生了转换
         if (javaSelector != newSelector) {
@@ -187,15 +188,15 @@ object SelectorConverter {
     /**
      * 将Java版选择器转换为基岩版
      */
-    fun convertJavaToBedrock(selector: String): SelectorConversionResult {
+    fun convertJavaToBedrock(selector: String, context: Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
         
         // 转换参数
-        val (convertedSelector, paramReminders) = convertSelectorParameters(selector, SelectorType.BEDROCK)
+        val (convertedSelector, paramReminders) = convertSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
         
         // 进一步转换参数格式
-        var bedrockSelector = convertJavaParametersToBedrock(convertedSelector, reminders)
+        var bedrockSelector = convertJavaParametersToBedrock(convertedSelector, reminders, context)
         
         // 处理NBT参数中的范围值
         bedrockSelector = processRangeValues(bedrockSelector)
@@ -212,7 +213,7 @@ object SelectorConverter {
     /**
      * 转换选择器参数格式
      */
-    private fun convertSelectorParameters(selector: String, targetType: SelectorType): Pair<String, List<String>> {
+    private fun convertSelectorParameters(selector: String, targetType: SelectorType, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         
         if ('[' !in selector || ']' !in selector) {
@@ -224,14 +225,14 @@ object SelectorConverter {
         
         // 处理hasitem参数转换为nbt参数
         if (targetType == SelectorType.JAVA && "hasitem=" in paramsPart) {
-            val (converted, hasitemReminders) = convertHasitemToNbt(paramsPart)
+            val (converted, hasitemReminders) = convertHasitemToNbt(paramsPart, context)
             paramsPart = converted
             reminders.addAll(hasitemReminders)
         }
         
         // 处理nbt参数转换为hasitem参数
         if (targetType == SelectorType.BEDROCK && "nbt=" in paramsPart) {
-            val (converted, nbtReminders) = convertNbtToHasitem(paramsPart)
+            val (converted, nbtReminders) = convertNbtToHasitem(paramsPart, context)
             paramsPart = converted
             reminders.addAll(nbtReminders)
         }
@@ -247,7 +248,7 @@ object SelectorConverter {
      * 只有完全不支持的参数才被剔除
      * 与Python版本的filter_selector_parameters函数逻辑一致
      */
-    fun filterSelectorParameters(selector: String, targetVersion: SelectorType): Pair<String, List<String>> {
+    fun filterSelectorParameters(selector: String, targetVersion: SelectorType, context: android.content.Context): Pair<String, List<String>> {
         val conversionReminders = mutableListOf<String>()
         
         // Java版特有参数（完全不支持，无法转换）
@@ -271,14 +272,14 @@ object SelectorConverter {
         
         // 处理hasitem到nbt的转换（基岩版到Java版）
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
-            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart)
+            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
         }
         
         // 处理nbt到hasitem的转换（Java版到基岩版）
         if (targetVersion == SelectorType.BEDROCK && "nbt=" in paramsPart) {
-            val (converted, nbtToHasitemReminders) = convertNbtToHasitem(paramsPart)
+            val (converted, nbtToHasitemReminders) = convertNbtToHasitem(paramsPart, context)
             paramsPart = converted
             conversionReminders.addAll(nbtToHasitemReminders)
         }
@@ -299,7 +300,7 @@ object SelectorConverter {
                 val negationPattern = "\\w+\\s*=\\s*!".toRegex()
                 if (negationPattern.containsMatchIn(scoresContent)) {
                     // Java版不支持scores反选，直接移除整个scores参数
-                    conversionReminders.add("基岩版scores反选参数" + fullMatch + "在Java版中不支持，已移除")
+                    conversionReminders.add(context.getString(R.string.bedrock_scores_negation_removed, fullMatch))
                     ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
@@ -310,12 +311,12 @@ object SelectorConverter {
         // 根据目标版本进行参数转换
         if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
-            paramsPart = convertDistanceParameters(paramsPart, conversionReminders)
-            paramsPart = convertRotationParameters(paramsPart, conversionReminders)
-            paramsPart = convertLevelParameters(paramsPart, conversionReminders)
+            paramsPart = convertDistanceParameters(paramsPart, conversionReminders, context)
+            paramsPart = convertRotationParameters(paramsPart, conversionReminders, context)
+            paramsPart = convertLevelParameters(paramsPart, conversionReminders, context)
 
             // 处理gamemode到m的转换（Java版到基岩版）
-            paramsPart = convertGamemodeToM(paramsPart, conversionReminders)
+            paramsPart = convertGamemodeToM(paramsPart, conversionReminders, context)
 
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
             val sortPattern = ",?sort=([^,\\]]+)".toRegex()
@@ -350,7 +351,7 @@ object SelectorConverter {
                                 paramsPart + "c=$cValue"
                             }
                         }
-                        conversionReminders.add("Java版sort=nearest已转换为基岩版c=$cValue")
+                        conversionReminders.add(context.getString(R.string.java_sort_nearest_converted, cValue))
                     }
                     "furthest" -> {
                         // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
@@ -372,11 +373,11 @@ object SelectorConverter {
                                 paramsPart + "c=$cValue"
                             }
                         }
-                        conversionReminders.add("Java版sort=furthest已转换为基岩版c=$cValue")
+                        conversionReminders.add(context.getString(R.string.java_sort_furthest_converted, cValue))
                     }
                     "arbitrary" -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add("Java版sort=arbitrary在基岩版中不支持，已移除")
+                        conversionReminders.add(context.getString(R.string.java_sort_arbitrary_not_supported))
                     }
                     "random" -> {
                         // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -399,7 +400,7 @@ object SelectorConverter {
                                     paramsPart + "c=$cValue"
                                 }
                             }
-                            conversionReminders.add("Java版$selectorVar[sort=random]已转换为基岩版@r[c=$cValue]")
+                            conversionReminders.add(context.getString(R.string.java_sort_random_converted, selectorVar, cValue))
                         } else {
                             paramsPart = paramsPart.replace(sortPattern, "")
                             if (limitValue != null) {
@@ -417,30 +418,30 @@ object SelectorConverter {
                                     paramsPart + "c=$cValue"
                                 }
                             }
-                            conversionReminders.add("Java版sort=random已转换为基岩版c=$cValue")
+                            conversionReminders.add(context.getString(R.string.java_sort_random_to_c, cValue))
                         }
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add("Java版sort=${sortValue}在基岩版中不支持，已移除")
+                        conversionReminders.add(context.getString(R.string.java_sort_not_supported, sortValue))
                     }
                 }
             } else {
                 // 没有sort参数，只转换limit
                 if (limitValue != null) {
-                    conversionReminders.add("Java版limit=${limitValue}参数已转换为基岩版c=${limitValue}")
-                    conversionReminders.add("limit只是限制数量，c当由近到远")
+                    conversionReminders.add(context.getString(R.string.java_limit_converted, limitValue, limitValue))
+                    conversionReminders.add(context.getString(R.string.limit_description))
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
         } else if (targetVersion == SelectorType.JAVA) {
             // 基岩版到Java版的参数转换
-            paramsPart = convertR_RmToDistance(paramsPart, conversionReminders)
-            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders)
-            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders)
-            paramsPart = convertL_LmToLevel(paramsPart, conversionReminders)
-            paramsPart = convertMToGamemode(paramsPart, conversionReminders)
-            paramsPart = convertCToLimitSort(paramsPart, conversionReminders)
+            paramsPart = convertR_RmToDistance(paramsPart, conversionReminders, context)
+            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders, context)
+            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders, context)
+            paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
+            paramsPart = convertMToGamemode(paramsPart, conversionReminders, context)
+            paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
         }
         
         // 分割参数，但要处理包含大括号的参数
@@ -499,7 +500,7 @@ object SelectorConverter {
                 // 特殊处理haspermission参数，它包含大括号
                 if (paramName == "haspermission" && targetVersion == SelectorType.JAVA) {
                     removedParams.add(paramName)
-                    conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
+                    conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
                 
@@ -508,7 +509,7 @@ object SelectorConverter {
                     if (targetVersion == SelectorType.BEDROCK) {
                         // Java版的nbt参数在基岩版中不支持
                         removedParams.add("nbt")
-                        conversionReminders.add("警告：Java版nbt参数在基岩版中不支持，已尝试转换为hasitem参数，如果转换失败则已移除")
+                        conversionReminders.add(context.getString(R.string.java_nbt_param_not_supported))
                     } else {
                         // 保留Java版的nbt参数
                         filteredParams.add(param)
@@ -518,10 +519,10 @@ object SelectorConverter {
                 else if (targetVersion == SelectorType.JAVA && paramName in bedrockSpecificParams) {
                     removedParams.add(paramName)
                     when (paramName) {
-                        "family" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有直接对应的功能，已移除。建议使用type参数指定实体类型作为替代")
-                        "haspermission" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
-                        "has_property" -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中没有对应的功能，已移除")
-                        else -> conversionReminders.add("警告：基岩版" + paramName + "参数在Java版中不支持，已移除")
+                        "family" -> conversionReminders.add(context.getString(R.string.bedrock_family_param_not_supported, paramName))
+                        "haspermission" -> conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
+                        "has_property" -> conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
+                        else -> conversionReminders.add(context.getString(R.string.bedrock_param_not_supported, paramName))
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
@@ -529,10 +530,10 @@ object SelectorConverter {
                 else if (targetVersion == SelectorType.BEDROCK && paramName in javaSpecificParams) {
                     removedParams.add(paramName)
                     when (paramName) {
-                        "team" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有队伍系统的直接对应功能")
-                        "predicate" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有谓词系统")
-                        "advancements" -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除。基岩版中没有进度系统")
-                        else -> conversionReminders.add("警告：Java版" + paramName + "参数在基岩版中不支持，已移除")
+                        "team" -> conversionReminders.add(context.getString(R.string.java_team_param_not_supported, paramName))
+                        "predicate" -> conversionReminders.add(context.getString(R.string.java_predicate_param_not_supported, paramName))
+                        "advancements" -> conversionReminders.add(context.getString(R.string.java_advancements_param_not_supported, paramName))
+                        else -> conversionReminders.add(context.getString(R.string.java_param_not_supported, paramName))
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
@@ -567,7 +568,7 @@ object SelectorConverter {
     /**
      * 将Java版的distance参数转换为基岩版的r/rm参数
      */
-    private fun convertDistanceParameters(paramsPart: String, conversionReminders: MutableList<String>): String {
+    private fun convertDistanceParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -593,17 +594,17 @@ object SelectorConverter {
                     // 有上下限：5..10 -> rm=5,r=10
                     val rmVal = parts[0]
                     val rVal = parts[1]
-                    conversionReminders.add("Java版distance=" + distanceValue + "参数已转换为基岩版rm=" + rmVal + ",r=" + rVal)
+                    conversionReminders.add(context.getString(R.string.java_distance_converted, distanceValue, rmVal, rVal))
                     "rm=$rmVal,r=$rVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：5.. -> rm=5
                     val rmVal = parts[0]
-                    conversionReminders.add("Java版distance=" + distanceValue + "参数已转换为基岩版rm=" + rmVal)
+                    conversionReminders.add(context.getString(R.string.java_distance_to_rm, distanceValue, rmVal))
                     "rm=$rmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..10 -> r=10
                     val rVal = parts[1]
-                    conversionReminders.add("Java版distance=" + distanceValue + "参数已转换为基岩版r=" + rVal)
+                    conversionReminders.add(context.getString(R.string.java_distance_to_r, distanceValue, rVal))
                     "r=$rVal"
                 } else {
                     // 无效格式
@@ -611,7 +612,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：10 -> rm=10,r=10（精确匹配）
-                conversionReminders.add("Java版distance=" + distanceValue + "参数已转换为基岩版rm=" + distanceValue + ",r=" + distanceValue)
+                conversionReminders.add(context.getString(R.string.java_distance_exact, distanceValue, distanceValue, distanceValue))
                 "rm=$distanceValue,r=$distanceValue"
             }
         }
@@ -631,7 +632,7 @@ object SelectorConverter {
     /**
      * 将Java版的x_rotation/y_rotation参数转换为基岩版的rx/rxm和ry/rym参数
      */
-    private fun convertRotationParameters(paramsPart: String, conversionReminders: MutableList<String>): String {
+    private fun convertRotationParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -657,17 +658,17 @@ object SelectorConverter {
                     // 有上下限：-45..45 -> rxm=-45,rx=45
                     val rxmVal = parts[0]
                     val rxVal = parts[1]
-                    conversionReminders.add("Java版x_rotation=" + rotationValue + "参数已转换为基岩版rxm=" + rxmVal + ",rx=" + rxVal)
+                    conversionReminders.add(context.getString(R.string.java_x_rotation_converted, rotationValue, rxmVal, rxVal))
                     "rxm=$rxmVal,rx=$rxVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：-45.. -> rxm=-45
                     val rxmVal = parts[0]
-                    conversionReminders.add("Java版x_rotation=" + rotationValue + "参数已转换为基岩版rxm=" + rxmVal)
+                    conversionReminders.add(context.getString(R.string.java_x_rotation_to_rxm, rotationValue, rxmVal))
                     "rxm=$rxmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..45 -> rx=45
                     val rxVal = parts[1]
-                    conversionReminders.add("Java版x_rotation=" + rotationValue + "参数已转换为基岩版rx=" + rxVal)
+                    conversionReminders.add(context.getString(R.string.java_x_rotation_to_rx, rotationValue, rxVal))
                     "rx=$rxVal"
                 } else {
                     // 无效格式
@@ -675,7 +676,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：45 -> rxm=45,rx=45（精确匹配）
-                conversionReminders.add("Java版x_rotation=" + rotationValue + "参数已转换为基岩版rxm=" + rotationValue + ",rx=" + rotationValue)
+                conversionReminders.add(context.getString(R.string.java_x_rotation_exact, rotationValue, rotationValue, rotationValue))
                 "rxm=$rotationValue,rx=$rotationValue"
             }
         }
@@ -693,17 +694,17 @@ object SelectorConverter {
                     // 有上下限：-45..45 -> rym=-45,ry=45
                     val rymVal = parts[0]
                     val ryVal = parts[1]
-                    conversionReminders.add("Java版y_rotation=" + rotationValue + "参数已转换为基岩版rym=" + rymVal + ",ry=" + ryVal)
+                    conversionReminders.add(context.getString(R.string.java_y_rotation_converted, rotationValue, rymVal, ryVal))
                     "rym=$rymVal,ry=$ryVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：-45.. -> rym=-45
                     val rymVal = parts[0]
-                    conversionReminders.add("Java版y_rotation=" + rotationValue + "参数已转换为基岩版rym=" + rymVal)
+                    conversionReminders.add(context.getString(R.string.java_y_rotation_to_rym, rotationValue, rymVal))
                     "rym=$rymVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..45 -> ry=45
                     val ryVal = parts[1]
-                    conversionReminders.add("Java版y_rotation=" + rotationValue + "参数已转换为基岩版ry=" + ryVal)
+                    conversionReminders.add(context.getString(R.string.java_y_rotation_to_ry, rotationValue, ryVal))
                     "ry=$ryVal"
                 } else {
                     // 无效格式
@@ -711,7 +712,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：90 -> rym=90,ry=90（精确匹配）
-                conversionReminders.add("Java版y_rotation=" + rotationValue + "参数已转换为基岩版rym=" + rotationValue + ",ry=" + rotationValue)
+                conversionReminders.add(context.getString(R.string.java_y_rotation_exact, rotationValue, rotationValue, rotationValue))
                 "rym=$rotationValue,ry=$rotationValue"
             }
         }
@@ -731,7 +732,7 @@ object SelectorConverter {
     /**
      * 将Java版的level参数转换为基岩版的l/lm参数
      */
-    private fun convertLevelParameters(paramsPart: String, conversionReminders: MutableList<String>): String {
+    private fun convertLevelParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -757,17 +758,17 @@ object SelectorConverter {
                     // 有上下限：5..10 -> lm=5,l=10
                     val lmVal = parts[0]
                     val lVal = parts[1]
-                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + lmVal + ",l=" + lVal)
+                    conversionReminders.add(context.getString(R.string.java_level_converted, levelValue, lmVal, lVal))
                     "lm=$lmVal,l=$lVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：5.. -> lm=5
                     val lmVal = parts[0]
-                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + lmVal)
+                    conversionReminders.add(context.getString(R.string.java_level_to_lm, levelValue, lmVal))
                     "lm=$lmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..10 -> l=10
                     val lVal = parts[1]
-                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版l=" + lVal)
+                    conversionReminders.add(context.getString(R.string.java_level_to_l, levelValue, lVal))
                     "l=$lVal"
                 } else {
                     // 无效格式
@@ -775,7 +776,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：10 -> lm=10,l=10
-                conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + levelValue + ",l=" + levelValue)
+                conversionReminders.add(context.getString(R.string.java_level_exact, levelValue, levelValue, levelValue))
                 "lm=$levelValue,l=$levelValue"
             }
         }
@@ -795,7 +796,7 @@ object SelectorConverter {
     /**
      * 将Java版的gamemode参数转换为基岩版的m参数
      */
-    private fun convertGamemodeToM(paramsPart: String, conversionReminders: MutableList<String>): String {
+    private fun convertGamemodeToM(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // Java版游戏模式到基岩版的映射
@@ -826,13 +827,13 @@ object SelectorConverter {
             
             if (gamemodeValue == "spectator") {
                 if (negation.isNotEmpty()) {
-                    conversionReminders.add("Java版反选旁观模式(gamemode=!" + gamemodeValue + ")在基岩版中不支持，已转换为反选生存模式")
+                    conversionReminders.add(context.getString(R.string.java_negation_spectator_converted))
                 } else {
-                    conversionReminders.add("Java版旁观模式(gamemode=" + gamemodeValue + ")在基岩版中不支持，已转换为生存模式")
+                    conversionReminders.add(context.getString(R.string.java_spectator_converted, gamemodeValue))
                 }
                 "m=${negation}survival"
             } else if (gamemodeValue in javaToBedrockGamemode) {
-                conversionReminders.add("Java版gamemode=" + gamemodeValue + "参数已转换为基岩版m=" + javaToBedrockGamemode[gamemodeValue])
+                conversionReminders.add(context.getString(R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]))
                 "m=${negation}${javaToBedrockGamemode[gamemodeValue]}"
             } else {
                 // 保持原值
@@ -886,7 +887,7 @@ object SelectorConverter {
     /**
      * 将基岩版参数转换为Java版参数
      */
-    private fun convertBedrockParametersToJava(selector: String, reminders: MutableList<String>): String {
+    private fun convertBedrockParametersToJava(selector: String, reminders: MutableList<String>, context: Context): String {
         var result = selector
         
         if ('[' !in result || ']' !in result) {
@@ -897,22 +898,22 @@ object SelectorConverter {
         var paramsPart = result.substringAfter('[').substringBefore(']')
         
         // 转换r/rm参数到distance参数
-        paramsPart = convertR_RmToDistance(paramsPart, reminders)
+        paramsPart = convertR_RmToDistance(paramsPart, reminders, context)
         
         // 转换rx/rxm参数到x_rotation参数
-        paramsPart = convertRx_RxmToXRotation(paramsPart, reminders)
+        paramsPart = convertRx_RxmToXRotation(paramsPart, reminders, context)
         
         // 转换ry/rym参数到y_rotation参数
-        paramsPart = convertRy_RymToYRotation(paramsPart, reminders)
+        paramsPart = convertRy_RymToYRotation(paramsPart, reminders, context)
         
         // 转换l/lm参数到level参数
-        paramsPart = convertL_LmToLevel(paramsPart, reminders)
+        paramsPart = convertL_LmToLevel(paramsPart, reminders, context)
         
         // 转换m参数到gamemode参数
-        paramsPart = convertMToGamemode(paramsPart, reminders)
+        paramsPart = convertMToGamemode(paramsPart, reminders, context)
         
         // 转换c参数到limit/sort参数
-        paramsPart = convertCToLimitSort(paramsPart, reminders)
+        paramsPart = convertCToLimitSort(paramsPart, reminders, context)
         
         return selectorVar + "[" + paramsPart + "]"
     }
@@ -920,7 +921,7 @@ object SelectorConverter {
     /**
      * 将Java版参数转换为基岩版参数
      */
-    private fun convertJavaParametersToBedrock(selector: String, reminders: MutableList<String>): String {
+    private fun convertJavaParametersToBedrock(selector: String, reminders: MutableList<String>, context: Context): String {
         var result = selector
         
         if ('[' !in result || ']' !in result) {
@@ -931,22 +932,22 @@ object SelectorConverter {
         var paramsPart = result.substringAfter('[').substringBefore(']')
         
         // 转换distance参数到r/rm参数
-        paramsPart = convertDistanceToR_Rm(paramsPart, reminders)
+        paramsPart = convertDistanceToR_Rm(paramsPart, reminders, context)
         
         // 转换x_rotation参数到rx/rxm参数
-        paramsPart = convertXRotationToRx_Rxm(paramsPart, reminders)
+        paramsPart = convertXRotationToRx_Rxm(paramsPart, reminders, context)
         
         // 转换y_rotation参数到ry/rym参数
-        paramsPart = convertYRotationToRy_Rym(paramsPart, reminders)
+        paramsPart = convertYRotationToRy_Rym(paramsPart, reminders, context)
         
         // 转换level参数到l/lm参数
-        paramsPart = convertLevelToL_Lm(paramsPart, reminders)
+        paramsPart = convertLevelToL_Lm(paramsPart, reminders, context)
         
         // 转换gamemode参数到m参数
-        paramsPart = convertGamemodeToM(paramsPart, reminders)
+        paramsPart = convertGamemodeToM(paramsPart, reminders, context)
         
         // 转换limit/sort参数到c参数
-        paramsPart = convertLimitSortToC(paramsPart, selectorVar, reminders)
+        paramsPart = convertLimitSortToC(paramsPart, selectorVar, reminders, context)
         
         // 检查是否需要修改选择器变量（用于 sort=random 的 @a/@r 转换）
         var finalSelectorVar = selectorVar
@@ -963,7 +964,7 @@ object SelectorConverter {
     
     // 以下是各种参数转换的具体实现
     
-    private fun convertR_RmToDistance(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertR_RmToDistance(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -997,11 +998,11 @@ object SelectorConverter {
             if (distanceValue.isNotEmpty()) {
                 when {
                     rmValue != null && rValue != null ->
-                        reminders.add("基岩版rm=" + rmValue + ",r=" + rValue + "参数已转换为Java版distance=" + distanceValue)
+                        reminders.add(context.getString(R.string.bedrock_rm_r_converted, rmValue, rValue, distanceValue))
                     rmValue != null ->
-                        reminders.add("基岩版rm=" + rmValue + "参数已转换为Java版distance=" + distanceValue)
+                        reminders.add(context.getString(R.string.bedrock_rm_converted, rmValue, distanceValue))
                     rValue != null ->
-                        reminders.add("基岩版r=" + rValue + "参数已转换为Java版distance=" + distanceValue)
+                        reminders.add(context.getString(R.string.bedrock_r_converted, rValue, distanceValue))
                 }
                 
                 // 移除原有的r和rm参数
@@ -1031,7 +1032,7 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertDistanceToR_Rm(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertDistanceToR_Rm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1074,7 +1075,7 @@ object SelectorConverter {
             rmValue?.let { reminderParts.add("rm=$it") }
             rValue?.let { reminderParts.add("r=$it") }
             if (reminderParts.isNotEmpty()) {
-                reminders.add("Java版distance=" + distanceValue + "参数已转换为基岩版" + reminderParts.joinToString(","))
+                reminders.add(context.getString(R.string.java_distance_to_bedrock, distanceValue, reminderParts.joinToString(",")))
             }
             
             // 移除distance参数
@@ -1098,44 +1099,48 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertRx_RxmToXRotation(paramsPart: String, reminders: MutableList<String>): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "x_rotation",
-            minParam = "rxm",
-            maxParam = "rx",
-            reminders = reminders
-        )
-    }
-    
-    private fun convertXRotationToRx_Rxm(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertRx_RxmToXRotation(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         return convertRotationParameter(
             paramsPart = paramsPart,
             paramName = "x_rotation",
             minParam = "rxm",
             maxParam = "rx",
             reminders = reminders,
+            context = context
+        )
+    }
+    
+    private fun convertXRotationToRx_Rxm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
+        return convertRotationParameter(
+            paramsPart = paramsPart,
+            paramName = "x_rotation",
+            minParam = "rxm",
+            maxParam = "rx",
+            reminders = reminders,
+            context = context,
             toJava = false
         )
     }
     
-    private fun convertRy_RymToYRotation(paramsPart: String, reminders: MutableList<String>): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "y_rotation",
-            minParam = "rym",
-            maxParam = "ry",
-            reminders = reminders
-        )
-    }
-    
-    private fun convertYRotationToRy_Rym(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertRy_RymToYRotation(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         return convertRotationParameter(
             paramsPart = paramsPart,
             paramName = "y_rotation",
             minParam = "rym",
             maxParam = "ry",
             reminders = reminders,
+            context = context
+        )
+    }
+    
+    private fun convertYRotationToRy_Rym(paramsPart: String, reminders: MutableList<String>, context: Context): String {
+        return convertRotationParameter(
+            paramsPart = paramsPart,
+            paramName = "y_rotation",
+            minParam = "rym",
+            maxParam = "ry",
+            reminders = reminders,
+            context = context,
             toJava = false
         )
     }
@@ -1146,6 +1151,7 @@ object SelectorConverter {
         minParam: String,
         maxParam: String,
         reminders: MutableList<String>,
+        context: Context,
         toJava: Boolean = true
     ): String {
         var result = paramsPart
@@ -1183,11 +1189,11 @@ object SelectorConverter {
                 if (rotationValue.isNotEmpty()) {
                     when {
                         minValue != null && maxValue != null ->
-                            reminders.add("基岩版" + minParam + "=" + minValue + "," + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                            reminders.add(context.getString(R.string.bedrock_rotation_converted, minParam, minValue, maxParam, maxValue, paramName, rotationValue))
                         minValue != null ->
-                            reminders.add("基岩版" + minParam + "=" + minValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                            reminders.add(context.getString(R.string.bedrock_rotation_min_converted, minParam, minValue, paramName, rotationValue))
                         maxValue != null ->
-                            reminders.add("基岩版" + maxParam + "=" + maxValue + "参数已转换为Java版" + paramName + "=" + rotationValue)
+                            reminders.add(context.getString(R.string.bedrock_rotation_max_converted, maxParam, maxValue, paramName, rotationValue))
                     }
                     
                     // 移除原有参数
@@ -1235,11 +1241,11 @@ object SelectorConverter {
                 // 添加提醒信息
                 when {
                     minValue != null && maxValue != null ->
-                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + minParam + "=" + minValue + "," + maxParam + "=" + maxValue)
+                        reminders.add(context.getString(R.string.java_rotation_converted, paramName, paramValue, minParam, minValue, maxParam, maxValue))
                     minValue != null ->
-                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + minParam + "=" + minValue)
+                        reminders.add(context.getString(R.string.java_rotation_to_min, paramName, paramValue, minParam, minValue))
                     maxValue != null ->
-                        reminders.add("Java版" + paramName + "=" + paramValue + "参数已转换为基岩版" + maxParam + "=" + maxValue)
+                        reminders.add(context.getString(R.string.java_rotation_to_max, paramName, paramValue, maxParam, maxValue))
                 }
                 
                 // 移除原有参数
@@ -1270,7 +1276,7 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertL_LmToLevel(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertL_LmToLevel(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1304,11 +1310,11 @@ object SelectorConverter {
             if (levelValue.isNotEmpty()) {
                 when {
                     lmValue != null && lValue != null ->
-                        reminders.add("基岩版lm=" + lmValue + ",l=" + lValue + "参数已转换为Java版level=" + levelValue)
+                        reminders.add(context.getString(R.string.bedrock_lm_l_converted, lmValue, lValue, levelValue))
                     lmValue != null ->
-                        reminders.add("基岩版lm=" + lmValue + "参数已转换为Java版level=" + levelValue)
+                        reminders.add(context.getString(R.string.bedrock_lm_converted, lmValue, levelValue))
                     lValue != null ->
-                        reminders.add("基岩版l=" + lValue + "参数已转换为Java版level=" + levelValue)
+                        reminders.add(context.getString(R.string.bedrock_l_converted, lValue, levelValue))
                 }
                 
                 // 移除原有的l和lm参数
@@ -1338,7 +1344,7 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertLevelToL_Lm(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertLevelToL_Lm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1376,7 +1382,7 @@ object SelectorConverter {
                 }
             }
             
-            reminders.add("Java版level=" + levelValue + "参数已转换为基岩版" + listOfNotNull(lmValue?.let { "lm=" + it }, lValue?.let { "l=" + it }).joinToString(","))
+            reminders.add(context.getString(R.string.java_level_to_bedrock, levelValue, listOfNotNull(lmValue?.let { "lm=" + it }, lValue?.let { "l=" + it }).joinToString(",")))
             
             // 移除level参数
             result = result.replace(levelPattern, "")
@@ -1399,7 +1405,7 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertMToGamemode(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertMToGamemode(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1439,9 +1445,9 @@ object SelectorConverter {
             // 如果是默认模式，需要提醒用户并转换为生存模式
             if (mValue == "default" || mValue == "d" || mValue == "5") {
                 if (negation.isNotEmpty()) {
-                    reminders.add("基岩版反选默认模式(m=!" + mValue + ")在Java版中不支持，已转换为反选生存模式")
+                    reminders.add(context.getString(R.string.bedrock_negation_default_converted))
                 } else {
-                    reminders.add("基岩版默认模式(m=" + mValue + ")在Java版中不支持，已转换为生存模式")
+                    reminders.add(context.getString(R.string.bedrock_default_converted, mValue))
                 }
                 "gamemode=${negation}survival"
             } else if (mValue in bedrockToJavaGamemode) {
@@ -1461,7 +1467,7 @@ object SelectorConverter {
     }
     
     // 特殊处理scores参数中的!=反选：在Java版输出中移除整个scores参数
-    fun processScoresNegation(selector: String, targetVersion: SelectorType): Pair<String, List<String>> {
+    fun processScoresNegation(selector: String, targetVersion: SelectorType, context: Context): Pair<String, List<String>> {
         val conversionReminders = mutableListOf<String>()
         
         if ('[' !in selector || ']' !in selector) {
@@ -1481,7 +1487,7 @@ object SelectorConverter {
                 // 检查是否有反选模式
                 if ("![" in scoresContent || "!" in scoresContent) {
                     // Java版不支持scores反选，直接移除整个scores参数
-                    conversionReminders.add("基岩版scores反选参数" + fullMatch + "在Java版中不支持，已移除")
+                    conversionReminders.add(context.getString(R.string.bedrock_scores_negation_removed, fullMatch))
                     ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
@@ -1499,7 +1505,7 @@ object SelectorConverter {
                 val levelPattern = "level=([^,\\}]+)".toRegex()
                 val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
                     val levelValue = levelMatch.groupValues[1]
-                    conversionReminders.add("Java版level=" + levelValue + "参数已转换为基岩版lm=" + levelValue + ",l=" + levelValue)
+                    conversionReminders.add(context.getString(R.string.java_level_in_scores_converted, levelValue, levelValue, levelValue))
                     "lm=$levelValue,l=$levelValue"
                 }
                 
@@ -1517,7 +1523,7 @@ object SelectorConverter {
     
     
     
-    private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>): String {
+    private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1539,7 +1545,7 @@ object SelectorConverter {
             
             if (cValue.startsWith("-")) {
                 val absCVal = cValue.substring(1)
-                reminders.add("基岩版c=" + cValue + "参数已转换为Java版limit=" + absCVal + ",sort=furthest")
+                reminders.add(context.getString(R.string.bedrock_c_negative_converted, cValue, absCVal))
                 
                 // 移除c参数
                 result = result.replace(cPattern, "")
@@ -1555,7 +1561,7 @@ object SelectorConverter {
                     result = addParameterToResult(result, "sort=furthest")
                 }
             } else {
-                reminders.add("基岩版c=" + cValue + "参数已转换为Java版limit=" + cValue + ",sort=nearest")
+                reminders.add(context.getString(R.string.bedrock_c_converted, cValue, cValue))
                 result = result.replace(cPattern, "limit=$cValue")
                 
                 // 恢复scores参数
@@ -1577,7 +1583,7 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertLimitSortToC(paramsPart: String, selectorVar: String, reminders: MutableList<String>): String {
+    private fun convertLimitSortToC(paramsPart: String, selectorVar: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1618,7 +1624,7 @@ object SelectorConverter {
                     }
 
                     result = addParameterToResult(result, "c=$cValue")
-                    reminders.add("Java版sort=nearest已转换为基岩版c=" + cValue)
+                    reminders.add(context.getString(R.string.java_sort_nearest_converted, cValue))
                 }
                 "furthest" -> {
                     // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
@@ -1635,7 +1641,7 @@ object SelectorConverter {
                     }
 
                     result = addParameterToResult(result, "c=$cValue")
-                    reminders.add("Java版sort=furthest已转换为基岩版c=" + cValue)
+                    reminders.add(context.getString(R.string.java_sort_furthest_converted, cValue))
                 }
                 "arbitrary" -> {
                     result = result.replace(sortPattern, "")
@@ -1645,7 +1651,7 @@ object SelectorConverter {
                         result = result.replace(placeholder, original)
                     }
 
-                    reminders.add("Java版sort=arbitrary在基岩版中不支持，已移除")
+                    reminders.add(context.getString(R.string.java_sort_arbitrary_not_supported))
                 }
                 "random" -> {
                     // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -1663,11 +1669,11 @@ object SelectorConverter {
 
                     result = addParameterToResult(result, "c=$cValue")
                     if (selectorVar == "@a" || selectorVar == "@r") {
-                        reminders.add("Java版" + selectorVar + "[sort=random]已转换为基岩版@r[c=" + cValue + "]")
+                        reminders.add(context.getString(R.string.java_sort_random_converted, selectorVar, cValue))
                         // 在 result 开头添加特殊标记，表示需要修改选择器变量
                         result = "__SELECTOR_VAR_CHANGE_TO__@r__" + result
                     } else {
-                        reminders.add("Java版sort=random已转换为基岩版c=" + cValue)
+                        reminders.add(context.getString(R.string.java_sort_random_to_c, cValue))
                     }
                 }
                 else -> {
@@ -1679,7 +1685,7 @@ object SelectorConverter {
                     }
 
                     val sortValueForMessage = sortValue
-                    reminders.add("Java版sort=" + sortValueForMessage + "在基岩版中不支持，已移除")
+                    reminders.add(context.getString(R.string.java_sort_not_supported, sortValueForMessage))
                 }
             }
         } else {
@@ -1704,8 +1710,8 @@ object SelectorConverter {
             val limitMatch = limitPattern.find(result)
             if (limitMatch != null) {
                 val limitValue = limitMatch.groupValues[1]
-                reminders.add("Java版limit=" + limitValue + "参数已转换为基岩版c=" + limitValue)
-                reminders.add("limit只是限制数量，c当由近到远")
+                reminders.add(context.getString(R.string.java_limit_converted, limitValue, limitValue))
+                reminders.add(context.getString(R.string.limit_description))
                 result = result.replace(limitPattern, "c=$limitValue")
 
                 // 恢复scores参数
@@ -1742,7 +1748,7 @@ object SelectorConverter {
     }
     
     // hasitem和nbt转换的完善实现，与Python版本一致
-    private fun convertHasitemToNbt(paramsPart: String): Pair<String, List<String>> {
+    private fun convertHasitemToNbt(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
         
@@ -1755,12 +1761,12 @@ object SelectorConverter {
             val nbtResult = parseHasitemComplex(content)
 
             if (nbtResult.isNotEmpty()) {
-                reminders.add("hasitem参数已转换为nbt格式，可能无法完全保留原意")
-                reminders.add("注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
+                reminders.add(context.getString(R.string.hasitem_converted))
+                reminders.add(context.getString(R.string.hasitem_count_note))
                 nbtResult
             } else {
                 // 转换失败，保留原始hasitem参数并添加提醒
-                reminders.add("hasitem参数转换失败，保留原始hasitem参数")
+                reminders.add(context.getString(R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
@@ -1773,12 +1779,12 @@ object SelectorConverter {
             val nbtResult = parseHasitemSimple(content)
             
             if (nbtResult.isNotEmpty()) {
-                reminders.add("hasitem参数已转换为nbt格式，可能无法完全保留原意")
-                reminders.add("注意：Java版NBT不需要Count值，hasitem的quantity参数未转换为NBT的Count字段")
+                reminders.add(context.getString(R.string.hasitem_converted))
+                reminders.add(context.getString(R.string.hasitem_count_note))
                 nbtResult
             } else {
                 // 转换失败，保留原始hasitem参数并添加提醒
-                reminders.add("hasitem参数转换失败，保留原始hasitem参数")
+                reminders.add(context.getString(R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
@@ -2023,7 +2029,7 @@ object SelectorConverter {
         return ""
     }
     
-    private fun convertNbtToHasitem(paramsPart: String): Pair<String, List<String>> {
+    private fun convertNbtToHasitem(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
         
@@ -2044,7 +2050,7 @@ object SelectorConverter {
                 
                 if (hasitemResult.isNotEmpty()) {
                     // 如果可以转换，返回hasitem参数
-                    reminders.add("nbt参数已转换为hasitem格式，可能无法完全保留原意")
+                    reminders.add(context.getString(R.string.nbt_converted))
                     "hasitem=$hasitemResult"
                 } else {
                     // 如果不能转换，返回原始nbt参数（保持完整格式）

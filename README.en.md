@@ -134,6 +134,18 @@ Handle §m§n codes like Python version:
 ./gradlew jacocoTestReport
 ```
 
+### File Access
+The app integrates MTDataFilesProvider, allowing MT Manager to access app private directory:
+
+**How to Use**:
+1. Build and install the app (debug version has it integrated)
+2. Open MT Manager
+3. Click "Add Local Storage" in the sidebar
+4. Find and select this app in the app list
+5. Click "Select" to access the app private directory
+
+**Note**: File provider is only injected in debug version. To inject in release version, change `debugImplementation` to `implementation` in `app/build.gradle`.
+
 ## 🧪 Test
 
 ### Unit Tests

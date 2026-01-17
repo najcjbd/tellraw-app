@@ -59,9 +59,9 @@ class VersionCheckRepository @Inject constructor(
                 Result.success(null)
             }
         } catch (e: IOException) {
-            Result.failure(Exception("网络错误: ${e.message}"))
+            Result.failure(Exception(context.getString(R.string.network_error, e.message ?: "")))
         } catch (e: HttpException) {
-            Result.failure(Exception("服务器错误: ${e.message}"))
+            Result.failure(Exception(context.getString(R.string.server_error, e.message ?: "")))
         }
     }
     
