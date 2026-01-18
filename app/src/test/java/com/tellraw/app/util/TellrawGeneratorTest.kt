@@ -21,7 +21,7 @@ import androidx.test.core.app.ApplicationProvider
     packageName = "com.tellraw.app"
 )
 class TellrawGeneratorTest {
-    private val context: Context = ApplicationProvider.getApplicationContext<android.app.Application>()
+    private val context: Context = ApplicationProvider.getApplicationContext<TestApplication>()
     
     /**
      * 测试组1：通用选择器参数命令生成测试
