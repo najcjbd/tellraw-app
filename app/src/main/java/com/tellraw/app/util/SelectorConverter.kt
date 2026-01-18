@@ -45,7 +45,7 @@ object SelectorConverter {
     // 基岩版特有颜色代码映射
     private val BEDROCK_COLORS = mapOf(
         "§g" to "§6",  // minecoin_gold -> gold
-        "§h" to "§f",  // material_quartz -> white 
+        "§h" to "§f",  // material_quartz -> white
         "§i" to "§7",  // material_iron -> gray
         "§j" to "§8",  // material_netherite -> dark_gray
         "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
@@ -57,7 +57,90 @@ object SelectorConverter {
         "§u" to "§d",  // material_amethyst -> light_purple
         "§v" to "§6",  // material_resin -> gold,
     )
-    
+
+    // 字符串资源的默认值映射（用于测试环境中资源不可用时）
+    private val STRING_DEFAULTS = mapOf(
+        R.string.bedrock_selector_converted to "基岩版选择器 %s 在Java版不支持，已转换为 %s",
+        R.string.bedrock_scores_negation_removed to "基岩版scores反选参数%s在Java版不支持，已移除",
+        R.string.java_sort_nearest_converted to "Java版sort=nearest已转换为基岩版c=%s",
+        R.string.java_sort_furthest_converted to "Java版sort=furthest已转换为基岩版c=%s",
+        R.string.java_sort_arbitrary_not_supported to "Java版sort=arbitrary在基岩版不支持，已移除",
+        R.string.java_sort_random_converted to "Java版%1\$s[sort=random]已转换为基岩版@r[c=%2\$s]",
+        R.string.java_sort_random_to_c to "Java版sort=random已转换为基岩版c=%s",
+        R.string.java_sort_not_supported to "Java版sort=%s在基岩版不支持，已移除",
+        R.string.java_limit_converted to "Java版limit=%s已转换为基岩版c=%s",
+        R.string.limit_description to "limit限制数量，c由近到远",
+        R.string.bedrock_param_no_equivalent to "警告：基岩版%s参数在Java版无对应功能，已移除",
+        R.string.java_nbt_param_not_supported to "警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除",
+        R.string.bedrock_family_param_not_supported to "警告：基岩版%s参数在Java版无对应功能，已移除。建议用type参数指定实体类型",
+        R.string.java_team_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无队伍系统",
+        R.string.java_predicate_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无谓词系统",
+        R.string.java_advancements_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无进度系统",
+        R.string.java_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除",
+        R.string.bedrock_param_not_supported to "警告：基岩版%s参数在Java版不支持，已移除",
+        R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
+        R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
+        R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",
+        R.string.java_distance_exact to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
+        R.string.java_x_rotation_converted to "Java版x_rotation=%s已转换为基岩版rxm=%s,rx=%s",
+        R.string.java_x_rotation_to_rxm to "Java版x_rotation=%s已转换为基岩版rxm=%s",
+        R.string.java_x_rotation_to_rx to "Java版x_rotation=%s已转换为基岩版rx=%s",
+        R.string.java_x_rotation_exact to "Java版x_rotation=%s已转换为基岩版rxm=%s,rx=%s",
+        R.string.java_y_rotation_converted to "Java版y_rotation=%s已转换为基岩版rym=%s,ry=%s",
+        R.string.java_y_rotation_to_rym to "Java版y_rotation=%s已转换为基岩版rym=%s",
+        R.string.java_y_rotation_to_ry to "Java版y_rotation=%s已转换为基岩版ry=%s",
+        R.string.java_y_rotation_exact to "Java版y_rotation=%s已转换为基岩版rym=%s,ry=%s",
+        R.string.java_level_converted to "Java版level=%s已转换为基岩版lm=%s,l=%s",
+        R.string.java_level_to_lm to "Java版level=%s已转换为基岩版lm=%s",
+        R.string.java_level_to_l to "Java版level=%s已转换为基岩版l=%s",
+        R.string.java_level_exact to "Java版level=%s已转换为基岩版lm=%s,l=%s",
+        R.string.java_negation_spectator_converted to "Java版反选旁观模式(gamemode=!)在基岩版不支持，已转换为反选生存模式",
+        R.string.java_spectator_converted to "Java版旁观模式(gamemode=%s)在基岩版不支持，已转换为生存模式",
+        R.string.java_gamemode_converted to "Java版gamemode=%1\$s已转换为基岩版m=%2\$s",
+        R.string.bedrock_rm_r_converted to "基岩版rm=%1\$s,r=%2\$s已转换为Java版distance=%3\$s",
+        R.string.bedrock_rm_converted to "基岩版rm=%1\$s已转换为Java版distance=%2\$s",
+        R.string.bedrock_r_converted to "基岩版r=%1\$s已转换为Java版distance=%2\$s",
+        R.string.java_distance_to_bedrock to "Java版distance=%s已转换为基岩版%s",
+        R.string.bedrock_rotation_converted to "基岩版%s=%s,%s=%s已转换为Java版%s=%s",
+        R.string.bedrock_rotation_min_converted to "基岩版%s=%s已转换为Java版%s=%s",
+        R.string.bedrock_rotation_max_converted to "基岩版%s=%s已转换为Java版%s=%s",
+        R.string.java_rotation_converted to "Java版%s=%s已转换为基岩版%s=%s,%s=%s",
+        R.string.java_rotation_to_min to "Java版%s=%s已转换为基岩版%s=%s",
+        R.string.java_rotation_to_max to "Java版%s=%s已转换为基岩版%s=%s",
+        R.string.bedrock_lm_l_converted to "基岩版lm=%s,l=%s已转换为Java版level=%s",
+        R.string.bedrock_lm_converted to "基岩版lm=%s已转换为Java版level=%s",
+        R.string.bedrock_l_converted to "基岩版l=%s已转换为Java版level=%s",
+        R.string.java_level_to_bedrock to "Java版level=%s已转换为基岩版%s",
+        R.string.bedrock_negation_default_converted to "基岩版反选默认模式(m=!)在Java版不支持，已转换为反选生存模式",
+        R.string.bedrock_default_converted to "基岩版默认模式(m=%s)在Java版不支持，已转换为生存模式",
+        R.string.java_level_in_scores_converted to "Java版level=%s已转换为基岩版lm=%s,l=%s",
+        R.string.bedrock_c_negative_converted to "基岩版c=%s已转换为Java版limit=%s,sort=furthest",
+        R.string.bedrock_c_converted to "基岩版c=%s已转换为Java版limit=%s,sort=nearest",
+        R.string.hasitem_converted to "hasitem已转换为nbt格式，可能无法完全保留原意",
+        R.string.hasitem_count_note to "注意：Java版NBT不需要Count值，hasitem的quantity参数未转换",
+        R.string.hasitem_conversion_failed to "hasitem转换失败，保留原参数",
+        R.string.nbt_converted to "nbt已转换为hasitem格式，可能无法完全保留原意"
+    )
+
+    /**
+     * 安全地获取字符串资源
+     * 如果资源不可用（例如在测试环境中），返回默认值
+     */
+    private fun getStringSafely(context: Context, resId: Int, vararg formatArgs: Any): String {
+        return try {
+            context.getString(resId, *formatArgs)
+        } catch (e: Exception) {
+            // 资源不可用时，使用默认值
+            val defaultTemplate = STRING_DEFAULTS[resId] ?: "警告：资源ID $resId 不可用"
+            return try {
+                String.format(defaultTemplate, *formatArgs)
+            } catch (e: Exception) {
+                // 格式化失败时返回原始模板
+                defaultTemplate
+            }
+        }
+    }
+
     /**
      * 检测 scores 参数中是否有反选
      * 例如：[scores={m=!5}] 包含反选，返回 true
@@ -161,7 +244,7 @@ object SelectorConverter {
         // 转换选择器变量
         if (selectorVar in selectorMapping) {
             newSelector = selectorMapping[selectorVar] + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
-            reminders.add(context.getString(R.string.bedrock_selector_converted, selectorVar, selectorMapping[selectorVar]!!))
+            reminders.add(getStringSafely(context, R.string.bedrock_selector_converted, selectorVar, selectorMapping[selectorVar]!!))
             wasConverted = true
         }
         
@@ -301,7 +384,7 @@ object SelectorConverter {
                 val negationPattern = "\\w+\\s*=\\s*!".toRegex()
                 if (negationPattern.containsMatchIn(scoresContent)) {
                     // Java版不支持scores反选，直接移除整个scores参数
-                    conversionReminders.add(context.getString(R.string.bedrock_scores_negation_removed, fullMatch))
+                    conversionReminders.add(getStringSafely(context, R.string.bedrock_scores_negation_removed, fullMatch))
                     ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
@@ -352,7 +435,7 @@ object SelectorConverter {
                                 paramsPart + "c=$cValue"
                             }
                         }
-                        conversionReminders.add(context.getString(R.string.java_sort_nearest_converted, cValue))
+                        conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, cValue))
                     }
                     "furthest" -> {
                         // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
@@ -374,11 +457,11 @@ object SelectorConverter {
                                 paramsPart + "c=$cValue"
                             }
                         }
-                        conversionReminders.add(context.getString(R.string.java_sort_furthest_converted, cValue))
+                        conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
                     }
                     "arbitrary" -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add(context.getString(R.string.java_sort_arbitrary_not_supported))
+                        conversionReminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
                     }
                     "random" -> {
                         // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -401,7 +484,7 @@ object SelectorConverter {
                                     paramsPart + "c=$cValue"
                                 }
                             }
-                            conversionReminders.add(context.getString(R.string.java_sort_random_converted, selectorVar, cValue))
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
                         } else {
                             paramsPart = paramsPart.replace(sortPattern, "")
                             if (limitValue != null) {
@@ -419,19 +502,19 @@ object SelectorConverter {
                                     paramsPart + "c=$cValue"
                                 }
                             }
-                            conversionReminders.add(context.getString(R.string.java_sort_random_to_c, cValue))
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
                         }
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add(context.getString(R.string.java_sort_not_supported, sortValue))
+                        conversionReminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValue))
                     }
                 }
             } else {
                 // 没有sort参数，只转换limit
                 if (limitValue != null) {
-                    conversionReminders.add(context.getString(R.string.java_limit_converted, limitValue, limitValue))
-                    conversionReminders.add(context.getString(R.string.limit_description))
+                    conversionReminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
+                    conversionReminders.add(getStringSafely(context, R.string.limit_description))
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
@@ -501,16 +584,16 @@ object SelectorConverter {
                 // 特殊处理haspermission参数，它包含大括号
                 if (paramName == "haspermission" && targetVersion == SelectorType.JAVA) {
                     removedParams.add(paramName)
-                    conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
+                    conversionReminders.add(getStringSafely(context, R.string.bedrock_param_no_equivalent, paramName))
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
-                
+
                 // 特殊处理nbt参数
                 if (paramName == "nbt") {
                     if (targetVersion == SelectorType.BEDROCK) {
                         // Java版的nbt参数在基岩版中不支持
                         removedParams.add("nbt")
-                        conversionReminders.add(context.getString(R.string.java_nbt_param_not_supported))
+                        conversionReminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
                     } else {
                         // 保留Java版的nbt参数
                         filteredParams.add(param)
@@ -520,10 +603,10 @@ object SelectorConverter {
                 else if (targetVersion == SelectorType.JAVA && paramName in bedrockSpecificParams) {
                     removedParams.add(paramName)
                     when (paramName) {
-                        "family" -> conversionReminders.add(context.getString(R.string.bedrock_family_param_not_supported, paramName))
-                        "haspermission" -> conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
-                        "has_property" -> conversionReminders.add(context.getString(R.string.bedrock_param_no_equivalent, paramName))
-                        else -> conversionReminders.add(context.getString(R.string.bedrock_param_not_supported, paramName))
+                        "family" -> conversionReminders.add(getStringSafely(context, R.string.bedrock_family_param_not_supported, paramName))
+                        "haspermission" -> conversionReminders.add(getStringSafely(context, R.string.bedrock_param_no_equivalent, paramName))
+                        "has_property" -> conversionReminders.add(getStringSafely(context, R.string.bedrock_param_no_equivalent, paramName))
+                        else -> conversionReminders.add(getStringSafely(context, R.string.bedrock_param_not_supported, paramName))
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
@@ -531,10 +614,10 @@ object SelectorConverter {
                 else if (targetVersion == SelectorType.BEDROCK && paramName in javaSpecificParams) {
                     removedParams.add(paramName)
                     when (paramName) {
-                        "team" -> conversionReminders.add(context.getString(R.string.java_team_param_not_supported, paramName))
-                        "predicate" -> conversionReminders.add(context.getString(R.string.java_predicate_param_not_supported, paramName))
-                        "advancements" -> conversionReminders.add(context.getString(R.string.java_advancements_param_not_supported, paramName))
-                        else -> conversionReminders.add(context.getString(R.string.java_param_not_supported, paramName))
+                        "team" -> conversionReminders.add(getStringSafely(context, R.string.java_team_param_not_supported, paramName))
+                        "predicate" -> conversionReminders.add(getStringSafely(context, R.string.java_predicate_param_not_supported, paramName))
+                        "advancements" -> conversionReminders.add(getStringSafely(context, R.string.java_advancements_param_not_supported, paramName))
+                        else -> conversionReminders.add(getStringSafely(context, R.string.java_param_not_supported, paramName))
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
@@ -595,17 +678,17 @@ object SelectorConverter {
                     // 有上下限：5..10 -> rm=5,r=10
                     val rmVal = parts[0]
                     val rVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_distance_converted, distanceValue, rmVal, rVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_distance_converted, distanceValue, rmVal, rVal))
                     "rm=$rmVal,r=$rVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：5.. -> rm=5
                     val rmVal = parts[0]
-                    conversionReminders.add(context.getString(R.string.java_distance_to_rm, distanceValue, rmVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_distance_to_rm, distanceValue, rmVal))
                     "rm=$rmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..10 -> r=10
                     val rVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_distance_to_r, distanceValue, rVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_distance_to_r, distanceValue, rVal))
                     "r=$rVal"
                 } else {
                     // 无效格式
@@ -613,7 +696,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：10 -> rm=10,r=10（精确匹配）
-                conversionReminders.add(context.getString(R.string.java_distance_exact, distanceValue, distanceValue, distanceValue))
+                conversionReminders.add(getStringSafely(context, R.string.java_distance_exact, distanceValue, distanceValue, distanceValue))
                 "rm=$distanceValue,r=$distanceValue"
             }
         }
@@ -659,17 +742,17 @@ object SelectorConverter {
                     // 有上下限：-45..45 -> rxm=-45,rx=45
                     val rxmVal = parts[0]
                     val rxVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_x_rotation_converted, rotationValue, rxmVal, rxVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_converted, rotationValue, rxmVal, rxVal))
                     "rxm=$rxmVal,rx=$rxVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：-45.. -> rxm=-45
                     val rxmVal = parts[0]
-                    conversionReminders.add(context.getString(R.string.java_x_rotation_to_rxm, rotationValue, rxmVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_to_rxm, rotationValue, rxmVal))
                     "rxm=$rxmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..45 -> rx=45
                     val rxVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_x_rotation_to_rx, rotationValue, rxVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_to_rx, rotationValue, rxVal))
                     "rx=$rxVal"
                 } else {
                     // 无效格式
@@ -677,7 +760,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：45 -> rxm=45,rx=45（精确匹配）
-                conversionReminders.add(context.getString(R.string.java_x_rotation_exact, rotationValue, rotationValue, rotationValue))
+                conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_exact, rotationValue, rotationValue, rotationValue))
                 "rxm=$rotationValue,rx=$rotationValue"
             }
         }
@@ -695,17 +778,17 @@ object SelectorConverter {
                     // 有上下限：-45..45 -> rym=-45,ry=45
                     val rymVal = parts[0]
                     val ryVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_y_rotation_converted, rotationValue, rymVal, ryVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_converted, rotationValue, rymVal, ryVal))
                     "rym=$rymVal,ry=$ryVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：-45.. -> rym=-45
                     val rymVal = parts[0]
-                    conversionReminders.add(context.getString(R.string.java_y_rotation_to_rym, rotationValue, rymVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_rym, rotationValue, rymVal))
                     "rym=$rymVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..45 -> ry=45
                     val ryVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_y_rotation_to_ry, rotationValue, ryVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_ry, rotationValue, ryVal))
                     "ry=$ryVal"
                 } else {
                     // 无效格式
@@ -713,7 +796,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：90 -> rym=90,ry=90（精确匹配）
-                conversionReminders.add(context.getString(R.string.java_y_rotation_exact, rotationValue, rotationValue, rotationValue))
+                conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_exact, rotationValue, rotationValue, rotationValue))
                 "rym=$rotationValue,ry=$rotationValue"
             }
         }
@@ -759,17 +842,17 @@ object SelectorConverter {
                     // 有上下限：5..10 -> lm=5,l=10
                     val lmVal = parts[0]
                     val lVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_level_converted, levelValue, lmVal, lVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_level_converted, levelValue, lmVal, lVal))
                     "lm=$lmVal,l=$lVal"
                 } else if (parts[0].isNotEmpty()) {
                     // 只有下限：5.. -> lm=5
                     val lmVal = parts[0]
-                    conversionReminders.add(context.getString(R.string.java_level_to_lm, levelValue, lmVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_level_to_lm, levelValue, lmVal))
                     "lm=$lmVal"
                 } else if (parts[1].isNotEmpty()) {
                     // 只有上限：..10 -> l=10
                     val lVal = parts[1]
-                    conversionReminders.add(context.getString(R.string.java_level_to_l, levelValue, lVal))
+                    conversionReminders.add(getStringSafely(context, R.string.java_level_to_l, levelValue, lVal))
                     "l=$lVal"
                 } else {
                     // 无效格式
@@ -777,7 +860,7 @@ object SelectorConverter {
                 }
             } else {
                 // 单个值：10 -> lm=10,l=10
-                conversionReminders.add(context.getString(R.string.java_level_exact, levelValue, levelValue, levelValue))
+                conversionReminders.add(getStringSafely(context, R.string.java_level_exact, levelValue, levelValue, levelValue))
                 "lm=$levelValue,l=$levelValue"
             }
         }
@@ -825,16 +908,16 @@ object SelectorConverter {
         result = result.replace(gamemodePattern) { match ->
             val negation = match.groupValues[1]  // ! 或空
             val gamemodeValue = match.groupValues[2].trim()
-            
+
             if (gamemodeValue == "spectator") {
                 if (negation.isNotEmpty()) {
-                    conversionReminders.add(context.getString(R.string.java_negation_spectator_converted))
+                    conversionReminders.add(getStringSafely(context, R.string.java_negation_spectator_converted))
                 } else {
-                    conversionReminders.add(context.getString(R.string.java_spectator_converted, gamemodeValue))
+                    conversionReminders.add(getStringSafely(context, R.string.java_spectator_converted, gamemodeValue))
                 }
                 "m=${negation}survival"
             } else if (gamemodeValue in javaToBedrockGamemode) {
-                conversionReminders.add(context.getString(R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]))
+                conversionReminders.add(getStringSafely(context, R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]))
                 "m=${negation}${javaToBedrockGamemode[gamemodeValue]}"
             } else {
                 // 保持原值
@@ -999,11 +1082,11 @@ object SelectorConverter {
             if (distanceValue.isNotEmpty()) {
                 when {
                     rmValue != null && rValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_rm_r_converted, rmValue, rValue, distanceValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_rm_r_converted, rmValue, rValue, distanceValue))
                     rmValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_rm_converted, rmValue, distanceValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_rm_converted, rmValue, distanceValue))
                     rValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_r_converted, rValue, distanceValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_r_converted, rValue, distanceValue))
                 }
                 
                 // 移除原有的r和rm参数
@@ -1076,7 +1159,7 @@ object SelectorConverter {
             rmValue?.let { reminderParts.add("rm=$it") }
             rValue?.let { reminderParts.add("r=$it") }
             if (reminderParts.isNotEmpty()) {
-                reminders.add(context.getString(R.string.java_distance_to_bedrock, distanceValue, reminderParts.joinToString(",")))
+                reminders.add(getStringSafely(context, R.string.java_distance_to_bedrock, distanceValue, reminderParts.joinToString(",")))
             }
             
             // 移除distance参数
@@ -1190,11 +1273,11 @@ object SelectorConverter {
                 if (rotationValue.isNotEmpty()) {
                     when {
                         minValue != null && maxValue != null ->
-                            reminders.add(context.getString(R.string.bedrock_rotation_converted, minParam, minValue, maxParam, maxValue, paramName, rotationValue))
+                            reminders.add(getStringSafely(context, R.string.bedrock_rotation_converted, minParam, minValue, maxParam, maxValue, paramName, rotationValue))
                         minValue != null ->
-                            reminders.add(context.getString(R.string.bedrock_rotation_min_converted, minParam, minValue, paramName, rotationValue))
+                            reminders.add(getStringSafely(context, R.string.bedrock_rotation_min_converted, minParam, minValue, paramName, rotationValue))
                         maxValue != null ->
-                            reminders.add(context.getString(R.string.bedrock_rotation_max_converted, maxParam, maxValue, paramName, rotationValue))
+                            reminders.add(getStringSafely(context, R.string.bedrock_rotation_max_converted, maxParam, maxValue, paramName, rotationValue))
                     }
                     
                     // 移除原有参数
@@ -1242,11 +1325,11 @@ object SelectorConverter {
                 // 添加提醒信息
                 when {
                     minValue != null && maxValue != null ->
-                        reminders.add(context.getString(R.string.java_rotation_converted, paramName, paramValue, minParam, minValue, maxParam, maxValue))
+                        reminders.add(getStringSafely(context, R.string.java_rotation_converted, paramName, paramValue, minParam, minValue, maxParam, maxValue))
                     minValue != null ->
-                        reminders.add(context.getString(R.string.java_rotation_to_min, paramName, paramValue, minParam, minValue))
+                        reminders.add(getStringSafely(context, R.string.java_rotation_to_min, paramName, paramValue, minParam, minValue))
                     maxValue != null ->
-                        reminders.add(context.getString(R.string.java_rotation_to_max, paramName, paramValue, maxParam, maxValue))
+                        reminders.add(getStringSafely(context, R.string.java_rotation_to_max, paramName, paramValue, maxParam, maxValue))
                 }
                 
                 // 移除原有参数
@@ -1311,11 +1394,11 @@ object SelectorConverter {
             if (levelValue.isNotEmpty()) {
                 when {
                     lmValue != null && lValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_lm_l_converted, lmValue, lValue, levelValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_lm_l_converted, lmValue, lValue, levelValue))
                     lmValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_lm_converted, lmValue, levelValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_lm_converted, lmValue, levelValue))
                     lValue != null ->
-                        reminders.add(context.getString(R.string.bedrock_l_converted, lValue, levelValue))
+                        reminders.add(getStringSafely(context, R.string.bedrock_l_converted, lValue, levelValue))
                 }
                 
                 // 移除原有的l和lm参数
@@ -1382,9 +1465,9 @@ object SelectorConverter {
                     levelValue to levelValue
                 }
             }
-            
-            reminders.add(context.getString(R.string.java_level_to_bedrock, levelValue, listOfNotNull(lmValue?.let { "lm=" + it }, lValue?.let { "l=" + it }).joinToString(",")))
-            
+
+            reminders.add(getStringSafely(context, R.string.java_level_to_bedrock, levelValue, listOfNotNull(lmValue?.let { "lm=" + it }, lValue?.let { "l=" + it }).joinToString(",")))
+
             // 移除level参数
             result = result.replace(levelPattern, "")
             
@@ -1446,9 +1529,9 @@ object SelectorConverter {
             // 如果是默认模式，需要提醒用户并转换为生存模式
             if (mValue == "default" || mValue == "d" || mValue == "5") {
                 if (negation.isNotEmpty()) {
-                    reminders.add(context.getString(R.string.bedrock_negation_default_converted))
+                    reminders.add(getStringSafely(context, R.string.bedrock_negation_default_converted))
                 } else {
-                    reminders.add(context.getString(R.string.bedrock_default_converted, mValue))
+                    reminders.add(getStringSafely(context, R.string.bedrock_default_converted, mValue))
                 }
                 "gamemode=${negation}survival"
             } else if (mValue in bedrockToJavaGamemode) {
@@ -1488,7 +1571,7 @@ object SelectorConverter {
                 // 检查是否有反选模式
                 if ("![" in scoresContent || "!" in scoresContent) {
                     // Java版不支持scores反选，直接移除整个scores参数
-                    conversionReminders.add(context.getString(R.string.bedrock_scores_negation_removed, fullMatch))
+                    conversionReminders.add(getStringSafely(context, R.string.bedrock_scores_negation_removed, fullMatch))
                     ""  // 返回空字符串，表示移除整个参数
                 } else {
                     fullMatch
@@ -1501,12 +1584,12 @@ object SelectorConverter {
             paramsPart = paramsPart.replace(scoresPattern) { match ->
                 val fullMatch = match.value
                 val scoresContent = match.groupValues[1]
-                
+
                 // 处理level参数
                 val levelPattern = "level=([^,\\}]+)".toRegex()
                 val newScoresContent = scoresContent.replace(levelPattern) { levelMatch ->
                     val levelValue = levelMatch.groupValues[1]
-                    conversionReminders.add(context.getString(R.string.java_level_in_scores_converted, levelValue, levelValue, levelValue))
+                    conversionReminders.add(getStringSafely(context, R.string.java_level_in_scores_converted, levelValue, levelValue, levelValue))
                     "lm=$levelValue,l=$levelValue"
                 }
                 
@@ -1546,23 +1629,23 @@ object SelectorConverter {
             
             if (cValue.startsWith("-")) {
                 val absCVal = cValue.substring(1)
-                reminders.add(context.getString(R.string.bedrock_c_negative_converted, cValue, absCVal))
-                
+                reminders.add(getStringSafely(context, R.string.bedrock_c_negative_converted, cValue, absCVal))
+
                 // 移除c参数
                 result = result.replace(cPattern, "")
-                
+
                 // 恢复scores参数
                 for ((placeholder, original) in scoresMatches) {
                     result = result.replace(placeholder, original)
                 }
-                
+
                 // 添加limit和sort参数
                 result = addParameterToResult(result, "limit=$absCVal")
                 if (!result.contains("sort=")) {
                     result = addParameterToResult(result, "sort=furthest")
                 }
             } else {
-                reminders.add(context.getString(R.string.bedrock_c_converted, cValue, cValue))
+                reminders.add(getStringSafely(context, R.string.bedrock_c_converted, cValue, cValue))
                 result = result.replace(cPattern, "limit=$cValue")
                 
                 // 恢复scores参数
@@ -1625,7 +1708,7 @@ object SelectorConverter {
                     }
 
                     result = addParameterToResult(result, "c=$cValue")
-                    reminders.add(context.getString(R.string.java_sort_nearest_converted, cValue))
+                    reminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, cValue))
                 }
                 "furthest" -> {
                     // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
@@ -1642,7 +1725,7 @@ object SelectorConverter {
                     }
 
                     result = addParameterToResult(result, "c=$cValue")
-                    reminders.add(context.getString(R.string.java_sort_furthest_converted, cValue))
+                    reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
                 }
                 "arbitrary" -> {
                     result = result.replace(sortPattern, "")
@@ -1652,7 +1735,7 @@ object SelectorConverter {
                         result = result.replace(placeholder, original)
                     }
 
-                    reminders.add(context.getString(R.string.java_sort_arbitrary_not_supported))
+                    reminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
                 }
                 "random" -> {
                     // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -1670,11 +1753,11 @@ object SelectorConverter {
 
                     result = addParameterToResult(result, "c=$cValue")
                     if (selectorVar == "@a" || selectorVar == "@r") {
-                        reminders.add(context.getString(R.string.java_sort_random_converted, selectorVar, cValue))
+                        reminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
                         // 在 result 开头添加特殊标记，表示需要修改选择器变量
                         result = "__SELECTOR_VAR_CHANGE_TO__@r__" + result
                     } else {
-                        reminders.add(context.getString(R.string.java_sort_random_to_c, cValue))
+                        reminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
                     }
                 }
                 else -> {
@@ -1686,7 +1769,7 @@ object SelectorConverter {
                     }
 
                     val sortValueForMessage = sortValue
-                    reminders.add(context.getString(R.string.java_sort_not_supported, sortValueForMessage))
+                    reminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValueForMessage))
                 }
             }
         } else {
@@ -1711,8 +1794,8 @@ object SelectorConverter {
             val limitMatch = limitPattern.find(result)
             if (limitMatch != null) {
                 val limitValue = limitMatch.groupValues[1]
-                reminders.add(context.getString(R.string.java_limit_converted, limitValue, limitValue))
-                reminders.add(context.getString(R.string.limit_description))
+                reminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
+                reminders.add(getStringSafely(context, R.string.limit_description))
                 result = result.replace(limitPattern, "c=$limitValue")
 
                 // 恢复scores参数
@@ -1762,12 +1845,12 @@ object SelectorConverter {
             val nbtResult = parseHasitemComplex(content)
 
             if (nbtResult.isNotEmpty()) {
-                reminders.add(context.getString(R.string.hasitem_converted))
-                reminders.add(context.getString(R.string.hasitem_count_note))
+                reminders.add(getStringSafely(context, R.string.hasitem_converted))
+                reminders.add(getStringSafely(context, R.string.hasitem_count_note))
                 nbtResult
             } else {
                 // 转换失败，保留原始hasitem参数并添加提醒
-                reminders.add(context.getString(R.string.hasitem_conversion_failed))
+                reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
@@ -1778,14 +1861,14 @@ object SelectorConverter {
             val fullMatch = match.value  // 完整的匹配，如 hasitem={...}
             val content = match.groupValues[1]
             val nbtResult = parseHasitemSimple(content)
-            
+
             if (nbtResult.isNotEmpty()) {
-                reminders.add(context.getString(R.string.hasitem_converted))
-                reminders.add(context.getString(R.string.hasitem_count_note))
+                reminders.add(getStringSafely(context, R.string.hasitem_converted))
+                reminders.add(getStringSafely(context, R.string.hasitem_count_note))
                 nbtResult
             } else {
                 // 转换失败，保留原始hasitem参数并添加提醒
-                reminders.add(context.getString(R.string.hasitem_conversion_failed))
+                reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
@@ -1978,10 +2061,10 @@ object SelectorConverter {
             } else {
                 // 尝试解析nbt内容，看是否可以转换为hasitem
                 val hasitemResult = tryConvertNbtContentToHasitem(nbtContent)
-                
+
                 if (hasitemResult.isNotEmpty()) {
                     // 如果可以转换，返回hasitem参数
-                    reminders.add(context.getString(R.string.nbt_converted))
+                    reminders.add(getStringSafely(context, R.string.nbt_converted))
                     "hasitem=$hasitemResult"
                 } else {
                     // 如果不能转换，返回原始nbt参数（保持完整格式）
