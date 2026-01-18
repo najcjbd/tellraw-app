@@ -201,7 +201,7 @@ Choose "No" to enter a new file name.</string>
     <string name="note_java_unsupported_params">Note: Java doesn\'t support these, removed: %s</string>
     <string name="note_java_specific">Note: %s</string>
     <string name="note_bedrock_unsupported_params">Note: Bedrock doesn\'t support these, removed: %s</string>
-    <string name="note_bedrock_selector_converted" formatted="false">Note: Bedrock selector %s not supported in Java, converted to %s</string>
+    <string name="note_bedrock_selector_converted">Note: Bedrock selector %s not supported in Java, converted to %s</string>
     <string name="command_generation_error">Command generation error</string>
     <string name="command_generation_error_with_message">Command generation error: %s</string>
     <string name="share_tellraw_command">Share Tellraw Command</string>
@@ -215,15 +215,15 @@ Choose "No" to enter a new file name.</string>
     <string name="server_error">Server error: %s</string>
     
     <!-- SelectorConverter Conversion Warnings -->
-    <string name="bedrock_selector_converted" formatted="false">Bedrock selector %s not supported in Java, converted to %s</string>
+    <string name="bedrock_selector_converted">Bedrock selector %s not supported in Java, converted to %s</string>
     <string name="bedrock_scores_negation_removed">Bedrock scores negation %s not supported in Java, removed</string>
     <string name="java_sort_nearest_converted">Java sort=nearest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
     <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary not supported in Bedrock, removed</string>
-    <string name="java_sort_random_converted" formatted="false">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
+    <string name="java_sort_random_converted">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
     <string name="java_sort_random_to_c">Java sort=random converted to Bedrock c=%s</string>
     <string name="java_sort_not_supported">Java sort=%s not supported in Bedrock, removed</string>
-    <string name="java_limit_converted" formatted="false">Java limit=%s converted to Bedrock c=%s</string>
+    <string name="java_limit_converted">Java limit=%s converted to Bedrock c=%s</string>
     <string name="limit_description">limit limits count, c sorts by distance</string>
     <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
     <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no equivalent in Java, removed</string>
@@ -233,44 +233,44 @@ Choose "No" to enter a new file name.</string>
     <string name="java_predicate_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no predicate system</string>
     <string name="java_advancements_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no advancement system</string>
     <string name="java_param_not_supported">Warning: Java %s not supported in Bedrock, removed</string>
-    <string name="java_distance_converted" formatted="false">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
-    <string name="java_distance_to_rm" formatted="false">Java distance=%s converted to Bedrock rm=%s</string>
-    <string name="java_distance_to_r" formatted="false">Java distance=%s converted to Bedrock r=%s</string>
-    <string name="java_distance_exact" formatted="false">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
-    <string name="java_x_rotation_converted" formatted="false">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
-    <string name="java_x_rotation_to_rxm" formatted="false">Java x_rotation=%s converted to Bedrock rxm=%s</string>
-    <string name="java_x_rotation_to_rx" formatted="false">Java x_rotation=%s converted to Bedrock rx=%s</string>
-    <string name="java_x_rotation_exact" formatted="false">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
-    <string name="java_y_rotation_converted" formatted="false">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
-    <string name="java_y_rotation_to_rym" formatted="false">Java y_rotation=%s converted to Bedrock rym=%s</string>
-    <string name="java_y_rotation_to_ry" formatted="false">Java y_rotation=%s converted to Bedrock ry=%s</string>
-    <string name="java_y_rotation_exact" formatted="false">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
-    <string name="java_level_converted" formatted="false">Java level=%s converted to Bedrock lm=%s,l=%s</string>
-    <string name="java_level_to_lm" formatted="false">Java level=%s converted to Bedrock lm=%s</string>
-    <string name="java_level_to_l" formatted="false">Java level=%s converted to Bedrock l=%s</string>
-    <string name="java_level_exact" formatted="false">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="java_distance_converted">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
+    <string name="java_distance_to_rm">Java distance=%s converted to Bedrock rm=%s</string>
+    <string name="java_distance_to_r">Java distance=%s converted to Bedrock r=%s</string>
+    <string name="java_distance_exact">Java distance=%s converted to Bedrock rm=%s,r=%s</string>
+    <string name="java_x_rotation_converted">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
+    <string name="java_x_rotation_to_rxm">Java x_rotation=%s converted to Bedrock rxm=%s</string>
+    <string name="java_x_rotation_to_rx">Java x_rotation=%s converted to Bedrock rx=%s</string>
+    <string name="java_x_rotation_exact">Java x_rotation=%s converted to Bedrock rxm=%s,rx=%s</string>
+    <string name="java_y_rotation_converted">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
+    <string name="java_y_rotation_to_rym">Java y_rotation=%s converted to Bedrock rym=%s</string>
+    <string name="java_y_rotation_to_ry">Java y_rotation=%s converted to Bedrock ry=%s</string>
+    <string name="java_y_rotation_exact">Java y_rotation=%s converted to Bedrock rym=%s,ry=%s</string>
+    <string name="java_level_converted">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="java_level_to_lm">Java level=%s converted to Bedrock lm=%s</string>
+    <string name="java_level_to_l">Java level=%s converted to Bedrock l=%s</string>
+    <string name="java_level_exact">Java level=%s converted to Bedrock lm=%s,l=%s</string>
     <string name="java_negation_spectator_converted">Java negation spectator mode (gamemode=!) not supported in Bedrock, converted to negation survival</string>
     <string name="java_spectator_converted">Java spectator mode (gamemode=%s) not supported in Bedrock, converted to survival</string>
     <string name="java_gamemode_converted">Java gamemode=%1$s converted to Bedrock m=%2$s</string>
     <string name="bedrock_rm_r_converted">Bedrock rm=%1$s,r=%2$s converted to Java distance=%3$s</string>
     <string name="bedrock_rm_converted">Bedrock rm=%1$s converted to Java distance=%2$s</string>
     <string name="bedrock_r_converted">Bedrock r=%1$s converted to Java distance=%2$s</string>
-    <string name="java_distance_to_bedrock" formatted="false">Java distance=%s converted to Bedrock %s</string>
-    <string name="bedrock_rotation_converted" formatted="false">Bedrock %s=%s,%s=%s converted to Java %s=%s</string>
-    <string name="bedrock_rotation_min_converted" formatted="false">Bedrock %s=%s converted to Java %s=%s</string>
-    <string name="bedrock_rotation_max_converted" formatted="false">Bedrock %s=%s converted to Java %s=%s</string>
-    <string name="java_rotation_converted" formatted="false">Java %s=%s converted to Bedrock %s=%s,%s=%s</string>
-    <string name="java_rotation_to_min" formatted="false">Java %s=%s converted to Bedrock %s=%s</string>
-    <string name="java_rotation_to_max" formatted="false">Java %s=%s converted to Bedrock %s=%s</string>
-    <string name="bedrock_lm_l_converted" formatted="false">Bedrock lm=%s,l=%s converted to Java level=%s</string>
-    <string name="bedrock_lm_converted" formatted="false">Bedrock lm=%s converted to Java level=%s</string>
-    <string name="bedrock_l_converted" formatted="false">Bedrock l=%s converted to Java level=%s</string>
-    <string name="java_level_to_bedrock" formatted="false">Java level=%s converted to Bedrock %s</string>
+    <string name="java_distance_to_bedrock">Java distance=%s converted to Bedrock %s</string>
+    <string name="bedrock_rotation_converted">Bedrock %s=%s,%s=%s converted to Java %s=%s</string>
+    <string name="bedrock_rotation_min_converted">Bedrock %s=%s converted to Java %s=%s</string>
+    <string name="bedrock_rotation_max_converted">Bedrock %s=%s converted to Java %s=%s</string>
+    <string name="java_rotation_converted">Java %s=%s converted to Bedrock %s=%s,%s=%s</string>
+    <string name="java_rotation_to_min">Java %s=%s converted to Bedrock %s=%s</string>
+    <string name="java_rotation_to_max">Java %s=%s converted to Bedrock %s=%s</string>
+    <string name="bedrock_lm_l_converted">Bedrock lm=%s,l=%s converted to Java level=%s</string>
+    <string name="bedrock_lm_converted">Bedrock lm=%s converted to Java level=%s</string>
+    <string name="bedrock_l_converted">Bedrock l=%s converted to Java level=%s</string>
+    <string name="java_level_to_bedrock">Java level=%s converted to Bedrock %s</string>
     <string name="bedrock_negation_default_converted">Bedrock negation default mode (m=!) not supported in Java, converted to negation survival</string>
     <string name="bedrock_default_converted">Bedrock default mode (m=%s) not supported in Java, converted to survival</string>
-    <string name="java_level_in_scores_converted" formatted="false">Java level=%s converted to Bedrock lm=%s,l=%s</string>
-    <string name="bedrock_c_negative_converted" formatted="false">Bedrock c=%s converted to Java limit=%s,sort=furthest</string>
-    <string name="bedrock_c_converted" formatted="false">Bedrock c=%s converted to Java limit=%s,sort=nearest</string>
+    <string name="java_level_in_scores_converted">Java level=%s converted to Bedrock lm=%s,l=%s</string>
+    <string name="bedrock_c_negative_converted">Bedrock c=%s converted to Java limit=%s,sort=furthest</string>
+    <string name="bedrock_c_converted">Bedrock c=%s converted to Java limit=%s,sort=nearest</string>
     <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
     <string name="hasitem_count_note">Note: Java NBT doesn\'t need Count value, hasitem quantity not converted</string>
     <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>
