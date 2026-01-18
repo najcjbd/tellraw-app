@@ -18,7 +18,6 @@ import androidx.test.core.app.ApplicationProvider
 @Config(
     sdk = [28],
     application = TestApplication::class,
-    manifest = "app/src/main/AndroidManifest.xml",
     packageName = "com.tellraw.app"
 )
 class SelectorConverterTest {
