@@ -20,15 +20,14 @@ import androidx.test.core.app.ApplicationProvider
 @Config(
     sdk = [28],
     application = TestApplication::class,
-    packageName = "com.tellraw.app",
-    manifest = "app/src/main/AndroidManifest.xml"
+    packageName = "com.tellraw.app"
 )
 class SelectorConverterTest {
     private lateinit var context: Context
     
     @Before
     fun setup() {
-        context = RuntimeEnvironment.getApplication() as TestApplication
+        context = RuntimeEnvironment.getApplication()
     }
     
     /**
