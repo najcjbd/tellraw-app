@@ -1,10 +1,12 @@
 package com.tellraw.app.data.repository
 
+import android.content.Context
 import com.tellraw.app.data.local.AppSettings
 import com.tellraw.app.data.local.AppSettingsDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +23,41 @@ class SettingsRepository @Inject constructor(
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
         private const val VALUE_MODE_COLOR = "color"
+        private const val CONFIG_FILENAME = "tellraw_config.json"
+    }
+    
+    /**
+     * 保存配置到JSON文件
+     * @param context 应用上下文
+     * @return 保存是否成功
+     */
+    suspend fun saveConfigToFile(context: Context): Boolean {
+        return try {
+            val json = exportSettingsAsJson()
+            val configFile = File(context.filesDir, CONFIG_FILENAME)
+            configFile.writeText(json)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 从JSON文件加载配置
+     * @param context 应用上下文
+     * @return 加载是否成功
+     */
+    suspend fun loadConfigFromFile(context: Context): Boolean {
+        return try {
+            val configFile = File(context.filesDir, CONFIG_FILENAME)
+            if (!configFile.exists()) {
+                return false
+            }
+            val json = configFile.readText()
+            importSettingsFromJson(json)
+        } catch (e: Exception) {
+            false
+        }
     }
     
     /**

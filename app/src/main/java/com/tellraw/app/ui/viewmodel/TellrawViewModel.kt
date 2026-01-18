@@ -49,7 +49,35 @@ class TellrawViewModel @Inject constructor(
         // 设置Context后初始化版本检查和加载设置
         initializeVersionCheck()
         viewModelScope.launch {
+            // 先从JSON文件加载配置
+            settingsRepository.loadConfigFromFile(context)
+            // 然后加载设置
             loadSettings()
+        }
+    }
+    
+    /**
+     * 保存配置到JSON文件
+     */
+    fun saveConfig() {
+        viewModelScope.launch {
+            val context = this@TellrawViewModel.context ?: return@launch
+            val success = settingsRepository.saveConfigToFile(context)
+            // 可以添加保存成功的提示
+        }
+    }
+    
+    /**
+     * 从JSON文件加载配置
+     */
+    fun loadConfig() {
+        viewModelScope.launch {
+            val context = this@TellrawViewModel.context ?: return@launch
+            val success = settingsRepository.loadConfigFromFile(context)
+            if (success) {
+                // 重新加载设置
+                loadSettings()
+            }
         }
     }
     
@@ -93,17 +121,27 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 处理配置文件中的互斥逻辑
-        if (mixedMode && cfEnabled) {
-            // 同时开启混合模式和§m/§n_c/f，都改为false，保持原有的mn_handling_mode
+        // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
+        // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
+        val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
+        
+        if (enabledCount >= 2) {
+            // 两个及以上开启，只保留"选择§m/§n的处理"
             settingsRepository.setMNMixedMode(false)
             settingsRepository.setMNCFEnabled(false)
             _mnMixedMode.value = false
             _mnCFEnabled.value = false
+            // 保留原有的mn_handling_mode
             _useJavaFontStyle.value = mnHandlingMode
-        } else if (mixedMode || cfEnabled) {
-            // 有一个开启时，mn_handling_mode为空（不显示选项）
-            _mnMixedMode.value = mixedMode
-            _mnCFEnabled.value = cfEnabled
+        } else if (mixedMode) {
+            // 只开启混合模式
+            _mnMixedMode.value = true
+            _mnCFEnabled.value = false
+            _useJavaFontStyle.value = true // 默认值，但UI中不显示
+        } else if (cfEnabled) {
+            // 只开启§m/§n_c/f
+            _mnMixedMode.value = false
+            _mnCFEnabled.value = true
             _useJavaFontStyle.value = true // 默认值，但UI中不显示
         } else {
             // 都没开启时，使用原有的mn_handling_mode
@@ -268,27 +306,27 @@ class TellrawViewModel @Inject constructor(
     /**
      * 处理混合模式下的§m/§n选择
      * @param codeType §m或§n
-     * @param choice "font"或"color"
+     * @param choice "font"表示方式一（Java版用字体模式，基岩版用颜色模式），"color"表示方式二（两版都用颜色模式）
      */
     fun handleMixedModeChoice(codeType: String, choice: String) {
         if (_mnMixedMode.value) {
-            // 找到第一个未选择的§m_f/§n_f并更新为§m_c/§n_c
+            // 找到第一个未选择的§m_f/§n_f并更新
             val targetCode = if (codeType == "§m") "§m_f" else "§n_f"
-            val replacementCode = if (choice == "color") {
-                if (codeType == "§m") "§m_c" else "§n_c"
-            } else {
-                targetCode
-            }
             
             if (choice == "font") {
-                // 选择字体方式，不需要修改
+                // 方式一：Java版用字体模式（§m_f/§n_f），基岩版用颜色模式（§m/§n）
+                // 不需要修改后台消息，保持§m_f/§n_f
+                // 在生成命令时，Java版会使用§m_f/§n_f（字体方式），基岩版会将§m_f/§n_f转换为§m/§n（颜色代码）
                 return
-            }
-            
-            // 找到第一个§m_f/§n_f并替换为§m_c/§n_c
-            val index = backendMessageContent.indexOf(targetCode)
-            if (index != -1) {
-                backendMessageContent = backendMessageContent.substring(0, index) + replacementCode + backendMessageContent.substring(index + 3)
+            } else if (choice == "color") {
+                // 方式二：两版都用颜色模式（§m_c/§n_c）
+                val replacementCode = if (codeType == "§m") "§m_c" else "§n_c"
+                
+                // 找到第一个§m_f/§n_f并替换为§m_c/§n_c
+                val index = backendMessageContent.indexOf(targetCode)
+                if (index != -1) {
+                    backendMessageContent = backendMessageContent.substring(0, index) + replacementCode + backendMessageContent.substring(index + 4)
+                }
             }
         }
     }
@@ -316,6 +354,11 @@ class TellrawViewModel @Inject constructor(
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNHandlingMode(useJavaFont)
+            // 自动保存配置到JSON文件
+            val ctx = this@TellrawViewModel.context
+            if (ctx != null) {
+                settingsRepository.saveConfigToFile(ctx)
+            }
         }
         generateCommands()
     }
@@ -325,10 +368,18 @@ class TellrawViewModel @Inject constructor(
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNMixedMode(enabled)
-            // 如果开启混合模式，清空mn_handling_mode（设置为默认值）
+            // 如果开启混合模式，自动关闭§m/§n_c/f
             if (enabled) {
+                settingsRepository.setMNCFEnabled(false)
+                _mnCFEnabled.value = false
+                // 清空mn_handling_mode（设置为默认值）
                 settingsRepository.setMNHandlingMode(true)
                 _useJavaFontStyle.value = true
+            }
+            // 自动保存配置到JSON文件
+            val ctx = this@TellrawViewModel.context
+            if (ctx != null) {
+                settingsRepository.saveConfigToFile(ctx)
             }
         }
         generateCommands()
@@ -339,15 +390,18 @@ class TellrawViewModel @Inject constructor(
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNCFEnabled(enabled)
-            // 如果启用了_c/_f后缀，自动关闭混合模式
-            if (enabled && _mnMixedMode.value) {
+            // 如果开启§m/§n_c/f，自动关闭混合模式
+            if (enabled) {
                 settingsRepository.setMNMixedMode(false)
                 _mnMixedMode.value = false
-            }
-            // 如果开启§m/§n_c/f，清空mn_handling_mode（设置为默认值）
-            if (enabled) {
+                // 清空mn_handling_mode（设置为默认值）
                 settingsRepository.setMNHandlingMode(true)
                 _useJavaFontStyle.value = true
+            }
+            // 自动保存配置到JSON文件
+            val ctx = this@TellrawViewModel.context
+            if (ctx != null) {
+                settingsRepository.saveConfigToFile(ctx)
             }
         }
         generateCommands()
@@ -891,31 +945,32 @@ class TellrawViewModel @Inject constructor(
                 // 检查文件是否存在
                 val existingUri = findFileInDirectory(contentResolver, uri, filename)
                 
-                if (existingUri != null) {
-                    // 文件已存在，询问用户是否使用现有文件
-                    _showFileExistsDialog.value = filename
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                // 文件不存在，直接创建新文件
-                val fileUri = createFileInDirectory(contentResolver, uri, filename)
-                
-                if (fileUri == null) {
-                    _writeFileMessage.value = context.getString(R.string.create_file_failed)
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
                 // 生成历史记录内容
                 val content = buildHistoryContent(historyList)
                 
-                // 写入文件
-                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
-                    outputStream.write(content.toByteArray())
+                if (existingUri != null) {
+                    // 文件已存在，直接追加写入
+                    contentResolver.openOutputStream(existingUri, "wa")?.use { outputStream ->
+                        outputStream.write(content.toByteArray())
+                    }
+                    _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
+                } else {
+                    // 文件不存在，创建新文件
+                    val fileUri = createFileInDirectory(contentResolver, uri, filename)
+                    
+                    if (fileUri == null) {
+                        _writeFileMessage.value = context.getString(R.string.create_file_failed)
+                        _isWritingToFile.value = false
+                        return@launch
+                    }
+                    
+                    // 写入文件
+                    contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
+                        outputStream.write(content.toByteArray())
+                    }
+                    
+                    _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
                 }
-                
-                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
             } catch (e: Exception) {
                 _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {
@@ -934,10 +989,14 @@ class TellrawViewModel @Inject constructor(
             // 生成历史记录内容
             val content = buildHistoryContent(historyList)
             
-            // 写入文件
-            file.writeText(content)
-            
-            _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+            // 如果文件已存在，追加写入；否则创建新文件
+            if (file.exists()) {
+                file.appendText(content)
+                _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
+            } else {
+                file.writeText(content)
+                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+            }
         } catch (e: Exception) {
             _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
         } finally {

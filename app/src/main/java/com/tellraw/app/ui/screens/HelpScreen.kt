@@ -55,6 +55,11 @@ fun HelpScreen(
             )
 
             HelpSection(
+                title = context.getString(R.string.help_mixed_mode),
+                content = context.getString(R.string.help_mixed_mode_content)
+            )
+
+            HelpSection(
                 title = context.getString(R.string.help_version_differences),
                 content = context.getString(R.string.help_version_differences_content)
             )

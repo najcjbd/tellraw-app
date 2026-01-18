@@ -178,9 +178,8 @@ object TextFormatter {
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9",
             "§a", "§b", "§c", "§d", "§e", "§f",
             "§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v",
-            "§k", "§l", "§m", "§n", "§o", "§r",
-            "§m_f", "§m_c", "§n_f", "§n_c",
-            "§m_", "§n_"
+            "§k", "§l", "§o", "§r",
+            "§m_f", "§m_c", "§n_f", "§n_c"
         )
         
         // 检测未知的§组合
@@ -212,13 +211,18 @@ object TextFormatter {
         while (i < jsonText.length) {
             if (jsonText[i] == '§' && i + 1 < jsonText.length) {
                 // 检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
-                // 混合模式下总是识别这些格式
                 if (i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
                     val code = jsonText.substring(i, i + 4)
                     tokens.add("format_code" to code)
                     i += 4
                 } else {
                     val code = jsonText.substring(i, i + 2)
+                    // 如果启用了§m/§n_c/f，普通的§m/§n被视为无效字符（像§&一样）
+                    if (mnCFEnabled && (code == "§m" || code == "§n")) {
+                        // 跳过这些无效字符
+                        i += 2
+                        continue
+                    }
                     tokens.add("format_code" to code)
                     i += 2
                 }
@@ -245,8 +249,8 @@ object TextFormatter {
         for ((tokenType, tokenValue) in tokens) {
             if (tokenType == "format_code") {
                 val code = tokenValue
-                // 颜色代码
-                if (code[1] in "0123456789abcdefghijklmnpqrstuv") {
+                // 颜色代码（不包含格式代码k、l、m、n、o、r）
+                if (code[1] in "0123456789abcdefgpqstuv") {
                     // 颜色代码
                     when (code) {
                         "§0" -> currentFormat["color"] = "black"
@@ -270,6 +274,19 @@ object TextFormatter {
                         "§h" -> currentFormat["color"] = "white"  // material_quartz
                         "§i" -> currentFormat["color"] = "gray"  // material_iron
                         "§j" -> currentFormat["color"] = "dark_gray"  // material_netherite
+                        "§p" -> currentFormat["color"] = "gold"  // material_gold
+                        "§q" -> currentFormat["color"] = "green"  // material_emerald
+                        "§s" -> currentFormat["color"] = "aqua"  // material_diamond
+                        "§t" -> currentFormat["color"] = "dark_blue"  // material_lapis
+                        "§u" -> currentFormat["color"] = "light_purple"  // material_amethyst
+                        "§v" -> currentFormat["color"] = "gold"  // material_resin
+                    }
+                }
+                // 格式代码（包含m和n）
+                else if (code[1] in "klmnor") {
+                    when (code) {
+                        "§k" -> currentFormat["obfuscated"] = true  // 随机字符（混淆）
+                        "§l" -> currentFormat["bold"] = true  // 粗体
                         "§m" -> {
                             if (mNHandling == "font") {
                                 // 在Java版中，§m作为格式化代码是删除线
@@ -288,21 +305,6 @@ object TextFormatter {
                                 currentFormat["color"] = "red"
                             }
                         }
-                        "§p" -> currentFormat["color"] = "gold"  // material_gold
-                        "§q" -> currentFormat["color"] = "green"  // material_emerald
-                        "§s" -> currentFormat["color"] = "aqua"  // material_diamond
-                        "§t" -> currentFormat["color"] = "dark_blue"  // material_lapis
-                        "§u" -> currentFormat["color"] = "light_purple"  // material_amethyst
-                        "§v" -> currentFormat["color"] = "gold"  // material_resin
-                    }
-                }
-                // 格式代码
-                else if (code[1] in "klmnor") {
-                    when (code) {
-                        "§k" -> currentFormat["obfuscated"] = true  // 随机字符（混淆）
-                        "§l" -> currentFormat["bold"] = true  // 粗体
-                        "§m" -> if (mNHandling != "color") currentFormat["strikethrough"] = true  // 删除线
-                        "§n" -> if (mNHandling != "color") currentFormat["underlined"] = true  // 下划线
                         "§o" -> currentFormat["italic"] = true  // 斜体
                         "§r" -> {
                             // 重置所有格式
@@ -398,20 +400,21 @@ object TextFormatter {
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
-        // 根据mNHandling参数决定是否保留原始颜色代码
-        if (mNHandling == "font") {
-            // Java版使用字体方式，基岩版使用颜色代码方式
-            // 保留§m/§n作为基岩版特有颜色代码
-            // §m -> material_redstone (深红色)
-            // §n -> material_copper (铜色)
-        } else if (mNHandling == "color") {
-            // Java版和基岩版都使用颜色代码方式
-            // 将§m/§n转换为标准颜色代码
-            processedText = processedText.replace("§m", "§4") // material_redstone -> dark_red
-            processedText = processedText.replace("§n", "§c") // material_copper -> red
-        }
+        // 将§m_f/§m_c/§n_f/§n_c统一缩写为§m/§n
+        processedText = processedText.replace("§m_f", "§m")
+        processedText = processedText.replace("§m_c", "§m")
+        processedText = processedText.replace("§n_f", "§n")
+        processedText = processedText.replace("§n_c", "§n")
         
-        // 基岩版不转换§m_f/§m_c/§n_f/§n_c，保持原样
+        // 如果启用了§m/§n_c/f，普通的§m/§n被视为无效字符（像§&一样），需要移除
+        if (mnCFEnabled) {
+            processedText = processedText.replace("§m", "")
+            processedText = processedText.replace("§n", "")
+        }
+        // 否则，保留§m/§n作为基岩版特有颜色代码
+        // §m -> material_redstone (深红色)
+        // §n -> material_copper (铜色)
+        // 注意：基岩版中§m和§n是有效的颜色代码，不需要转换
         
         // 处理其他基岩版特有颜色代码
         val bedrockSpecificCodes = mapOf(

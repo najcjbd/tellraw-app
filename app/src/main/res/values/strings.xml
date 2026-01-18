@@ -88,6 +88,8 @@
     <string name="help_selector_content">选择器指定命令目标：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 随机玩家\n• @e - 所有实体\n• @s - 命令执行者\n\n支持参数过滤：\n• @a[gamemode=survival] - 生存模式玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格内最近的玩家</string>
     <string name="help_text_formatting">文本格式化</string>
     <string name="help_text_formatting_content">支持Minecraft颜色和格式代码：\n\n颜色：\n• §0 黑色    §1 深蓝   §2 深绿\n• §3 深青   §4 深红   §5 深紫\n• §6 金色    §7 灰色   §8 深灰\n• §9 蓝色    §a 绿色   §b 青色\n• §c 红色    §d 粉色   §e 黄色\n• §f 白色\n\n格式：\n• §l 粗体    §m 删除线 §n 下划线\n• §o 斜体    §k 混乱   §r 重置</string>
+    <string name="help_mixed_mode">混合模式</string>
+    <string name="help_mixed_mode_content">混合模式允许为每个§m/§n代码单独选择处理方式：\n\n方式一（推荐）：\n• Java版：使用字体方式（删除线/下划线）\n• 基岩版：使用颜色代码方式（深红色/红色）\n\n方式二：\n• Java版：使用颜色代码方式（深红色/红色）\n• 基岩版：使用颜色代码方式（深红色/红色）\n\n注意：混合模式下，输入框显示原始§m/§n代码，后台自动转换为§m_f/§n_f（字体方式）或§m_c/§n_c（颜色方式）。</string>
     <string name="help_version_differences">版本差异</string>
     <string name="help_version_differences_content">Java版和基岩版在选择器和格式化上有差异：\n\n选择器：\n• Java版用distance，基岩版用r/rm\n• Java版用gamemode，基岩版用m\n• Java版支持nbt，基岩版支持hasitem\n\n格式化：\n• §m§n代码处理方式不同\n• 某些颜色代码在基岩版有特殊含义</string>
     <string name="help_usage_tips">使用提示</string>
@@ -277,6 +279,8 @@
     <!-- §m§n代码 -->
     <string name="code_strikethrough">§m（删除线）</string>
     <string name="code_underline">§n（下划线）</string>
+    <string name="code_option_1_description">方式一：Java版用字体方式，基岩版用颜色代码</string>
+    <string name="code_option_2_description">方式二：两版都用颜色代码</string>
     
     <!-- 文件名输入对话框 -->
     <string name="enter_filename">输入历史记录文件名：</string>

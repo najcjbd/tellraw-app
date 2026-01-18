@@ -228,7 +228,7 @@ fun MNCodeDialog(
     
     AlertDialog(
         onDismissRequest = {
-            // 点击空白区域取消时，默认使用字体方式
+            // 点击空白区域取消时，默认使用方式一
             if (mnMixedMode) {
                 onMixedModeChoice(codeType ?: "§m", "font")
             } else {
@@ -242,8 +242,21 @@ fun MNCodeDialog(
         text = {
             Column {
                 if (mnMixedMode) {
+                    // 混合模式：显示方式一和方式二
                     Text(
                         text = stringResource(R.string.code_dialog_message_mixed, codeName)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.code_option_1_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.code_option_2_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 } else {
                     Text(
@@ -265,10 +278,11 @@ fun MNCodeDialog(
                 }
             }
         },
-        confirmButton = {
+        dismissButton = {
             TextButton(
                 onClick = {
                     if (mnMixedMode) {
+                        // 方式一：Java版用字体模式，基岩版用颜色模式
                         onMixedModeChoice(codeType ?: "§m", "font")
                     } else {
                         onUseJavaFontStyle(true)
@@ -278,10 +292,11 @@ fun MNCodeDialog(
                 Text(stringResource(R.string.code_option_1))
             }
         },
-        dismissButton = {
+        confirmButton = {
             TextButton(
                 onClick = {
                     if (mnMixedMode) {
+                        // 方式二：两版都用颜色模式
                         onMixedModeChoice(codeType ?: "§m", "color")
                     } else {
                         onUseJavaFontStyle(false)
@@ -324,7 +339,13 @@ fun SettingsDialog(
                 ) {
                     Switch(
                         checked = mnMixedMode,
-                        onCheckedChange = onMNMixedModeChanged,
+                        onCheckedChange = { enabled ->
+                            // 开启混合模式时，自动关闭§m/§n_c/f和字体/颜色选择
+                            if (enabled) {
+                                onMNCFEnabledChanged(false)
+                            }
+                            onMNMixedModeChanged(enabled)
+                        },
                         enabled = !mnCFEnabled
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -357,7 +378,10 @@ fun SettingsDialog(
                         ) {
                             RadioButton(
                                 selected = useJavaFontStyle,
-                                onClick = { onUseJavaFontStyleChanged(true) }
+                                onClick = { 
+                                    // 选择字体模式时，保持混合模式和§m/§n_c/f关闭
+                                    onUseJavaFontStyleChanged(true)
+                                }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
@@ -378,7 +402,10 @@ fun SettingsDialog(
                         ) {
                             RadioButton(
                                 selected = !useJavaFontStyle,
-                                onClick = { onUseJavaFontStyleChanged(false) }
+                                onClick = { 
+                                    // 选择颜色模式时，保持混合模式和§m/§n_c/f关闭
+                                    onUseJavaFontStyleChanged(false)
+                                }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
@@ -402,7 +429,13 @@ fun SettingsDialog(
                 ) {
                     Switch(
                         checked = mnCFEnabled,
-                        onCheckedChange = onMNCFEnabledChanged,
+                        onCheckedChange = { enabled ->
+                            // 开启§m/§n_c/f时，自动关闭混合模式
+                            if (enabled) {
+                                onMNMixedModeChanged(false)
+                            }
+                            onMNCFEnabledChanged(enabled)
+                        },
                         enabled = !mnMixedMode
                     )
                     Spacer(modifier = Modifier.width(8.dp))
