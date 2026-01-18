@@ -310,4 +310,14 @@
     <!-- 禁用检查对话框 -->
     <string name="disable_version_check">禁用版本检查</string>
     <string name="disable_version_check_message">确定禁用版本检查吗？\n\n禁用后将不再自动检查新版本，可在设置中重新启用。</string>
+    
+    <!-- 硬编码字符串 -->
+    <string name="clipboard_label">Tellraw命令</string>
+    <string name="share_subject">Minecraft Tellraw命令</string>
+    <string name="java_edition_short">Java</string>
+    <string name="filter_java_edition">Java版</string>
+    <string name="filter_bedrock_edition">基岩版</string>
+    <string name="filter_nbt_param">nbt参数</string>
+    <string name="filter_param_converted">参数已转换为</string>
+    <string name="filter_converted">已转换为</string>
 </resources>

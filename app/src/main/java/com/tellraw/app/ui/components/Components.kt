@@ -31,7 +31,7 @@ import java.util.*
 @Composable
 fun SelectorTypeBadge(type: com.tellraw.app.model.SelectorType) {
     val (text, color) = when (type) {
-        com.tellraw.app.model.SelectorType.JAVA -> "Java" to MaterialTheme.colorScheme.primary
+        com.tellraw.app.model.SelectorType.JAVA -> stringResource(R.string.java_edition_short) to MaterialTheme.colorScheme.primary
         com.tellraw.app.model.SelectorType.BEDROCK -> stringResource(R.string.selector_type_bedrock_short) to MaterialTheme.colorScheme.secondary
         com.tellraw.app.model.SelectorType.UNIVERSAL -> stringResource(R.string.selector_type_universal_short) to MaterialTheme.colorScheme.tertiary
     }

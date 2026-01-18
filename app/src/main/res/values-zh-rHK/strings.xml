@@ -88,6 +88,8 @@
     <string name="help_selector_content">選擇器指定指令目標：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 隨機玩家\n• @e - 所有實體\n• @s - 指令執行者\n\n支援參數過濾：\n• @a[gamemode=survival] - 生存模式玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格內最近的玩家</string>
     <string name="help_text_formatting">文字格式化</string>
     <string name="help_text_formatting_content">支援Minecraft顏色和格式代碼：\n\n顏色：\n• §0 黑色    §1 深藍   §2 深綠\n• §3 深青   §4 深紅   §5 深紫\n• §6 金色    §7 灰色   §8 深灰\n• §9 藍色    §a 綠色   §b 青色\n• §c 紅色    §d 粉色   §e 黃色\n• §f 白色\n\n格式：\n• §l 粗體    §m 刪除線 §n 底線\n• §o 斜體    §k 混亂   §r 重置</string>
+    <string name="help_mixed_mode">混合模式</string>
+    <string name="help_mixed_mode_content">混合模式允許為每個§m/§n代碼單獨選擇處理方式：\n\n方式一（推薦）：\n• Java版：使用字體方式（刪除線/底線）\n• 基岩版：使用顏色代碼方式（深紅色/紅色）\n\n方式二：\n• Java版：使用顏色代碼方式（深紅色/紅色）\n• 基岩版：使用顏色代碼方式（深紅色/紅色）\n\n注意：混合模式下，輸入框顯示原始§m/§n代碼，後台自動轉換為§m_f/§n_f（字體方式）或§m_c/§n_c（顏色方式）。</string>
     <string name="help_version_differences">版本差異</string>
     <string name="help_version_differences_content">Java版和基岩版在選擇器和格式化上有差異：\n\n選擇器：\n• Java版用distance，基岩版用r/rm\n• Java版用gamemode，基岩版用m\n• Java版支援nbt，基岩版支援hasitem\n\n格式化：\n• §m§n代碼處理方式不同\n• 某些顏色代碼在基岩版有特殊含義</string>
     <string name="help_usage_tips">使用提示</string>
@@ -277,6 +279,8 @@
     <!-- §m§n代碼 -->
     <string name="code_strikethrough">§m（刪除線）</string>
     <string name="code_underline">§n（底線）</string>
+    <string name="code_option_1_description">方式一：Java版用字體方式，基岩版用顏色代碼</string>
+    <string name="code_option_2_description">方式二：兩版都用顏色代碼</string>
     
     <!-- 檔名輸入對話框 -->
     <string name="enter_filename">輸入歷史紀錄檔名：</string>
@@ -306,4 +310,14 @@
     <!-- 停用檢查對話框 -->
     <string name="disable_version_check">停用版本檢查</string>
     <string name="disable_version_check_message">確定停用版本檢查嗎？\n\n停用後將不再自動檢查新版本，可在設定中重新啟用。</string>
+    
+    <!-- 硬編碼字串 -->
+    <string name="clipboard_label">Tellraw指令</string>
+    <string name="share_subject">Minecraft Tellraw指令</string>
+    <string name="java_edition_short">Java</string>
+    <string name="filter_java_edition">Java版</string>
+    <string name="filter_bedrock_edition">基岩版</string>
+    <string name="filter_nbt_param">nbt參數</string>
+    <string name="filter_param_converted">參數已轉換為</string>
+    <string name="filter_converted">已轉換為</string>
 </resources>

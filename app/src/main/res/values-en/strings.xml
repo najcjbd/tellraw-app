@@ -113,6 +113,8 @@ Colors:
 Formats:
 • §l Bold     §m Strike      §n Underline
 • §o Italic   §k Random      §r Reset</string>
+    <string name="help_mixed_mode">Mixed Mode</string>
+    <string name="help_mixed_mode_content">Mixed mode allows choosing how to handle each §m/§n code individually:\n\nOption 1 (Recommended):\n• Java: Use font style (strikethrough/underline)\n• Bedrock: Use color codes (dark red/red)\n\nOption 2:\n• Java: Use color codes (dark red/red)\n• Bedrock: Use color codes (dark red/red)\n\nNote: In mixed mode, the input shows original §m/§n codes, and the backend automatically converts them to §m_f/§n_f (font style) or §m_c/§n_c (color style).</string>
     <string name="help_version_differences">Version Differences</string>
     <string name="help_version_differences_content">Java and Bedrock use different selectors:
 
@@ -361,4 +363,16 @@ Will not auto-check for updates. Re-enable in settings.</string>
     <!-- §m§n Codes -->
     <string name="code_strikethrough">§m (strikethrough)</string>
     <string name="code_underline">§n (underline)</string>
+    <string name="code_option_1_description">Option 1: Java uses font style, Bedrock uses color codes</string>
+    <string name="code_option_2_description">Option 2: Both use color codes</string>
+    
+    <!-- Hardcoded strings -->
+    <string name="clipboard_label">Tellraw Command</string>
+    <string name="share_subject">Minecraft Tellraw Command</string>
+    <string name="java_edition_short">Java</string>
+    <string name="filter_java_edition">Java Edition</string>
+    <string name="filter_bedrock_edition">Bedrock Edition</string>
+    <string name="filter_nbt_param">nbt parameter</string>
+    <string name="filter_param_converted">parameter converted to</string>
+    <string name="filter_converted">converted to</string>
 </resources>
