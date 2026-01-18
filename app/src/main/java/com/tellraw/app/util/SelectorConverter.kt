@@ -243,7 +243,7 @@ object SelectorConverter {
         
         // 转换选择器变量
         if (selectorVar in selectorMapping) {
-            newSelector = selectorMapping[selectorVar] + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
+            newSelector = selectorMapping[selectorVar]!! + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
             reminders.add(getStringSafely(context, R.string.bedrock_selector_converted, selectorVar, selectorMapping[selectorVar]!!))
             wasConverted = true
         }
@@ -917,8 +917,8 @@ object SelectorConverter {
                 }
                 "m=${negation}survival"
             } else if (gamemodeValue in javaToBedrockGamemode) {
-                conversionReminders.add(getStringSafely(context, R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]))
-                "m=${negation}${javaToBedrockGamemode[gamemodeValue]}"
+                conversionReminders.add(getStringSafely(context, R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]!!))
+                "m=${negation}${javaToBedrockGamemode[gamemodeValue]!!}"
             } else {
                 // 保持原值
                 match.value
@@ -1535,7 +1535,7 @@ object SelectorConverter {
                 }
                 "gamemode=${negation}survival"
             } else if (mValue in bedrockToJavaGamemode) {
-                "gamemode=${negation}${bedrockToJavaGamemode[mValue]}"
+                "gamemode=${negation}${bedrockToJavaGamemode[mValue]!!}"
             } else {
                 // 保持原值
                 match.value
