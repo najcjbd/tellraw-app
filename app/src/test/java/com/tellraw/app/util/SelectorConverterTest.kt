@@ -2,11 +2,13 @@ package com.tellraw.app.util
 
 import com.tellraw.app.TestApplication
 import com.tellraw.app.model.SelectorType
+import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.RuntimeEnvironment
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 
@@ -18,10 +20,16 @@ import androidx.test.core.app.ApplicationProvider
 @Config(
     sdk = [28],
     application = TestApplication::class,
-    packageName = "com.tellraw.app"
+    packageName = "com.tellraw.app",
+    manifest = "app/src/main/AndroidManifest.xml"
 )
 class SelectorConverterTest {
-    private val context: Context = ApplicationProvider.getApplicationContext<TestApplication>()
+    private lateinit var context: Context
+    
+    @Before
+    fun setup() {
+        context = RuntimeEnvironment.getApplication() as TestApplication
+    }
     
     /**
      * 测试组1：通用选择器参数（8~9个参数）
