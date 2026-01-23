@@ -135,6 +135,10 @@
     <string name="append_to_file">附加到檔案</string>
     <string name="file_exists_message">檔案 &quot;%s&quot; 已存在。\n\n是否附加歷史記錄？\n\n選擇&quot;否&quot;需自訂新檔名。</string>
     <string name="create_file_failed">建立失敗</string>
+    <string name="create_file_failed_permission">建立失敗：請授予所有檔案存取權限</string>
+    <string name="create_file_failed_directory_not_supported">建立失敗：選擇的目錄不支援建立檔案，請選擇其他目錄</string>
+    <string name="create_file_failed_invalid_uri">建立失敗：無效的目錄路徑，請透過系統檔案管理器選擇目錄</string>
+    <string name="grant_all_files_access">授予權限</string>
     <string name="append_file_failed">附加失敗</string>
     <string name="write_success">成功寫入 %d 筆記錄</string>
     <string name="append_success">成功附加 %d 筆記錄</string>

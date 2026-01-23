@@ -132,6 +132,10 @@
     <string name="append_to_file">Append to file</string>
     <string name="file_exists_message">File "%s" already exists.\n\nAppend history to this file?\n\nChoose "No" to enter a new file name.</string>
     <string name="create_file_failed">Failed to create file</string>
+    <string name="create_file_failed_permission">Failed to create: Please grant all files access permission</string>
+    <string name="create_file_failed_directory_not_supported">Failed to create: The selected directory does not support file creation, please select another directory</string>
+    <string name="create_file_failed_invalid_uri">Failed to create: Invalid directory path, please select directory through system file manager</string>
+    <string name="grant_all_files_access">Grant permission</string>
     <string name="append_file_failed">Failed to append</string>
     <string name="write_success">Wrote %d records</string>
     <string name="append_success">Appended %d records</string>
