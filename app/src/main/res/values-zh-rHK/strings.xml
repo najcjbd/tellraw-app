@@ -159,7 +159,7 @@
     <string name="note_java_unsupported_params">注意：Java版不支援以下參數，已移除: %s</string>
     <string name="note_java_specific">注意：%s</string>
     <string name="note_bedrock_unsupported_params">注意：基岩版不支援以下參數，已移除: %s</string>
-    <string name="note_bedrock_selector_converted">注意：基岩版選擇器 %s 在Java版不支援，已轉換為 %s</string>
+    <string name="note_bedrock_selector_converted" formatted="false">注意：基岩版選擇器 %s 在Java版不支援，已轉換為 %s</string>
     <string name="command_generation_error">指令生成錯誤</string>
     <string name="command_generation_error_with_message">指令生成錯誤: %s</string>
     <string name="share_tellraw_command">分享Tellraw指令</string>
@@ -191,19 +191,19 @@
     <string name="java_predicate_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無謂詞系統</string>
     <string name="java_advancements_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無進度系統</string>
     <string name="java_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除</string>
-    <string name="java_distance_converted">Java版distance=%s已轉換為基岩版rm=%s,r=%s</string>
+    <string name="java_distance_converted" formatted="false">Java版distance=%s已轉換為基岩版rm=%s,r=%s</string>
     <string name="java_distance_to_rm">Java版distance=%s已轉換為基岩版rm=%s</string>
     <string name="java_distance_to_r">Java版distance=%s已轉換為基岩版r=%s</string>
     <string name="java_distance_exact">Java版distance=%s已轉換為基岩版rm=%s,r=%s</string>
-    <string name="java_x_rotation_converted">Java版x_rotation=%s已轉換為基岩版rxm=%s,rx=%s</string>
+    <string name="java_x_rotation_converted" formatted="false">Java版x_rotation=%s已轉換為基岩版rxm=%s,rx=%s</string>
     <string name="java_x_rotation_to_rxm">Java版x_rotation=%s已轉換為基岩版rxm=%s</string>
     <string name="java_x_rotation_to_rx">Java版x_rotation=%s已轉換為基岩版rx=%s</string>
     <string name="java_x_rotation_exact">Java版x_rotation=%s已轉換為基岩版rxm=%s,rx=%s</string>
-    <string name="java_y_rotation_converted">Java版y_rotation=%s已轉換為基岩版rym=%s,ry=%s</string>
+    <string name="java_y_rotation_converted" formatted="false">Java版y_rotation=%s已轉換為基岩版rym=%s,ry=%s</string>
     <string name="java_y_rotation_to_rym">Java版y_rotation=%s已轉換為基岩版rym=%s</string>
     <string name="java_y_rotation_to_ry">Java版y_rotation=%s已轉換為基岩版ry=%s</string>
     <string name="java_y_rotation_exact">Java版y_rotation=%s已轉換為基岩版rym=%s,ry=%s</string>
-    <string name="java_level_converted">Java版level=%s已轉換為基岩版lm=%s,l=%s</string>
+    <string name="java_level_converted" formatted="false">Java版level=%s已轉換為基岩版lm=%s,l=%s</string>
     <string name="java_level_to_lm">Java版level=%s已轉換為基岩版lm=%s</string>
     <string name="java_level_to_l">Java版level=%s已轉換為基岩版l=%s</string>
     <string name="java_level_exact">Java版level=%s已轉換為基岩版lm=%s,l=%s</string>
@@ -214,21 +214,21 @@
     <string name="bedrock_rm_converted">基岩版rm=%s已轉換為Java版distance=%s</string>
     <string name="bedrock_r_converted">基岩版r=%s已轉換為Java版distance=%s</string>
     <string name="java_distance_to_bedrock">Java版distance=%s已轉換為基岩版%s</string>
-    <string name="bedrock_rotation_converted">基岩版%s=%s,%s=%s已轉換為Java版%s=%s</string>
-    <string name="bedrock_rotation_min_converted">基岩版%s=%s已轉換為Java版%s=%s</string>
-    <string name="bedrock_rotation_max_converted">基岩版%s=%s已轉換為Java版%s=%s</string>
-    <string name="java_rotation_converted">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s,%5$s=%6$s</string>
-    <string name="java_rotation_to_min">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s</string>
-    <string name="java_rotation_to_max">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s</string>
-    <string name="bedrock_lm_l_converted">基岩版lm=%s,l=%s已轉換為Java版level=%s</string>
+    <string name="bedrock_rotation_converted" formatted="false">基岩版%s=%s,%s=%s已轉換為Java版%s=%s</string>
+    <string name="bedrock_rotation_min_converted" formatted="false">基岩版%s=%s已轉換為Java版%s=%s</string>
+    <string name="bedrock_rotation_max_converted" formatted="false">基岩版%s=%s已轉換為Java版%s=%s</string>
+    <string name="java_rotation_converted" formatted="false">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s,%5$s=%6$s</string>
+    <string name="java_rotation_to_min" formatted="false">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s</string>
+    <string name="java_rotation_to_max" formatted="false">Java版%1$s=%2$s已轉換為基岩版%3$s=%4$s</string>
+    <string name="bedrock_lm_l_converted" formatted="false">基岩版lm=%s,l=%s已轉換為Java版level=%s</string>
     <string name="bedrock_lm_converted">基岩版lm=%s已轉換為Java版level=%s</string>
     <string name="bedrock_l_converted">基岩版l=%s已轉換為Java版level=%s</string>
     <string name="java_level_to_bedrock">Java版level=%s已轉換為基岩版%s</string>
     <string name="bedrock_negation_default_converted">基岩版反選預設模式(m=!)在Java版不支援，已轉換為反選生存模式</string>
     <string name="bedrock_default_converted">基岩版預設模式(m=%s)在Java版不支援，已轉換為生存模式</string>
     <string name="java_level_in_scores_converted">Java版level=%s已轉換為基岩版lm=%s,l=%s</string>
-    <string name="bedrock_c_negative_converted">基岩版c=%s已轉換為Java版limit=%s,sort=furthest</string>
-    <string name="bedrock_c_converted">基岩版c=%s已轉換為Java版limit=%s,sort=nearest</string>
+    <string name="bedrock_c_negative_converted" formatted="false">基岩版c=%s已轉換為Java版limit=%s,sort=furthest</string>
+    <string name="bedrock_c_converted" formatted="false">基岩版c=%s已轉換為Java版limit=%s,sort=nearest</string>
     <string name="hasitem_converted">hasitem已轉換為nbt格式，可能無法完全保留原意</string>
     <string name="hasitem_count_note">注意：Java版NBT不需要Count值，hasitem的quantity參數未轉換</string>
     <string name="hasitem_conversion_failed">hasitem轉換失敗，保留原參數</string>

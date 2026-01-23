@@ -642,7 +642,7 @@ class TellrawViewModel @Inject constructor(
                 action = Intent.ACTION_SEND
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, command)
-                putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_subject))
+                putExtra(Intent.EXTRA_SUBJECT, ctx.getString(R.string.share_subject))
             }
             ctx.startActivity(Intent.createChooser(shareIntent, ctx.getString(R.string.share_tellraw_command)))
         }
