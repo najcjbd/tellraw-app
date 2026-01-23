@@ -192,6 +192,16 @@ class TellrawViewModel @Inject constructor(
     // 后台存储的消息（混合模式下转换为§m_f/§m_c/§n_f/§n_c）
     private var backendMessageContent = ""
     
+    // frontendMessage中§m/§n的位置映射（混合模式下使用）
+    // 记录每个§m/§n在frontendMessage中的位置和对应的backendMessage中的位置和类型
+    private data class MNMapping(
+        val frontendPos: Int,          // 在frontendMessage中的位置
+        val backendPos: Int,           // 在backendMessage中的位置
+        val type: String,              // "m" 或 "n"
+        val mode: String               // "f" (font) 或 "c" (color)
+    )
+    private var mnMappings = mutableListOf<MNMapping>()
+    
     // 版本检查相关状态
     private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
     val showUpdateDialog: StateFlow<GithubRelease?> = _showUpdateDialog.asStateFlow()
@@ -289,18 +299,75 @@ class TellrawViewModel @Inject constructor(
         } else {
             backendMessageContent = message
         }
+        
+        // 更新计数器为实际数量（修复删除时计数器不准确的问题）
+        _mCodeCount.value = currentMCount
+        _nCodeCount.value = currentNCount
     }
     
     /**
      * 更新后台消息（混合模式下将§m/§n转换为§m_f/§m_c/§n_f/§n_c）
+     * 使用位置映射来保留用户的选择
      */
     private fun updateBackendMessage(frontendMessage: String) {
-        // 将§m/§n转换为§m_f/§m_c/§n_f/§n_c
-        // 这里暂时全部转换为§m_f/§n_f（字体方式），用户选择后会更新
-        var result = frontendMessage
-        result = result.replace("§m", "§m_f")
-        result = result.replace("§n", "§n_f")
-        backendMessageContent = result
+        // 构建新的backendMessage
+        val newBackend = StringBuilder()
+        val newMappings = mutableListOf<MNMapping>()
+        
+        var frontendIndex = 0
+        var backendIndex = 0
+        
+        while (frontendIndex < frontendMessage.length) {
+            // 检查是否是§m或§n
+            if (frontendIndex + 1 < frontendMessage.length && 
+                (frontendMessage[frontendIndex] == '§') &&
+                (frontendMessage[frontendIndex + 1] == 'm' || frontendMessage[frontendIndex + 1] == 'n')) {
+                
+                val code = frontendMessage.substring(frontendIndex, frontendIndex + 2)
+                val type = if (code == "§m") "m" else "n"
+                
+                // 检查是否在旧映射中存在
+                val oldMapping = mnMappings.find { it.frontendPos == frontendIndex }
+                
+                if (oldMapping != null) {
+                    // 保留旧的选择
+                    val backendCode = if (oldMapping.type == "m") {
+                        "§m_${oldMapping.mode}"
+                    } else {
+                        "§n_${oldMapping.mode}"
+                    }
+                    newBackend.append(backendCode)
+                    newMappings.add(MNMapping(
+                        frontendPos = frontendIndex,
+                        backendPos = backendIndex,
+                        type = type,
+                        mode = oldMapping.mode
+                    ))
+                    backendIndex += 4
+                } else {
+                    // 新增的§m/§n，默认使用字体方式
+                    val backendCode = if (type == "m") "§m_f" else "§n_f"
+                    newBackend.append(backendCode)
+                    newMappings.add(MNMapping(
+                        frontendPos = frontendIndex,
+                        backendPos = backendIndex,
+                        type = type,
+                        mode = "f"
+                    ))
+                    backendIndex += 4
+                }
+                
+                frontendIndex += 2
+            } else {
+                // 普通字符
+                newBackend.append(frontendMessage[frontendIndex])
+                frontendIndex++
+                backendIndex++
+            }
+        }
+        
+        backendMessageContent = newBackend.toString()
+        mnMappings = newMappings
     }
     
     /**
@@ -310,8 +377,7 @@ class TellrawViewModel @Inject constructor(
      */
     fun handleMixedModeChoice(codeType: String, choice: String) {
         if (_mnMixedMode.value) {
-            // 找到第一个未选择的§m_f/§n_f并更新
-            val targetCode = if (codeType == "§m") "§m_f" else "§n_f"
+            val type = if (codeType == "§m") "m" else "n"
             
             if (choice == "font") {
                 // 方式一：Java版用字体模式（§m_f/§n_f），基岩版用颜色模式（§m/§n）
@@ -320,12 +386,17 @@ class TellrawViewModel @Inject constructor(
                 return
             } else if (choice == "color") {
                 // 方式二：两版都用颜色模式（§m_c/§n_c）
-                val replacementCode = if (codeType == "§m") "§m_c" else "§n_c"
-                
-                // 找到第一个§m_f/§n_f并替换为§m_c/§n_c
-                val index = backendMessageContent.indexOf(targetCode)
-                if (index != -1) {
-                    backendMessageContent = backendMessageContent.substring(0, index) + replacementCode + backendMessageContent.substring(index + 4)
+                // 找到第一个mode为"f"的映射并更新
+                val mappingIndex = mnMappings.indexOfFirst { it.type == type && it.mode == "f" }
+                if (mappingIndex != -1) {
+                    val mapping = mnMappings[mappingIndex]
+                    // 更新映射表
+                    mnMappings[mappingIndex] = mapping.copy(mode = "c")
+                    // 更新backendMessageContent
+                    val backendCode = if (type == "m") "§m_c" else "§n_c"
+                    backendMessageContent = backendMessageContent.substring(0, mapping.backendPos) + 
+                                             backendCode + 
+                                             backendMessageContent.substring(mapping.backendPos + 4)
                 }
             }
         }
@@ -679,6 +750,10 @@ class TellrawViewModel @Inject constructor(
         _nCodeCount.value = 0
         lastMessageContent = ""
         
+        // 重置后台消息和映射表
+        backendMessageContent = ""
+        mnMappings.clear()
+        
         // 重置对话框状态
         _showMNDialog.value = null
     }
@@ -733,6 +808,16 @@ class TellrawViewModel @Inject constructor(
         _mCodeCount.value = 0
         _nCodeCount.value = 0
         lastMessageContent = history.message
+        
+        // 在混合模式下，重新构建映射表
+        if (_mnMixedMode.value) {
+            backendMessageContent = ""
+            mnMappings.clear()
+            updateBackendMessage(history.message)
+        } else {
+            backendMessageContent = history.message
+            mnMappings.clear()
+        }
         
         // 重置对话框状态
         _showMNDialog.value = null
@@ -945,6 +1030,14 @@ class TellrawViewModel @Inject constructor(
                 }
                 
                 val uri = Uri.parse(uriString)
+                
+                // 验证 URI 格式，必须是 SAF 支持的 content:// 格式
+                if (!"content".equals(uri.scheme, ignoreCase = true)) {
+                    _writeFileMessage.value = context.getString(R.string.create_file_failed_invalid_uri)
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
                 val contentResolver = context.contentResolver
                 
                 // 检查文件是否存在
@@ -961,7 +1054,15 @@ class TellrawViewModel @Inject constructor(
                 val fileUri = createFileInDirectory(contentResolver, uri, filename)
                 
                 if (fileUri == null) {
-                    _writeFileMessage.value = context.getString(R.string.create_file_failed)
+                    // 检查是否是目录不支持创建文件
+                    val directoryFlags = getDirectoryFlags(contentResolver, uri)
+                    val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE) != 0L
+                    
+                    if (!canCreate) {
+                        _writeFileMessage.value = context.getString(R.string.create_file_failed_directory_not_supported)
+                    } else {
+                        _writeFileMessage.value = context.getString(R.string.create_file_failed)
+                    }
                     _isWritingToFile.value = false
                     return@launch
                 }
@@ -975,6 +1076,13 @@ class TellrawViewModel @Inject constructor(
                 }
                 
                 _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+            } catch (e: SecurityException) {
+                // 权限问题，提示用户授予所有文件访问权限
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    _writeFileMessage.value = context.getString(R.string.create_file_failed_permission)
+                } else {
+                    _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
+                }
             } catch (e: Exception) {
                 _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {
@@ -1145,7 +1253,19 @@ class TellrawViewModel @Inject constructor(
             // 检查目录URI是否有效
             val docId = DocumentsContract.getDocumentId(directoryUri)
             if (docId.isNullOrEmpty()) {
-                android.util.Log.e("TellrawViewModel", "Invalid directory URI")
+                android.util.Log.e("TellrawViewModel", "Invalid directory URI: $directoryUri")
+                return null
+            }
+
+            android.util.Log.d("TellrawViewModel", "Creating file: $filename in directory: $directoryUri")
+
+            // 检查目录是否支持创建文件
+            val directoryFlags = getDirectoryFlags(contentResolver, directoryUri)
+            val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE) != 0L
+            
+            if (!canCreate) {
+                android.util.Log.e("TellrawViewModel", "Directory does not support creating files")
+                android.util.Log.e("TellrawViewModel", "Directory flags: $directoryFlags")
                 return null
             }
 
@@ -1159,18 +1279,77 @@ class TellrawViewModel @Inject constructor(
             
             if (fileUri == null) {
                 android.util.Log.e("TellrawViewModel", "Failed to create document: $filename")
+                android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
+                android.util.Log.e("TellrawViewModel", "Document ID: $docId")
+                android.util.Log.e("TellrawViewModel", "Directory flags: $directoryFlags")
+                
+                // 尝试检查目录是否可写
+                try {
+                    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                        directoryUri,
+                        docId
+                    )
+                    android.util.Log.d("TellrawViewModel", "Children URI: $childrenUri")
+                    
+                    val projection = arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_FLAGS
+                    )
+                    
+                    contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                        android.util.Log.d("TellrawViewModel", "Directory query returned ${cursor.count} items")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("TellrawViewModel", "Failed to query directory: ${e.message}")
+                }
+            } else {
+                android.util.Log.d("TellrawViewModel", "Successfully created file: $fileUri")
             }
             
             fileUri
         } catch (e: SecurityException) {
             android.util.Log.e("TellrawViewModel", "SecurityException when creating file: ${e.message}")
+            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
+            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
             null
         } catch (e: IllegalArgumentException) {
             android.util.Log.e("TellrawViewModel", "IllegalArgumentException when creating file: ${e.message}")
+            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
+            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
             null
         } catch (e: Exception) {
-            android.util.Log.e("TellrawViewModel", "Exception when creating file: ${e.message}", e)
+            android.util.Log.e("TellrawViewModel", "Exception when creating file: ${e.message}")
+            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
+            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
             null
+        }
+    }
+
+    /**
+     * 获取目录的 flags
+     */
+    private suspend fun getDirectoryFlags(contentResolver: ContentResolver, directoryUri: Uri): Long {
+        return try {
+            val docId = DocumentsContract.getDocumentId(directoryUri)
+            if (docId.isNullOrEmpty()) {
+                return 0L
+            }
+            
+            val documentUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
+            val projection = arrayOf(DocumentsContract.Document.COLUMN_FLAGS)
+            
+            contentResolver.query(documentUri, projection, null, null, null)?.use { cursor ->
+                val flagsIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_FLAGS)
+                if (flagsIndex != -1 && cursor.moveToFirst()) {
+                    cursor.getLong(flagsIndex)
+                } else {
+                    0L
+                }
+            } ?: 0L
+        } catch (e: Exception) {
+            android.util.Log.e("TellrawViewModel", "Failed to get directory flags: ${e.message}")
+            0L
         }
     }
     

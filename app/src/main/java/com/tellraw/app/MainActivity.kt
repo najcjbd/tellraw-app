@@ -97,6 +97,39 @@ class MainActivity : ComponentActivity() {
             requestStoragePermission()
         }
     }
+
+    /**
+     * 检查是否有所有文件访问权限（MANAGE_EXTERNAL_STORAGE）
+     */
+    fun hasAllFilesAccessPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            false
+        }
+    }
+
+    /**
+     * 请求所有文件访问权限（跳转到系统设置）
+     */
+    fun requestAllFilesAccessPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } catch (e: Exception) {
+                // 某些设备可能不支持这个 Intent，尝试通用设置
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            }
+        }
+    }
     
     /**
      * 检查是否有存储权限

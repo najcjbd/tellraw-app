@@ -33,10 +33,7 @@
     <!-- Warnings and Tips -->
     <string name="conversion_warnings">Warnings</string>
     <string name="mn_code_detected">§m§n code found</string>
-    <string name="mn_code_dialog_message">§m§n code found. Choose how to use it:
-
-1. Java: font style, Bedrock: color codes
-2. Both: color codes</string>
+    <string name="mn_code_dialog_message">§m§n code found. Choose how to use it:\n\n1. Java: font style, Bedrock: color codes\n2. Both: color codes</string>
     <string name="mn_code_option_1">Option 1</string>
     <string name="mn_code_option_2">Option 2</string>
     
@@ -83,57 +80,17 @@
     <!-- Help Interface -->
     <string name="help_title">Help</string>
     <string name="help_about">About</string>
-    <string name="help_about_content">Tellraw Generator helps create tellraw commands.
-
-Supports Java and Bedrock selector conversion and text formatting.</string>
+    <string name="help_about_content">Tellraw Generator helps create tellraw commands.\n\nSupports Java and Bedrock selector conversion and text formatting.</string>
     <string name="help_selector_input">Selectors</string>
-    <string name="help_selector_content">Selectors pick targets:
-
-• @a - All players
-• @p - Nearest player
-• @r - Random player
-• @e - All entities
-• @s - Command sender
-
-Use filters like:
-• @a[gamemode=survival] - All survival players
-• @e[type=cow] - All cows
-• @p[distance=..10] - Nearest player in 10 blocks</string>
+    <string name="help_selector_content">Selectors pick targets:\n\n• @a - All players\n• @p - Nearest player\n• @r - Random player\n• @e - All entities\n• @s - Command sender\n\nUse filters like:\n• @a[gamemode=survival] - All survival players\n• @e[type=cow] - All cows\n• @p[distance=..10] - Nearest player in 10 blocks</string>
     <string name="help_text_formatting">Text Colors</string>
-    <string name="help_text_formatting_content">Use Minecraft color and format codes:
-
-Colors:
-• §0 Black    §1 Dark Blue   §2 Dark Green
-• §3 Dark Aqua §4 Dark Red    §5 Dark Purple
-• §6 Gold     §7 Gray        §8 Dark Gray
-• §9 Blue     §a Green       §b Aqua
-• §c Red      §d Light Purple §e Yellow
-• §f White
-
-Formats:
-• §l Bold     §m Strike      §n Underline
-• §o Italic   §k Random      §r Reset</string>
+    <string name="help_text_formatting_content">Use Minecraft color and format codes:\n\nColors:\n• §0 Black    §1 Dark Blue   §2 Dark Green\n• §3 Dark Aqua §4 Dark Red    §5 Dark Purple\n• §6 Gold     §7 Gray        §8 Dark Gray\n• §9 Blue     §a Green       §b Aqua\n• §c Red      §d Light Purple §e Yellow\n• §f White\n\nFormats:\n• §l Bold     §m Strike      §n Underline\n• §o Italic   §k Random      §r Reset</string>
     <string name="help_mixed_mode">Mixed Mode</string>
     <string name="help_mixed_mode_content">Mixed mode allows choosing how to handle each §m/§n code individually:\n\nOption 1 (Recommended):\n• Java: Use font style (strikethrough/underline)\n• Bedrock: Use color codes (dark red/red)\n\nOption 2:\n• Java: Use color codes (dark red/red)\n• Bedrock: Use color codes (dark red/red)\n\nNote: In mixed mode, the input shows original §m/§n codes, and the backend automatically converts them to §m_f/§n_f (font style) or §m_c/§n_c (color style).</string>
     <string name="help_version_differences">Version Differences</string>
-    <string name="help_version_differences_content">Java and Bedrock use different selectors:
-
-• Java: distance, Bedrock: r/rm
-• Java: gamemode, Bedrock: m
-• Java: nbt, Bedrock: hasitem
-
-Text formats:
-• §m§n codes work differently
-• Some colors mean different things in Bedrock</string>
+    <string name="help_version_differences_content">Java and Bedrock use different selectors:\n\n• Java: distance, Bedrock: r/rm\n• Java: gamemode, Bedrock: m\n• Java: nbt, Bedrock: hasitem\n\nText formats:\n• §m§n codes work differently\n• Some colors mean different things in Bedrock</string>
     <string name="help_usage_tips">How to Use</string>
-    <string name="help_usage_tips_content">1. Enter selector and message
-2. Auto-detects selector type
-3. Generate Java and Bedrock commands
-4. Copy or share commands
-
-For §m§n codes:
-• Font style: Java keeps format, Bedrock uses colors
-• Color style: Both use colors</string>
+    <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
     <string name="help_conversion_warning">Check converted commands manually.</string>
     
     <!-- Common -->
@@ -173,11 +130,7 @@ For §m§n codes:
     <string name="use_existing_file">Use this file</string>
     <string name="customize_filename">Choose new name</string>
     <string name="append_to_file">Append to file</string>
-    <string name="file_exists_message">File "%s" already exists.
-
-Append history to this file?
-
-Choose "No" to enter a new file name.</string>
+    <string name="file_exists_message">File "%s" already exists.\n\nAppend history to this file?\n\nChoose "No" to enter a new file name.</string>
     <string name="create_file_failed">Failed to create file</string>
     <string name="append_file_failed">Failed to append</string>
     <string name="write_success">Wrote %d records</string>
@@ -284,18 +237,9 @@ Choose "No" to enter a new file name.</string>
     
     <!-- Code Dialog -->
     <string name="detected_code">%s code found</string>
-    <string name="code_dialog_message">%s code found. Choose how to handle:
-
-1. Font style
-2. Color style</string>
-    <string name="code_dialog_message_mixed">%s code found. Choose how to handle:
-
-1. Font style
-2. Color style</string>
-    <string name="code_dialog_message_full">%s code found. Choose how to handle:
-
-1. Java: font style, Bedrock: color codes
-2. Both: color codes</string>
+    <string name="code_dialog_message">%s code found. Choose how to handle:\n\n1. Font style\n2. Color style</string>
+    <string name="code_dialog_message_mixed">%s code found. Choose how to handle:\n\n1. Font style\n2. Color style</string>
+    <string name="code_dialog_message_full">%s code found. Choose how to handle:\n\n1. Java: font style, Bedrock: color codes\n2. Both: color codes</string>
     <string name="code_option_1">Option 1</string>
     <string name="code_option_2">Option 2</string>
     
@@ -314,9 +258,7 @@ Choose "No" to enter a new file name.</string>
     
     <!-- Disable Check Dialog -->
     <string name="disable_version_check">Disable version check</string>
-    <string name="disable_version_check_message">Disable version check?
-
-Will not auto-check for updates. Re-enable in settings.</string>
+    <string name="disable_version_check_message">Disable version check?\n\nWill not auto-check for updates. Re-enable in settings.</string>
     
     <!-- Color Code Names -->
     <string name="color_code_black">Black</string>

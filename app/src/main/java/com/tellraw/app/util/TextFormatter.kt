@@ -400,21 +400,29 @@ object TextFormatter {
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
-        // 将§m_f/§m_c/§n_f/§n_c统一缩写为§m/§n
-        processedText = processedText.replace("§m_f", "§m")
-        processedText = processedText.replace("§m_c", "§m")
-        processedText = processedText.replace("§n_f", "§n")
-        processedText = processedText.replace("§n_c", "§n")
-        
-        // 如果启用了§m/§n_c/f，普通的§m/§n被视为无效字符（像§&一样），需要移除
-        if (mnCFEnabled) {
-            processedText = processedText.replace("§m", "")
-            processedText = processedText.replace("§n", "")
-        }
-        // 否则，保留§m/§n作为基岩版特有颜色代码
         // §m -> material_redstone (深红色)
         // §n -> material_copper (铜色)
-        // 注意：基岩版中§m和§n是有效的颜色代码，不需要转换
+        if (mnCFEnabled) {
+            // 在§m/§n_c/f模式下，将§m_f/§m_c统一转换为§m（material_redstone）
+            processedText = processedText.replace("§m_f", "§m")
+            processedText = processedText.replace("§m_c", "§m")
+            // 将§n_f/§n_c统一转换为§n（material_copper）
+            processedText = processedText.replace("§n_f", "§n")
+            processedText = processedText.replace("§n_c", "§n")
+            // 普通的§m/§n被视为无效字符，需要移除
+            processedText = processedText.replace("§m", "")
+            processedText = processedText.replace("§n", "")
+        } else {
+            // 非§m/§n_c/f模式下，将§m_f/§m_c/§n_f/§n_c统一缩写为§m/§n
+            processedText = processedText.replace("§m_f", "§m")
+            processedText = processedText.replace("§m_c", "§m")
+            processedText = processedText.replace("§n_f", "§n")
+            processedText = processedText.replace("§n_c", "§n")
+            // 保留§m/§n作为基岩版特有颜色代码
+            // §m -> material_redstone (深红色)
+            // §n -> material_copper (铜色)
+            // 注意：基岩版中§m和§n是有效的颜色代码，不需要转换
+        }
         
         // 处理其他基岩版特有颜色代码
         val bedrockSpecificCodes = mapOf(

@@ -211,6 +211,9 @@ fun MainScreen(
             onWriteToFile = {
                 viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>())
             },
+            onGrantAllFilesAccess = {
+                activity?.requestAllFilesAccessPermission()
+            },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
         )

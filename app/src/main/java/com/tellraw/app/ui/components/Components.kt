@@ -659,6 +659,7 @@ fun HistoryStorageSettingsDialog(
     onEditFilename: () -> Unit,
     onClearSettings: () -> Unit,
     onWriteToFile: () -> Unit,
+    onGrantAllFilesAccess: () -> Unit = {},
     isWriting: Boolean = false,
     writeMessage: String? = null
 ) {
@@ -774,15 +775,28 @@ fun HistoryStorageSettingsDialog(
                                 MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Text(
-                            text = writeMessage,
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (writeMessage.contains(stringResource(R.string.success)))
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = writeMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (writeMessage.contains(stringResource(R.string.success)))
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            // 如果消息包含"权限"，显示授予权限按钮
+                            if (writeMessage.contains("权限") && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                TextButton(
+                                    onClick = onGrantAllFilesAccess,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(stringResource(R.string.grant_all_files_access))
+                                }
+                            }
+                        }
                     }
                 }
                 
