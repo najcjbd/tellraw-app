@@ -90,10 +90,9 @@ private fun HelpSection(
                 color = MaterialTheme.colorScheme.primary
             )
             
-            // 使用AnnotatedString来处理换行符
-            val annotatedContent = androidx.compose.ui.text.AnnotatedString.Builder(content).toAnnotatedString()
+            // 直接使用Text组件显示内容，Compose会自动处理\n换行符
             Text(
-                text = annotatedContent,
+                text = content,
                 style = MaterialTheme.typography.bodyMedium
             )
         }

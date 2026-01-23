@@ -572,8 +572,8 @@ class TellrawViewModel @Inject constructor(
                     else -> "color"
                 }
                 
-                // 使用统一的命令生成函数
-                val result = generateTellrawCommands(selector, messageToUse, mNHandling, true)
+                // 使用统一的命令生成函数，使用实际的_mnCFEnabled状态值
+                val result = generateTellrawCommands(selector, messageToUse, mNHandling, _mnCFEnabled.value)
                 
                 _javaCommand.value = result.javaCommand
                 _bedrockCommand.value = result.bedrockCommand
@@ -841,7 +841,10 @@ class TellrawViewModel @Inject constructor(
      */
     private suspend fun loadHistoryStorageSettings() {
         _historyStorageUri.value = settingsRepository.getHistoryStorageUri()
-        _historyStorageFilename.value = settingsRepository.getHistoryStorageFilename()
+        // 清理文件名：移除引号和其他非法字符
+        val rawFilename = settingsRepository.getHistoryStorageFilename()
+        val cleanFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+        _historyStorageFilename.value = cleanFilename
     }
     
     /**
@@ -890,8 +893,10 @@ class TellrawViewModel @Inject constructor(
      */
     fun setHistoryStorageFilename(filename: String) {
         viewModelScope.launch {
-            settingsRepository.setHistoryStorageFilename(filename)
-            _historyStorageFilename.value = filename
+            // 清理文件名：移除引号和其他非法字符
+            val cleanFilename = filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+            settingsRepository.setHistoryStorageFilename(cleanFilename)
+            _historyStorageFilename.value = cleanFilename
         }
     }
     
@@ -945,32 +950,31 @@ class TellrawViewModel @Inject constructor(
                 // 检查文件是否存在
                 val existingUri = findFileInDirectory(contentResolver, uri, filename)
                 
+                if (existingUri != null) {
+                    // 文件已存在，弹出对话框让用户选择
+                    _showFileExistsDialog.value = filename
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
+                // 文件不存在，创建新文件
+                val fileUri = createFileInDirectory(contentResolver, uri, filename)
+                
+                if (fileUri == null) {
+                    _writeFileMessage.value = context.getString(R.string.create_file_failed)
+                    _isWritingToFile.value = false
+                    return@launch
+                }
+                
                 // 生成历史记录内容
                 val content = buildHistoryContent(historyList)
                 
-                if (existingUri != null) {
-                    // 文件已存在，直接追加写入
-                    contentResolver.openOutputStream(existingUri, "wa")?.use { outputStream ->
-                        outputStream.write(content.toByteArray())
-                    }
-                    _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
-                } else {
-                    // 文件不存在，创建新文件
-                    val fileUri = createFileInDirectory(contentResolver, uri, filename)
-                    
-                    if (fileUri == null) {
-                        _writeFileMessage.value = context.getString(R.string.create_file_failed)
-                        _isWritingToFile.value = false
-                        return@launch
-                    }
-                    
-                    // 写入文件
-                    contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
-                        outputStream.write(content.toByteArray())
-                    }
-                    
-                    _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+                // 写入文件
+                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
+                    outputStream.write(content.toByteArray())
                 }
+                
+                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
             } catch (e: Exception) {
                 _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {

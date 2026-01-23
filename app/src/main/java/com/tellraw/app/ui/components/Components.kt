@@ -857,7 +857,8 @@ fun FilenameInputDialog(
                     val finalFilename = if (filename.isBlank()) {
                         "TellrawCommand.txt"
                     } else {
-                        filename.trim()
+                        // 清理文件名：移除引号和其他非法字符
+                        filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
                     }
                     onConfirm(finalFilename)
                 }

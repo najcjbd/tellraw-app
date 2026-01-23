@@ -27,6 +27,7 @@ This is an Android app that converts the Python version of tellraw.py. It has al
 - **📚 History**: Save and manage command history
 - **🎨 Quick Color Input**: Built-in color code picker
 - **📱 Responsive Design**: Works on different screen sizes
+- **💾 File Export**: Export history to custom location (SAF) or app sandbox
 
 ## 🏗️ Tech Stack
 
@@ -39,6 +40,46 @@ This is an Android app that converts the Python version of tellraw.py. It has al
 - **JSON**: Gson
 - **Build**: Gradle 8.1.2
 
+### Project Architecture
+```
+📱 Android App
+├── 🎯 UI Layer (Jetpack Compose)
+│   ├── 📱 MainScreen (Main Screen)
+│   ├── 📱 HelpScreen (Help Page)
+│   └── 🎨 Components (UI Components)
+│       ├── 🔔 UpdateDialog (Update Notification)
+│       ├── 📋 CommandResults (Command Display)
+│       ├── 🎨 ColorCodeQuickInput (Color Code Input)
+│       ├── 📱 MNCodeDialog (§m§n Code Handling)
+│       ├── 📁 HistoryStorageSettingsDialog (History Storage Settings)
+│       └── 📝 FilenameInputDialog (Filename Input)
+│
+├── 🧠 ViewModel Layer (MVVM)
+│   └── 📱 TellrawViewModel (Main Business Logic)
+│       ├── 🔄 Command Generation Logic
+│       ├── 📋 Copy & Share Functionality
+│       ├── 🔄 Version Check Management
+│       └── 💾 History Management
+│
+├── 📊 Repository Layer (Data Repository)
+│   ├── 📱 TellrawRepository (Command Data)
+│   ├── 🔄 VersionCheckRepository (Version Check)
+│   └── ⚙️ SettingsRepository (Settings Management)
+│
+├── 🌐 Remote Layer (Network Layer)
+│   ├── 📡 ApiService (Custom API)
+│   └── 🐙 GithubApiService (GitHub API)
+│
+├── 💾 Local Layer (Local Storage)
+│   └── 🗄️ AppDatabase (Room Database)
+│       └── 📝 CommandHistory (History Records)
+│
+└── ⚙️ Util Layer (Utility Classes)
+    ├── 🔄 TextFormatter (Text Formatting)
+    ├── 🔄 SelectorConverter (Selector Conversion)
+    └── 🎨 Components (UI Component Utilities)
+```
+
 ## 🔄 Version Check
 
 The app checks GitHub for new releases on startup:
@@ -48,6 +89,12 @@ The app checks GitHub for new releases on startup:
 3. **💾 Local Storage**: Save settings locally
 4. **🌐 Error Handling**: Handle network errors
 5. **🚫 User Control**: Can disable version check
+
+### Configuration Management
+- **✅ Enable/Disable**: Users can enable or disable version check anytime
+- **💾 Local Storage**: Configuration saved in SharedPreferences and JSON file
+- **📝 Version Record**: Record current version and last check time
+- **⏰ Interval Control**: Default 24-hour check interval
 
 ## 🎯 Core Features
 
@@ -81,7 +128,13 @@ TEXT_COLOR_CODES = mapOf(
     "§i" to "§7",  // material_iron -> gray
     "§j" to "§8",  // material_netherite -> dark gray
     "§m" to "§4",  // material_redstone -> dark red (special)
-    "§n" to "§6",  // material_copper -> gold (special)
+    "§n" to "§c",  // material_copper -> red (special)
+    "§p" to "§6",  // material_gold -> gold
+    "§q" to "§a",  // material_emerald -> green
+    "§s" to "§b",  // material_diamond -> aqua
+    "§t" to "§1",  // material_lapis -> dark blue
+    "§u" to "§d",  // material_amethyst -> light purple
+    "§v" to "§6",  // material_resin -> gold
     // ... more color codes
 )
 ```
@@ -95,10 +148,49 @@ TEXT_COLOR_CODES = mapOf(
 - **§r**: Reset
 
 ### §m§n Code Handling
-Handle §m§n codes like Python version:
-- Detect §m§n codes in text
-- Offer two handling options
-- Java font style vs color style
+Three handling modes for §m§n codes:
+
+#### Mode 1: Font Style (Default)
+- **Java Edition**: Use font formatting codes (strikethrough/underline)
+- **Bedrock Edition**: Use color codes (dark red/red)
+- **Use Case**: Java needs font effects, Bedrock compatibility
+
+#### Mode 2: Color Code Style
+- **Java Edition**: Use color codes (dark red/red)
+- **Bedrock Edition**: Use color codes (dark red/red)
+- **Use Case**: Both versions need color effects
+
+#### Mode 3: §m/§n_c/f Mode
+- **Format**: §m_f (font), §m_c (color), §n_f (font), §n_c (color)
+- **Feature**: Specify handling method for each §m/§n code individually
+- **Use Case**: Fine-grained control over each code's handling
+
+### Mixed Mode
+Mixed mode allows selecting handling method for each §m/§n code:
+- Input box displays original §m/§n codes
+- Backend automatically converts to §m_f/§m_c/§n_f/§n_c
+- Dialog pops up for each §m/§n input to select handling method
+
+## 📚 History Management
+
+### Local Storage
+- Use Room database to store command history
+- Support search, load, delete history records
+- Auto-save each generated command
+
+### File Export
+- **SAF Support**: Support selecting export location through Storage Access Framework (SAF)
+- **Sandbox Storage**: Default save to app sandbox if no location selected
+- **File Handling**:
+  - Auto-create if file doesn't exist
+  - Prompt user to choose if file exists (append or customize filename)
+  - Support custom filename (default: TellrawCommand.txt)
+- **Format Standard**: Use txt text format, includes commands, time, etc.
+
+### Storage Location
+- **Select Directory**: Users can select any accessible directory through SAF
+- **App Sandbox**: Default save to `Android/data/[package]/files/` directory
+- **Configuration Persistence**: Storage settings saved locally, auto-load on next startup
 
 ## 🛠️ Build
 
@@ -145,6 +237,28 @@ The app integrates MTDataFilesProvider, allowing MT Manager to access app privat
 5. Click "Select" to access the app private directory
 
 **Note**: File provider is only injected in debug version. To inject in release version, change `debugImplementation` to `implementation` in `app/build.gradle`.
+
+### Cloud Build Configuration
+Project supports GitHub Actions cloud build:
+
+```yaml
+name: Android CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew test
+```
 
 ## 🧪 Test
 

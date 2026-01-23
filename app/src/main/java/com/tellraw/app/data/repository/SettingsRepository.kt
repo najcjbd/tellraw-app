@@ -247,7 +247,9 @@ class SettingsRepository @Inject constructor(
             val mnMixedMode = extractJsonValue(jsonString, "mn_mixed_mode") == "true"
             val mnCfEnabled = extractJsonValue(jsonString, "mn_cf_enabled") == "true"
             val historyStorageUri = extractJsonValue(jsonString, "history_storage_uri") ?: ""
-            val historyStorageFilename = extractJsonValue(jsonString, "history_storage_filename") ?: "TellrawCommand.txt"
+            val rawFilename = extractJsonValue(jsonString, "history_storage_filename") ?: "TellrawCommand.txt"
+            // 清理文件名：移除引号和其他非法字符
+            val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
             
             // 保存配置
             appSettingsDao.insert(AppSettings(KEY_MN_HANDLING_MODE, mnHandlingMode))
@@ -266,7 +268,7 @@ class SettingsRepository @Inject constructor(
      * 从 JSON 字符串中提取值
      */
     private fun extractJsonValue(jsonString: String, key: String): String? {
-        val pattern = "\"$key\"\\s*:\\s*\"?([^,}\\n]+)\"?".toRegex()
+        val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\"".toRegex()
         val match = pattern.find(jsonString)
         return match?.groupValues?.get(1)?.trim()
     }
