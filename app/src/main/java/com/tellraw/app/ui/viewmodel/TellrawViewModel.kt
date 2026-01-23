@@ -1056,7 +1056,7 @@ class TellrawViewModel @Inject constructor(
                 if (fileUri == null) {
                     // 检查是否是目录不支持创建文件
                     val directoryFlags = getDirectoryFlags(contentResolver, uri)
-                    val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE) != 0L
+                    val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE.toLong()) != 0L
                     
                     if (!canCreate) {
                         _writeFileMessage.value = context.getString(R.string.create_file_failed_directory_not_supported)
@@ -1261,7 +1261,7 @@ class TellrawViewModel @Inject constructor(
 
             // 检查目录是否支持创建文件
             val directoryFlags = getDirectoryFlags(contentResolver, directoryUri)
-            val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE) != 0L
+            val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE.toLong()) != 0L
             
             if (!canCreate) {
                 android.util.Log.e("TellrawViewModel", "Directory does not support creating files")
