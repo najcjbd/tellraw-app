@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tellraw.app.MainActivity
 import com.tellraw.app.R
 import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.repository.HistoryRepository
@@ -1052,39 +1053,6 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 追加写入到已存在的文件
-     */
-    fun appendToExistingFile(context: Context, historyList: List<HistoryItem>) {
-        viewModelScope.launch {
-            _isWritingToFile.value = true
-            _writeFileMessage.value = null
-            
-            try {
-                val storagePath = settingsRepository.getHistoryStorageUri()
-                val filename = settingsRepository.getHistoryStorageFilename()
-                
-                if (storagePath == null) {
-                    writeToFileInSandbox(context, filename, historyList)
-                    return@launch
-                }
-                
-                val file = java.io.File(storagePath, filename)
-                if (file.exists()) {
-                    appendToFile(file, historyList)
-                    _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
-                } else {
-                    _writeFileMessage.value = context.getString(R.string.file_not_found)
-                }
-            } catch (e: Exception) {
-                _writeFileMessage.value = context.getString(R.string.append_file_failed) + ": ${e.message}"
-            } finally {
-                _isWritingToFile.value = false
-                hideFileExistsDialog()
-            }
-        }
-    }
-    
-    /**
      * 创建新文件并写入
      */
     fun createNewFile(context: Context, newFilename: String, historyList: List<HistoryItem>) {
@@ -1173,10 +1141,13 @@ class TellrawViewModel @Inject constructor(
                 val file = java.io.File(storagePath, filename)
                 
                 // 生成历史记录内容
-                val content = historyRepository.buildHistoryContent(historyList)
+                val content = StringBuilder()
+                for (item in historyList) {
+                    content.append(historyRepository.buildHistoryContent(item))
+                }
                 
                 // 追加写入文件
-                file.appendText(content)
+                file.appendText(content.toString())
                 
                 _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
             } catch (e: Exception) {
@@ -1195,10 +1166,13 @@ class TellrawViewModel @Inject constructor(
             val file = java.io.File(context.filesDir, filename)
             
             // 生成历史记录内容
-            val content = historyRepository.buildHistoryContent(historyList)
+            val content = StringBuilder()
+            for (item in historyList) {
+                content.append(historyRepository.buildHistoryContent(item))
+            }
             
             // 追加写入文件
-            file.appendText(content)
+            file.appendText(content.toString())
             
             _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
         } catch (e: Exception) {
