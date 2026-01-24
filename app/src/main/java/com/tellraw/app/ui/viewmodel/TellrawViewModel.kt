@@ -515,7 +515,9 @@ class TellrawViewModel @Inject constructor(
         allBedrockReminders.addAll(bedrockRemovedParams)
         
         // 检测§m_f/§n_f，添加基岩版转换警告
-        if ("§m_f" in message || "§n_f" in message) {
+        // 但在混合模式下不显示此警告
+        val isMixedMode = mNHandling == "font" && !mnCFEnabled
+        if (!isMixedMode && ("§m_f" in message || "§n_f" in message)) {
             context?.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.bedrock_font_to_color_warning))
             }
@@ -985,9 +987,27 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 将历史记录写入文件
+     * 将历史记录写入文件（追加模式）
      */
     fun writeHistoryToFile(context: Context, historyList: List<HistoryItem>) {
+        val activity = context as? MainActivity
+        
+        // 主动申请权限
+        activity?.requestAllFilesAccessIfNeeded(
+            onGranted = {
+                doWriteHistoryToFile(context, historyList)
+            },
+            onDenied = {
+                _writeFileMessage.value = context.getString(R.string.permission_denied)
+                _isWritingToFile.value = false
+            }
+        )
+    }
+    
+    /**
+     * 实际执行写入历史记录
+     */
+    private fun doWriteHistoryToFile(context: Context, historyList: List<HistoryItem>) {
         viewModelScope.launch {
             _isWritingToFile.value = true
             _writeFileMessage.value = null
@@ -1005,13 +1025,14 @@ class TellrawViewModel @Inject constructor(
                 // 使用文件管理器选择的目录
                 val file = java.io.File(storagePath, filename)
                 
-                // 生成历史记录内容
-                val content = historyRepository.buildHistoryContent(historyList)
-                
-                // 写入文件
-                file.writeText(content)
-                
-                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+                // 检查文件是否存在
+                if (file.exists()) {
+                    // 文件已存在，显示对话框询问用户
+                    _showFileExistsDialog.value = filename
+                } else {
+                    // 文件不存在，直接写入
+                    appendToFile(file, historyList)
+                }
             } catch (e: Exception) {
                 _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {
@@ -1021,23 +1042,108 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 将历史记录写入应用沙盒
+     * 追加写入到文件
+     */
+    private fun appendToFile(file: java.io.File, historyList: List<HistoryItem>) {
+        for (item in historyList) {
+            val content = historyRepository.buildSingleHistoryItem(item)
+            file.appendText(content)
+        }
+    }
+    
+    /**
+     * 追加写入到已存在的文件
+     */
+    fun appendToExistingFile(context: Context, historyList: List<HistoryItem>) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val storagePath = settingsRepository.getHistoryStorageUri()
+                val filename = settingsRepository.getHistoryStorageFilename()
+                
+                if (storagePath == null) {
+                    writeToFileInSandbox(context, filename, historyList)
+                    return@launch
+                }
+                
+                val file = java.io.File(storagePath, filename)
+                if (file.exists()) {
+                    appendToFile(file, historyList)
+                    _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
+                } else {
+                    _writeFileMessage.value = context.getString(R.string.file_not_found)
+                }
+            } catch (e: Exception) {
+                _writeFileMessage.value = context.getString(R.string.append_file_failed) + ": ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
+                hideFileExistsDialog()
+            }
+        }
+    }
+    
+    /**
+     * 创建新文件并写入
+     */
+    fun createNewFile(context: Context, newFilename: String, historyList: List<HistoryItem>) {
+        viewModelScope.launch {
+            _isWritingToFile.value = true
+            _writeFileMessage.value = null
+            
+            try {
+                val storagePath = settingsRepository.getHistoryStorageUri()
+                
+                if (storagePath == null) {
+                    writeToFileInSandbox(context, newFilename, historyList)
+                    return@launch
+                }
+                
+                val file = java.io.File(storagePath, newFilename)
+                
+                // 如果新文件已存在，追加写入
+                if (file.exists()) {
+                    appendToFile(file, historyList)
+                } else {
+                    // 创建新文件并写入
+                    file.createNewFile()
+                    appendToFile(file, historyList)
+                }
+                
+                // 更新文件名设置
+                settingsRepository.setHistoryStorageFilename(newFilename)
+                _historyStorageFilename.value = newFilename
+                
+                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+            } catch (e: Exception) {
+                _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
+            } finally {
+                _isWritingToFile.value = false
+                hideFileExistsDialog()
+            }
+        }
+    }
+    
+    /**
+     * 将历史记录写入应用沙盒（追加模式）
      */
     private suspend fun writeToFileInSandbox(context: Context, filename: String, historyList: List<HistoryItem>) {
         try {
             val file = java.io.File(context.filesDir, filename)
             
-            // 生成历史记录内容
-            val content = historyRepository.buildHistoryContent(historyList)
-            
-            // 如果文件已存在，追加写入；否则创建新文件
-            if (file.exists()) {
-                file.appendText(content)
-                _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
-            } else {
-                file.writeText(content)
-                _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
+            // 确保文件存在
+            if (!file.exists()) {
+                file.createNewFile()
             }
+            
+            // 追加写入历史记录
+            for (item in historyList) {
+                val content = historyRepository.buildHistoryContent(item)
+                file.appendText(content)
+            }
+            
+            _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
         } catch (e: Exception) {
             _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
         } finally {

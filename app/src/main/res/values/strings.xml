@@ -94,6 +94,8 @@
     <string name="help_version_differences_content">Java版和基岩版在选择器和格式化上有差异：\n\n选择器：\n• Java版用distance，基岩版用r/rm\n• Java版用gamemode，基岩版用m\n• Java版支持nbt，基岩版支持hasitem\n\n格式化：\n• §m§n代码处理方式不同\n• 某些颜色代码在基岩版有特殊含义</string>
     <string name="help_usage_tips">使用提示</string>
     <string name="help_usage_tips_content">1. 输入选择器和消息\n2. 自动检测选择器类型\n3. 生成Java版和基岩版命令\n4. 复制或分享命令\n5. 选择器参数转换需人工检查\n\n遇到§m§n代码时：\n• 字体方式：Java版保持原样，基岩版用颜色代码\n• 颜色代码方式：两版都用颜色代码</string>
+    <string name="help_history_storage">历史记录存储</string>
+    <string name="help_history_storage_content">历史记录默认保存在应用沙盒中，也可选择自定义目录。\n\n存储格式：\n• 时间\n• 输入内容\n• Java版输出\n• 基岩版输出\n\n注意事项：\n• 历史记录按时间从新到旧显示\n• 转移存储位置后，旧位置的历史记录需要手动查看\n• 清空历史记录仅删除应用生成的记录，不影响原有内容\n• 如果自定义文件不存在，会自动使用应用沙盒</string>
     <string name="help_conversion_warning">选择器参数转换需人工检查</string>
     
     <!-- 通用 -->
@@ -148,6 +150,9 @@
     <string name="clear_settings_confirm">确定清除存储设置吗？</string>
     <string name="sandbox_storage_hint">未选择目录时保存在应用沙盒中</string>
     <string name="success">成功</string>
+    <string name="parent_directory">上级目录</string>
+    <string name="filename_placeholder">请输入文件名</string>
+    <string name="selected_directory">已选中：%s</string>
     
     <!-- TextFormatter 错误和警告 -->
     <string name="java_font_bedrock_color">Java版用字体，基岩版用颜色代码</string>
@@ -288,7 +293,6 @@
     
     <!-- 文件名输入对话框 -->
     <string name="enter_filename">输入历史记录文件名：</string>
-    <string name="filename_placeholder">TellrawCommand.txt</string>
     
     <!-- 代码对话框 -->
     <string name="detected_code">检测到%s代码</string>

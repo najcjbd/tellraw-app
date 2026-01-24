@@ -1,5 +1,6 @@
 package com.tellraw.app.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tellraw.app.R
@@ -19,15 +21,26 @@ fun HelpScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
         TopAppBar(
-            title = { Text(context.getString(R.string.help_title)) },
+            title = { 
+                Text(
+                    context.getString(R.string.help_title),
+                    style = if (isLandscape) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium
+                ) 
+            },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = context.getString(R.string.back))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = context.getString(R.string.back),
+                        modifier = Modifier.size(if (isLandscape) 24.dp else 24.dp)
+                    )
                 }
             }
         )
@@ -67,6 +80,11 @@ fun HelpScreen(
             HelpSection(
                 title = context.getString(R.string.help_usage_tips),
                 content = context.getString(R.string.help_usage_tips_content)
+            )
+
+            HelpSection(
+                title = context.getString(R.string.help_history_storage),
+                content = context.getString(R.string.help_history_storage_content)
             )
         }
     }

@@ -329,14 +329,14 @@ fun SettingsDialog(
         Surface(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(400.dp),
+                .width(350.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // 顶部栏
+                // 顶部栏 - 减小高度和字体
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
@@ -344,22 +344,23 @@ fun SettingsDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             stringResource(R.string.settings_title),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                         IconButton(
                             onClick = onDismiss,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = stringResource(R.string.close),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -371,12 +372,12 @@ fun SettingsDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.mn_mixed_mode_config),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.bodyLarge
                     )
                     
                     // 混合模式开关
@@ -684,16 +685,15 @@ fun HistoryDialog(
         Surface(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(400.dp),
+                .width(450.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
             ) {
-                // 顶部栏
+                // 顶部栏 - 减小高度和字体
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
@@ -701,40 +701,41 @@ fun HistoryDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             stringResource(R.string.command_history),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                         Row {
                             IconButton(
                                 onClick = onShowStorageSettings,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Settings,
                                     contentDescription = stringResource(R.string.settings_title),
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                             IconButton(
                                 onClick = onDismiss,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = stringResource(R.string.close),
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
                     }
                 }
                 
-                // 搜索框
+                // 搜索框 - 减小高度
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { 
@@ -744,20 +745,22 @@ fun HistoryDialog(
                     label = { Text(stringResource(R.string.search_history)) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    singleLine = true,
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { 
                                 searchQuery = ""
                                 onSearch("")
-                            }) {
-                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_history))
+                            }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_history), modifier = Modifier.size(16.dp))
                             }
                         }
                     }
                 )
                 
-                // 历史记录列表
+                // 历史记录列表 - 增大宽度
                 if (historyList.isEmpty()) {
                     Box(
                         modifier = Modifier
@@ -771,7 +774,7 @@ fun HistoryDialog(
                             Icon(
                                 Icons.Default.History,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(40.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -787,8 +790,8 @@ fun HistoryDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(historyList) { history ->
                             HistoryItem(
@@ -800,15 +803,17 @@ fun HistoryDialog(
                     }
                 }
                 
-                // 底部操作栏
+                // 底部操作栏 - 减小高度
                 Surface(
                     tonalElevation = 2.dp
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .height(44.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (historyList.isNotEmpty()) {
                             OutlinedButton(
@@ -816,16 +821,18 @@ fun HistoryDialog(
                                     onClearAll()
                                     onDismiss()
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text(stringResource(R.string.clear_history))
+                                Text(stringResource(R.string.clear_history), style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         Button(
                             onClick = onDismiss,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(stringResource(R.string.close))
+                            Text(stringResource(R.string.close), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -1032,16 +1039,14 @@ fun HistoryStorageSettingsDialog(
         Surface(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(400.dp),
+                .width(350.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
+                modifier = Modifier.fillMaxSize()
             ) {
-                // 顶部栏
+                // 顶部栏 - 减小高度和字体
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 2.dp
@@ -1049,22 +1054,23 @@ fun HistoryStorageSettingsDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             stringResource(R.string.storage_settings),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                         IconButton(
                             onClick = onDismiss,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = stringResource(R.string.close),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -1076,12 +1082,12 @@ fun HistoryStorageSettingsDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.storage_location),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.bodyLarge
                     )
                     
                     // 存储目录
@@ -1480,7 +1486,7 @@ fun FilenameInputDialog(
 fun FileExistsDialog(
     filename: String,
     onDismiss: () -> Unit,
-    onUseExisting: () -> Unit,
+    onAppendToExisting: () -> Unit,
     onCustomize: () -> Unit
 ) {
     AlertDialog(
@@ -1495,8 +1501,8 @@ fun FileExistsDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onUseExisting) {
-                Text(stringResource(R.string.use_existing_file))
+            TextButton(onClick = onAppendToExisting) {
+                Text(stringResource(R.string.append_to_file))
             }
         },
         dismissButton = {
@@ -1551,24 +1557,35 @@ fun DirectoryPickerDialog(
             shadowElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
+                modifier = Modifier.fillMaxSize()
             ) {
-                // 标题栏
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // 标题栏 - 减小高度
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
                 ) {
-                    Text(
-                        text = stringResource(R.string.storage_directory_selected),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.select_directory),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.cancel),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
                 
@@ -1578,22 +1595,23 @@ fun DirectoryPickerDialog(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(12.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.Folder,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = currentPath,
+                            text = stringResource(R.string.selected_directory, currentPath),
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2
                         )
@@ -1605,18 +1623,18 @@ fun DirectoryPickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 12.dp)
                 ) {
                     androidx.compose.foundation.lazy.LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        contentPadding = PaddingValues(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         // 返回上一级按钮
                         if (currentPath != "/") {
                             item {
                                 androidx.compose.material3.ListItem(
-                                    headlineContent = { Text("..") },
+                                    headlineContent = { Text(stringResource(R.string.parent_directory), style = MaterialTheme.typography.bodySmall) },
                                     leadingContent = {
                                         Icon(
                                             Icons.Default.Folder,
@@ -1669,24 +1687,32 @@ fun DirectoryPickerDialog(
                     }
                 }
                 
-                // 操作按钮
+                // 操作按钮 - 移到右边，长方形设计
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .height(36.dp)
+                            .width(80.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Text(stringResource(R.string.cancel))
+                        Text(stringResource(R.string.cancel), style = MaterialTheme.typography.bodySmall)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { onDirectorySelected(currentPath) },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .height(36.dp)
+                            .width(100.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Text(stringResource(R.string.storage_directory_selected))
+                        Text(stringResource(R.string.select_directory), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -1721,7 +1747,7 @@ fun DirectoryPickerDialog(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = currentPath,
+                            text = stringResource(R.string.selected_directory, currentPath),
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2
                         )
@@ -1745,7 +1771,7 @@ fun DirectoryPickerDialog(
                         if (currentPath != "/") {
                             item {
                                 androidx.compose.material3.ListItem(
-                                    headlineContent = { Text("..") },
+                                    headlineContent = { Text(stringResource(R.string.parent_directory)) },
                                     leadingContent = {
                                         Icon(
                                             Icons.Default.Folder,
@@ -1800,22 +1826,32 @@ fun DirectoryPickerDialog(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // 操作按钮
+                // 操作按钮 - 移到右边，长方形设计
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .height(36.dp)
+                            .width(80.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Text(stringResource(R.string.cancel))
+                        Text(stringResource(R.string.cancel), style = MaterialTheme.typography.bodySmall)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { onDirectorySelected(currentPath) },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .height(36.dp)
+                            .width(100.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Text(stringResource(R.string.storage_directory_selected))
+                        Text(stringResource(R.string.select_directory), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

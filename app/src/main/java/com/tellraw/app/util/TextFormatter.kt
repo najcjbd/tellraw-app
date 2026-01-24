@@ -208,10 +208,13 @@ object TextFormatter {
         // 匹配§+字符的模式，然后处理后续的文本
         val tokens = mutableListOf<Pair<String, String>>() // (type, value)
         i = 0
+        // 混合模式：mnCFEnabled=false且mNHandling="font"
+        val isMixedMode = !mnCFEnabled && mNHandling == "font"
         while (i < jsonText.length) {
             if (jsonText[i] == '§' && i + 1 < jsonText.length) {
-                // 如果启用了§m/§n_c/f模式，检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
-                if (mnCFEnabled && i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
+                // 检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
+                // 在§m/§n_c/f模式或混合模式下都支持
+                if ((mnCFEnabled || isMixedMode) && i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
                     val code = jsonText.substring(i, i + 4)
                     tokens.add("format_code" to code)
                     i += 4
@@ -286,9 +289,9 @@ object TextFormatter {
                 else if (code.startsWith("§m_") || code.startsWith("§n_")) {
                     when (code) {
                         "§m_f" -> currentFormat["strikethrough"] = true  // 删除线（字体方式）
-                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式）
+                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式），保留strikethrough
                         "§n_f" -> currentFormat["underlined"] = true  // 下划线（字体方式）
-                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式）
+                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式），保留underlined
                     }
                 }
                 // 格式代码（包含m和n）
@@ -402,9 +405,24 @@ object TextFormatter {
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
         // §m -> material_redstone (深红色)
         // §n -> material_copper (铜色)
+        
+        // 混合模式：mnCFEnabled=false且mNHandling="font"
+        val isMixedMode = !mnCFEnabled && mNHandling == "font"
+        
         if (mnCFEnabled) {
             // 在§m/§n_c/f模式下，先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
             // 只移除后面不是_f或_c的§m和§n
+            processedText = processedText.replace(Regex("§m(?![_fn])"), "")
+            processedText = processedText.replace(Regex("§n(?![_fn])"), "")
+            // 然后将§m_f/§m_c统一转换为§m（material_redstone）
+            processedText = processedText.replace("§m_f", "§m")
+            processedText = processedText.replace("§m_c", "§m")
+            // 将§n_f/§n_c统一转换为§n（material_copper）
+            processedText = processedText.replace("§n_f", "§n")
+            processedText = processedText.replace("§n_c", "§n")
+        } else if (isMixedMode) {
+            // 混合模式：将§m_f/§m_c/§n_f/§n_c统一转换为§m/§n（颜色代码）
+            // 先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
             processedText = processedText.replace(Regex("§m(?![_fn])"), "")
             processedText = processedText.replace(Regex("§n(?![_fn])"), "")
             // 然后将§m_f/§m_c统一转换为§m（material_redstone）

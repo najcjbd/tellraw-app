@@ -35,8 +35,13 @@ class HistoryRepository @Inject constructor(
     companion object {
         private const val DEFAULT_FILENAME = "TellrawCommand.txt"
         private const val CONFIG_FILENAME = "tellraw_config.json"
-        private const val SEPARATOR = "========================================"
         private const val DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
+        
+        // 特殊符号：用于标记历史记录的开始和结束
+        // \u200B = 零宽度空格（Zero Width Space）
+        // \u200C = 零宽度非连接符（Zero Width Non-Joiner）
+        private const val START_MARKER = " \u200B"
+        private const val END_MARKER = " \u200C"
     }
     
     private val dateFormat = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
@@ -122,17 +127,29 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 获取历史记录文件
+     * 优先使用用户选择的目录，如果文件不存在则使用应用沙盒
      */
     private fun getHistoryFile(): File {
         val uri = _storageUri.value
         val filename = _storageFilename.value
         
         return if (uri != null) {
-            // 用户选择了存储目录，使用文件路径
-            File(context.filesDir, "${filename}_cache") // 临时缓存文件
+            // 用户选择了存储目录
+            val externalFile = File(uri, filename)
+            if (externalFile.exists()) {
+                externalFile
+            } else {
+                // 文件不存在，使用应用沙盒
+                File(context.filesDir, filename)
+            }
         } else {
             // 未选择存储目录，使用应用沙盒
-            File(context.filesDir, filename)
+            val sandboxFile = File(context.filesDir, filename)
+            if (!sandboxFile.exists()) {
+                // 文件不存在，创建它
+                sandboxFile.createNewFile()
+            }
+            sandboxFile
         }
     }
     
@@ -157,45 +174,67 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 解析历史记录内容
+     * 解析历史记录内容（精简格式）
+     * 格式：时间\n\n输入内容\n\nJava输出\n\n基岩版输出
      */
     private fun parseHistoryContent(content: String): List<HistoryItem> {
         val history = mutableListOf<HistoryItem>()
-        val sections = content.split(SEPARATOR)
+        
+        // 按开始标记分割
+        val sections = content.split(START_MARKER)
         
         for (section in sections) {
             if (section.trim().isEmpty()) continue
             
             try {
-                val selector = extractLineValue(section, "命令：")
-                val message = extractLineValue(section, "消息：")
-                val javaCommand = extractLineValue(section, "Java版：")
-                val bedrockCommand = extractLineValue(section, "基岩版：")
-                val timeText = extractLineValue(section, "时间：")
+                // 提取时间（第一行）
+                val lines = section.lines()
+                if (lines.isEmpty()) continue
                 
-                if (selector != null && message != null && javaCommand != null && bedrockCommand != null && timeText != null) {
-                    val timestamp = parseTimestamp(timeText)
-                    history.add(HistoryItem(selector, message, javaCommand, bedrockCommand, timestamp))
-                }
+                val timeText = lines[0].trim()
+                val timestamp = parseTimestamp(timeText)
+                
+                // 提取内容（跳过时间行和空行）
+                val contentLines = lines.drop(1).filter { it.isNotEmpty() }
+                if (contentLines.size < 3) continue
+                
+                // 解析：输入内容、Java输出、基岩版输出
+                // 输入内容是第一个非空行
+                val message = contentLines[0]
+                
+                // Java输出是第二个非空行
+                val javaCommand = contentLines[1]
+                
+                // 基岩版输出是第三个非空行（移除结束标记）
+                val bedrockCommand = contentLines[2].replace(END_MARKER, "").trim()
+                
+                // 选择器从Java命令中提取
+                val selector = extractSelectorFromCommand(javaCommand)
+                
+                history.add(HistoryItem(selector, message, javaCommand, bedrockCommand, timestamp))
             } catch (e: Exception) {
                 // 跳过解析失败的记录
             }
         }
         
-        return history
+        // 按时间从新到旧排序
+        return history.sortedByDescending { it.timestamp }
     }
     
     /**
-     * 从内容中提取指定行的值
+     * 从命令中提取选择器
      */
-    private fun extractLineValue(content: String, prefix: String): String? {
-        val lines = content.lines()
-        for (line in lines) {
-            if (line.trim().startsWith(prefix)) {
-                return line.substring(prefix.length).trim()
+    private fun extractSelectorFromCommand(command: String): String {
+        try {
+            // 命令格式：tellraw @a {...}
+            val parts = command.split(" ", limit = 3)
+            if (parts.size >= 2) {
+                return parts[1]
             }
+        } catch (e: Exception) {
+            // 提取失败
         }
-        return null
+        return "@a"
     }
     
     /**
@@ -210,16 +249,25 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 保存历史记录
+     * 保存历史记录（追加模式）
+     * 只用于批量保存，单个添加使用addHistory
      */
     suspend fun saveHistory(historyList: List<HistoryItem>) {
         withContext(Dispatchers.IO) {
             try {
-                val content = buildHistoryContentInternal(historyList)
                 val file = getHistoryFile()
-                file.writeText(content)
-                _historyList.value = historyList
                 
+                // 清空文件并重新写入
+                file.writeText("")
+                
+                // 按时间从新到旧排序并写入
+                val sortedList = historyList.sortedByDescending { it.timestamp }
+                for (item in sortedList) {
+                    val content = buildSingleHistoryItem(item)
+                    file.appendText(content)
+                }
+                
+                _historyList.value = sortedList
                 saveConfig()
             } catch (e: Exception) {
                 // 保存失败
@@ -228,47 +276,124 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 构建历史记录内容
+     * 构建历史记录内容（精简格式）
+     * 格式：时间\n\n输入内容\n\nJava输出\n\n基岩版输出
      */
     private fun buildHistoryContentInternal(historyList: List<HistoryItem>): String {
         val content = StringBuilder()
         
-        for (item in historyList) {
-            content.append(SEPARATOR).append("\n")
-            content.append("命令：").append(item.selector).append("\n")
-            content.append("消息：").append(item.message).append("\n")
-            content.append("Java版：").append(item.javaCommand).append("\n")
-            content.append("基岩版：").append(item.bedrockCommand).append("\n")
-            content.append("时间：").append(dateFormat.format(Date(item.timestamp))).append("\n")
-            content.append(SEPARATOR).append("\n")
+        // 按时间从新到旧排序
+        val sortedList = historyList.sortedByDescending { it.timestamp }
+        
+        for (item in sortedList) {
+            val timeText = dateFormat.format(Date(item.timestamp))
+            content.append(timeText).append(START_MARKER).append("\n\n")
+            content.append(item.message).append("\n\n")
+            content.append(item.javaCommand).append("\n\n")
+            content.append(item.bedrockCommand).append(END_MARKER).append("\n\n")
         }
         
         return content.toString()
     }
     
     /**
-     * 添加历史记录
+     * 添加历史记录（追加模式）
      */
     suspend fun addHistory(item: HistoryItem) {
-        val currentList = _historyList.value.toMutableList()
-        currentList.add(0, item) // 添加到开头
-        saveHistory(currentList)
+        withContext(Dispatchers.IO) {
+            try {
+                val file = getHistoryFile()
+                val content = buildSingleHistoryItem(item)
+                
+                // 追加到文件末尾
+                file.appendText(content)
+                
+                // 重新加载历史记录
+                loadHistory()
+            } catch (e: Exception) {
+                // 添加失败
+            }
+        }
     }
     
     /**
-     * 删除历史记录
+     * 构建单个历史记录项的内容
+     */
+    fun buildSingleHistoryItem(item: HistoryItem): String {
+        val timeText = dateFormat.format(Date(item.timestamp))
+        return "$timeText$START_MARKER\n\n${item.message}\n\n${item.javaCommand}\n\n${item.bedrockCommand}$END_MARKER\n\n"
+    }
+    
+    /**
+     * 删除历史记录（根据特殊符号删除）
      */
     suspend fun deleteHistory(item: HistoryItem) {
-        val currentList = _historyList.value.toMutableList()
-        currentList.remove(item)
-        saveHistory(currentList)
+        withContext(Dispatchers.IO) {
+            try {
+                val file = getHistoryFile()
+                if (!file.exists()) return@withContext
+                
+                var content = file.readText()
+                val itemContent = buildSingleHistoryItem(item)
+                
+                // 删除匹配的内容
+                if (itemContent in content) {
+                    content = content.replace(itemContent, "")
+                    file.writeText(content)
+                }
+                
+                // 重新加载历史记录
+                loadHistory()
+            } catch (e: Exception) {
+                // 删除失败
+            }
+        }
     }
     
     /**
-     * 清空历史记录
+     * 清空历史记录（只删除应用生成的记录）
+     * 根据特殊符号删除，不误伤原有内容
      */
     suspend fun clearHistory() {
-        saveHistory(emptyList())
+        withContext(Dispatchers.IO) {
+            try {
+                val file = getHistoryFile()
+                if (!file.exists()) return@withContext
+                
+                var content = file.readText()
+                
+                // 删除所有包含开始标记的内容（应用生成的记录）
+                // 保留不包含特殊符号的原始内容
+                val lines = content.lines().toMutableList()
+                val newLines = mutableListOf<String>()
+                var skipNext = false
+                
+                for (i in lines.indices) {
+                    if (skipNext) {
+                        // 检查是否到达结束标记
+                        if (END_MARKER in lines[i]) {
+                            skipNext = false
+                        }
+                        continue
+                    }
+                    
+                    if (START_MARKER in lines[i]) {
+                        // 跳过这行及后续内容，直到遇到结束标记
+                        skipNext = true
+                        continue
+                    }
+                    
+                    newLines.add(lines[i])
+                }
+                
+                file.writeText(newLines.joinToString("\n"))
+                
+                // 重新加载历史记录
+                loadHistory()
+            } catch (e: Exception) {
+                // 清空失败
+            }
+        }
     }
     
     /**
@@ -310,12 +435,12 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 构建历史记录内容
-     * 这个方法生成历史记录的文本内容，由调用者负责写入文件
+     * 构建单个历史记录项的内容
+     * 这个方法生成单个历史记录的文本内容，由调用者负责写入文件
      */
-    suspend fun buildHistoryContent(historyList: List<HistoryItem>): String {
+    suspend fun buildHistoryContent(item: HistoryItem): String {
         return withContext(Dispatchers.IO) {
-            buildHistoryContentInternal(historyList)
+            buildSingleHistoryItem(item)
         }
     }
 }

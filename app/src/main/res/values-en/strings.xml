@@ -91,6 +91,8 @@
     <string name="help_version_differences_content">Java and Bedrock use different selectors:\n\n• Java: distance, Bedrock: r/rm\n• Java: gamemode, Bedrock: m\n• Java: nbt, Bedrock: hasitem\n\nText formats:\n• §m§n codes work differently\n• Some colors mean different things in Bedrock</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
+    <string name="help_history_storage">History Storage</string>
+    <string name="help_history_storage_content">History is saved in app sandbox by default, but you can choose a custom folder.\n\nStorage format:\n• Time\n• Input content\n• Java output\n• Bedrock output\n\nNotes:\n• History is displayed newest to oldest\n• After changing storage location, old history must be viewed manually in the original file\n• Clearing history only removes app-generated records, preserving original content\n• If custom file doesn\'t exist, app sandbox is used automatically</string>
     <string name="help_conversion_warning">Check converted commands manually.</string>
     
     <!-- Common -->
@@ -145,6 +147,9 @@
     <string name="clear_settings_confirm">Clear storage settings?</string>
     <string name="sandbox_storage_hint">History saves to app sandbox when no folder selected</string>
     <string name="success">Success</string>
+    <string name="parent_directory">Parent directory</string>
+    <string name="filename_placeholder">Enter file name</string>
+    <string name="selected_directory">Selected: %s</string>
     
     <!-- TextFormatter Errors and Warnings -->
     <string name="java_font_bedrock_color">Java uses font style, Bedrock uses color codes</string>
@@ -237,7 +242,6 @@
     
     <!-- Filename Input Dialog -->
     <string name="enter_filename">Enter history file name:</string>
-    <string name="filename_placeholder">TellrawCommand.txt</string>
     
     <!-- Code Dialog -->
     <string name="detected_code">%s code found</string>

@@ -38,6 +38,13 @@ class MainActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 隐藏刘海屏区域（横屏）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = 
+                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        
         setContent {
             TellrawGeneratorTheme {
                 Surface(
@@ -63,6 +70,45 @@ class MainActivity : ComponentActivity() {
             onPermissionGranted = onGranted
             onPermissionDenied = onDenied
             requestStoragePermission()
+        }
+    }
+    
+    /**
+     * 主动申请所有文件访问权限（Android 11+）
+     * 在需要写入外部文件时调用
+     */
+    fun requestAllFilesAccessIfNeeded(onGranted: () -> Unit, onDenied: () -> Unit = {}) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!hasAllFilesAccessPermission()) {
+                onPermissionGranted = onGranted
+                onPermissionDenied = onDenied
+                requestAllFilesAccessPermission()
+            } else {
+                onGranted()
+            }
+        } else {
+            // Android 10及以下，检查传统存储权限
+            if (!hasStoragePermission()) {
+                onPermissionGranted = onGranted
+                onPermissionDenied = onDenied
+                requestStoragePermission()
+            } else {
+                onGranted()
+            }
+        }
+    }
+    
+    /**
+     * 主动申请存储权限
+     * 在需要读取外部文件时调用
+     */
+    fun requestStoragePermissionIfNeeded(onGranted: () -> Unit, onDenied: () -> Unit = {}) {
+        if (!hasStoragePermission()) {
+            onPermissionGranted = onGranted
+            onPermissionDenied = onDenied
+            requestStoragePermission()
+        } else {
+            onGranted()
         }
     }
 

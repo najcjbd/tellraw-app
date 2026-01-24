@@ -249,7 +249,7 @@ fun MainScreen(
         FileExistsDialog(
             filename = filename,
             onDismiss = { viewModel.hideFileExistsDialog() },
-            onUseExisting = {
+            onAppendToExisting = {
                 viewModel.appendToExistingFile(context, commandHistory.toList())
                 viewModel.hideFileExistsDialog()
             },
