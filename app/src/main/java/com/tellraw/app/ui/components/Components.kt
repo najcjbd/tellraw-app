@@ -1,5 +1,6 @@
 package com.tellraw.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -355,7 +357,7 @@ fun SettingsDialog(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                androidx.compose.material.icons.Icons.Default.Close,
+                                Icons.Default.Close,
                                 contentDescription = stringResource(R.string.close),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -723,7 +725,7 @@ fun HistoryDialog(
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
-                                    androidx.compose.material.icons.Icons.Default.Close,
+                                    Icons.Default.Close,
                                     contentDescription = stringResource(R.string.close),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -1060,7 +1062,7 @@ fun HistoryStorageSettingsDialog(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                androidx.compose.material.icons.Icons.Default.Close,
+                                Icons.Default.Close,
                                 contentDescription = stringResource(R.string.close),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -1509,6 +1511,7 @@ fun FileExistsDialog(
  * 文件夹选择器对话框（替代SAF）
  * 使用传统的文件管理器界面，只允许选择文件夹
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DirectoryPickerDialog(
     initialPath: String = "/storage/emulated/0",

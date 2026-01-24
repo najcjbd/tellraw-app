@@ -13,6 +13,7 @@ import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.repository.HistoryRepository
 import com.tellraw.app.data.repository.SettingsRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
+import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.util.SelectorConverter
@@ -400,10 +401,7 @@ class TellrawViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setMNHandlingMode(useJavaFont)
             // 自动保存配置到JSON文件
-            val ctx = this@TellrawViewModel.context
-            if (ctx != null) {
-                settingsRepository.saveConfigToFile(ctx)
-            }
+            settingsRepository.saveConfig()
         }
         generateCommands()
     }
@@ -422,10 +420,7 @@ class TellrawViewModel @Inject constructor(
                 _useJavaFontStyle.value = true
             }
             // 自动保存配置到JSON文件
-            val ctx = this@TellrawViewModel.context
-            if (ctx != null) {
-                settingsRepository.saveConfigToFile(ctx)
-            }
+            settingsRepository.saveConfig()
         }
         generateCommands()
     }
@@ -444,10 +439,7 @@ class TellrawViewModel @Inject constructor(
                 _useJavaFontStyle.value = true
             }
             // 自动保存配置到JSON文件
-            val ctx = this@TellrawViewModel.context
-            if (ctx != null) {
-                settingsRepository.saveConfigToFile(ctx)
-            }
+            settingsRepository.saveConfig()
         }
         generateCommands()
     }

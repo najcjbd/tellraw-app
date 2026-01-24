@@ -98,6 +98,7 @@ fun MainScreen(
             selectorType = selectorType,
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
+            showSettingsDialog = showSettingsDialog,
             viewModel = viewModel
         )
     } else {
@@ -445,6 +446,7 @@ private fun LandscapeLayout(
     selectorType: SelectorType,
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
+    showSettingsDialog: MutableState<Boolean>,
     viewModel: TellrawViewModel
 ) {
     Column(

@@ -215,7 +215,7 @@ class HistoryRepository @Inject constructor(
     suspend fun saveHistory(historyList: List<HistoryItem>) {
         withContext(Dispatchers.IO) {
             try {
-                val content = buildHistoryContent(historyList)
+                val content = buildHistoryContentInternal(historyList)
                 val file = getHistoryFile()
                 file.writeText(content)
                 _historyList.value = historyList
@@ -230,7 +230,7 @@ class HistoryRepository @Inject constructor(
     /**
      * 构建历史记录内容
      */
-    private fun buildHistoryContent(historyList: List<HistoryItem>): String {
+    private fun buildHistoryContentInternal(historyList: List<HistoryItem>): String {
         val content = StringBuilder()
         
         for (item in historyList) {
@@ -315,7 +315,7 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun buildHistoryContent(historyList: List<HistoryItem>): String {
         return withContext(Dispatchers.IO) {
-            buildHistoryContent(historyList)
+            buildHistoryContentInternal(historyList)
         }
     }
 }

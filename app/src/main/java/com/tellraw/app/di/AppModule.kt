@@ -2,7 +2,6 @@ package com.tellraw.app.di
 
 import android.content.Context
 import com.tellraw.app.data.remote.GithubApiService
-import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import dagger.Module
 import dagger.Provides
