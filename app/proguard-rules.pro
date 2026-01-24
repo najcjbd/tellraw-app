@@ -27,11 +27,6 @@
     @dagger.hilt.android.AndroidEntryPoint <methods>;
 }
 
-# Keep Room entities
--keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class *
--dontwarn androidx.room.paging.**
-
 # Keep Retrofit interfaces
 -keep interface retrofit2.Call { *; }
 -keep interface retrofit2.http.Body { *; }

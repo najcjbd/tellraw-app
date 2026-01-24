@@ -1,8 +1,6 @@
 package com.tellraw.app.di
 
 import android.content.Context
-import androidx.room.Room
-import com.tellraw.app.data.local.AppDatabase
 import com.tellraw.app.data.remote.GithubApiService
 import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
@@ -55,30 +53,6 @@ object AppModule {
     @Singleton
     fun provideGithubApiService(githubRetrofit: Retrofit): GithubApiService {
         return githubRetrofit.create(GithubApiService::class.java)
-    }
-    
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        // 使用外部存储的Android/data沙盒目录
-        val databasePath = context.getExternalFilesDir(null)?.absolutePath
-        val databaseFile = if (databasePath != null) {
-            java.io.File(databasePath, "tellraw_database")
-        } else {
-            // 如果外部存储不可用，回退到内部存储
-            context.getDatabasePath("tellraw_database")
-        }
-        
-        // 确保目录存在
-        databaseFile.parentFile?.mkdirs()
-        
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            databaseFile.absolutePath
-        )
-        .fallbackToDestructiveMigration()
-        .build()
     }
     
     @Provides
