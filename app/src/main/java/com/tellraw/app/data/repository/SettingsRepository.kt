@@ -1,21 +1,23 @@
 package com.tellraw.app.data.repository
 
 import android.content.Context
-import com.tellraw.app.data.local.AppSettings
-import com.tellraw.app.data.local.AppSettingsDao
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SettingsRepository @Inject constructor(
-    private val appSettingsDao: AppSettingsDao
+    @ApplicationContext private val context: Context
 ) {
-    
     companion object {
+        private const val CONFIG_FILENAME = "tellraw_config.json"
         private const val KEY_MN_HANDLING_MODE = "mn_handling_mode"
         private const val KEY_MN_MIXED_MODE = "mn_mixed_mode"
         private const val KEY_MN_CF_ENABLED = "mn_cf_enabled"
@@ -23,50 +25,135 @@ class SettingsRepository @Inject constructor(
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
         private const val VALUE_MODE_COLOR = "color"
-        private const val CONFIG_FILENAME = "tellraw_config.json"
+        private const val DEFAULT_HISTORY_FILENAME = "TellrawCommand.txt"
+    }
+    
+    // §m§n处理模式
+    private val _mnHandlingMode = MutableStateFlow(true) // 默认使用字体方式
+    val mnHandlingMode: Flow<Boolean> = _mnHandlingMode.asStateFlow()
+    
+    // 混合模式开关
+    private val _mnMixedMode = MutableStateFlow(false)
+    val mnMixedMode: Flow<Boolean> = _mnMixedMode.asStateFlow()
+    
+    // §m/§n_c/f开关
+    private val _mnCFEnabled = MutableStateFlow(false)
+    val mnCFEnabled: Flow<Boolean> = _mnCFEnabled.asStateFlow()
+    
+    // 历史记录存储目录URI
+    private val _historyStorageUri = MutableStateFlow<String?>(null)
+    val historyStorageUri: Flow<String?> = _historyStorageUri.asStateFlow()
+    
+    // 历史记录存储文件名
+    private val _historyStorageFilename = MutableStateFlow(DEFAULT_HISTORY_FILENAME)
+    val historyStorageFilename: Flow<String> = _historyStorageFilename.asStateFlow()
+    
+    /**
+     * 初始化配置
+     */
+    suspend fun init() {
+        loadConfig()
     }
     
     /**
-     * 保存配置到JSON文件
-     * @param context 应用上下文
-     * @return 保存是否成功
+     * 加载配置
      */
-    suspend fun saveConfigToFile(context: Context): Boolean {
-        return try {
-            val json = exportSettingsAsJson()
-            val configFile = File(context.filesDir, CONFIG_FILENAME)
-            configFile.writeText(json)
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    /**
-     * 从JSON文件加载配置
-     * @param context 应用上下文
-     * @return 加载是否成功
-     */
-    suspend fun loadConfigFromFile(context: Context): Boolean {
-        return try {
-            val configFile = File(context.filesDir, CONFIG_FILENAME)
-            if (!configFile.exists()) {
-                return false
+    suspend fun loadConfig(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val configFile = File(context.filesDir, CONFIG_FILENAME)
+                if (!configFile.exists()) {
+                    return@withContext false
+                }
+                
+                val json = configFile.readText()
+                importSettingsFromJson(json)
+            } catch (e: Exception) {
+                false
             }
-            val json = configFile.readText()
-            importSettingsFromJson(json)
-        } catch (e: Exception) {
-            false
         }
     }
+    
+    /**
+     * 保存配置
+     */
+    suspend fun saveConfig(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val json = exportSettingsAsJson()
+                val configFile = File(context.filesDir, CONFIG_FILENAME)
+                configFile.writeText(json)
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
+    
+    /**
+     * 从 JSON 字符串导入配置
+     */
+    private suspend fun importSettingsFromJson(jsonString: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val mnHandlingMode = extractJsonValue(jsonString, KEY_MN_HANDLING_MODE) ?: VALUE_MODE_FONT
+                val mnMixedMode = extractJsonValue(jsonString, KEY_MN_MIXED_MODE) == "true"
+                val mnCfEnabled = extractJsonValue(jsonString, KEY_MN_CF_ENABLED) == "true"
+                val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
+                val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
+                val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+                
+                _mnHandlingMode.value = mnHandlingMode == VALUE_MODE_FONT
+                _mnMixedMode.value = mnMixedMode
+                _mnCFEnabled.value = mnCfEnabled
+                _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
+                _historyStorageFilename.value = historyStorageFilename
+                
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
+    
+    /**
+     * 导出配置为 JSON 字符串
+     */
+    private fun exportSettingsAsJson(): String {
+        val mnHandlingMode = if (_mnHandlingMode.value) VALUE_MODE_FONT else VALUE_MODE_COLOR
+        val mnMixedMode = _mnMixedMode.value
+        val mnCfEnabled = _mnCFEnabled.value
+        val historyStorageUri = _historyStorageUri.value ?: ""
+        val historyStorageFilename = _historyStorageFilename.value
+        
+        return """
+            {
+              "$KEY_MN_HANDLING_MODE": "$mnHandlingMode",
+              "$KEY_MN_MIXED_MODE": $mnMixedMode,
+              "$KEY_MN_CF_ENABLED": $mnCfEnabled,
+              "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
+              "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
+            }
+        """.trimIndent()
+    }
+    
+    /**
+     * 从 JSON 字符串中提取值
+     */
+    private fun extractJsonValue(jsonString: String, key: String): String? {
+        val pattern = "\"$key\"\\s*:\\s*\"?([^\"]*)\"?".toRegex()
+        val match = pattern.find(jsonString)
+        return match?.groupValues?.get(1)?.trim()
+    }
+    
+    // §m§n处理模式相关方法
     
     /**
      * 获取§m§n处理模式
      * @return true表示使用字体方式，false表示使用颜色代码方式
      */
     suspend fun getMNHandlingMode(): Boolean {
-        val settings = appSettingsDao.getByKey(KEY_MN_HANDLING_MODE)
-        return settings?.value == VALUE_MODE_FONT
+        return _mnHandlingMode.value
     }
     
     /**
@@ -74,18 +161,8 @@ class SettingsRepository @Inject constructor(
      * @param useFontMode true表示使用字体方式，false表示使用颜色代码方式
      */
     suspend fun setMNHandlingMode(useFontMode: Boolean) {
-        val value = if (useFontMode) VALUE_MODE_FONT else VALUE_MODE_COLOR
-        appSettingsDao.insert(AppSettings(KEY_MN_HANDLING_MODE, value))
-    }
-    
-    /**
-     * 获取§m§n处理模式的Flow
-     */
-    fun getMNHandlingModeFlow(): Flow<Boolean> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == KEY_MN_HANDLING_MODE }
-            setting?.value == VALUE_MODE_FONT
-        }
+        _mnHandlingMode.value = useFontMode
+        saveConfig()
     }
     
     /**
@@ -93,8 +170,7 @@ class SettingsRepository @Inject constructor(
      * @return true表示混合模式开启，false表示关闭
      */
     suspend fun getMNMixedMode(): Boolean {
-        val settings = appSettingsDao.getByKey(KEY_MN_MIXED_MODE)
-        return settings?.value == "true"
+        return _mnMixedMode.value
     }
     
     /**
@@ -102,17 +178,8 @@ class SettingsRepository @Inject constructor(
      * @param enabled true表示开启混合模式，false表示关闭
      */
     suspend fun setMNMixedMode(enabled: Boolean) {
-        appSettingsDao.insert(AppSettings(KEY_MN_MIXED_MODE, enabled.toString()))
-    }
-    
-    /**
-     * 获取混合模式开关的Flow
-     */
-    fun getMNMixedModeFlow(): Flow<Boolean> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == KEY_MN_MIXED_MODE }
-            setting?.value == "true"
-        }
+        _mnMixedMode.value = enabled
+        saveConfig()
     }
     
     /**
@@ -120,8 +187,7 @@ class SettingsRepository @Inject constructor(
      * @return true表示启用_c/_f后缀，false表示禁用
      */
     suspend fun getMNCFEnabled(): Boolean {
-        val settings = appSettingsDao.getByKey(KEY_MN_CF_ENABLED)
-        return settings?.value == "true"
+        return _mnCFEnabled.value
     }
     
     /**
@@ -129,42 +195,8 @@ class SettingsRepository @Inject constructor(
      * @param enabled true表示启用_c/_f后缀，false表示禁用
      */
     suspend fun setMNCFEnabled(enabled: Boolean) {
-        appSettingsDao.insert(AppSettings(KEY_MN_CF_ENABLED, enabled.toString()))
-    }
-    
-    /**
-     * 获取§m/§n_c/f开关的Flow
-     */
-    fun getMNCFEnabledFlow(): Flow<Boolean> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == KEY_MN_CF_ENABLED }
-            setting?.value == "true"
-        }
-    }
-    
-    /**
-     * 保存通用设置
-     */
-    suspend fun saveSetting(key: String, value: String) {
-        appSettingsDao.insert(AppSettings(key, value))
-    }
-    
-    /**
-     * 获取通用设置
-     */
-    suspend fun getSetting(key: String, defaultValue: String = ""): String {
-        val settings = appSettingsDao.getByKey(key)
-        return settings?.value ?: defaultValue
-    }
-    
-    /**
-     * 获取通用设置的Flow
-     */
-    fun getSettingFlow(key: String, defaultValue: String = ""): Flow<String> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == key }
-            setting?.value ?: defaultValue
-        }
+        _mnCFEnabled.value = enabled
+        saveConfig()
     }
     
     // 历史记录存储相关方法
@@ -173,103 +205,39 @@ class SettingsRepository @Inject constructor(
      * 获取历史记录存储目录URI
      */
     suspend fun getHistoryStorageUri(): String? {
-        val settings = appSettingsDao.getByKey(KEY_HISTORY_STORAGE_URI)
-        return settings?.value?.takeIf { it.isNotEmpty() }
+        return _historyStorageUri.value
     }
     
     /**
      * 设置历史记录存储目录URI
      */
     suspend fun setHistoryStorageUri(uri: String) {
-        appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_URI, uri))
-    }
-    
-    /**
-     * 获取历史记录存储目录URI的Flow
-     */
-    fun getHistoryStorageUriFlow(): Flow<String?> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == KEY_HISTORY_STORAGE_URI }
-            setting?.value?.takeIf { it.isNotEmpty() }
-        }
+        _historyStorageUri.value = uri.takeIf { it.isNotEmpty() }
+        saveConfig()
     }
     
     /**
      * 获取历史记录存储文件名
      */
     suspend fun getHistoryStorageFilename(): String {
-        val settings = appSettingsDao.getByKey(KEY_HISTORY_STORAGE_FILENAME)
-        return settings?.value?.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
+        return _historyStorageFilename.value
     }
     
     /**
      * 设置历史记录存储文件名
      */
     suspend fun setHistoryStorageFilename(filename: String) {
-        appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_FILENAME, filename))
+        val cleanFilename = filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+        _historyStorageFilename.value = cleanFilename.takeIf { it.isNotEmpty() } ?: DEFAULT_HISTORY_FILENAME
+        saveConfig()
     }
     
     /**
-     * 获取历史记录存储文件名的Flow
+     * 清除历史记录存储设置
      */
-    fun getHistoryStorageFilenameFlow(): Flow<String> {
-        return appSettingsDao.getAll().map { settings ->
-            val setting = settings.find { it.key == KEY_HISTORY_STORAGE_FILENAME }
-            setting?.value?.takeIf { it.isNotEmpty() } ?: "TellrawCommand.txt"
-        }
-    }
-    
-    /**
-     * 导出配置为 JSON 字符串
-     */
-    suspend fun exportSettingsAsJson(): String {
-        val settings = appSettingsDao.getAll().first().associate { it.key to it.value }
-
-        val json = StringBuilder()
-        json.append("{\n")
-        json.append("  \"mn_handling_mode\": \"${settings[KEY_MN_HANDLING_MODE] ?: VALUE_MODE_FONT}\",\n")
-        json.append("  \"mn_mixed_mode\": ${settings[KEY_MN_MIXED_MODE] == "true"},\n")
-        json.append("  \"mn_cf_enabled\": ${settings[KEY_MN_CF_ENABLED] == "true"},\n")
-        json.append("  \"history_storage_uri\": \"${settings[KEY_HISTORY_STORAGE_URI] ?: ""}\",\n")
-        json.append("  \"history_storage_filename\": \"${settings[KEY_HISTORY_STORAGE_FILENAME] ?: "TellrawCommand.txt"}\"\n")
-        json.append("}")
-
-        return json.toString()
-    }
-    
-    /**
-     * 从 JSON 字符串导入配置
-     */
-    suspend fun importSettingsFromJson(jsonString: String): Boolean {
-        return try {
-            // 简单的 JSON 解析（不使用外部库）
-            val mnHandlingMode = extractJsonValue(jsonString, "mn_handling_mode") ?: VALUE_MODE_FONT
-            val mnMixedMode = extractJsonValue(jsonString, "mn_mixed_mode") == "true"
-            val mnCfEnabled = extractJsonValue(jsonString, "mn_cf_enabled") == "true"
-            val historyStorageUri = extractJsonValue(jsonString, "history_storage_uri") ?: ""
-            val rawFilename = extractJsonValue(jsonString, "history_storage_filename") ?: "TellrawCommand.txt"
-            // 清理文件名：移除引号和其他非法字符
-            val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
-            
-            // 保存配置
-            appSettingsDao.insert(AppSettings(KEY_MN_HANDLING_MODE, mnHandlingMode))
-            appSettingsDao.insert(AppSettings(KEY_MN_MIXED_MODE, mnMixedMode.toString()))
-            appSettingsDao.insert(AppSettings(KEY_MN_CF_ENABLED, mnCfEnabled.toString()))
-            appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_URI, historyStorageUri))
-            appSettingsDao.insert(AppSettings(KEY_HISTORY_STORAGE_FILENAME, historyStorageFilename))
-            
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    /**
-     * 从 JSON 字符串中提取值
-     */
-    private fun extractJsonValue(jsonString: String, key: String): String? {
-        val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\"".toRegex()
-        val match = pattern.find(jsonString)
-        return match?.groupValues?.get(1)?.trim()
+    suspend fun clearHistoryStorageSettings() {
+        _historyStorageUri.value = null
+        _historyStorageFilename.value = DEFAULT_HISTORY_FILENAME
+        saveConfig()
     }
 }

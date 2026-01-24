@@ -2,19 +2,16 @@ package com.tellraw.app.ui.viewmodel
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tellraw.app.R
-import com.tellraw.app.data.local.CommandHistory
-import com.tellraw.app.data.remote.GithubRelease
+import com.tellraw.app.data.repository.HistoryItem
+import com.tellraw.app.data.repository.HistoryRepository
 import com.tellraw.app.data.repository.SettingsRepository
-import com.tellraw.app.data.repository.TellrawRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.TellrawCommand
@@ -30,9 +27,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TellrawViewModel @Inject constructor(
-    private val tellrawRepository: TellrawRepository,
     private val versionCheckRepository: VersionCheckRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
     
     private val _selectorInput = MutableStateFlow("")
@@ -46,38 +43,15 @@ class TellrawViewModel @Inject constructor(
      */
     fun setContext(context: Context) {
         this.context = context
-        // 设置Context后初始化版本检查和加载设置
+        // 设置Context后初始化版本检查、加载设置和历史记录
         initializeVersionCheck()
         viewModelScope.launch {
             // 先从JSON文件加载配置
-            settingsRepository.loadConfigFromFile(context)
+            settingsRepository.loadConfig()
             // 然后加载设置
             loadSettings()
-        }
-    }
-    
-    /**
-     * 保存配置到JSON文件
-     */
-    fun saveConfig() {
-        viewModelScope.launch {
-            val context = this@TellrawViewModel.context ?: return@launch
-            val success = settingsRepository.saveConfigToFile(context)
-            // 可以添加保存成功的提示
-        }
-    }
-    
-    /**
-     * 从JSON文件加载配置
-     */
-    fun loadConfig() {
-        viewModelScope.launch {
-            val context = this@TellrawViewModel.context ?: return@launch
-            val success = settingsRepository.loadConfigFromFile(context)
-            if (success) {
-                // 重新加载设置
-                loadSettings()
-            }
+            // 加载历史记录
+            historyRepository.init()
         }
     }
     
@@ -210,13 +184,13 @@ class TellrawViewModel @Inject constructor(
     val showDisableCheckDialog: StateFlow<Boolean> = _showDisableCheckDialog.asStateFlow()
     
     // 历史记录相关状态
-    val commandHistory: Flow<List<CommandHistory>> = tellrawRepository.getCommandHistory()
+    val commandHistory: Flow<List<HistoryItem>> = historyRepository.historyList
     
     // 搜索结果状态
-    private val _searchResults = MutableStateFlow<List<CommandHistory>>(emptyList())
-    val searchResults: StateFlow<List<CommandHistory>> = _searchResults.asStateFlow()
+    private val _searchResults = MutableStateFlow<List<HistoryItem>>(emptyList())
+    val searchResults: StateFlow<List<HistoryItem>> = _searchResults.asStateFlow()
     
-    // SAF相关状态
+    // 历史记录存储相关状态
     private val _historyStorageUri = MutableStateFlow<String?>(null)
     val historyStorageUri: StateFlow<String?> = _historyStorageUri.asStateFlow()
     
@@ -548,6 +522,13 @@ class TellrawViewModel @Inject constructor(
         allBedrockReminders.addAll(bedrockGamemodeReminders)
         allBedrockReminders.addAll(bedrockRemovedParams)
         
+        // 检测§m_f/§n_f，添加基岩版转换警告
+        if ("§m_f" in message || "§n_f" in message) {
+            context?.let { ctx ->
+                allWarnings.add(ctx.getString(R.string.bedrock_font_to_color_warning))
+            }
+        }
+        
         // 生成Java版命令
         val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
         val javaCommand = "tellraw $javaSelectorFiltered $javaJson"
@@ -728,11 +709,14 @@ class TellrawViewModel @Inject constructor(
         // 如果有内容，先保存到历史记录
         if (selector.isNotEmpty() || message.isNotEmpty()) {
             viewModelScope.launch {
-                tellrawRepository.saveCommandToHistory(
-                    selector = selector,
-                    message = message,
-                    javaCommand = javaCommand,
-                    bedrockCommand = bedrockCommand
+                historyRepository.addHistory(
+                    HistoryItem(
+                        selector = selector,
+                        message = message,
+                        javaCommand = javaCommand,
+                        bedrockCommand = bedrockCommand,
+                        timestamp = System.currentTimeMillis()
+                    )
                 )
             }
         }
@@ -763,9 +747,9 @@ class TellrawViewModel @Inject constructor(
     /**
      * 删除指定的历史记录
      */
-    fun deleteHistoryItem(history: CommandHistory) {
+    fun deleteHistoryItem(history: HistoryItem) {
         viewModelScope.launch {
-            tellrawRepository.deleteCommandHistory(history)
+            historyRepository.deleteHistory(history)
         }
     }
     
@@ -782,22 +766,25 @@ class TellrawViewModel @Inject constructor(
             
             // 如果有内容，先保存到历史记录
             if (selector.isNotEmpty() || message.isNotEmpty()) {
-                tellrawRepository.saveCommandToHistory(
-                    selector = selector,
-                    message = message,
-                    javaCommand = javaCommand,
-                    bedrockCommand = bedrockCommand
+                historyRepository.addHistory(
+                    HistoryItem(
+                        selector = selector,
+                        message = message,
+                        javaCommand = javaCommand,
+                        bedrockCommand = bedrockCommand,
+                        timestamp = System.currentTimeMillis()
+                    )
                 )
             }
             
-            tellrawRepository.clearAllHistory()
+            historyRepository.clearHistory()
         }
     }
     
     /**
      * 从历史记录加载命令
      */
-    fun loadFromHistory(history: CommandHistory) {
+    fun loadFromHistory(history: HistoryItem) {
         _selectorInput.value = history.selector
         _messageInput.value = history.message
         _javaCommand.value = history.javaCommand
@@ -826,15 +813,9 @@ class TellrawViewModel @Inject constructor(
     // 搜索历史记录
     fun searchHistory(query: String) {
         viewModelScope.launch {
-            tellrawRepository.searchHistory(query).collect { results ->
-                _searchResults.value = results
-            }
+            val results = historyRepository.searchHistory(query)
+            _searchResults.value = results
         }
-    }
-    
-    // 根据ID获取历史记录
-    suspend fun getHistoryById(id: Long): CommandHistory? {
-        return tellrawRepository.getHistoryById(id)
     }
     
     // 版本检查相关方法
@@ -919,7 +900,7 @@ class TellrawViewModel @Inject constructor(
         return versionCheckRepository.isVersionCheckDisabled()
     }
     
-    // SAF相关方法
+    // 历史记录存储相关方法
     
     /**
      * 加载历史记录存储设置
@@ -1014,75 +995,31 @@ class TellrawViewModel @Inject constructor(
     /**
      * 将历史记录写入文件
      */
-    fun writeHistoryToFile(context: Context, historyList: List<CommandHistory>) {
+    fun writeHistoryToFile(context: Context, historyList: List<HistoryItem>) {
         viewModelScope.launch {
             _isWritingToFile.value = true
             _writeFileMessage.value = null
             
             try {
-                val uriString = settingsRepository.getHistoryStorageUri()
+                val storagePath = settingsRepository.getHistoryStorageUri()
                 val filename = settingsRepository.getHistoryStorageFilename()
                 
-                if (uriString == null) {
-                    // 未选择文件夹，存储在Android/data沙盒中
+                if (storagePath == null) {
+                    // 未选择文件夹，存储在应用沙盒中
                     writeToFileInSandbox(context, filename, historyList)
                     return@launch
                 }
                 
-                val uri = Uri.parse(uriString)
-                
-                // 验证 URI 格式，必须是 SAF 支持的 content:// 格式
-                if (!"content".equals(uri.scheme, ignoreCase = true)) {
-                    _writeFileMessage.value = context.getString(R.string.create_file_failed_invalid_uri)
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                val contentResolver = context.contentResolver
-                
-                // 检查文件是否存在
-                val existingUri = findFileInDirectory(contentResolver, uri, filename)
-                
-                if (existingUri != null) {
-                    // 文件已存在，弹出对话框让用户选择
-                    _showFileExistsDialog.value = filename
-                    _isWritingToFile.value = false
-                    return@launch
-                }
-                
-                // 文件不存在，创建新文件
-                val fileUri = createFileInDirectory(contentResolver, uri, filename)
-                
-                if (fileUri == null) {
-                    // 检查是否是目录不支持创建文件
-                    val directoryFlags = getDirectoryFlags(contentResolver, uri)
-                    val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE.toLong()) != 0L
-                    
-                    if (!canCreate) {
-                        _writeFileMessage.value = context.getString(R.string.create_file_failed_directory_not_supported)
-                    } else {
-                        _writeFileMessage.value = context.getString(R.string.create_file_failed)
-                    }
-                    _isWritingToFile.value = false
-                    return@launch
-                }
+                // 使用文件管理器选择的目录
+                val file = java.io.File(storagePath, filename)
                 
                 // 生成历史记录内容
-                val content = buildHistoryContent(historyList)
+                val content = historyRepository.buildHistoryContent(historyList)
                 
                 // 写入文件
-                contentResolver.openOutputStream(fileUri, "w")?.use { outputStream ->
-                    outputStream.write(content.toByteArray())
-                }
+                file.writeText(content)
                 
                 _writeFileMessage.value = context.getString(R.string.write_success, historyList.size)
-            } catch (e: SecurityException) {
-                // 权限问题，提示用户授予所有文件访问权限
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    _writeFileMessage.value = context.getString(R.string.create_file_failed_permission)
-                } else {
-                    _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
-                }
             } catch (e: Exception) {
                 _writeFileMessage.value = context.getString(R.string.create_file_failed) + ": ${e.message}"
             } finally {
@@ -1094,12 +1031,12 @@ class TellrawViewModel @Inject constructor(
     /**
      * 将历史记录写入应用沙盒
      */
-    private suspend fun writeToFileInSandbox(context: Context, filename: String, historyList: List<CommandHistory>) {
+    private suspend fun writeToFileInSandbox(context: Context, filename: String, historyList: List<HistoryItem>) {
         try {
             val file = java.io.File(context.filesDir, filename)
             
             // 生成历史记录内容
-            val content = buildHistoryContent(historyList)
+            val content = historyRepository.buildHistoryContent(historyList)
             
             // 如果文件已存在，追加写入；否则创建新文件
             if (file.exists()) {
@@ -1119,40 +1056,29 @@ class TellrawViewModel @Inject constructor(
     /**
      * 使用现有文件追加历史记录
      */
-    fun appendToExistingFile(context: Context, historyList: List<CommandHistory>) {
+    fun appendToExistingFile(context: Context, historyList: List<HistoryItem>) {
         viewModelScope.launch {
             _isWritingToFile.value = true
             _writeFileMessage.value = null
             
             try {
-                val uriString = settingsRepository.getHistoryStorageUri()
+                val storagePath = settingsRepository.getHistoryStorageUri()
                 val filename = settingsRepository.getHistoryStorageFilename()
                 
-                if (uriString == null) {
+                if (storagePath == null) {
                     // 未选择文件夹，在沙盒中追加
                     appendToFileInSandbox(context, filename, historyList)
                     return@launch
                 }
                 
-                val uri = Uri.parse(uriString)
-                val contentResolver = context.contentResolver
-                
-                // 查找文件
-                val fileUri = findFileInDirectory(contentResolver, uri, filename)
-                
-                if (fileUri == null) {
-                    _writeFileMessage.value = context.getString(R.string.file_not_found)
-                    _isWritingToFile.value = false
-                    return@launch
-                }
+                // 使用文件管理器选择的目录
+                val file = java.io.File(storagePath, filename)
                 
                 // 生成历史记录内容
-                val content = buildHistoryContent(historyList)
+                val content = historyRepository.buildHistoryContent(historyList)
                 
                 // 追加写入文件
-                contentResolver.openOutputStream(fileUri, "wa")?.use { outputStream ->
-                    outputStream.write(content.toByteArray())
-                }
+                file.appendText(content)
                 
                 _writeFileMessage.value = context.getString(R.string.append_success, historyList.size)
             } catch (e: Exception) {
@@ -1166,12 +1092,12 @@ class TellrawViewModel @Inject constructor(
     /**
      * 在应用沙盒中追加历史记录
      */
-    private suspend fun appendToFileInSandbox(context: Context, filename: String, historyList: List<CommandHistory>) {
+    private suspend fun appendToFileInSandbox(context: Context, filename: String, historyList: List<HistoryItem>) {
         try {
             val file = java.io.File(context.filesDir, filename)
             
             // 生成历史记录内容
-            val content = buildHistoryContent(historyList)
+            val content = historyRepository.buildHistoryContent(historyList)
             
             // 追加写入文件
             file.appendText(content)
@@ -1183,194 +1109,4 @@ class TellrawViewModel @Inject constructor(
             _isWritingToFile.value = false
         }
     }
-    
-    /**
-     * 在目录中查找文件
-     */
-    private suspend fun findFileInDirectory(
-        contentResolver: ContentResolver,
-        directoryUri: Uri,
-        filename: String
-    ): Uri? {
-        return try {
-            val docId = DocumentsContract.getDocumentId(directoryUri)
-            if (docId.isNullOrEmpty()) {
-                android.util.Log.e("TellrawViewModel", "Invalid directory URI")
-                return null
-            }
-            
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                directoryUri,
-                docId
-            )
-            
-            val projection = arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME
-            )
-            
-            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val docIdIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                
-                if (docIdIndex == -1 || nameIndex == -1) {
-                    android.util.Log.e("TellrawViewModel", "Invalid cursor indices")
-                    return@use null
-                }
-                
-                while (cursor.moveToNext()) {
-                    val currentDocId = cursor.getString(docIdIndex)
-                    val name = cursor.getString(nameIndex)
-                    
-                    if (name == filename && currentDocId != null) {
-                        return DocumentsContract.buildDocumentUriUsingTree(directoryUri, currentDocId)
-                    }
-                }
-            }
-            
-            null
-        } catch (e: SecurityException) {
-            android.util.Log.e("TellrawViewModel", "SecurityException when finding file: ${e.message}")
-            null
-        } catch (e: IllegalArgumentException) {
-            android.util.Log.e("TellrawViewModel", "IllegalArgumentException when finding file: ${e.message}")
-            null
-        } catch (e: Exception) {
-            android.util.Log.e("TellrawViewModel", "Exception when finding file: ${e.message}", e)
-            null
-        }
-    }
-    
-    /**
-     * 在目录中创建文件
-     */
-    private suspend fun createFileInDirectory(
-        contentResolver: ContentResolver,
-        directoryUri: Uri,
-        filename: String
-    ): Uri? {
-        return try {
-            // 检查目录URI是否有效
-            val docId = DocumentsContract.getDocumentId(directoryUri)
-            if (docId.isNullOrEmpty()) {
-                android.util.Log.e("TellrawViewModel", "Invalid directory URI: $directoryUri")
-                return null
-            }
-
-            android.util.Log.d("TellrawViewModel", "Creating file: $filename in directory: $directoryUri")
-
-            // 检查目录是否支持创建文件
-            val directoryFlags = getDirectoryFlags(contentResolver, directoryUri)
-            val canCreate = (directoryFlags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE.toLong()) != 0L
-            
-            if (!canCreate) {
-                android.util.Log.e("TellrawViewModel", "Directory does not support creating files")
-                android.util.Log.e("TellrawViewModel", "Directory flags: $directoryFlags")
-                return null
-            }
-
-            // 尝试创建文件
-            val fileUri = DocumentsContract.createDocument(
-                contentResolver,
-                directoryUri,
-                "text/plain",
-                filename
-            )
-            
-            if (fileUri == null) {
-                android.util.Log.e("TellrawViewModel", "Failed to create document: $filename")
-                android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
-                android.util.Log.e("TellrawViewModel", "Document ID: $docId")
-                android.util.Log.e("TellrawViewModel", "Directory flags: $directoryFlags")
-                
-                // 尝试检查目录是否可写
-                try {
-                    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                        directoryUri,
-                        docId
-                    )
-                    android.util.Log.d("TellrawViewModel", "Children URI: $childrenUri")
-                    
-                    val projection = arrayOf(
-                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                        DocumentsContract.Document.COLUMN_FLAGS
-                    )
-                    
-                    contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                        android.util.Log.d("TellrawViewModel", "Directory query returned ${cursor.count} items")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("TellrawViewModel", "Failed to query directory: ${e.message}")
-                }
-            } else {
-                android.util.Log.d("TellrawViewModel", "Successfully created file: $fileUri")
-            }
-            
-            fileUri
-        } catch (e: SecurityException) {
-            android.util.Log.e("TellrawViewModel", "SecurityException when creating file: ${e.message}")
-            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
-            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
-            null
-        } catch (e: IllegalArgumentException) {
-            android.util.Log.e("TellrawViewModel", "IllegalArgumentException when creating file: ${e.message}")
-            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
-            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
-            null
-        } catch (e: Exception) {
-            android.util.Log.e("TellrawViewModel", "Exception when creating file: ${e.message}")
-            android.util.Log.e("TellrawViewModel", "Directory URI: $directoryUri")
-            android.util.Log.e("TellrawViewModel", "Filename: $filename", e)
-            null
-        }
-    }
-
-    /**
-     * 获取目录的 flags
-     */
-    private suspend fun getDirectoryFlags(contentResolver: ContentResolver, directoryUri: Uri): Long {
-        return try {
-            val docId = DocumentsContract.getDocumentId(directoryUri)
-            if (docId.isNullOrEmpty()) {
-                return 0L
-            }
-            
-            val documentUri = DocumentsContract.buildDocumentUriUsingTree(directoryUri, docId)
-            val projection = arrayOf(DocumentsContract.Document.COLUMN_FLAGS)
-            
-            contentResolver.query(documentUri, projection, null, null, null)?.use { cursor ->
-                val flagsIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_FLAGS)
-                if (flagsIndex != -1 && cursor.moveToFirst()) {
-                    cursor.getLong(flagsIndex)
-                } else {
-                    0L
-                }
-            } ?: 0L
-        } catch (e: Exception) {
-            android.util.Log.e("TellrawViewModel", "Failed to get directory flags: ${e.message}")
-            0L
-        }
-    }
-    
-    /**
-     * 构建历史记录内容
-     */
-    private fun buildHistoryContent(historyList: List<CommandHistory>): String {
-        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-        
-        return buildString {
-            historyList.forEach { history ->
-                val timeText = dateFormat.format(java.util.Date(history.timestamp))
-                context?.let { ctx ->
-                    append(ctx.getString(R.string.history_command, "${history.selector} ${history.message}") + "\n")
-                    append(ctx.getString(R.string.history_java_command, history.javaCommand) + "\n")
-                    append(ctx.getString(R.string.history_bedrock_command, history.bedrockCommand) + "\n")
-                    append(ctx.getString(R.string.history_time, timeText) + "\n")
-                }
-                append("========================================\n")
-            }
-        }
-    }
-    
-    }
+}

@@ -36,38 +36,6 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    // SAF目录选择器
-    private val directoryPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            // 获取持久化权限
-            contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            // 将URI传递给ViewModel
-            onDirectorySelected?.invoke(uri.toString())
-        }
-    }
-    
-    // 目录选择回调
-    private var onDirectorySelected: ((String) -> Unit)? = null
-    
-    // SAF文件创建器
-    private val fileCreatorLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri: Uri? ->
-        if (uri != null) {
-            // 获取持久化权限
-            contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            // TODO: 将URI传递给ViewModel
-        }
-    }
-    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -136,7 +104,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun hasStoragePermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 不需要传统存储权限，SAF可以直接使用
+            // Android 11+ 不需要传统存储权限
             true
         } else {
             // Android 10及以下需要检查存储权限
@@ -172,20 +140,5 @@ class MainActivity : ComponentActivity() {
         if (permissions.isNotEmpty()) {
             storagePermissionLauncher.launch(permissions)
         }
-    }
-    
-    /**
-     * 启动目录选择器
-     */
-    fun launchDirectoryPicker(onSelected: (String) -> Unit) {
-        onDirectorySelected = onSelected
-        directoryPickerLauncher.launch(null)
-    }
-    
-    /**
-     * 启动文件创建器
-     */
-    fun launchFileCreator(filename: String) {
-        fileCreatorLauncher.launch(filename)
     }
 }

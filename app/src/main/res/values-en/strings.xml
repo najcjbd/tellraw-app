@@ -321,4 +321,7 @@
     <string name="filter_nbt_param">nbt parameter</string>
     <string name="filter_param_converted">parameter converted to</string>
     <string name="filter_converted">converted to</string>
+    
+    <!-- §m§n Code conversion warning -->
+    <string name="bedrock_font_to_color_warning">In Bedrock, §m_f/§n_f will be converted to color codes (§m/§n), not font styles (strikethrough/underline)</string>
 </resources>

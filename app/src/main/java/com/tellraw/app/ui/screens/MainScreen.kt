@@ -22,7 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.tellraw.app.R
-import com.tellraw.app.data.local.CommandHistory
+import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.ui.components.*
@@ -54,7 +54,7 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     
-    // SAF相关状态
+    // 历史记录存储相关状态
     val showStorageSettingsDialog by viewModel.showStorageSettingsDialog.collectAsState()
     val showFilenameDialog by viewModel.showFilenameDialog.collectAsState()
     val showFileExistsDialog by viewModel.showFileExistsDialog.collectAsState()
@@ -62,6 +62,9 @@ fun MainScreen(
     val historyStorageFilename by viewModel.historyStorageFilename.collectAsState()
     val isWritingToFile by viewModel.isWritingToFile.collectAsState()
     val writeFileMessage by viewModel.writeFileMessage.collectAsState()
+    
+    // 文件选择器相关状态
+    val showDirectoryPickerDialog = remember { mutableStateOf(false) }
     
     // 用于跟踪光标位置的状态
     val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
@@ -196,26 +199,35 @@ fun MainScreen(
             onSelectDirectory = {
                 activity?.checkAndRequestStoragePermission(
                     onGranted = {
-                        activity?.launchDirectoryPicker { uri ->
-                            viewModel.setHistoryStorageUri(uri)
-                        }
+                        showDirectoryPickerDialog.value = true
                     },
                     onDenied = {
-                        // 权限被拒绝，清空历史记录存储设置
-                        viewModel.clearHistoryStorageSettings()
+                        // 权限被拒绝，不显示文件选择器
                     }
                 )
             },
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
             onWriteToFile = {
-                viewModel.writeHistoryToFile(context, commandHistory.toList<CommandHistory>())
+                viewModel.writeHistoryToFile(context, commandHistory.toList())
             },
             onGrantAllFilesAccess = {
                 activity?.requestAllFilesAccessPermission()
             },
             isWriting = isWritingToFile,
             writeMessage = writeFileMessage
+        )
+    }
+    
+    // 文件选择器对话框
+    if (showDirectoryPickerDialog.value) {
+        DirectoryPickerDialog(
+            initialPath = historyStorageUri ?: "/storage/emulated/0",
+            onDismiss = { showDirectoryPickerDialog.value = false },
+            onDirectorySelected = { path ->
+                viewModel.setHistoryStorageUri(path)
+                showDirectoryPickerDialog.value = false
+            }
         )
     }
     
@@ -462,6 +474,16 @@ private fun LandscapeLayout(
                     Icon(
                         Icons.Default.History, 
                         contentDescription = stringResource(R.string.history),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { showSettingsDialog.value = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.settings_title),
                         modifier = Modifier.size(18.dp)
                     )
                 }

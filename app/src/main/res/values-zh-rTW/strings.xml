@@ -324,4 +324,7 @@
     <string name="filter_nbt_param">nbt參數</string>
     <string name="filter_param_converted">參數已轉換為</string>
     <string name="filter_converted">已轉換為</string>
+    
+    <!-- §m§n代碼轉換警告 -->
+    <string name="bedrock_font_to_color_warning">在基岩版中，§m_f/§n_f將被轉換為顏色代碼（§m/§n），而非字體格式（刪除線/底線）</string>
 </resources>

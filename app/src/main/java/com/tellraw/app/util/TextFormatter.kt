@@ -210,8 +210,8 @@ object TextFormatter {
         i = 0
         while (i < jsonText.length) {
             if (jsonText[i] == '§' && i + 1 < jsonText.length) {
-                // 检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
-                if (i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
+                // 如果启用了§m/§n_c/f模式，检查是否是§m_f/§m_c/§n_f/§n_c格式（4字符）
+                if (mnCFEnabled && i + 3 < jsonText.length && jsonText.substring(i, i + 4) in setOf("§m_f", "§m_c", "§n_f", "§n_c")) {
                     val code = jsonText.substring(i, i + 4)
                     tokens.add("format_code" to code)
                     i += 4
@@ -282,6 +282,15 @@ object TextFormatter {
                         "§v" -> currentFormat["color"] = "gold"  // material_resin
                     }
                 }
+                // §m_f/§m_c/§n_f/§n_c格式（优先处理，因为它们是4字符代码）
+                else if (code.startsWith("§m_") || code.startsWith("§n_")) {
+                    when (code) {
+                        "§m_f" -> currentFormat["strikethrough"] = true  // 删除线（字体方式）
+                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式）
+                        "§n_f" -> currentFormat["underlined"] = true  // 下划线（字体方式）
+                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式）
+                    }
+                }
                 // 格式代码（包含m和n）
                 else if (code[1] in "klmnor") {
                     when (code) {
@@ -310,15 +319,6 @@ object TextFormatter {
                             // 重置所有格式
                             currentFormat.clear()
                         }
-                    }
-                }
-                // §m_f/§m_c/§n_f/§n_c格式
-                else if (code.startsWith("§m_") || code.startsWith("§n_")) {
-                    when (code) {
-                        "§m_f" -> currentFormat["strikethrough"] = true  // 删除线（字体方式）
-                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式）
-                        "§n_f" -> currentFormat["underlined"] = true  // 下划线（字体方式）
-                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式）
                     }
                 }
             } else {  // token_type == 'text'
@@ -403,25 +403,23 @@ object TextFormatter {
         // §m -> material_redstone (深红色)
         // §n -> material_copper (铜色)
         if (mnCFEnabled) {
-            // 在§m/§n_c/f模式下，将§m_f/§m_c统一转换为§m（material_redstone）
+            // 在§m/§n_c/f模式下，先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
+            // 只移除后面不是_f或_c的§m和§n
+            processedText = processedText.replace(Regex("§m(?![_fn])"), "")
+            processedText = processedText.replace(Regex("§n(?![_fn])"), "")
+            // 然后将§m_f/§m_c统一转换为§m（material_redstone）
             processedText = processedText.replace("§m_f", "§m")
             processedText = processedText.replace("§m_c", "§m")
             // 将§n_f/§n_c统一转换为§n（material_copper）
             processedText = processedText.replace("§n_f", "§n")
             processedText = processedText.replace("§n_c", "§n")
-            // 普通的§m/§n被视为无效字符，需要移除
-            processedText = processedText.replace("§m", "")
-            processedText = processedText.replace("§n", "")
         } else {
-            // 非§m/§n_c/f模式下，将§m_f/§m_c/§n_f/§n_c统一缩写为§m/§n
-            processedText = processedText.replace("§m_f", "§m")
-            processedText = processedText.replace("§m_c", "§m")
-            processedText = processedText.replace("§n_f", "§n")
-            processedText = processedText.replace("§n_c", "§n")
+            // "选择§m/§n的处理方式模式"（非§m/§n_c/f模式）
             // 保留§m/§n作为基岩版特有颜色代码
             // §m -> material_redstone (深红色)
             // §n -> material_copper (铜色)
             // 注意：基岩版中§m和§n是有效的颜色代码，不需要转换
+            // 在这个模式下，§m_c等不会被识别为特殊格式，而是理解为§m + _c
         }
         
         // 处理其他基岩版特有颜色代码

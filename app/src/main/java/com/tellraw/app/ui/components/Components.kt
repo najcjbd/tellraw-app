@@ -319,183 +319,419 @@ fun SettingsDialog(
     onMNMixedModeChanged: (Boolean) -> Unit,
     onMNCFEnabledChanged: (Boolean) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(R.string.settings_title))
-        },
-        text = {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(400.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text(
-                    text = stringResource(R.string.mn_mixed_mode_config),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                // 混合模式开关
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
                 ) {
-                    Switch(
-                        checked = mnMixedMode,
-                        onCheckedChange = { enabled ->
-                            // 开启混合模式时，自动关闭§m/§n_c/f和字体/颜色选择
-                            if (enabled) {
-                                onMNCFEnabledChanged(false)
-                            }
-                            onMNMixedModeChanged(enabled)
-                        },
-                        enabled = !mnCFEnabled
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = stringResource(R.string.mn_mixed_mode),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (mnCFEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                            stringResource(R.string.settings_title),
+                            style = MaterialTheme.typography.titleMedium
                         )
-                        Text(
-                            text = stringResource(R.string.mn_mixed_mode_description),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
                 
-                // 只有当混合模式和§m/§n_c/f都关闭时，才显示字体/颜色选择
-                if (!mnMixedMode && !mnCFEnabled) {
+                // 设置内容
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     Text(
-                        text = stringResource(R.string.mn_handling_method_title),
-                        style = MaterialTheme.typography.bodyMedium
+                        text = stringResource(R.string.mn_mixed_mode_config),
+                        style = MaterialTheme.typography.titleMedium
                     )
                     
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // 混合模式开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = useJavaFontStyle,
-                                onClick = { 
-                                    // 选择字体模式时，保持混合模式和§m/§n_c/f关闭
-                                    onUseJavaFontStyleChanged(true)
+                        Switch(
+                            checked = mnMixedMode,
+                            onCheckedChange = { enabled ->
+                                // 开启混合模式时，自动关闭§m/§n_c/f和字体/颜色选择
+                                if (enabled) {
+                                    onMNCFEnabledChanged(false)
                                 }
+                                onMNMixedModeChanged(enabled)
+                            },
+                            enabled = !mnCFEnabled
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.mn_mixed_mode),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (mnCFEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = stringResource(R.string.mn_font_style),
-                                    style = MaterialTheme.typography.bodyMedium
+                            Text(
+                                text = stringResource(R.string.mn_mixed_mode_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // 只有当混合模式和§m/§n_c/f都关闭时，才显示字体/颜色选择
+                    if (!mnMixedMode && !mnCFEnabled) {
+                        Text(
+                            text = stringResource(R.string.mn_handling_method_title),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = useJavaFontStyle,
+                                    onClick = { 
+                                        // 选择字体模式时，保持混合模式和§m/§n_c/f关闭
+                                        onUseJavaFontStyleChanged(true)
+                                    }
                                 )
-                                Text(
-                                    text = stringResource(R.string.mn_font_style_description),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.mn_font_style),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.mn_font_style_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = !useJavaFontStyle,
+                                    onClick = { 
+                                        // 选择颜色模式时，保持混合模式和§m/§n_c/f关闭
+                                        onUseJavaFontStyleChanged(false)
+                                    }
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.mn_color_style),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.mn_color_style_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                        
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = !useJavaFontStyle,
-                                onClick = { 
-                                    // 选择颜色模式时，保持混合模式和§m/§n_c/f关闭
-                                    onUseJavaFontStyleChanged(false)
+                    }
+                    
+                    // §m/§n_c/f设置
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = mnCFEnabled,
+                            onCheckedChange = { enabled ->
+                                // 开启§m/§n_c/f时，自动关闭混合模式
+                                if (enabled) {
+                                    onMNMixedModeChanged(false)
                                 }
+                                onMNCFEnabledChanged(enabled)
+                            },
+                            enabled = !mnMixedMode
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.mn_cf_enabled),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (mnMixedMode) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = stringResource(R.string.mn_color_style),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    text = stringResource(R.string.mn_color_style_description),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                text = stringResource(R.string.mn_cf_enabled_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
                 
-                // §m/§n_c/f设置
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // 底部操作栏
+                Surface(
+                    tonalElevation = 2.dp
                 ) {
-                    Switch(
-                        checked = mnCFEnabled,
-                        onCheckedChange = { enabled ->
-                            // 开启§m/§n_c/f时，自动关闭混合模式
-                            if (enabled) {
-                                onMNMixedModeChanged(false)
-                            }
-                            onMNCFEnabledChanged(enabled)
-                        },
-                        enabled = !mnMixedMode
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.mn_cf_enabled),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (mnMixedMode) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.mn_cf_enabled_description),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.ok))
+                        }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.ok))
-            }
         }
-    )
+    } else {
+        // 竖屏：对话框布局
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(stringResource(R.string.settings_title))
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.mn_mixed_mode_config),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    
+                    // 混合模式开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = mnMixedMode,
+                            onCheckedChange = { enabled ->
+                                // 开启混合模式时，自动关闭§m/§n_c/f和字体/颜色选择
+                                if (enabled) {
+                                    onMNCFEnabledChanged(false)
+                                }
+                                onMNMixedModeChanged(enabled)
+                            },
+                            enabled = !mnCFEnabled
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.mn_mixed_mode),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (mnCFEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.mn_mixed_mode_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // 只有当混合模式和§m/§n_c/f都关闭时，才显示字体/颜色选择
+                    if (!mnMixedMode && !mnCFEnabled) {
+                        Text(
+                            text = stringResource(R.string.mn_handling_method_title),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = useJavaFontStyle,
+                                    onClick = { 
+                                        // 选择字体模式时，保持混合模式和§m/§n_c/f关闭
+                                        onUseJavaFontStyleChanged(true)
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.mn_font_style),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.mn_font_style_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = !useJavaFontStyle,
+                                    onClick = { 
+                                        // 选择颜色模式时，保持混合模式和§m/§n_c/f关闭
+                                        onUseJavaFontStyleChanged(false)
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.mn_color_style),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.mn_color_style_description),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // §m/§n_c/f设置
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = mnCFEnabled,
+                            onCheckedChange = { enabled ->
+                                // 开启§m/§n_c/f时，自动关闭混合模式
+                                if (enabled) {
+                                    onMNMixedModeChanged(false)
+                                }
+                                onMNCFEnabledChanged(enabled)
+                            },
+                            enabled = !mnMixedMode
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.mn_cf_enabled),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (mnMixedMode) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.mn_cf_enabled_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun HistoryDialog(
-    historyList: List<com.tellraw.app.data.local.CommandHistory>,
+    historyList: List<com.tellraw.app.data.repository.HistoryItem>,
     onDismiss: () -> Unit,
-    onLoadHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
-    onDeleteHistory: (com.tellraw.app.data.local.CommandHistory) -> Unit,
+    onLoadHistory: (com.tellraw.app.data.repository.HistoryItem) -> Unit,
+    onDeleteHistory: (com.tellraw.app.data.repository.HistoryItem) -> Unit,
     onClearAll: () -> Unit = {},
     onSearch: (String) -> Unit = {},
     onShowStorageSettings: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(stringResource(R.string.command_history))
-                IconButton(
-                    onClick = onShowStorageSettings
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = stringResource(R.string.settings_title)
-                    )
-                }
-            }
-        },
-        text = {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(400.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
             ) {
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            stringResource(R.string.command_history),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Row {
+                            IconButton(
+                                onClick = onShowStorageSettings,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.settings_title),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = onDismiss,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    androidx.compose.material.icons.Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.close),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
                 // 搜索框
                 OutlinedTextField(
                     value = searchQuery,
@@ -504,7 +740,9 @@ fun HistoryDialog(
                         onSearch(it)
                     },
                     label = { Text(stringResource(R.string.search_history)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { 
@@ -517,11 +755,12 @@ fun HistoryDialog(
                     }
                 )
                 
+                // 历史记录列表
                 if (historyList.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp),
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -543,7 +782,10 @@ fun HistoryDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 400.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(historyList) { history ->
@@ -555,33 +797,150 @@ fun HistoryDialog(
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (historyList.isNotEmpty()) {
-                    TextButton(
-                        onClick = {
-                            onClearAll()
-                            onDismiss()
-                        }
+                
+                // 底部操作栏
+                Surface(
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(stringResource(R.string.clear_history))
+                        if (historyList.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = {
+                                    onClearAll()
+                                    onDismiss()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.clear_history))
+                            }
+                        }
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.close))
+                        }
                     }
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.close))
                 }
             }
         }
-    )
+    } else {
+        // 竖屏：对话框布局
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.command_history))
+                    IconButton(
+                        onClick = onShowStorageSettings
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.settings_title)
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 搜索框
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { 
+                            searchQuery = it
+                            onSearch(it)
+                        },
+                        label = { Text(stringResource(R.string.search_history)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { 
+                                    searchQuery = ""
+                                    onSearch("")
+                                }) {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_history))
+                                }
+                            }
+                        }
+                    )
+                    
+                    if (historyList.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (searchQuery.isEmpty()) stringResource(R.string.no_history) else stringResource(R.string.no_search_results),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 400.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(historyList) { history ->
+                                HistoryItem(
+                                    history = history,
+                                    onLoad = { onLoadHistory(history) },
+                                    onDelete = { onDeleteHistory(history) }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (historyList.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                onClearAll()
+                                onDismiss()
+                            }
+                        ) {
+                            Text(stringResource(R.string.clear_history))
+                        }
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.close))
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun HistoryItem(
-    history: com.tellraw.app.data.local.CommandHistory,
+    history: com.tellraw.app.data.repository.HistoryItem,
     onLoad: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -663,177 +1022,404 @@ fun HistoryStorageSettingsDialog(
     isWriting: Boolean = false,
     writeMessage: String? = null
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(R.string.storage_settings))
-        },
-        text = {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(400.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
             ) {
-                Text(
-                    text = stringResource(R.string.storage_location),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                // 存储目录
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                        Text(
+                            stringResource(R.string.storage_settings),
+                            style = MaterialTheme.typography.titleMedium
                         )
-                        Column(
-                            modifier = Modifier.weight(1f)
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp)
                         ) {
-                            Text(
-                                text = stringResource(R.string.storage_directory),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Text(
-                                text = if (storageUri != null) stringResource(R.string.storage_directory_selected) else stringResource(R.string.storage_directory_not_set),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (storageUri != null) 
-                                    MaterialTheme.colorScheme.onSurface 
-                                else 
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(onClick = onSelectDirectory) {
                             Icon(
-                                Icons.Default.Edit,
-                                contentDescription = stringResource(R.string.select_directory)
+                                androidx.compose.material.icons.Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                 }
                 
-                // 文件名
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                // 设置内容
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.storage_filename),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Text(
-                                text = filename,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = onEditFilename) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = stringResource(R.string.set_filename)
-                            )
-                        }
-                    }
-                }
-                
-                // 提示信息
-                if (storageUri == null) {
                     Text(
-                        text = stringResource(R.string.sandbox_storage_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = stringResource(R.string.storage_location),
+                        style = MaterialTheme.typography.titleMedium
                     )
-                }
-                
-                // 写入状态消息
-                if (writeMessage != null) {
+                    
+                    // 存储目录
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (writeMessage.contains(stringResource(R.string.success)))
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                MaterialTheme.colorScheme.errorContainer
-                        )
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = writeMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (writeMessage.contains(stringResource(R.string.success)))
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                else
-                                    MaterialTheme.colorScheme.onErrorContainer
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            // 如果消息包含"权限"，显示授予权限按钮
-                            if (writeMessage.contains("权限") && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                TextButton(
-                                    onClick = onGrantAllFilesAccess,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(stringResource(R.string.grant_all_files_access))
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.storage_directory),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = if (storageUri != null) stringResource(R.string.storage_directory_selected) else stringResource(R.string.storage_directory_not_set),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (storageUri != null) 
+                                        MaterialTheme.colorScheme.onSurface 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = onSelectDirectory) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.select_directory)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 文件名
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.storage_filename),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = filename,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(onClick = onEditFilename) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.set_filename)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 提示信息
+                    if (storageUri == null) {
+                        Text(
+                            text = stringResource(R.string.sandbox_storage_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    // 写入状态消息
+                    if (writeMessage != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (writeMessage.contains(stringResource(R.string.success)))
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Text(
+                                    text = writeMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (writeMessage.contains(stringResource(R.string.success)))
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                // 如果消息包含"权限"，显示授予权限按钮
+                                if (writeMessage.contains("权限") && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = onGrantAllFilesAccess,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(stringResource(R.string.grant_all_files_access))
+                                    }
                                 }
                             }
                         }
                     }
+                    
+                    // 清除设置按钮
+                    if (storageUri != null) {
+                        OutlinedButton(
+                            onClick = onClearSettings,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.clear_storage_settings))
+                        }
+                    }
                 }
                 
-                // 清除设置按钮
-                if (storageUri != null) {
-                    OutlinedButton(
-                        onClick = onClearSettings,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.clear_storage_settings))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Button(
-                    onClick = onWriteToFile,
-                    enabled = !isWriting
+                // 底部操作栏
+                Surface(
+                    tonalElevation = 2.dp
                 ) {
-                    if (isWriting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        Button(
+                            onClick = onWriteToFile,
+                            enabled = !isWriting,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isWriting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
+                        }
                     }
-                    Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
                 }
             }
         }
-    )
+    } else {
+        // 竖屏：对话框布局
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(stringResource(R.string.storage_settings))
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.storage_location),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    
+                    // 存储目录
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.storage_directory),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = if (storageUri != null) stringResource(R.string.storage_directory_selected) else stringResource(R.string.storage_directory_not_set),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (storageUri != null) 
+                                        MaterialTheme.colorScheme.onSurface 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = onSelectDirectory) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.select_directory)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 文件名
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.storage_filename),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = filename,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(onClick = onEditFilename) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.set_filename)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // 提示信息
+                    if (storageUri == null) {
+                        Text(
+                            text = stringResource(R.string.sandbox_storage_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    // 写入状态消息
+                    if (writeMessage != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (writeMessage.contains(stringResource(R.string.success)))
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Text(
+                                    text = writeMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (writeMessage.contains(stringResource(R.string.success)))
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                // 如果消息包含"权限"，显示授予权限按钮
+                                if (writeMessage.contains("权限") && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = onGrantAllFilesAccess,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(stringResource(R.string.grant_all_files_access))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 清除设置按钮
+                    if (storageUri != null) {
+                        OutlinedButton(
+                            onClick = onClearSettings,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.clear_storage_settings))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = onWriteToFile,
+                        enabled = !isWriting
+                    ) {
+                        if (isWriting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -917,4 +1503,319 @@ fun FileExistsDialog(
             }
         }
     )
+}
+
+/**
+ * 文件夹选择器对话框（替代SAF）
+ * 使用传统的文件管理器界面，只允许选择文件夹
+ */
+@Composable
+fun DirectoryPickerDialog(
+    initialPath: String = "/storage/emulated/0",
+    onDismiss: () -> Unit,
+    onDirectorySelected: (String) -> Unit
+) {
+    var currentPath by remember { mutableStateOf(initialPath) }
+    var directories by remember { mutableStateOf<List<String>>(emptyList()) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    // 加载当前目录的文件夹列表
+    LaunchedEffect(currentPath) {
+        try {
+            val file = java.io.File(currentPath)
+            if (file.exists() && file.isDirectory) {
+                directories = file.listFiles()
+                    ?.filter { it.isDirectory }
+                    ?.map { it.name }
+                    ?.sorted()
+                    ?: emptyList()
+            } else {
+                directories = emptyList()
+            }
+        } catch (e: Exception) {
+            directories = emptyList()
+        }
+    }
+    
+    if (isLandscape) {
+        // 横屏布局：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(400.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+            ) {
+                // 标题栏
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.storage_directory_selected),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+                    }
+                }
+                
+                Divider()
+                
+                // 当前路径显示
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = currentPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2
+                        )
+                    }
+                }
+                
+                // 文件夹列表
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // 返回上一级按钮
+                        if (currentPath != "/") {
+                            item {
+                                androidx.compose.material3.ListItem(
+                                    headlineContent = { Text("..") },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.Folder,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        val parentFile = java.io.File(currentPath).parentFile
+                                        if (parentFile != null) {
+                                            currentPath = parentFile.absolutePath
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        
+                        // 文件夹列表
+                        items(directories) { dirName ->
+                            androidx.compose.material3.ListItem(
+                                headlineContent = { Text(dirName) },
+                                leadingContent = {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    currentPath = "$currentPath/$dirName"
+                                }
+                            )
+                        }
+                        
+                        // 空状态
+                        if (directories.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.no_history),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 操作按钮
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { onDirectorySelected(currentPath) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.storage_directory_selected))
+                    }
+                }
+            }
+        }
+    } else {
+        // 竖屏布局：上下分栏
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDismiss,
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.8f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+            ) {
+                // 当前路径显示
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = currentPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // 文件夹列表
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // 返回上一级按钮
+                        if (currentPath != "/") {
+                            item {
+                                androidx.compose.material3.ListItem(
+                                    headlineContent = { Text("..") },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.Folder,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        val parentFile = java.io.File(currentPath).parentFile
+                                        if (parentFile != null) {
+                                            currentPath = parentFile.absolutePath
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        
+                        // 文件夹列表
+                        items(directories) { dirName ->
+                            androidx.compose.material3.ListItem(
+                                headlineContent = { Text(dirName) },
+                                leadingContent = {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    currentPath = "$currentPath/$dirName"
+                                }
+                            )
+                        }
+                        
+                        // 空状态
+                        if (directories.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.no_history),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // 操作按钮
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { onDirectorySelected(currentPath) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.storage_directory_selected))
+                    }
+                }
+            }
+        }
+    }
 }
