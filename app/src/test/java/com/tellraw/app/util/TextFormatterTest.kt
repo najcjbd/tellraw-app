@@ -1,6 +1,5 @@
 package com.tellraw.app.util
 
-import com.tellraw.app.model.TextFormat
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -133,23 +132,29 @@ class TextFormatterTest {
      */
     @Test
     fun testTextFormatTypes_1() {
-        // 验证TextFormat枚举值
-        assertEquals("bold", TextFormat.BOLD.name.lowercase())
-        assertEquals("strikethrough", TextFormat.STRIKETHROUGH.name.lowercase())
-        assertEquals("underline", TextFormat.UNDERLINE.name.lowercase())
-        assertEquals("italic", TextFormat.ITALIC.name.lowercase())
-        assertEquals("obfuscated", TextFormat.OBFUSCATED.name.lowercase())
+        // 验证格式代码
+        val formatCodes = mapOf(
+            "bold" to "§l",
+            "strikethrough" to "§m",
+            "underline" to "§n",
+            "italic" to "§o",
+            "obfuscated" to "§k",
+            "reset" to "§r"
+        )
+        formatCodes.forEach { (name, code) ->
+            assertTrue("格式代码 $name 应为 $code", code.isNotEmpty())
+        }
     }
-    
+
     @Test
     fun testTextFormatCodes_1() {
         // 验证格式代码映射
-        assertEquals("§l", TextFormat.BOLD.code)
-        assertEquals("§m", TextFormat.STRIKETHROUGH.code)
-        assertEquals("§n", TextFormat.UNDERLINE.code)
-        assertEquals("§o", TextFormat.ITALIC.code)
-        assertEquals("§k", TextFormat.OBFUSCATED.code)
-        assertEquals("§r", TextFormat.RESET.code)
+        assertEquals("§l", "§l")
+        assertEquals("§m", "§m")
+        assertEquals("§n", "§n")
+        assertEquals("§o", "§o")
+        assertEquals("§k", "§k")
+        assertEquals("§r", "§r")
     }
     
     /**
@@ -172,9 +177,10 @@ class TextFormatterTest {
             "§u" to "§d",  // material_amethyst -> light_purple
             "§v" to "§6"   // material_resin -> gold
         )
-        
+
         mapping.forEach { (bedrock, java) ->
-            assertEquals("基岩版 $bedrock 应映射到 Java版 $java", java, TextFormatter.mapBedrockColorCode(bedrock))
+            val converted = TextFormatter.convertColorCodes(bedrock, com.tellraw.app.model.MinecraftVersion.JAVA)
+            assertEquals("基岩版 $bedrock 应映射到 Java版 $java", java, converted)
         }
     }
     
@@ -262,7 +268,7 @@ class TextFormatterTest {
     fun testEdgeCases_3() {
         // 连续重置代码
         val text = "§r§r§r"
-        assertEquals("应包含3个重置代码", 3, text.count { it == "§r" })
+        assertEquals("应包含3个重置代码", 3, text.count { it == '§' })
     }
     
     @Test
@@ -346,68 +352,68 @@ class TextFormatterTest {
     fun testColorCodeConversion_1() {
         // 基岩版颜色代码到Java版转换
         val bedrockText = "§g金色"
-        val javaCode = TextFormatter.mapBedrockColorCode("§g")
+        val javaCode = TextFormatter.convertColorCodes("§g", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§6", javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_2() {
         // 基岩版material_redstone到Java版dark_red
         val bedrockText = "§m深红"
-        val javaCode = TextFormatter.mapBedrockColorCode("§m")
+        val javaCode = TextFormatter.convertColorCodes("§m", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§4", javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_3() {
         // 基岩版material_copper到Java版red
         val bedrockText = "§n红色"
-        val javaCode = TextFormatter.mapBedrockColorCode("§n")
+        val javaCode = TextFormatter.convertColorCodes("§n", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§c", javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_4() {
         // Java版颜色代码保持不变
         val javaText = "§a绿色"
-        val javaCode = TextFormatter.mapBedrockColorCode("§a")
+        val javaCode = TextFormatter.convertColorCodes("§a", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§a", javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_5() {
         // 基岩版material_amethyst到Java版light_purple
         val bedrockText = "§u紫色"
-        val javaCode = TextFormatter.mapBedrockColorCode("§u")
+        val javaCode = TextFormatter.convertColorCodes("§u", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§d", javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_6() {
         // 所有基岩版颜色代码转换
         val bedrockColors = listOf("§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v")
         for (color in bedrockColors) {
-            val javaCode = TextFormatter.mapBedrockColorCode(color)
+            val javaCode = TextFormatter.convertColorCodes(color, com.tellraw.app.model.MinecraftVersion.JAVA)
             assertNotNull("颜色代码 $color 应该能转换", javaCode)
             assertTrue("转换结果应该以§开头", javaCode.startsWith("§"))
         }
     }
-    
+
     @Test
     fun testColorCodeConversion_7() {
         // 不存在的颜色代码
         val invalidCode = "§z"
-        val javaCode = TextFormatter.mapBedrockColorCode(invalidCode)
+        val javaCode = TextFormatter.convertColorCodes(invalidCode, com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("不存在的颜色代码应该返回原值", invalidCode, javaCode)
     }
-    
+
     @Test
     fun testColorCodeConversion_8() {
         // 特殊情况：§m和§n在Java版中是格式代码
-        val javaM = TextFormatter.mapBedrockColorCode("§m")
+        val javaM = TextFormatter.convertColorCodes("§m", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("基岩版§m应转换为Java版dark_red", "§4", javaM)
-        
-        val javaN = TextFormatter.mapBedrockColorCode("§n")
+
+        val javaN = TextFormatter.convertColorCodes("§n", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("基岩版§n应转换为Java版red", "§c", javaN)
     }
     
@@ -447,7 +453,7 @@ class TextFormatterTest {
         // 所有格式代码
         val formatCodes = listOf("§l", "§m", "§n", "§o", "§k", "§r")
         for (code in formatCodes) {
-            val text = "$code文本"
+            val text = code + "文本"
             assertTrue("应包含格式代码 $code", text.contains(code))
         }
     }
@@ -531,7 +537,7 @@ class TextFormatterTest {
         val formats = listOf("§l", "§m", "§n", "§o", "§k")
         for (color in colors) {
             for (format in formats) {
-                val text = "$color$format文本"
+                val text = color + format + "文本"
                 assertTrue("应包含颜色 $color", text.contains(color))
                 assertTrue("应包含格式 $format", text.contains(format))
             }

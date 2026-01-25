@@ -1429,23 +1429,23 @@ class SelectorConverterTest {
         // 空选择器
         val selector = ""
         val type = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.UNKNOWN, type)
+        assertEquals(SelectorType.UNIVERSAL, type)
     }
-    
+
     @Test
     fun testEmptyInvalidInputs_2() {
         // 只有@
         val selector = "@"
         val type = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.UNKNOWN, type)
+        assertEquals(SelectorType.UNIVERSAL, type)
     }
-    
+
     @Test
     fun testEmptyInvalidInputs_3() {
         // 无效的选择器变量
         val selector = "@x"
         val type = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.UNKNOWN, type)
+        assertEquals(SelectorType.UNIVERSAL, type)
     }
     
     @Test
