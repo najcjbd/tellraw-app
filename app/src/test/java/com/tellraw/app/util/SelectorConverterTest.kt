@@ -1281,11 +1281,10 @@ class SelectorConverterTest {
      */
     @Test
     fun testHasitemNbtEdgeCases_1() {
-        // 空hasitem数组应该被移除
+        // 空hasitem数组应该转换为空的nbt参数
         val bedrockSelector = "@a[hasitem=[]]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertFalse("空hasitem数组应该被移除", conversion.javaSelector.contains("hasitem"))
-        assertFalse("空hasitem数组不应该转换为nbt", conversion.javaSelector.contains("nbt="))
+        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
@@ -1298,29 +1297,29 @@ class SelectorConverterTest {
     
     @Test
     fun testHasitemNbtEdgeCases_3() {
-        // hasitem只有quantity，没有item，应该被移除
+        // hasitem只有quantity，应该转换为nbt参数中的Count
         val bedrockSelector = "@a[hasitem={quantity=5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertFalse("只有quantity的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
-        assertFalse("只有quantity的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
+        assertTrue("quantity应该被转换为Count", conversion.javaSelector.contains("Count:"))
+        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
     fun testHasitemNbtEdgeCases_4() {
-        // hasitem只有location，没有item，应该被移除
+        // hasitem只有location，应该转换为nbt参数中的Slot
         val bedrockSelector = "@a[hasitem={location=slot.hotbar}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertFalse("只有location的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
-        assertFalse("只有location的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
+        assertTrue("location应该被转换为Slot", conversion.javaSelector.contains("Slot:"))
+        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
     fun testHasitemNbtEdgeCases_5() {
-        // hasitem只有slot，没有item，应该被移除
+        // hasitem只有slot，应该转换为nbt参数中的Slot
         val bedrockSelector = "@a[hasitem={slot=5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertFalse("只有slot的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
-        assertFalse("只有slot的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
+        assertTrue("slot应该被转换为Slot", conversion.javaSelector.contains("Slot:"))
+        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
