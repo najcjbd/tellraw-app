@@ -510,7 +510,20 @@ object TextFormatter {
             "§c" to "red",
             "§d" to "light_purple",
             "§e" to "yellow",
-            "§f" to "white"
+            "§f" to "white",
+            // 基岩版特有颜色代码
+            "§g" to "minecoin_gold",
+            "§h" to "material_quartz",
+            "§i" to "material_iron",
+            "§j" to "material_netherite",
+            "§m" to "material_redstone",
+            "§n" to "material_copper",
+            "§p" to "material_gold",
+            "§q" to "material_emerald",
+            "§s" to "material_diamond",
+            "§t" to "material_lapis",
+            "§u" to "material_amethyst",
+            "§v" to "material_resin"
         )
         return colorNames[colorCode] ?: "white"
     }

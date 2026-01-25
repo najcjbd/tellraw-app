@@ -1025,7 +1025,7 @@ object SelectorConverter {
         
         // 检查是否需要修改选择器变量（用于 sort=random 的 @a/@r 转换）
         var finalSelectorVar = selectorVar
-        if (paramsPart.startsWith("__SELECTOR_VAR_CHANGE_TO__")) {
+        if (paramsPart.contains("__SELECTOR_VAR_CHANGE_TO__")) {
             val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__([@\\w]+)__").find(paramsPart)
             if (matchResult != null) {
                 finalSelectorVar = matchResult.groupValues[1]
@@ -2090,10 +2090,12 @@ object SelectorConverter {
                 if (slotNum == -106) continue
 
                 // 确定位置类型
+                // Java版的格子0-8等于基岩版的location=slot.hotbar,slot=0-8
+                // Java版的格子大于8那么基岩版就是location=slot.inventory,slot=JAVA版数字-9
                 val (location, hasitemSlot) = if (slotNum >= 0 && slotNum <= 8) {
                     "slot.hotbar" to slotNum.toString()
                 } else {
-                    "slot.inventory" to (slotNum + 9).toString()
+                    "slot.inventory" to (slotNum - 9).toString()
                 }
 
                 val hasitemItem = parseNbtItemToHasitem(itemData, location, hasitemSlot, reminders, context)
