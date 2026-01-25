@@ -261,8 +261,9 @@ object SelectorConverter {
         val (convertedSelector, paramReminders) = filterSelectorParameters(newSelector, SelectorType.JAVA, context)
         reminders.addAll(paramReminders)
         
-        // 进一步转换参数格式
-        val javaSelector = convertBedrockParametersToJava(convertedSelector, reminders, context)
+        // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertBedrockParametersToJava
+        // 直接返回转换后的选择器
+        val javaSelector = convertedSelector
         
         // 如果参数发生了变化，也认为发生了转换
         if (javaSelector != newSelector) {
@@ -288,8 +289,9 @@ object SelectorConverter {
         val (convertedSelector, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
 
-        // 进一步转换参数格式
-        var bedrockSelector = convertJavaParametersToBedrock(convertedSelector, reminders, context)
+        // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertJavaParametersToBedrock
+        // 直接返回转换后的选择器
+        var bedrockSelector = convertedSelector
 
         return SelectorConversionResult(
             javaSelector = selector,
@@ -385,7 +387,15 @@ object SelectorConverter {
         }
         
         // 根据目标版本进行参数转换
-        if (targetVersion == SelectorType.BEDROCK) {
+        if (targetVersion == SelectorType.JAVA) {
+            // 基岩版到Java版的参数转换
+            paramsPart = convertR_RmToDistance(paramsPart, conversionReminders, context)
+            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders, context)
+            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders, context)
+            paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
+            paramsPart = convertMToGamemode(paramsPart, conversionReminders, context)
+            paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
+        } else if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
             paramsPart = convertDistanceParameters(paramsPart, conversionReminders, context)
             paramsPart = convertRotationParameters(paramsPart, conversionReminders, context)
@@ -1843,32 +1853,46 @@ object SelectorConverter {
         var result = paramsPart
 
         // 处理数组格式：hasitem=[{...},{...}]
-        val arrayPattern = "hasitem=\\[([^\\[\\]]*)\\]".toRegex()
-        result = result.replace(arrayPattern) { match ->
-            val fullMatch = match.value
-            val content = match.groupValues[1]
-            val nbtResult = parseHasitemArray(content, reminders, context)
+        val arrayPattern = "hasitem=\\[".toRegex()
+        val arrayMatch = arrayPattern.find(paramsPart)
 
-            if (nbtResult.isNotEmpty()) {
-                nbtResult
-            } else {
-                reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
-                fullMatch
+        if (arrayMatch != null) {
+            val startIndex = arrayMatch.range.first
+            // 找到匹配的 hasitem 数组的完整内容
+            val arrayContent = extractArrayContent(paramsPart.substring(startIndex + 9))
+
+            if (arrayContent != null) {
+                val fullMatch = "hasitem=[$arrayContent]"
+                val nbtResult = parseHasitemArray(arrayContent, reminders, context)
+
+                if (nbtResult.isNotEmpty()) {
+                    result = result.replace(fullMatch, nbtResult)
+                } else {
+                    // 空数组或转换失败，移除整个 hasitem 参数
+                    result = result.replace(fullMatch, "")
+                }
             }
         }
 
         // 处理简单格式：hasitem={...}
-        val simplePattern = "hasitem=\\{([^}]*)\\}".toRegex()
-        result = result.replace(simplePattern) { match ->
-            val fullMatch = match.value
-            val content = match.groupValues[1]
-            val nbtResult = parseHasitemSingle(content, reminders, context)
+        val simplePattern = "hasitem=\\{".toRegex()
+        val simpleMatch = simplePattern.find(result)
 
-            if (nbtResult.isNotEmpty()) {
-                nbtResult
-            } else {
-                reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
-                fullMatch
+        if (simpleMatch != null && simpleMatch.range.first >= 0) {
+            val startIndex = simpleMatch.range.first
+            // 找到匹配的 hasitem 对象的完整内容
+            val objectContent = extractObjectContent(result.substring(startIndex + 9))
+
+            if (objectContent != null) {
+                val fullMatch = "hasitem={$objectContent}"
+                val nbtResult = parseHasitemSingle(objectContent, reminders, context)
+
+                if (nbtResult.isNotEmpty()) {
+                    result = result.replace(fullMatch, nbtResult)
+                } else {
+                    // 无效参数或转换失败，移除整个 hasitem 参数
+                    result = result.replace(fullMatch, "")
+                }
             }
         }
 
@@ -1878,6 +1902,77 @@ object SelectorConverter {
         result = result.replace("\\[".toRegex(), "[")
 
         return result to reminders
+    }
+
+    /**
+     * 提取完整的数组内容
+     */
+    private fun extractArrayContent(str: String): String? {
+        var bracketCount = 0
+        var braceCount = 0
+        var result = StringBuilder()
+
+        for (char in str) {
+            when (char) {
+                '[' -> {
+                    bracketCount++
+                    result.append(char)
+                }
+                ']' -> {
+                    bracketCount--
+                    result.append(char)
+                    if (bracketCount == 0) {
+                        return result.substring(1, result.length - 1) // 去掉外层方括号
+                    }
+                }
+                '{' -> {
+                    braceCount++
+                    result.append(char)
+                }
+                '}' -> {
+                    braceCount--
+                    result.append(char)
+                }
+                else -> {
+                    if (bracketCount > 0) {
+                        result.append(char)
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 提取完整的对象内容
+     */
+    private fun extractObjectContent(str: String): String? {
+        var braceCount = 0
+        var result = StringBuilder()
+
+        for (char in str) {
+            when (char) {
+                '{' -> {
+                    braceCount++
+                    result.append(char)
+                }
+                '}' -> {
+                    braceCount--
+                    result.append(char)
+                    if (braceCount == 0) {
+                        return result.substring(1, result.length - 1) // 去掉外层花括号
+                    }
+                }
+                else -> {
+                    if (braceCount > 0) {
+                        result.append(char)
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
     /**
@@ -2154,22 +2249,57 @@ object SelectorConverter {
         val reminders = mutableListOf<String>()
         var result = paramsPart
 
-        // 匹配 nbt 参数
-        val nbtPattern = "nbt=(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
-        result = result.replace(nbtPattern) { match ->
-            val fullMatch = match.value
-            val nbtContent = match.groupValues[1]
+        // 匹配 nbt 参数 - 使用更智能的方法来提取 nbt 内容
+        val nbtPattern = "nbt=\\{".toRegex()
+        val nbtMatch = nbtPattern.find(paramsPart)
 
-            val hasitemResult = parseNbtToHasitem(nbtContent, reminders, context)
+        if (nbtMatch != null) {
+            val startIndex = nbtMatch.range.first
+            // 找到匹配的 nbt 参数的完整内容
+            val nbtContent = extractNbtContent(paramsPart.substring(startIndex + 5))
 
-            if (hasitemResult.isNotEmpty()) {
-                "hasitem=$hasitemResult"
-            } else {
-                fullMatch
+            if (nbtContent != null) {
+                val fullMatch = "nbt={$nbtContent}"
+                val hasitemResult = parseNbtToHasitem(nbtContent, reminders, context)
+
+                if (hasitemResult.isNotEmpty()) {
+                    result = result.replace(fullMatch, "hasitem=$hasitemResult")
+                }
             }
         }
 
         return result to reminders
+    }
+
+    /**
+     * 提取完整的 nbt 内容
+     */
+    private fun extractNbtContent(str: String): String? {
+        var braceCount = 0
+        var result = StringBuilder()
+
+        for (char in str) {
+            when (char) {
+                '{' -> {
+                    braceCount++
+                    result.append(char)
+                }
+                '}' -> {
+                    braceCount--
+                    result.append(char)
+                    if (braceCount == 0) {
+                        return result.toString()
+                    }
+                }
+                else -> {
+                    if (braceCount > 0) {
+                        result.append(char)
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
     /**
