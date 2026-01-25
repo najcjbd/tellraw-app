@@ -97,12 +97,12 @@
     <string name="hasitem_conversion_failed">hasitem轉換失敗，保留原參數</string>
     <string name="nbt_converted">nbt已轉換為hasitem格式，可能無法完全保留原意</string>
     <string name="hasitem_location_not_supported">警告：基岩版location=%s在Java版無對應功能，已移除</string>
-    <string name="hasitem_quantity_min_only">注意：quantity=%s.. 已轉換為 %s</string>
-    <string name="hasitem_quantity_max_only">注意：quantity=..%s 已轉換為 %s</string>
+    <string name="hasitem_quantity_min_only">注意：quantity=%s.. 已轉換為 %sb</string>
+    <string name="hasitem_quantity_max_only">注意：quantity=..%s 已轉換為 %sb</string>
     <string name="hasitem_quantity_range">注意：quantity=%1$s..%2$s 已轉換為 %3$s（中間值）</string>
     <string name="hasitem_quantity_negation_not_supported">警告：quantity反選（!）在Java版不支援，已移除</string>
-    <string name="hasitem_slot_min_only">注意：slot=%s.. 已轉換為 %s</string>
-    <string name="hasitem_slot_max_only">注意：slot=..%s 已轉換為 %s</string>
+    <string name="hasitem_slot_min_only">注意：slot=%s..</string>
+    <string name="hasitem_slot_max_only">注意：slot=..%s</string>
     <string name="hasitem_slot_negation_not_supported">警告：slot反選（!）在Java版不支援，已移除</string>
     <string name="help_usage_tips">使用提示</string>
     <string name="help_usage_tips_content">1. 輸入選擇器和訊息\n2. 自動偵測選擇器類型\n3. 產生Java版和基岩版指令\n4. 複製或分享指令\n5. 選擇器參數轉換需人工檢查\n\n遇到§m§n代碼時：\n• 字體方式：Java版保持原樣，基岩版用顏色代碼\n• 顏色代碼方式：兩版都用顏色代碼</string>
@@ -180,7 +180,7 @@
     <string name="note_java_unsupported_params">注意：Java版不支援以下參數，已移除: %s</string>
     <string name="note_java_specific">注意：%s</string>
     <string name="note_bedrock_unsupported_params">注意：基岩版不支援以下參數，已移除: %s</string>
-    <string name="note_bedrock_selector_converted">注意：基岩版選擇器 %s 在Java版不支援，已轉換為 %s</string>
+    <string name="note_bedrock_selector_converted">注意：基岩版選擇器 %1$s 在Java版不支援，已轉換為 %2$s</string>
     <string name="command_generation_error">指令產生錯誤</string>
     <string name="command_generation_error_with_message">指令產生錯誤: %s</string>
     <string name="share_tellraw_command">分享Tellraw指令</string>
@@ -194,7 +194,7 @@
     <string name="server_error">伺服器錯誤: %s</string>
     
     <!-- SelectorConverter 轉換提醒 -->
-    <string name="bedrock_selector_converted">基岩版選擇器 %s 在Java版不支援，已轉換為 %s</string>
+    <string name="bedrock_selector_converted">基岩版選擇器 %1$s 在Java版不支援，已轉換為 %2$s</string>
     <string name="bedrock_scores_negation_removed">基岩版scores反選參數%s在Java版不支援，已移除</string>
     <string name="java_sort_nearest_converted">Java版sort=nearest已轉換為基岩版c=%s</string>
     <string name="java_sort_furthest_converted">Java版sort=furthest已轉換為基岩版c=%s</string>
@@ -203,7 +203,7 @@
     <string name="java_sort_random_converted">Java版%s[sort=random]已轉換為基岩版@r[c=%s]</string>
     <string name="java_sort_random_to_c">Java版sort=random已轉換為基岩版c=%s</string>
     <string name="java_sort_not_supported">Java版sort=%s在基岩版不支援，已移除</string>
-    <string name="java_limit_converted">Java版limit=%s已轉換為基岩版c=%s</string>
+    <string name="java_limit_converted">Java版limit=%1$s已轉換為基岩版c=%2$s</string>
     <string name="limit_description">limit限制數量，c由近到遠</string>
     <string name="bedrock_param_not_supported">警告：基岩版%s參數在Java版不支援，已移除</string>
     <string name="bedrock_param_no_equivalent">警告：基岩版%s參數在Java版無對應功能，已移除</string>

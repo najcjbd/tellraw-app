@@ -91,7 +91,7 @@ class TextFormatterTest {
      * 测试组4：混合模式测试
      */
     @Test
- fun testMixedMode_1() {
+    fun testMixedMode_1() {
         // §m_f 字体方式
         val text = "§m_f删除线文本"
         assertTrue("应包含§m_f", text.contains("§m_f"))
@@ -336,7 +336,7 @@ class TextFormatterTest {
         
         bedrockColorNames.forEach { (code, name) ->
             assertEquals("基岩版颜色代码 §$code 应对应 $name", name, TextFormatter.getColorName("§$code"))
-        )
+        }
     }
     
     /**

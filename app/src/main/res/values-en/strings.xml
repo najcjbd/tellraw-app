@@ -93,12 +93,12 @@
     <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
     <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
     <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
-    <string name="hasitem_quantity_min_only">Note: quantity=%s.. converted to %s</string>
-    <string name="hasitem_quantity_max_only">Note: quantity=..%s converted to %s</string>
+    <string name="hasitem_quantity_min_only">Note: quantity=%s.. converted to %sb</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%s converted to %sb</string>
     <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s converted to %3$s (middle value)</string>
     <string name="hasitem_quantity_negation_not_supported">Warning: quantity negation (!) not supported in Java, removed</string>
-    <string name="hasitem_slot_min_only">Note: slot=%s.. converted to %s</string>
-    <string name="hasitem_slot_max_only">Note: slot=..%s converted to %s</string>
+    <string name="hasitem_slot_min_only">Note: slot=%s..</string>
+    <string name="hasitem_slot_max_only">Note: slot=..%s</string>
     <string name="hasitem_slot_negation_not_supported">Warning: slot negation (!) not supported in Java, removed</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
@@ -176,7 +176,7 @@
     <string name="note_java_unsupported_params">Note: Java doesn\'t support these, removed: %s</string>
     <string name="note_java_specific">Note: %s</string>
     <string name="note_bedrock_unsupported_params">Note: Bedrock doesn\'t support these, removed: %s</string>
-    <string name="note_bedrock_selector_converted">Note: Bedrock selector %s not supported in Java, converted to %s</string>
+    <string name="note_bedrock_selector_converted">Note: Bedrock selector %1$s not supported in Java, converted to %2$s</string>
     <string name="command_generation_error">Command generation error</string>
     <string name="command_generation_error_with_message">Command generation error: %s</string>
     <string name="share_tellraw_command">Share Tellraw Command</string>
@@ -190,7 +190,7 @@
     <string name="server_error">Server error: %s</string>
     
     <!-- SelectorConverter Conversion Warnings -->
-    <string name="bedrock_selector_converted">Bedrock selector %s not supported in Java, converted to %s</string>
+    <string name="bedrock_selector_converted">Bedrock selector %1$s not supported in Java, converted to %2$s</string>
     <string name="bedrock_scores_negation_removed">Bedrock scores negation %s not supported in Java, removed</string>
     <string name="java_sort_nearest_converted">Java sort=nearest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
@@ -199,7 +199,7 @@
     <string name="java_sort_random_converted">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
     <string name="java_sort_random_to_c">Java sort=random converted to Bedrock c=%s</string>
     <string name="java_sort_not_supported">Java sort=%s not supported in Bedrock, removed</string>
-    <string name="java_limit_converted">Java limit=%s converted to Bedrock c=%s</string>
+    <string name="java_limit_converted">Java limit=%1$s converted to Bedrock c=%2$s</string>
     <string name="limit_description">limit limits count, c sorts by distance</string>
     <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
     <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no equivalent in Java, removed</string>
