@@ -203,7 +203,7 @@ class TextFormatterTest {
     fun testComplexFormatting_2() {
         // 嵌套格式代码
         val text = "§l§a粗体§m删除线§n下划线§r§o斜体§k混乱"
-        assertTrue("应包含多个格式代码", text.count { it == '§' } >= 8)
+        assertTrue("应包含多个格式代码", text.count { it == '§' } >= 7)
     }
     
     @Test

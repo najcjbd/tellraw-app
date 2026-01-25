@@ -505,6 +505,10 @@ object SelectorConverter {
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
                         }
+                        // 当选择器是 @a 时，更新为 @r
+                        if (selectorVar == "@a") {
+                            selectorVar = "@r"
+                        }
                     }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
@@ -1964,6 +1968,11 @@ object SelectorConverter {
      * 解析 hasitem 数组
      */
     private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context): String {
+        // 如果内容为空，返回空字符串（表示移除该参数）
+        if (content.trim().isEmpty()) {
+            return ""
+        }
+
         val objects = mutableListOf<String>()
         var braceCount = 0
         var currentObj = ""
@@ -1991,18 +2000,105 @@ object SelectorConverter {
             }
         }
 
-        // 为每个对象生成独立的 nbt 参数
-        val nbtParams = mutableListOf<String>()
+        // 解析每个对象，分类处理
+        val equipmentItems = mutableMapOf<String, String>()  // head, chest, legs, feet, offhand
+        val inventoryItems = mutableListOf<String>()  // 物品栏物品
+        val selectedItem = mutableListOf<String>()  // 主手物品
 
         for (obj in objects) {
-            val nbtResult = parseHasitemSingle(obj, reminders, context)
-            if (nbtResult.startsWith("nbt={")) {
-                nbtParams.add(nbtResult)
+            val params = mutableMapOf<String, String>()
+            val parts = obj.split(",(?![^{}]*\\})".toRegex())
+
+            for (part in parts) {
+                if ("=" in part) {
+                    val (key, value) = part.split("=", limit = 2)
+                    params[key.trim()] = value.trim()
+                }
+            }
+
+            val item = params["item"] ?: continue
+            val quantity = params["quantity"]
+            val location = params["location"]
+            val slot = params["slot"]
+
+            // 处理物品ID
+            val itemId = if (item.startsWith("minecraft:")) item else "minecraft:$item"
+
+            // 处理 quantity 范围
+            val processedQuantity = processQuantityRange(quantity, reminders, context)
+            val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+
+            // 根据位置类型分类
+            when (location) {
+                "slot.weapon.mainhand" -> {
+                    // 主手 → SelectedItem
+                    selectedItem.add("{id:\"$itemId\"$countPart}")
+                }
+                "slot.weapon.offhand" -> {
+                    // 副手 → equipment.offhand
+                    equipmentItems["offhand"] = "{id:\"$itemId\"$countPart}"
+                }
+                "slot.armor.head" -> {
+                    // 头盔 → equipment.head
+                    equipmentItems["head"] = "{id:\"$itemId\"$countPart}"
+                }
+                "slot.armor.chest" -> {
+                    // 胸甲 → equipment.chest
+                    equipmentItems["chest"] = "{id:\"$itemId\"$countPart}"
+                }
+                "slot.armor.legs" -> {
+                    // 护腿 → equipment.legs
+                    equipmentItems["legs"] = "{id:\"$itemId\"$countPart}"
+                }
+                "slot.armor.feet" -> {
+                    // 靴子 → equipment.feet
+                    equipmentItems["feet"] = "{id:\"$itemId\"$countPart}"
+                }
+                "slot.hotbar", "slot.inventory" -> {
+                    // 物品栏 → Inventory
+                    val slotNumbers = parseSlotRange(slot, location, reminders, context)
+                    if (slotNumbers.isEmpty()) {
+                        // 没有指定槽位，使用通用格式
+                        inventoryItems.add("{id:\"$itemId\"$countPart}")
+                    } else {
+                        // 构建多个槽位的 NBT
+                        for (slotNum in slotNumbers) {
+                            inventoryItems.add("{Slot:${slotNum}b,id:\"$itemId\"$countPart}")
+                        }
+                    }
+                }
+                null -> {
+                    // 没有指定位置，使用通用格式
+                    inventoryItems.add("{id:\"$itemId\"$countPart}")
+                }
             }
         }
 
-        // 返回多个独立的 nbt 参数，用逗号分隔
-        return nbtParams.joinToString(",")
+        // 合并所有 NBT 参数
+        val nbtParts = mutableListOf<String>()
+
+        // 添加 SelectedItem
+        if (selectedItem.isNotEmpty()) {
+            nbtParts.add("SelectedItem:${selectedItem[0]}")
+        }
+
+        // 添加 equipment
+        if (equipmentItems.isNotEmpty()) {
+            val equipmentParts = equipmentItems.map { (key, value) -> "$key:$value" }
+            nbtParts.add("equipment:{${equipmentParts.joinToString(",")}}")
+        }
+
+        // 添加 Inventory
+        if (inventoryItems.isNotEmpty()) {
+            nbtParts.add("Inventory:[${inventoryItems.joinToString(",")}]")
+        }
+
+        // 返回合并后的 nbt 参数
+        return if (nbtParts.isNotEmpty()) {
+            "nbt={${nbtParts.joinToString(",")}}"
+        } else {
+            ""
+        }
     }
 
     /**
