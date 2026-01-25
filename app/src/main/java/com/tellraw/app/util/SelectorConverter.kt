@@ -343,7 +343,7 @@ object SelectorConverter {
         }
         
         // 提取参数部分
-        val selectorVar = selector.split('[')[0]
+        var selectorVar = selector.split('[')[0]
         var paramsPart = selector.substringAfter('[').substringBefore(']')
 
         // 注意：scores 参数内部的记分项不应该被当作选择器参数处理
