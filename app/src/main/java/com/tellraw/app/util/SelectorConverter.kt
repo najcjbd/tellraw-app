@@ -4,6 +4,7 @@ import android.content.Context
 import com.tellraw.app.R
 import com.tellraw.app.model.*
 import java.util.regex.Pattern
+import kotlin.math.roundToInt
 
 object SelectorConverter {
     
@@ -115,7 +116,7 @@ object SelectorConverter {
         R.string.bedrock_default_converted to "基岩版默认模式(m=%s)在Java版不支持，已转换为生存模式",
         R.string.java_level_in_scores_converted to "Java版level=%s已转换为基岩版lm=%s,l=%s",
         R.string.bedrock_c_negative_converted to "基岩版c=%s已转换为Java版limit=%s,sort=furthest",
-R.string.bedrock_c_converted to "基岩版c=%1$s已转换为Java版limit=%2$s,sort=nearest",
+        R.string.bedrock_c_converted to "基岩版c=%1\$s已转换为Java版limit=%2\$s,sort=nearest",
         R.string.java_nbt_param_not_supported to "警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除",
         R.string.hasitem_converted to "hasitem已转换为nbt格式，可能无法完全保留原意",
         R.string.hasitem_conversion_failed to "hasitem转换失败，保留原参数",
@@ -123,7 +124,7 @@ R.string.bedrock_c_converted to "基岩版c=%1$s已转换为Java版limit=%2$s,so
         R.string.hasitem_location_not_supported to "警告：基岩版location=%s在Java版无对应功能，已移除",
         R.string.hasitem_quantity_min_only to "注意：quantity=%s.. 已转换为 %s",
         R.string.hasitem_quantity_max_only to "注意：quantity=..%s 已转换为 %s",
-        R.string.hasitem_quantity_range to "注意：quantity=%1$s..%2$s 已转换为 %3$s（中间值）",
+        R.string.hasitem_quantity_range to "注意：quantity=%1\$s..%2\$s 已转换为 %3\$s（中间值）",
         R.string.hasitem_quantity_negation_not_supported to "警告：quantity反选（!）在Java版不支持，已移除",
         R.string.hasitem_slot_min_only to "注意：slot=%s.. 已转换为 %s",
         R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
