@@ -9,13 +9,13 @@ object SelectorConverter {
     
     // Java版特有参数
     private val JAVA_SPECIFIC_PARAMS = listOf(
-        "distance", "x_rotation", "y_rotation", "nbt", "team", "limit", "sort", 
+        "distance", "x_rotation", "y_rotation", "nbt", "team", "limit", "sort",
         "predicate", "advancements", "level", "gamemode", "attributes"
     )
     
     // 基岩版特有参数
     private val BEDROCK_SPECIFIC_PARAMS = listOf(
-        "r", "rm", "rx", "rxm", "ry", "rym", "hasitem", "family", "l", "lm", 
+        "r", "rm", "rx", "rxm", "ry", "rym", "hasitem", "family", "l", "lm",
         "m", "haspermission", "has_property", "c"
     )
     
@@ -64,6 +64,7 @@ object SelectorConverter {
         R.string.bedrock_scores_negation_removed to "基岩版scores反选参数%s在Java版不支持，已移除",
         R.string.java_sort_nearest_converted to "Java版sort=nearest已转换为基岩版c=%s",
         R.string.java_sort_furthest_converted to "Java版sort=furthest已转换为基岩版c=%s",
+        R.string.java_sort_furthest_converted_all to "Java版sort=furthest已转换为基岩版c=-9999。注意：sort=furthest是按顺序从远到近的全部，c=-9999是按顺序从远到近的最近9999个实体",
         R.string.java_sort_arbitrary_not_supported to "Java版sort=arbitrary在基岩版不支持，已移除",
         R.string.java_sort_random_converted to "Java版%1\$s[sort=random]已转换为基岩版@r[c=%2\$s]",
         R.string.java_sort_random_to_c to "Java版sort=random已转换为基岩版c=%s",
@@ -71,7 +72,6 @@ object SelectorConverter {
         R.string.java_limit_converted to "Java版limit=%s已转换为基岩版c=%s",
         R.string.limit_description to "limit限制数量，c由近到远",
         R.string.bedrock_param_no_equivalent to "警告：基岩版%s参数在Java版无对应功能，已移除",
-        R.string.java_nbt_param_not_supported to "警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除",
         R.string.bedrock_family_param_not_supported to "警告：基岩版%s参数在Java版无对应功能，已移除。建议用type参数指定实体类型",
         R.string.java_team_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无队伍系统",
         R.string.java_predicate_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无谓词系统",
@@ -115,11 +115,19 @@ object SelectorConverter {
         R.string.bedrock_default_converted to "基岩版默认模式(m=%s)在Java版不支持，已转换为生存模式",
         R.string.java_level_in_scores_converted to "Java版level=%s已转换为基岩版lm=%s,l=%s",
         R.string.bedrock_c_negative_converted to "基岩版c=%s已转换为Java版limit=%s,sort=furthest",
-        R.string.bedrock_c_converted to "基岩版c=%s已转换为Java版limit=%s,sort=nearest",
+R.string.bedrock_c_converted to "基岩版c=%1$s已转换为Java版limit=%2$s,sort=nearest",
+        R.string.java_nbt_param_not_supported to "警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除",
         R.string.hasitem_converted to "hasitem已转换为nbt格式，可能无法完全保留原意",
-        R.string.hasitem_count_note to "注意：Java版NBT不需要Count值，hasitem的quantity参数未转换",
         R.string.hasitem_conversion_failed to "hasitem转换失败，保留原参数",
-        R.string.nbt_converted to "nbt已转换为hasitem格式，可能无法完全保留原意"
+        R.string.nbt_converted to "nbt已转换为hasitem格式，可能无法完全保留原意",
+        R.string.hasitem_location_not_supported to "警告：基岩版location=%s在Java版无对应功能，已移除",
+        R.string.hasitem_quantity_min_only to "注意：quantity=%s.. 已转换为 %s",
+        R.string.hasitem_quantity_max_only to "注意：quantity=..%s 已转换为 %s",
+        R.string.hasitem_quantity_range to "注意：quantity=%1$s..%2$s 已转换为 %3$s（中间值）",
+        R.string.hasitem_quantity_negation_not_supported to "警告：quantity反选（!）在Java版不支持，已移除",
+        R.string.hasitem_slot_min_only to "注意：slot=%s.. 已转换为 %s",
+        R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
+        R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除"
     )
 
     /**
@@ -249,7 +257,7 @@ object SelectorConverter {
         }
         
         // 转换参数
-        val (convertedSelector, paramReminders) = convertSelectorParameters(newSelector, SelectorType.JAVA, context)
+        val (convertedSelector, paramReminders) = filterSelectorParameters(newSelector, SelectorType.JAVA, context)
         reminders.addAll(paramReminders)
         
         // 进一步转换参数格式
@@ -276,15 +284,12 @@ object SelectorConverter {
         val reminders = mutableListOf<String>()
         
         // 转换参数
-        val (convertedSelector, paramReminders) = convertSelectorParameters(selector, SelectorType.BEDROCK, context)
+        val (convertedSelector, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
-        
+
         // 进一步转换参数格式
         var bedrockSelector = convertJavaParametersToBedrock(convertedSelector, reminders, context)
-        
-        // 处理NBT参数中的范围值
-        bedrockSelector = processRangeValues(bedrockSelector)
-        
+
         return SelectorConversionResult(
             javaSelector = selector,
             bedrockSelector = bedrockSelector,
@@ -306,21 +311,7 @@ object SelectorConverter {
         
         val selectorVar = selector.split('[')[0]
         var paramsPart = selector.substringAfter('[').substringBefore(']')
-        
-        // 处理hasitem参数转换为nbt参数
-        if (targetType == SelectorType.JAVA && "hasitem=" in paramsPart) {
-            val (converted, hasitemReminders) = convertHasitemToNbt(paramsPart, context)
-            paramsPart = converted
-            reminders.addAll(hasitemReminders)
-        }
-        
-        // 处理nbt参数转换为hasitem参数
-        if (targetType == SelectorType.BEDROCK && "nbt=" in paramsPart) {
-            val (converted, nbtReminders) = convertNbtToHasitem(paramsPart, context)
-            paramsPart = converted
-            reminders.addAll(nbtReminders)
-        }
-        
+
         // 去除不必要的空格
         paramsPart = removeUnnecessarySpaces(paramsPart)
         
@@ -353,21 +344,7 @@ object SelectorConverter {
         // 提取参数部分
         val selectorVar = selector.split('[')[0]
         var paramsPart = selector.substringAfter('[').substringBefore(']')
-        
-        // 处理hasitem到nbt的转换（基岩版到Java版）
-        if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
-            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
-            paramsPart = converted
-            conversionReminders.addAll(hasitemToNbtReminders)
-        }
-        
-        // 处理nbt到hasitem的转换（Java版到基岩版）
-        if (targetVersion == SelectorType.BEDROCK && "nbt=" in paramsPart) {
-            val (converted, nbtToHasitemReminders) = convertNbtToHasitem(paramsPart, context)
-            paramsPart = converted
-            conversionReminders.addAll(nbtToHasitemReminders)
-        }
-        
+
         // 注意：scores 参数内部的记分项不应该被当作选择器参数处理
         // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
         // 只有独立的 level 参数（不在 scores 内部）才需要转换
@@ -379,7 +356,7 @@ object SelectorConverter {
             paramsPart = paramsPart.replace(scoresPattern) { match ->
                 val fullMatch = match.value
                 val scoresContent = match.groupValues[1]
-                
+
                 // 检查是否有反选模式（!= 或 ! 在值部分）
                 val negationPattern = "\\w+\\s*=\\s*!".toRegex()
                 if (negationPattern.containsMatchIn(scoresContent)) {
@@ -390,6 +367,20 @@ object SelectorConverter {
                     fullMatch
                 }
             }
+        }
+
+        // 处理hasitem到nbt的转换（基岩版到Java版）
+        if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
+            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
+            paramsPart = converted
+            conversionReminders.addAll(hasitemToNbtReminders)
+        }
+
+        // 处理nbt到hasitem的转换（Java版到基岩版）
+        if (targetVersion == SelectorType.BEDROCK && "nbt=" in paramsPart) {
+            val (converted, nbtToHasitemReminders) = convertNbtToHasitem(paramsPart, context)
+            paramsPart = converted
+            conversionReminders.addAll(nbtToHasitemReminders)
         }
         
         // 根据目标版本进行参数转换
@@ -457,11 +448,20 @@ object SelectorConverter {
                                 paramsPart + "c=$cValue"
                             }
                         }
-                        conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
+                        // 只有在转换为 c=-9999 时才显示说明
+                        if (cValue == "-9999") {
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted_all))
+                        } else {
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
+                        }
                     }
                     "arbitrary" -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
-                        conversionReminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
+                        // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
+                        // 当为其他大选择器时，删除并提醒用户
+                        if (selectorVar != "@a" && selectorVar != "@e") {
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
+                        }
                     }
                     "random" -> {
                         // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -588,19 +588,8 @@ object SelectorConverter {
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
 
-                // 特殊处理nbt参数
-                if (paramName == "nbt") {
-                    if (targetVersion == SelectorType.BEDROCK) {
-                        // Java版的nbt参数在基岩版中不支持
-                        removedParams.add("nbt")
-                        conversionReminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
-                    } else {
-                        // 保留Java版的nbt参数
-                        filteredParams.add(param)
-                    }
-                }
                 // 根据目标版本过滤参数
-                else if (targetVersion == SelectorType.JAVA && paramName in bedrockSpecificParams) {
+                if (targetVersion == SelectorType.JAVA && paramName in bedrockSpecificParams) {
                     removedParams.add(paramName)
                     when (paramName) {
                         "family" -> conversionReminders.add(getStringSafely(context, R.string.bedrock_family_param_not_supported, paramName))
@@ -1725,7 +1714,12 @@ object SelectorConverter {
                     }
 
                     result = addParameterToResult(result, "c=$cValue")
-                    reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
+                    // 只有在转换为 c=-9999 时才显示说明
+                    if (cValue == "-9999") {
+                        reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted_all))
+                    } else {
+                        reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
+                    }
                 }
                 "arbitrary" -> {
                     result = result.replace(sortPattern, "")
@@ -1735,7 +1729,11 @@ object SelectorConverter {
                         result = result.replace(placeholder, original)
                     }
 
-                    reminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
+                    // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
+                    // 当为其他大选择器时，删除并提醒用户
+                    if (selectorVar != "@a" && selectorVar != "@e") {
+                        reminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
+                    }
                 }
                 "random" -> {
                     // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
@@ -1830,133 +1828,146 @@ object SelectorConverter {
         
         return cleanParams + "," + newParam
     }
-    
-    // hasitem和nbt转换的完善实现，与Python版本一致
+
+    /**
+     * 处理 hasitem 参数转换为 nbt 参数（基岩版到Java版）
+     * 支持完整的转换逻辑，包括装备槽位和物品栏槽位
+     */
     private fun convertHasitemToNbt(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
-        
-        // 处理hasitem的复杂格式：hasitem=[{...},{...}] 或 hasitem={...}
-        // 先处理复杂格式 [{}]
-        val complexPattern = "hasitem=\\[([^\\[\\]]*)\\]".toRegex()
-        result = result.replace(complexPattern) { match ->
-            val fullMatch = match.value  // 完整的匹配，如 hasitem=[{...}]
+
+        // 处理数组格式：hasitem=[{...},{...}]
+        val arrayPattern = "hasitem=\\[([^\\[\\]]*)\\]".toRegex()
+        result = result.replace(arrayPattern) { match ->
+            val fullMatch = match.value
             val content = match.groupValues[1]
-            val nbtResult = parseHasitemComplex(content)
+            val nbtResult = parseHasitemArray(content, reminders, context)
 
             if (nbtResult.isNotEmpty()) {
-                reminders.add(getStringSafely(context, R.string.hasitem_converted))
-                reminders.add(getStringSafely(context, R.string.hasitem_count_note))
                 nbtResult
             } else {
-                // 转换失败，保留原始hasitem参数并添加提醒
                 reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
-        
-        // 再处理简单格式 {...}
+
+        // 处理简单格式：hasitem={...}
         val simplePattern = "hasitem=\\{([^}]*)\\}".toRegex()
         result = result.replace(simplePattern) { match ->
-            val fullMatch = match.value  // 完整的匹配，如 hasitem={...}
+            val fullMatch = match.value
             val content = match.groupValues[1]
-            val nbtResult = parseHasitemSimple(content)
+            val nbtResult = parseHasitemSingle(content, reminders, context)
 
             if (nbtResult.isNotEmpty()) {
-                reminders.add(getStringSafely(context, R.string.hasitem_converted))
-                reminders.add(getStringSafely(context, R.string.hasitem_count_note))
                 nbtResult
             } else {
-                // 转换失败，保留原始hasitem参数并添加提醒
                 reminders.add(getStringSafely(context, R.string.hasitem_conversion_failed))
                 fullMatch
             }
         }
-        
+
         // 清理多余的逗号和空括号
         result = result.replace(",,", ",")
         result = result.replace(",\\]".toRegex(), "]")
         result = result.replace("\\[".toRegex(), "[")
-        
+
         return result to reminders
     }
-    
+
     /**
-     * 解析简单的hasitem参数并转换为nbt参数
+     * 解析单个 hasitem 条目
      */
-    private fun parseHasitemSimple(hasitemContent: String): String {
-        // 解析hasitem参数
+    private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context): String {
         val params = mutableMapOf<String, String>()
-        val parts = hasitemContent.split(",(?![^{}]*\\})".toRegex())
-        
+        val parts = content.split(",(?![^{}]*\\})".toRegex())
+
         for (part in parts) {
             if ("=" in part) {
                 val (key, value) = part.split("=", limit = 2)
                 params[key.trim()] = value.trim()
             }
         }
-        
-        // 提取物品信息
-        val itemName = params["item"]?.trim('"') ?: return ""
+
+        val item = params["item"] ?: return ""
+        val quantity = params["quantity"]
         val location = params["location"]
         val slot = params["slot"]
 
-        // 构建nbt参数
-        if (itemName.isNotEmpty()) {
-            // Java版NBT不需要Count值，有了反而会让检测失效
-            // 所以不转换quantity参数到Count字段，保留原始的hasitem格式
-            // 添加minecraft:前缀（如果需要）
-            val fullItemName = if (!itemName.startsWith("minecraft:")) {
-                "minecraft:$itemName"
-            } else {
-                itemName
+        // 处理物品ID
+        val itemId = if (item.startsWith("minecraft:")) item else "minecraft:$item"
+
+        // 处理 quantity 范围
+        val processedQuantity = processQuantityRange(quantity, reminders, context)
+
+        // 根据位置类型转换
+        return when (location) {
+            "slot.weapon.mainhand" -> {
+                // 主手 → SelectedItem
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
             }
-            
-            // 构建NBT项，不包含Count字段
-            val nbtItem = if (location != null && slot != null) {
-                // 有具体位置信息，尝试映射到NBT的Slot字段
-                val slotNum = when (location) {
-                    "slot.weapon.mainhand" -> 0
-                    "slot.weapon.offhand" -> 1
-                    "slot.hotbar" -> {
-                        // 解析slot范围，如"0..2"，取第一个值
-                        if (".." in slot) slot.split("..")[0].toInt() else slot.toInt()
-                    }
-                    "slot.inventory" -> {
-                        // 解析slot范围，如"9..35"，取第一个值
-                        if (".." in slot) slot.split("..")[0].toInt() else slot.toInt()
-                    }
-                    else -> null
-                }
-                
-                if (slotNum != null) {
-                    "{id:\"" + fullItemName + "\",Slot:" + slotNum + "b}"
+            "slot.weapon.offhand" -> {
+                // 副手 → equipment.offhand
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
+            }
+            "slot.armor.head" -> {
+                // 头盔 → equipment.head
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={equipment:{head:{id:\"$itemId\"$countPart}}}"
+            }
+            "slot.armor.chest" -> {
+                // 胸甲 → equipment.chest
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={equipment:{chest:{id:\"$itemId\"$countPart}}}"
+            }
+            "slot.armor.legs" -> {
+                // 护腿 → equipment.legs
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={equipment:{legs:{id:\"$itemId\"$countPart}}}"
+            }
+            "slot.armor.feet" -> {
+                // 靴子 → equipment.feet
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={equipment:{feet:{id:\"$itemId\"$countPart}}}"
+            }
+            "slot.hotbar", "slot.inventory" -> {
+                // 物品栏 → Inventory
+                val slotNumbers = parseSlotRange(slot, location, reminders, context)
+                if (slotNumbers.isEmpty()) {
+                    // 没有指定槽位，使用通用格式
+                    "nbt={Inventory:[{id:\"$itemId\"}]}"
                 } else {
-                    // 无法确定槽位，使用通用格式
-                    "{id:\"" + fullItemName + "\"}"
+                    // 构建多个槽位的 NBT
+                    val nbtItems = slotNumbers.map { slotNum ->
+                        val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                        "{Slot:${slotNum}b,id:\"$itemId\"$countPart}"
+                    }
+                    "nbt={Inventory:[${nbtItems.joinToString(",")}]}"
                 }
-            } else {
-                // 没有具体位置信息，使用通用格式
-                "{id:\"" + fullItemName + "\"}"
             }
-            
-            // 构建完整的NBT内容
-            return "nbt={Inventory:[$nbtItem]}"
+            null -> {
+                // 没有指定位置，使用通用格式
+                "nbt={Inventory:[{id:\"$itemId\"}]}"
+            }
+            else -> {
+                // 不支持的位置
+                reminders.add(getStringSafely(context, R.string.hasitem_location_not_supported, location))
+                ""
+            }
         }
-        
-        return ""
     }
-    
+
     /**
-     * 解析复杂的hasitem参数并转换为nbt参数
+     * 解析 hasitem 数组
      */
-    private fun parseHasitemComplex(hasitemContent: String): String {
-        // 解析数组中的每个对象
+    private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context): String {
         val objects = mutableListOf<String>()
         var braceCount = 0
         var currentObj = ""
-        
-        for (char in hasitemContent + ",") {
+
+        for (char in content + ",") {
             when (char) {
                 '{' -> {
                     braceCount++
@@ -1969,7 +1980,7 @@ object SelectorConverter {
                     braceCount--
                     currentObj += char
                     if (braceCount == 0 && currentObj.isNotEmpty()) {
-                        objects.add(currentObj.substring(1, currentObj.length - 1)) // 移除首尾的{}
+                        objects.add(currentObj.substring(1, currentObj.length - 1))
                         continue
                     }
                 }
@@ -1978,357 +1989,289 @@ object SelectorConverter {
                 currentObj += char
             }
         }
-        
-        // 构建nbt内容
-        val nbtItems = mutableListOf<String>()
-        
-        for (obj in objects) {
-            val params = mutableMapOf<String, String>()
-            val parts = obj.split(",(?![^{}]*\\})".toRegex())
-            
-            for (part in parts) {
-                if ("=" in part) {
-                    val (key, value) = part.split("=", limit = 2)
-                    params[key.trim()] = value.trim()
-                }
-            }
-            
-            // 提取物品信息
-            val itemName = params["item"]?.trim('"') ?: continue
-            val location = params["location"]
-            val slot = params["slot"]
 
-            // 添加minecraft:前缀（如果需要）
-            val fullItemName = if (!itemName.startsWith("minecraft:")) {
-                "minecraft:$itemName"
-            } else {
-                itemName
+        // 为每个对象生成独立的 nbt 参数
+        val nbtParams = mutableListOf<String>()
+
+        for (obj in objects) {
+            val nbtResult = parseHasitemSingle(obj, reminders, context)
+            if (nbtResult.startsWith("nbt={")) {
+                nbtParams.add(nbtResult)
             }
-            
-            // 处理位置信息
-            val slotNum = if (location != null && slot != null) {
-                when (location) {
-                    "slot.weapon.mainhand" -> 0
-                    "slot.weapon.offhand" -> 1
-                    "slot.hotbar" -> {
-                        // 解析slot范围，如"0..2"，取第一个值
-                        if (".." in slot) slot.split("..")[0].toInt() else slot.toInt()
-                    }
-                    "slot.inventory" -> {
-                        // 解析slot范围，如"9..35"，取第一个值
-                        if (".." in slot) slot.split("..")[0].toInt() else slot.toInt()
-                    }
-                    else -> null
-                }
-            } else {
-                null
-            }
-            
-            // 构建带Slot信息的NBT项，不包含Count字段
-            val nbtItem = if (slotNum != null) {
-                "{id:\"" + fullItemName + "\",Slot:" + slotNum + "b}"
-            } else {
-                // 没有具体位置信息，使用通用格式
-                "{id:\"" + fullItemName + "\"}"
-            }
-            
-            nbtItems.add(nbtItem)
         }
-        
-        if (nbtItems.isNotEmpty()) {
-            val nbtContent = "{Inventory:[${nbtItems.joinToString(",")}]}"
-            return nbtContent
-        }
-        
-        return ""
+
+        // 返回多个独立的 nbt 参数，用逗号分隔
+        return nbtParams.joinToString(",")
     }
-    
+
+    /**
+     * 处理 nbt 参数转换为 hasitem 参数（Java版到基岩版）
+     */
     private fun convertNbtToHasitem(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
-        
-        // 使用非递归正则表达式匹配nbt参数，处理嵌套的大括号结构
-        val nbtPattern = "nbt=(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
-        
-        result = result.replace(nbtPattern) { match ->
-            val fullMatch = match.value  // 完整匹配，如 nbt={...}
-            val nbtContent = match.groupValues[1]  // 大括号内的内容
-            
-            // 先检查是否包含物品相关信息（SelectedItem、Item、Inventory）
-            if (!setOf("SelectedItem", "Item", "Inventory").any { it in nbtContent }) {
-                // 如果不包含物品信息，直接返回原匹配内容
-                fullMatch
-            } else {
-                // 尝试解析nbt内容，看是否可以转换为hasitem
-                val hasitemResult = tryConvertNbtContentToHasitem(nbtContent)
 
-                if (hasitemResult.isNotEmpty()) {
-                    // 如果可以转换，返回hasitem参数
-                    reminders.add(getStringSafely(context, R.string.nbt_converted))
-                    "hasitem=$hasitemResult"
-                } else {
-                    // 如果不能转换，返回原始nbt参数（保持完整格式）
-                    fullMatch
-                }
+        // 匹配 nbt 参数
+        val nbtPattern = "nbt=(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
+        result = result.replace(nbtPattern) { match ->
+            val fullMatch = match.value
+            val nbtContent = match.groupValues[1]
+
+            val hasitemResult = parseNbtToHasitem(nbtContent, reminders, context)
+
+            if (hasitemResult.isNotEmpty()) {
+                "hasitem=$hasitemResult"
+            } else {
+                fullMatch
             }
         }
-        
+
         return result to reminders
     }
-    
+
     /**
-     * 尝试将nbt内容转换为hasitem内容
+     * 解析 nbt 内容转换为 hasitem
      */
-    private fun tryConvertNbtContentToHasitem(nbtContent: String): String {
-        // 模式1: SelectedItem:{...id:"xxx"..., ...,Slot:0b} - 用于指定槽位
-        val selectedItemPattern = "SelectedItem\\s*:\\s*\\{([^}]*(?:\\{[^}]*\\}[^}]*)*)\\}".toRegex()
+    private fun parseNbtToHasitem(nbtContent: String, reminders: MutableList<String>, context: Context): String {
+        val hasitemItems = mutableListOf<String>()
+
+        // 解析 SelectedItem
+        val selectedItemPattern = "SelectedItem\\s*:\\s*\\{([^}]*)\\}".toRegex()
         selectedItemPattern.find(nbtContent)?.let { match ->
             val itemData = match.groupValues[1]
-            // 提取id
-            val idPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
-            idPattern.find(itemData)?.let { idMatch ->
-                val itemId = idMatch.groupValues[1]
-                // 移除minecraft:前缀（如果存在）
-                val cleanItemId = if (itemId.startsWith("minecraft:")) {
-                    itemId.substring(10)  // 移除 'minecraft:' 前缀
-                } else {
-                    itemId
-                }
-                
-                // 提取Count（数量）
-                val countPattern = "Count\\s*[\"']?\\s*:\\s*(\\d+)[bBfFdD]?".toRegex()
-                val countMatch = countPattern.find(itemData)
-                
-                // 提取Slot信息
-                val slotPattern = "Slot\\s*[\"']?\\s*:\\s*(\\d+)".toRegex()
-                val slotMatch = slotPattern.find(itemData)
-                
-                if (slotMatch != null) {
-                    val slotValue = slotMatch.groupValues[1]
-                    val slotStr = when (slotValue) {
-                        "0" -> ",location=slot.weapon.mainhand"  // 主手
-                        "1" -> ",location=slot.weapon.offhand"   // 副手
-                        else -> ",location=slot.inventory,slot=$slotValue..$slotValue"
+            val hasitemItem = parseNbtItemToHasitem(itemData, "slot.weapon.mainhand", "0", reminders, context)
+            if (hasitemItem.isNotEmpty()) {
+                hasitemItems.add(hasitemItem)
+            }
+        }
+
+        // 解析 equipment
+        val equipmentPattern = "equipment\\s*:\\s*\\{([^}]*)\\}".toRegex()
+        equipmentPattern.find(nbtContent)?.let { match ->
+            val equipmentData = match.groupValues[1]
+            val parts = equipmentData.split(",")
+
+            for (part in parts) {
+                if (":" in part) {
+                    val (slotType, itemData) = part.split(":", limit = 2)
+                    val location = when (slotType) {
+                        "head" -> "slot.armor.head"
+                        "chest" -> "slot.armor.chest"
+                        "legs" -> "slot.armor.legs"
+                        "feet" -> "slot.armor.feet"
+                        "offhand" -> "slot.weapon.offhand"
+                        else -> continue
                     }
-                    
-                    val countStr = if (countMatch != null) {
-                        ",quantity=${countMatch.groupValues[1]}.."
-                    } else ""
-                    
-                    return "{item=$cleanItemId$countStr$slotStr}"
-                } else {
-                    // 如果没有显式槽位信息，SelectedItem默认是主手物品
-                    val slotStr = ",location=slot.weapon.mainhand"
-                    val countStr = if (countMatch != null) {
-                        ",quantity=${countMatch.groupValues[1]}.."
-                    } else ""
-                    
-                    return "{item=$cleanItemId$countStr$slotStr}"
+                    val hasitemItem = parseNbtItemToHasitem(itemData, location, "0", reminders, context)
+                    if (hasitemItem.isNotEmpty()) {
+                        hasitemItems.add(hasitemItem)
+                    }
                 }
             }
         }
-        
-        // 模式2: Inventory:[{...id:"xxx"..., ...,Slot:0b, ...}, ...] - 指定具体槽位的物品
+
+        // 解析 Inventory
         val inventoryPattern = "Inventory\\s*:\\s*\\[([^\\]]*)\\]".toRegex()
         inventoryPattern.find(nbtContent)?.let { match ->
-            val inventoryContent = match.groupValues[1]
-            // 解析所有物品
-            val items = mutableListOf<String>()
-            
-            // 使用正则表达式匹配所有物品对象
-            val itemObjectPattern = "\\{([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)\\}".toRegex()
-            val itemObjects = itemObjectPattern.findAll(inventoryContent).map { it.groupValues[1] }.toList()
-            
-            for (itemObj in itemObjects) {
-                // 提取id
-                val idPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
-                val idMatch = idPattern.find(itemObj)
-                if (idMatch == null) continue  // 跳过没有id的物品
-                
-                val itemId = idMatch.groupValues[1]
-                // 移除minecraft:前缀（如果存在）
-                val cleanItemId = if (itemId.startsWith("minecraft:")) {
-                    itemId.substring(10)  // 移除 'minecraft:' 前缀
+            val inventoryData = match.groupValues[1]
+
+            // 匹配 Inventory 中的每个物品
+            val itemPattern = "\\{([^{}]*)\\}".toRegex()
+            val items = itemPattern.findAll(inventoryData).map { it.groupValues[1] }.toList()
+
+            for (itemData in items) {
+                // 提取 Slot
+                val slotPattern = "Slot\\s*:\\s*(-?\\d+)b".toRegex()
+                val slotMatch = slotPattern.find(itemData)
+                val slotNum = slotMatch?.groupValues?.get(1)?.toIntOrNull() ?: continue
+
+                // 跳过 SelectedItem (Slot:-106)
+                if (slotNum == -106) continue
+
+                // 确定位置类型
+                val (location, hasitemSlot) = if (slotNum >= 0 && slotNum <= 8) {
+                    "slot.hotbar" to slotNum.toString()
                 } else {
-                    itemId
+                    "slot.inventory" to (slotNum + 9).toString()
                 }
-                
-                // 提取Count（数量）
-                val countPattern = "Count\\s*[\"']?\\s*:\\s*(\\d+)[bBfFdD]?".toRegex()
-                val countMatch = countPattern.find(itemObj)
-                
-                // 提取Slot信息
-                val slotPattern = "Slot\\s*[\"']?\\s*:\\s*(\\d+)".toRegex()
-                val slotMatch = slotPattern.find(itemObj)
-                
-                // 构建hasitem参数
-                var itemStr = "item=$cleanItemId"
-                if (countMatch != null) {
-                    itemStr += ",quantity=${countMatch.groupValues[1]}.."
+
+                val hasitemItem = parseNbtItemToHasitem(itemData, location, hasitemSlot, reminders, context)
+                if (hasitemItem.isNotEmpty()) {
+                    hasitemItems.add(hasitemItem)
                 }
-                
-                if (slotMatch != null) {
-                    val slotValue = slotMatch.groupValues[1]
-                    val locationStr = when (slotValue) {
-                        "0" -> ",location=slot.weapon.mainhand"
-                        "1" -> ",location=slot.weapon.offhand"
-                        in setOf("2", "3", "4", "5", "6", "7", "8") -> ",location=slot.hotbar,slot=$slotValue..$slotValue"
-                        else -> ",location=slot.inventory,slot=$slotValue..$slotValue"
+            }
+        }
+
+        return if (hasitemItems.size == 1) {
+            "{${hasitemItems[0]}}"
+        } else if (hasitemItems.size > 1) {
+            "[${hasitemItems.joinToString(",") { "{$it}" }}]"
+        } else {
+            ""
+        }
+    }
+
+    /**
+     * 解析单个 NBT 物品转换为 hasitem 格式
+     */
+    private fun parseNbtItemToHasitem(
+        itemData: String,
+        location: String,
+        slot: String,
+        reminders: MutableList<String>,
+        context: Context
+    ): String {
+        // 提取 id
+        val idPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
+        val idMatch = idPattern.find(itemData)
+        val itemId = idMatch?.groupValues?.get(1) ?: return ""
+
+        // 移除 minecraft: 前缀
+        val cleanItemId = if (itemId.startsWith("minecraft:")) {
+            itemId.substring(10)
+        } else {
+            itemId
+        }
+
+        // 提取 Count
+        val countPattern = "Count\\s*:\\s*(\\d+)b".toRegex()
+        val countMatch = countPattern.find(itemData)
+
+        val itemStr = mutableListOf("item=$cleanItemId")
+        itemStr.add("location=$location")
+        itemStr.add("slot=$slot")
+
+        if (countMatch != null) {
+            itemStr.add("quantity=${countMatch.groupValues[1]}")
+        }
+
+        return itemStr.joinToString(",")
+    }
+
+    /**
+     * 处理 quantity 范围
+     * 返回处理后的数量（整数），并添加提醒信息
+     */
+    private fun processQuantityRange(
+        quantity: String?,
+        reminders: MutableList<String>,
+        context: Context
+    ): String? {
+        if (quantity == null) return null
+
+        return when {
+            quantity == "0.." -> {
+                // 0.. 表示不做过滤，返回 null
+                null
+            }
+            quantity.endsWith("..") -> {
+                // 2.. 取 2
+                val value = quantity.substringBefore("..").toIntOrNull()
+                if (value != null) {
+                    reminders.add(getStringSafely(context, R.string.hasitem_quantity_min_only, value))
+                    "${value}b"
+                } else null
+            }
+            quantity.startsWith("..") -> {
+                // ..5 取 5
+                val value = quantity.substringAfter("..").toIntOrNull()
+                if (value != null) {
+                    reminders.add(getStringSafely(context, R.string.hasitem_quantity_max_only, value))
+                    "${value}b"
+                } else null
+            }
+            ".." in quantity -> {
+                // 3..5 取中间值
+                val parts = quantity.split("..")
+                if (parts.size == 2) {
+                    val min = parts[0].toIntOrNull()
+                    val max = parts[1].toIntOrNull()
+                    if (min != null && max != null) {
+                        val midValue = ((min + max) / 2.0).roundToInt()
+                        reminders.add(getStringSafely(context, R.string.hasitem_quantity_range, min, max, midValue))
+                        "${midValue}b"
+                    } else null
+                } else null
+            }
+            quantity.startsWith("!") -> {
+                // !5 不支持，返回 null 并提醒
+                reminders.add(getStringSafely(context, R.string.hasitem_quantity_negation_not_supported))
+                null
+            }
+            else -> {
+                // 单个数字，直接使用
+                val value = quantity.toIntOrNull()
+                if (value != null) {
+                    "${value}b"
+                } else null
+            }
+        }
+    }
+
+    /**
+     * 解析 slot 范围
+     * 返回槽位编号列表
+     */
+    private fun parseSlotRange(
+        slot: String?,
+        location: String,
+        reminders: MutableList<String>,
+        context: Context
+    ): List<Int> {
+        if (slot == null) return emptyList()
+
+        val slotNumbers = mutableListOf<Int>()
+
+        when {
+            slot.endsWith("..") -> {
+                // 0.. 取 0
+                val value = slot.substringBefore("..").toIntOrNull()
+                if (value != null) {
+                    slotNumbers.add(value)
+                    reminders.add(getStringSafely(context, R.string.hasitem_slot_min_only, value))
+                }
+            }
+            slot.startsWith("..") -> {
+                // ..8 取 8
+                val value = slot.substringAfter("..").toIntOrNull()
+                if (value != null) {
+                    slotNumbers.add(value)
+                    reminders.add(getStringSafely(context, R.string.hasitem_slot_max_only, value))
+                }
+            }
+            ".." in slot -> {
+                // 0..8 取所有值
+                val parts = slot.split("..")
+                if (parts.size == 2) {
+                    val min = parts[0].toIntOrNull()
+                    val max = parts[1].toIntOrNull()
+                    if (min != null && max != null) {
+                        for (i in min..max) {
+                            slotNumbers.add(i)
+                        }
                     }
-                    itemStr += locationStr
                 }
-                
-                items.add(itemStr)
             }
-            
-            if (items.isNotEmpty()) {
-                // 如果有多个物品，构建hasitem数组格式
-                return if (items.size == 1) {
-                    "{${items[0]}}"
-                } else {
-                    // 多个物品使用数组格式
-                    val itemsStr = items.joinToString(",") { "{$it}" }
-                    "[$itemsStr]"
+            slot.startsWith("!") -> {
+                // !0 不支持
+                reminders.add(getStringSafely(context, R.string.hasitem_slot_negation_not_supported))
+            }
+            else -> {
+                // 单个槽位
+                val value = slot.toIntOrNull()
+                if (value != null) {
+                    slotNumbers.add(value)
                 }
             }
         }
-        
-        // 模式3: Item:{...id:"xxx"..., ...} (对于物品实体)
-        val itemPattern = "Item\\s*:\\s*\\{([^}]*(?:\\{[^}]*\\}[^}]*)*)\\}".toRegex()
-        itemPattern.find(nbtContent)?.let { match ->
-            val itemData = match.groupValues[1]
-            // 提取id
-            val idPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
-            idPattern.find(itemData)?.let { idMatch ->
-                val itemId = idMatch.groupValues[1]
-                // 移除minecraft:前缀（如果存在）
-                val cleanItemId = if (itemId.startsWith("minecraft:")) {
-                    itemId.substring(10)  // 移除 'minecraft:' 前缀
-                } else {
-                    itemId
-                }
-                
-                // 提取Count（数量）
-                val countPattern = "Count\\s*[\"']?\\s*:\\s*(\\d+)[bBfFdD]?".toRegex()
-                val countMatch = countPattern.find(itemData)
-                
-                return if (countMatch != null) {
-                    "{item=$cleanItemId,quantity=${countMatch.groupValues[1]}..}"
-                } else {
-                    "{item=$cleanItemId}"
-                }
+
+        // 转换槽位编号
+        return slotNumbers.map { slotNum ->
+            when (location) {
+                "slot.hotbar" -> slotNum
+                "slot.inventory" -> slotNum + 9
+                else -> slotNum
             }
         }
-        
-        // 模式4: 直接的物品ID匹配，如 {id:"minecraft:diamond"}
-        val directIdPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
-        directIdPattern.find(nbtContent)?.let { match ->
-            val itemId = match.groupValues[1]
-            // 移除minecraft:前缀（如果存在）
-            val cleanItemId = if (itemId.startsWith("minecraft:")) {
-                itemId.substring(10)  // 移除 'minecraft:' 前缀
-            } else {
-                itemId
-            }
-            return "hasitem={item=$cleanItemId}"
-        }
-        
-        // 模式5: Tags匹配，如 {Tags:["a","b"]}
-        val tagsPattern = "Tags\\s*:\\s*\\[([^\\]]*)\\]".toRegex()
-        tagsPattern.find(nbtContent)?.let { match ->
-            val tagsContent = match.groupValues[1]
-            // 提取所有标签
-            val tagPattern = "[\"']([^\"']+)[\"']".toRegex()
-            val tags = tagPattern.findAll(tagsContent).map { it.groupValues[1] }.toList()
-            
-            if (tags.isNotEmpty()) {
-                // 将每个标签转换为单独的tag参数
-                // 返回第一个标签作为tag参数，因为hasitem不支持多个标签
-                return "tag=${tags[0]}"
-            }
-        }
-        
-        // 模式6: 实体类型匹配，如 {Type:"minecraft:zombie"}
-        val entityTypePattern = "Type\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()
-        entityTypePattern.find(nbtContent)?.let { match ->
-            val entityType = match.groupValues[1]
-            // 移除minecraft:前缀（如果存在）
-            val cleanEntityType = if (entityType.startsWith("minecraft:")) {
-                entityType.substring(10)  // 移除 'minecraft:' 前缀
-            } else {
-                entityType
-            }
-            return "type=$cleanEntityType"
-        }
-        
-        // 如果没有找到可转换的模式，返回空字符串
-        return ""
-    }
-    
-    /**
-     * 处理参数中的范围数值，提取第一个数字用于不支持范围的参数
-     * 与Python版本的process_range_values函数逻辑一致
-     */
-    private fun processRangeValues(selector: String): String {
-        var result = selector
-        
-        // Java版的nbt参数不支持范围选择，需要提取第一个数字
-        // 例如：nbt={Inventory:[{id:"minecraft:diamond",Count:3..}]}
-        // 需要转换为：nbt={Inventory:[{id:"minecraft:diamond",Count:3b}]}
-        
-        val nbtPattern = "nbt=(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
-        result = result.replace(nbtPattern) { match ->
-            val nbtContent = match.groupValues[1]
-            // 处理nbt中的范围数值
-            processNbtContentRanges(nbtContent)
-        }
-        
-        return result
-    }
-    
-    /**
-     * 处理NBT内容中的范围数值
-     */
-    private fun processNbtContentRanges(nbtContent: String): String {
-        // 处理Count范围
-        val countRangePattern = "Count:(\\d*\\.\\.\\d*)".toRegex()
-        var result = nbtContent.replace(countRangePattern) { match ->
-            val countValue = match.groupValues[1]
-            // 如果是范围，提取第一个数字
-            if (".." in countValue) {
-                val rangeParts = countValue.split("..")
-                try {
-                    val firstNum = if (rangeParts[0].isNotEmpty()) rangeParts[0].toInt() else 0
-                    "Count:${firstNum}b"
-                } catch (e: NumberFormatException) {
-                    match.value
-                }
-            } else {
-                match.value
-            }
-        }
-        
-        // 处理其他可能的数值范围字段
-        val generalRangePattern = "(\\w+):(\\d*\\.\\.\\d*)".toRegex()
-        result = result.replace(generalRangePattern) { match ->
-            val fieldName = match.groupValues[1]
-            val fieldValue = match.groupValues[2]
-            // 如果是范围，提取第一个数字
-            if (".." in fieldValue) {
-                val rangeParts = fieldValue.split("..")
-                try {
-                    val firstNum = if (rangeParts[0].isNotEmpty()) rangeParts[0].toInt() else 0
-                    // 根据字段名决定后缀
-                    val suffix = if (fieldName in setOf("Count", "Damage")) "b" else ""
-                    fieldName + ":" + firstNum + suffix
-                } catch (e: NumberFormatException) {
-                    match.value
-                }
-            } else {
-                match.value
-            }
-        }
-        
-        return result
     }
 }

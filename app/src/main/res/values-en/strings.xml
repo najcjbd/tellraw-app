@@ -89,6 +89,17 @@
     <string name="help_mixed_mode_content">Mixed mode allows choosing how to handle each §m/§n code individually:\n\nOption 1 (Recommended):\n• Java: Use font style (strikethrough/underline)\n• Bedrock: Use color codes (dark red/red)\n\nOption 2:\n• Java: Use color codes (dark red/red)\n• Bedrock: Use color codes (dark red/red)\n\nNote: In mixed mode, the input shows original §m/§n codes, and the backend automatically converts them to §m_f/§n_f (font style) or §m_c/§n_c (color style).</string>
     <string name="help_version_differences">Version Differences</string>
     <string name="help_version_differences_content">Java and Bedrock use different selectors:\n\n• Java: distance, Bedrock: r/rm\n• Java: gamemode, Bedrock: m\n• Java: nbt, Bedrock: hasitem\n\nText formats:\n• §m§n codes work differently\n• Some colors mean different things in Bedrock</string>
+    <string name="java_nbt_param_not_supported">Warning: Java nbt not supported in Bedrock, attempted conversion to hasitem, removed if failed</string>
+    <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
+    <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
+    <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
+    <string name="hasitem_quantity_min_only">Note: quantity=%s.. converted to %s</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%s converted to %s</string>
+    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s converted to %3$s (middle value)</string>
+    <string name="hasitem_quantity_negation_not_supported">Warning: quantity negation (!) not supported in Java, removed</string>
+    <string name="hasitem_slot_min_only">Note: slot=%s.. converted to %s</string>
+    <string name="hasitem_slot_max_only">Note: slot=..%s converted to %s</string>
+    <string name="hasitem_slot_negation_not_supported">Warning: slot negation (!) not supported in Java, removed</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
     <string name="help_history_storage">History Storage</string>
@@ -183,6 +194,7 @@
     <string name="bedrock_scores_negation_removed">Bedrock scores negation %s not supported in Java, removed</string>
     <string name="java_sort_nearest_converted">Java sort=nearest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
+    <string name="java_sort_furthest_converted_all">Java sort=furthest converted to Bedrock c=-9999. Note: sort=furthest selects all entities from farthest to nearest, c=-9999 selects the nearest 9999 entities from farthest to nearest</string>
     <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary not supported in Bedrock, removed</string>
     <string name="java_sort_random_converted">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
     <string name="java_sort_random_to_c">Java sort=random converted to Bedrock c=%s</string>
@@ -192,7 +204,6 @@
     <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
     <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no equivalent in Java, removed</string>
     <string name="bedrock_family_param_not_supported">Warning: Bedrock %s has no equivalent in Java, removed. Use type parameter instead</string>
-    <string name="java_nbt_param_not_supported">Warning: Java nbt not supported in Bedrock, attempted conversion to hasitem, removed if failed</string>
     <string name="java_team_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no team system</string>
     <string name="java_predicate_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no predicate system</string>
     <string name="java_advancements_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no advancement system</string>
@@ -235,10 +246,6 @@
     <string name="java_level_in_scores_converted">Java level=%1$s converted to Bedrock lm=%2$s,l=%3$s</string>
     <string name="bedrock_c_negative_converted">Bedrock c=%1$s converted to Java limit=%2$s,sort=furthest</string>
     <string name="bedrock_c_converted">Bedrock c=%1$s converted to Java limit=%2$s,sort=nearest</string>
-    <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
-    <string name="hasitem_count_note">Note: Java NBT doesn\'t need Count value, hasitem quantity not converted</string>
-    <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>
-    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
     
     <!-- Filename Input Dialog -->
     <string name="enter_filename">Enter history file name:</string>
@@ -322,7 +329,6 @@
     <string name="java_edition_short">Java</string>
     <string name="filter_java_edition">Java Edition</string>
     <string name="filter_bedrock_edition">Bedrock Edition</string>
-    <string name="filter_nbt_param">nbt parameter</string>
     <string name="filter_param_converted">parameter converted to</string>
     <string name="filter_converted">converted to</string>
     

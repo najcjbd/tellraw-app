@@ -534,48 +534,44 @@ class TellrawViewModel @Inject constructor(
         
         // 处理提醒信息显示
         // 分类并去重处理Java版提醒
-        val javaNonReminders = allJavaReminders.filter { 
-            !it.startsWith("Java版") && !it.startsWith("基岩版") && 
-            "nbt参数" !in it && "参数已转换为" !in it && "已转换为" !in it 
+        val javaNonReminders = allJavaReminders.filter {
+            !it.startsWith("Java版") && !it.startsWith("基岩版")
         }.distinct()
-        
-        val javaSpecificReminders = allJavaReminders.filter { 
-            "参数已转换为" in it || "nbt参数" in it || 
-            "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
+
+        val javaSpecificReminders = allJavaReminders.filter {
+            it.startsWith("Java版") || it.startsWith("基岩版")
         }.distinct()
-        
+
         // 分类并去重处理基岩版提醒
-        val bedrockNonReminders = allBedrockReminders.filter { 
-            !it.startsWith("Java版") && !it.startsWith("基岩版") && 
-            "nbt参数" !in it && "参数已转换为" !in it && "已转换为" !in it 
+        val bedrockNonReminders = allBedrockReminders.filter {
+            !it.startsWith("Java版") && !it.startsWith("基岩版")
         }.distinct()
-        
-        val bedrockSpecificReminders = allBedrockReminders.filter { 
-            "参数已转换为" in it || "nbt参数" in it || 
-            "已转换为" in it || (it.startsWith("Java版") || it.startsWith("基岩版"))
+
+        val bedrockSpecificReminders = allBedrockReminders.filter {
+            it.startsWith("Java版") || it.startsWith("基岩版")
         }.distinct()
-        
+
         // 添加Java版参数剔除提醒
         if (javaNonReminders.isNotEmpty()) {
             context?.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_java_unsupported_params, javaNonReminders.joinToString(", ")))
             }
         }
-        
+
         // 添加Java版特殊提醒
         javaSpecificReminders.forEach { reminder ->
             context?.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_java_specific, reminder))
             }
         }
-        
+
         // 添加基岩版参数剔除提醒
         if (bedrockNonReminders.isNotEmpty()) {
             context?.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_bedrock_unsupported_params, bedrockNonReminders.joinToString(", ")))
             }
         }
-        
+
         // 添加基岩版特殊提醒
         bedrockSpecificReminders.forEach { reminder ->
             context?.let { ctx ->

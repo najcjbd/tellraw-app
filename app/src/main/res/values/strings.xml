@@ -92,6 +92,18 @@
     <string name="help_mixed_mode_content">混合模式允许为每个§m/§n代码单独选择处理方式：\n\n方式一（推荐）：\n• Java版：使用字体方式（删除线/下划线）\n• 基岩版：使用颜色代码方式（深红色/红色）\n\n方式二：\n• Java版：使用颜色代码方式（深红色/红色）\n• 基岩版：使用颜色代码方式（深红色/红色）\n\n注意：混合模式下，输入框显示原始§m/§n代码，后台自动转换为§m_f/§n_f（字体方式）或§m_c/§n_c（颜色方式）。</string>
     <string name="help_version_differences">版本差异</string>
     <string name="help_version_differences_content">Java版和基岩版在选择器和格式化上有差异：\n\n选择器：\n• Java版用distance，基岩版用r/rm\n• Java版用gamemode，基岩版用m\n• Java版支持nbt，基岩版支持hasitem\n\n格式化：\n• §m§n代码处理方式不同\n• 某些颜色代码在基岩版有特殊含义</string>
+    <string name="java_nbt_param_not_supported">警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除</string>
+    <string name="hasitem_converted">hasitem已转换为nbt格式，可能无法完全保留原意</string>
+    <string name="hasitem_conversion_failed">hasitem转换失败，保留原参数</string>
+    <string name="nbt_converted">nbt已转换为hasitem格式，可能无法完全保留原意</string>
+    <string name="hasitem_location_not_supported">警告：基岩版location=%s在Java版无对应功能，已移除</string>
+    <string name="hasitem_quantity_min_only">注意：quantity=%s.. 已转换为 %s</string>
+    <string name="hasitem_quantity_max_only">注意：quantity=..%s 已转换为 %s</string>
+    <string name="hasitem_quantity_range">注意：quantity=%1$s..%2$s 已转换为 %3$s（中间值）</string>
+    <string name="hasitem_quantity_negation_not_supported">警告：quantity反选（！）在Java版不支持，已移除</string>
+    <string name="hasitem_slot_min_only">注意：slot=%s.. 已转换为 %s</string>
+    <string name="hasitem_slot_max_only">注意：slot=..%s 已转换为 %s</string>
+    <string name="hasitem_slot_negation_not_supported">警告：slot反选（！）在Java版不支持，已移除</string>
     <string name="help_usage_tips">使用提示</string>
     <string name="help_usage_tips_content">1. 输入选择器和消息\n2. 自动检测选择器类型\n3. 生成Java版和基岩版命令\n4. 复制或分享命令\n5. 选择器参数转换需人工检查\n\n遇到§m§n代码时：\n• 字体方式：Java版保持原样，基岩版用颜色代码\n• 颜色代码方式：两版都用颜色代码</string>
     <string name="help_history_storage">历史记录存储</string>
@@ -186,6 +198,7 @@
     <string name="bedrock_scores_negation_removed">基岩版scores反选参数%s在Java版不支持，已移除</string>
     <string name="java_sort_nearest_converted">Java版sort=nearest已转换为基岩版c=%s</string>
     <string name="java_sort_furthest_converted">Java版sort=furthest已转换为基岩版c=%s</string>
+    <string name="java_sort_furthest_converted_all">Java版sort=furthest已转换为基岩版c=-9999。注意：sort=furthest是按顺序从远到近的全部，c=-9999是按顺序从远到近的最近9999个实体</string>
     <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版不支持，已移除</string>
 <string name="java_sort_random_converted">Java版%1$s[sort=random]已转换为基岩版@r[c=%2$s]</string>
     <string name="java_sort_random_to_c">Java版sort=random已转换为基岩版c=%s</string>
@@ -195,7 +208,6 @@
     <string name="bedrock_param_not_supported">警告：基岩版%s参数在Java版不支持，已移除</string>
     <string name="bedrock_param_no_equivalent">警告：基岩版%s参数在Java版无对应功能，已移除</string>
     <string name="bedrock_family_param_not_supported">警告：基岩版%s参数在Java版无对应功能，已移除。建议用type参数指定实体类型</string>
-    <string name="java_nbt_param_not_supported">警告：Java版nbt参数在基岩版不支持，已尝试转换为hasitem，失败则移除</string>
     <string name="java_team_param_not_supported">警告：Java版%s参数在基岩版不支持，已移除。基岩版无队伍系统</string>
     <string name="java_predicate_param_not_supported">警告：Java版%s参数在基岩版不支持，已移除。基岩版无谓词系统</string>
     <string name="java_advancements_param_not_supported">警告：Java版%s参数在基岩版不支持，已移除。基岩版无进度系统</string>
@@ -238,10 +250,6 @@
     <string name="java_level_in_scores_converted">Java版level=%1$s已转换为基岩版lm=%2$s,l=%3$s</string>
     <string name="bedrock_c_negative_converted">基岩版c=%1$s已转换为Java版limit=%2$s,sort=furthest</string>
     <string name="bedrock_c_converted">基岩版c=%1$s已转换为Java版limit=%2$s,sort=nearest</string>
-    <string name="hasitem_converted">hasitem已转换为nbt格式，可能无法完全保留原意</string>
-    <string name="hasitem_count_note">注意：Java版NBT不需要Count值，hasitem的quantity参数未转换</string>
-    <string name="hasitem_conversion_failed">hasitem转换失败，保留原参数</string>
-    <string name="nbt_converted">nbt已转换为hasitem格式，可能无法完全保留原意</string>
     
     <!-- 颜色代码名称 -->
     <string name="color_code_black">黑色</string>
@@ -325,7 +333,6 @@
     <string name="java_edition_short">Java</string>
     <string name="filter_java_edition">Java版</string>
     <string name="filter_bedrock_edition">基岩版</string>
-    <string name="filter_nbt_param">nbt参数</string>
     <string name="filter_param_converted">参数已转换为</string>
     <string name="filter_converted">已转换为</string>
     
