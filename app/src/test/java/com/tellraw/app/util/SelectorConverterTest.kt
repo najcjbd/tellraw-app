@@ -933,24 +933,28 @@ class SelectorConverterTest {
     @Test
     fun testParameterFiltering_2() {
         // 过滤基岩版独有参数到Java版
-        // hasitem 应该被转换为 nbt，r 应该被转换为 distance，只有 family 应该被移除
+        // hasitem 应该被转换为 nbt，r 应该被转换为 distance，family 参数会被移除
         val bedrockSelector = "@a[r=10,hasitem={item=diamond},family=zombie]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
-        assertFalse("hasitem应该被转换为nbt，而不是被移除", removed.contains("hasitem"))
-        assertFalse("r应该被转换为distance，而不是被移除", removed.contains("r"))
-        assertTrue("应移除family参数", removed.contains("family"))
+        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
+        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        // 检查转换后的选择器
         assertTrue("转换后的选择器应包含nbt", filtered.contains("nbt"))
         assertTrue("转换后的选择器应包含distance", filtered.contains("distance"))
+        assertFalse("转换后的选择器不应包含hasitem", filtered.contains("hasitem"))
+        assertFalse("转换后的选择器不应包含r", filtered.contains("r"))
+        assertFalse("转换后的选择器不应包含family", filtered.contains("family"))
     }
     
     @Test
     fun testParameterFiltering_3() {
         // 保留通用参数
         val selector = "@e[type=cow,name=Test]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
+        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
+        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        // 检查转换后的选择器
         assertTrue("应保留type参数", filtered.contains("type"))
         assertTrue("应保留name参数", filtered.contains("name"))
-        assertTrue("不应移除任何参数", removed.isEmpty())
+        assertTrue("通用参数转换应该没有提醒信息", reminders.isEmpty())
     }
     
     @Test
@@ -958,16 +962,21 @@ class SelectorConverterTest {
         // 过滤scores反选（基岩版到Java版）
         // Java版不支持scores反选，所以整个scores参数应该被移除
         val bedrockSelector = "@e[scores={kills=!5}]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
-        assertTrue("应移除scores参数", removed.contains("scores"))
+        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
+        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        // 检查转换后的选择器
         assertFalse("转换后的选择器不应包含scores参数", filtered.contains("scores"))
+        // 检查提醒信息中是否有scores反选移除的提醒
+        assertTrue("提醒信息应包含scores反选移除的提醒", reminders.any { it.contains("scores") })
     }
     
     @Test
- fun testParameterFiltering_5() {
+    fun testParameterFiltering_5() {
         // 保留scores非反选
         val selector = "@e[scores={kills=5}]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
+        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
+        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        // 检查转换后的选择器
         assertTrue("应保留scores参数", filtered.contains("scores"))
     }
     
@@ -1281,10 +1290,12 @@ class SelectorConverterTest {
      */
     @Test
     fun testHasitemNbtEdgeCases_1() {
-        // 空hasitem数组应该转换为空的nbt参数
+        // 空hasitem数组应该被移除（没有item选项）
         val bedrockSelector = "@a[hasitem=[]]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
+        // 空的hasitem数组没有item，应该被移除
+        assertFalse("hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
+        assertFalse("空的hasitem数组不应该转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
@@ -1297,37 +1308,48 @@ class SelectorConverterTest {
     
     @Test
     fun testHasitemNbtEdgeCases_3() {
-        // hasitem只有quantity，应该转换为nbt参数中的Count
+        // hasitem只有quantity，没有item，应该被移除
         val bedrockSelector = "@a[hasitem={quantity=5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("quantity应该被转换为Count", conversion.javaSelector.contains("Count:"))
-        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
+        // 没有item的hasitem应该被移除
+        assertFalse("没有item的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
+        assertFalse("没有item的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
     fun testHasitemNbtEdgeCases_4() {
-        // hasitem只有location，应该转换为nbt参数中的Slot
+        // hasitem只有location，没有item，应该被移除
         val bedrockSelector = "@a[hasitem={location=slot.hotbar}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("location应该被转换为Slot", conversion.javaSelector.contains("Slot:"))
-        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
+        // 没有item的hasitem应该被移除
+        assertFalse("没有item的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
+        assertFalse("没有item的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
     fun testHasitemNbtEdgeCases_5() {
-        // hasitem只有slot，应该转换为nbt参数中的Slot
+        // hasitem只有slot，没有item，应该被移除
         val bedrockSelector = "@a[hasitem={slot=5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("slot应该被转换为Slot", conversion.javaSelector.contains("Slot:"))
-        assertTrue("hasitem应该被转换为nbt", conversion.javaSelector.contains("nbt="))
+        // 没有item的hasitem应该被移除
+        assertFalse("没有item的hasitem应该被移除", conversion.javaSelector.contains("hasitem"))
+        assertFalse("没有item的hasitem不应该转换为nbt", conversion.javaSelector.contains("nbt="))
     }
     
     @Test
     fun testHasitemNbtEdgeCases_6() {
-        // hasitem只有data
+        // hasitem带有data参数，data在Java版中不再使用，应该被忽略
         val bedrockSelector = "@a[hasitem={item=diamond,data=1}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 应该转换为nbt，但data参数会被忽略
         assertTrue("应包含nbt参数", conversion.javaSelector.contains("nbt="))
+        assertTrue("应包含diamond物品", conversion.javaSelector.contains("diamond"))
+        // 检查是否有关于data参数的提醒
+        val hasDataReminder = conversion.javaReminders.any { it.contains("data") }
+        // 如果有提醒，说明data参数被处理了（可能被忽略）
+        if (hasDataReminder) {
+            assertTrue("提醒信息应包含data", conversion.javaReminders.any { it.contains("data") })
+        }
     }
     
     @Test

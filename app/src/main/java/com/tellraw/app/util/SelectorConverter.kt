@@ -405,14 +405,14 @@ object SelectorConverter {
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders, context)
 
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
-            val sortPattern = ",?sort=([^,\\]]+)".toRegex()
-            val limitPattern = "limit=([+-]?\\d+)".toRegex()
+            val sortPattern = "(^|,)sort=([^,\\]]+)".toRegex()
+            val limitPattern = "(^|,)limit=([+-]?\\d+)".toRegex()
 
             // 先查找sort和limit参数
             val sortMatch = sortPattern.find(paramsPart)
             val limitMatch = limitPattern.find(paramsPart)
-            val sortValue: String? = sortMatch?.groupValues?.get(1)
-            val limitValue: String? = limitMatch?.groupValues?.get(1)
+            val sortValue: String? = sortMatch?.groupValues?.get(2)
+            val limitValue: String? = limitMatch?.groupValues?.get(2)
 
             // 处理sort和limit参数
             if (sortValue != null) {
@@ -1685,16 +1685,16 @@ object SelectorConverter {
         }
 
         // 处理sort参数（此时scores参数已被替换为占位符，不会误匹配）
-        val sortPattern = "(?<!__SCORES_)\\bsort=([^,\\]]+)".toRegex()
+        val sortPattern = "(?<!__SCORES_)(^|,)sort=([^,\\]]+)".toRegex()
         val sortMatch = sortPattern.find(result)
 
         if (sortMatch != null) {
-            val sortValue: String = sortMatch.groupValues[1]
+            val sortValue: String = sortMatch.groupValues[2]
 
             // 查找limit参数（此时scores参数已被替换为占位符，不会误匹配）
-            val limitPattern = "(?<!__SCORES_)\\blimit=([+-]?\\d+)".toRegex()
+            val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
             val limitMatch = limitPattern.find(result)
-            val limitValue: String? = limitMatch?.groupValues?.get(1)
+            val limitValue: String? = limitMatch?.groupValues?.get(2)
 
             when (sortValue) {
                 "nearest" -> {
@@ -1803,10 +1803,10 @@ object SelectorConverter {
             }
 
             // 此时scores参数已被替换为占位符，不会误匹配
-            val limitPattern = "(?<!__SCORES_)\\blimit=([+-]?\\d+)".toRegex()
+            val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
             val limitMatch = limitPattern.find(result)
             if (limitMatch != null) {
-                val limitValue = limitMatch.groupValues[1]
+                val limitValue = limitMatch.groupValues[2]
                 reminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
                 reminders.add(getStringSafely(context, R.string.limit_description))
                 result = result.replace(limitPattern, "c=$limitValue")
