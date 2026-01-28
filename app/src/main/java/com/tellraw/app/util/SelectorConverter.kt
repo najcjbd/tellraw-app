@@ -355,21 +355,39 @@ object SelectorConverter {
         
         // 处理 scores 参数的反选（基岩版特有功能）
         if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
-            val scoresPattern = "scores=\\{([^}]*)\\}".toRegex()
-            paramsPart = paramsPart.replace(scoresPattern) { match ->
-                val fullMatch = match.value
-                val scoresContent = match.groupValues[1]
-
+            // 查找所有scores参数并检查是否包含反选
+            val scoresPattern = "scores=\\{".toRegex()
+            val scoresToProcess = mutableListOf<Pair<Int, String>>()  // (startIndex, "scores={...}")
+            
+            var match = scoresPattern.find(paramsPart)
+            while (match != null) {
+                val startIndex = match.range.first
+                // 提取完整的scores内容
+                val scoresContent = extractBraceContent(paramsPart.substring(startIndex + 7))
+                if (scoresContent != null) {
+                    val fullMatch = "scores={$scoresContent}"
+                    scoresToProcess.add(Pair(startIndex, fullMatch))
+                }
+                match = scoresPattern.find(paramsPart, startIndex + 1)
+            }
+            
+            // 处理每个scores参数
+            for ((_, fullMatch) in scoresToProcess) {
+                val scoresContent = fullMatch.substring(8, fullMatch.length - 1)  // 去掉 "scores={" 和 "}"
+                
                 // 检查是否有反选模式（!= 或 ! 在值部分）
                 val negationPattern = "\\w+\\s*=\\s*!".toRegex()
                 if (negationPattern.containsMatchIn(scoresContent)) {
                     // Java版不支持scores反选，直接移除整个scores参数
                     conversionReminders.add(getStringSafely(context, R.string.bedrock_scores_negation_removed, fullMatch))
-                    ""  // 返回空字符串，表示移除整个参数
-                } else {
-                    fullMatch
+                    paramsPart = paramsPart.replace(fullMatch, "")
                 }
+                // 如果没有反选，scores参数应该被保留（不做什么）
             }
+            
+            // 清理可能的双逗号
+            paramsPart = paramsPart.replace(",,", ",")
+            paramsPart = paramsPart.replace(",\\]".toRegex(), "]")
         }
 
         // 处理hasitem到nbt的转换（基岩版到Java版）
@@ -1943,18 +1961,25 @@ object SelectorConverter {
         var bracketCount = 0
         var braceCount = 0
         var result = StringBuilder()
+        var started = false
 
         for (char in str) {
             when (char) {
                 '[' -> {
                     bracketCount++
-                    result.append(char)
+                    if (!started) {
+                        started = true  // 跳过第一个 '['
+                    } else {
+                        result.append(char)  // 保留内层的 '['
+                    }
                 }
                 ']' -> {
                     bracketCount--
-                    result.append(char)
                     if (bracketCount == 0) {
-                        return result.substring(1, result.length - 1) // 去掉外层方括号
+                        // 遇到外层的 ']'，结束
+                        return result.toString()
+                    } else {
+                        result.append(char)  // 保留内层的 ']'
                     }
                 }
                 '{' -> {
@@ -1966,7 +1991,7 @@ object SelectorConverter {
                     result.append(char)
                 }
                 else -> {
-                    if (bracketCount > 0) {
+                    if (started) {
                         result.append(char)
                     }
                 }
@@ -1982,22 +2007,29 @@ object SelectorConverter {
     private fun extractObjectContent(str: String): String? {
         var braceCount = 0
         var result = StringBuilder()
+        var started = false
 
         for (char in str) {
             when (char) {
                 '{' -> {
                     braceCount++
-                    result.append(char)
+                    if (!started) {
+                        started = true  // 跳过第一个 '{'
+                    } else {
+                        result.append(char)  // 保留内层的 '{'
+                    }
                 }
                 '}' -> {
                     braceCount--
-                    result.append(char)
                     if (braceCount == 0) {
-                        return result.substring(1, result.length - 1) // 去掉外层花括号
+                        // 遇到外层的 '}'，结束
+                        return result.toString()
+                    } else {
+                        result.append(char)  // 保留内层的 '}'
                     }
                 }
                 else -> {
-                    if (braceCount > 0) {
+                    if (started) {
                         result.append(char)
                     }
                 }
@@ -2364,6 +2396,132 @@ object SelectorConverter {
     private fun extractNbtContent(str: String): String? {
         var braceCount = 0
         var result = StringBuilder()
+        var started = false
+
+        for (char in str) {
+            when (char) {
+                '{' -> {
+                    braceCount++
+                    if (!started) {
+                        started = true  // 跳过第一个 '{'
+                    } else {
+                        result.append(char)  // 保留内层的 '{'
+                    }
+                }
+                '}' -> {
+                    braceCount--
+                    if (braceCount == 0) {
+                        // 遇到外层的 '}'，结束
+                        return result.toString()
+                    } else {
+                        result.append(char)  // 保留内层的 '}'
+                    }
+                }
+                else -> {
+                    if (started) {
+                        result.append(char)
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 解析 nbt 内容转换为 hasitem 物品列表
+     * 返回hasitem物品的字符串列表,不进行格式化拼接
+     */
+    private fun parseNbtToHasitemItems(nbtContent: String, reminders: MutableList<String>, context: Context): List<String> {
+        val hasitemItems = mutableListOf<String>()
+
+        // 解析 SelectedItem - 使用智能提取方法
+        val selectedItemMatch = extractKeyValue(nbtContent, "SelectedItem")
+        if (selectedItemMatch != null) {
+            val hasitemItem = parseNbtItemToHasitem(selectedItemMatch, "slot.weapon.mainhand", "0", reminders, context)
+            if (hasitemItem.isNotEmpty()) {
+                hasitemItems.add(hasitemItem)
+            }
+        }
+
+        // 解析 equipment - 使用智能提取方法
+        val equipmentMatch = extractKeyValue(nbtContent, "equipment")
+        if (equipmentMatch != null) {
+            // 移除外层花括号
+            val innerContent = if (equipmentMatch.startsWith("{") && equipmentMatch.endsWith("}")) {
+                equipmentMatch.substring(1, equipmentMatch.length - 1)
+            } else {
+                equipmentMatch
+            }
+
+            // 解析equipment的各个槽位
+            val equipmentItems = parseEquipmentContent(innerContent, reminders, context)
+            hasitemItems.addAll(equipmentItems)
+        }
+
+        // 解析 Inventory - 使用智能提取方法
+        val inventoryMatch = extractKeyValue(nbtContent, "Inventory")
+        if (inventoryMatch != null) {
+            // 移除外层方括号
+            val innerContent = if (inventoryMatch.startsWith("[") && inventoryMatch.endsWith("]")) {
+                inventoryMatch.substring(1, inventoryMatch.length - 1)
+            } else {
+                inventoryMatch
+            }
+
+            // 解析Inventory中的每个物品
+            val inventoryItems = parseInventoryContent(innerContent, reminders, context)
+            hasitemItems.addAll(inventoryItems)
+        }
+
+        return hasitemItems
+    }
+
+    /**
+     * 从 NBT 内容中提取键值对
+     * 例如从 "SelectedItem:{id:\"...\"}" 提取 "{id:\"...\"}"
+     */
+    private fun extractKeyValue(nbtContent: String, key: String): String? {
+        // 查找键的位置
+        val keyPattern = Regex("\\b$key\\s*:\\s*")
+        val match = keyPattern.find(nbtContent) ?: return null
+
+        val startIndex = match.range.last
+        // 从键的后面开始解析
+        val remaining = nbtContent.substring(startIndex).trim()
+
+        // 判断值的类型
+        val firstChar = remaining.firstOrNull()
+        return when (firstChar) {
+            '{' -> extractBraceContent(remaining)
+            '[' -> extractBracketContent(remaining)
+            '"' -> {
+                // 字符串值
+                val endQuote = remaining.indexOf('"', 1)
+                if (endQuote > 0) {
+                    remaining.substring(0, endQuote + 1)
+                } else {
+                    remaining
+                }
+            }
+            else -> {
+                // 其他值（数字、布尔值等）
+                val endPos = remaining.indexOfAny(charArrayOf(',', '}'))
+                if (endPos > 0) {
+                    remaining.substring(0, endPos).trim()
+                } else {
+                    remaining.trim()
+                }
+            }
+        }
+    }
+
+    /**
+     * 提取花括号内容（包括外层花括号）
+     */
+    private fun extractBraceContent(str: String): String? {
+        var braceCount = 0
+        var result = StringBuilder()
 
         for (char in str) {
             when (char) {
@@ -2390,55 +2548,34 @@ object SelectorConverter {
     }
 
     /**
-     * 解析 nbt 内容转换为 hasitem 物品列表
-     * 返回hasitem物品的字符串列表,不进行格式化拼接
+     * 提取方括号内容（包括外层方括号）
      */
-    private fun parseNbtToHasitemItems(nbtContent: String, reminders: MutableList<String>, context: Context): List<String> {
-        val hasitemItems = mutableListOf<String>()
+    private fun extractBracketContent(str: String): String? {
+        var bracketCount = 0
+        var result = StringBuilder()
 
-        // 解析 SelectedItem
-        val selectedItemPattern = "SelectedItem\\s*:\\s*(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
-        selectedItemPattern.find(nbtContent)?.let { match ->
-            val itemData = match.groupValues[1]
-            val hasitemItem = parseNbtItemToHasitem(itemData, "slot.weapon.mainhand", "0", reminders, context)
-            if (hasitemItem.isNotEmpty()) {
-                hasitemItems.add(hasitemItem)
+        for (char in str) {
+            when (char) {
+                '[' -> {
+                    bracketCount++
+                    result.append(char)
+                }
+                ']' -> {
+                    bracketCount--
+                    result.append(char)
+                    if (bracketCount == 0) {
+                        return result.toString()
+                    }
+                }
+                else -> {
+                    if (bracketCount > 0) {
+                        result.append(char)
+                    }
+                }
             }
         }
 
-        // 解析 equipment
-        val equipmentPattern = "equipment\\s*:\\s*(\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})".toRegex()
-        equipmentPattern.find(nbtContent)?.let { match ->
-            val equipmentData = match.groupValues[1]
-            // 移除外层花括号
-            val innerContent = if (equipmentData.startsWith("{") && equipmentData.endsWith("}")) {
-                equipmentData.substring(1, equipmentData.length - 1)
-            } else {
-                equipmentData
-            }
-
-            // 解析equipment的各个槽位
-            val equipmentItems = parseEquipmentContent(innerContent, reminders, context)
-            hasitemItems.addAll(equipmentItems)
-        }
-
-        // 解析 Inventory
-        val inventoryPattern = "Inventory\\s*:\\s*(\\[[^\\[\\]]*(?:\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}[^\\[\\]]*)*\\])".toRegex()
-        inventoryPattern.find(nbtContent)?.let { match ->
-            val inventoryData = match.groupValues[1]
-            // 移除外层方括号
-            val innerContent = if (inventoryData.startsWith("[") && inventoryData.endsWith("]")) {
-                inventoryData.substring(1, inventoryData.length - 1)
-            } else {
-                inventoryData
-            }
-
-            // 解析Inventory中的每个物品
-            val inventoryItems = parseInventoryContent(innerContent, reminders, context)
-            hasitemItems.addAll(inventoryItems)
-        }
-
-        return hasitemItems
+        return null
     }
 
     /**
