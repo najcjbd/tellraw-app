@@ -668,7 +668,7 @@ object SelectorConverter {
             .replace(",\\]".toRegex(), "]")
             .replace("\\[".toRegex(), "[")
         
-        return finalSelector to removedParams
+        return finalSelector to conversionReminders
     }
     
     /**
@@ -2864,8 +2864,12 @@ object SelectorConverter {
     }
 
     /**
-     * 解析 slot 范围
-     * 返回槽位编号列表
+     * 解析 slot 范围（基岩版到Java版）
+     * 返回Java版的槽位编号列表
+     * 
+     * 转换规则：
+     * - 基岩版 slot.hotbar,slot=0-8 → Java版 Inventory Slot 0-8（直接对应）
+     * - 基岩版 slot.inventory,slot=0 → Java版 Inventory Slot 9（需要 +9）
      */
     private fun parseSlotRange(
         slot: String?,
@@ -2920,11 +2924,11 @@ object SelectorConverter {
             }
         }
 
-        // 转换槽位编号
+        // 转换槽位编号：基岩版到Java版
         return slotNumbers.map { slotNum ->
             when (location) {
-                "slot.hotbar" -> slotNum
-                "slot.inventory" -> slotNum + 9
+                "slot.hotbar" -> slotNum  // slot.hotbar 0-8 → Inventory 0-8
+                "slot.inventory" -> slotNum + 9  // slot.inventory 0 → Inventory 9
                 else -> slotNum
             }
         }
