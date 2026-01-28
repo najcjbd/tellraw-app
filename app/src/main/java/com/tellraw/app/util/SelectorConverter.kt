@@ -496,6 +496,10 @@ object SelectorConverter {
                                 }
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
+                            // 当选择器是 @a 时，更新为 @r
+                            if (selectorVar == "@a") {
+                                selectorVar = "@r"
+                            }
                         } else {
                             paramsPart = paramsPart.replace(sortPattern, "")
                             if (limitValue != null) {
@@ -514,10 +518,6 @@ object SelectorConverter {
                                 }
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
-                        }
-                        // 当选择器是 @a 时，更新为 @r
-                        if (selectorVar == "@a") {
-                            selectorVar = "@r"
                         }
                     }
                     else -> {
@@ -2012,12 +2012,14 @@ object SelectorConverter {
      */
     private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context): String {
         val params = mutableMapOf<String, String>()
-        val parts = content.split(",(?![^{}]*\\})".toRegex())
+        val parts = parseHasitemObjectParams(content)
 
         for (part in parts) {
             if ("=" in part) {
-                val (key, value) = part.split("=", limit = 2)
-                params[key.trim()] = value.trim()
+                val equalIndex = part.indexOf('=')
+                val key = part.substring(0, equalIndex).trim()
+                val value = part.substring(equalIndex + 1).trim()
+                params[key] = value
             }
         }
 
@@ -2125,6 +2127,7 @@ object SelectorConverter {
                     braceCount--
                     currentObj += char
                     if (braceCount == 0 && currentObj.isNotEmpty()) {
+                        // 去掉外层花括号
                         objects.add(currentObj.substring(1, currentObj.length - 1))
                         continue
                     }
@@ -2147,8 +2150,10 @@ object SelectorConverter {
 
             for (part in parts) {
                 if ("=" in part) {
-                    val (key, value) = part.split("=", limit = 2)
-                    params[key.trim()] = value.trim()
+                    val equalIndex = part.indexOf('=')
+                    val key = part.substring(0, equalIndex).trim()
+                    val value = part.substring(equalIndex + 1).trim()
+                    params[key] = value
                 }
             }
 
@@ -2251,18 +2256,29 @@ object SelectorConverter {
         val params = mutableListOf<String>()
         var braceCount = 0
         var currentParam = ""
+        var inStringValue = false
+        var stringChar = '"'
 
         for (char in obj + ",") {
             when {
-                char == '{' -> {
+                !inStringValue && (char == '"' || char == '\'') -> {
+                    inStringValue = true
+                    stringChar = char
+                    currentParam += char
+                }
+                inStringValue && char == stringChar -> {
+                    inStringValue = false
+                    currentParam += char
+                }
+                !inStringValue && char == '{' -> {
                     braceCount++
                     currentParam += char
                 }
-                char == '}' -> {
+                !inStringValue && char == '}' -> {
                     braceCount--
                     currentParam += char
                 }
-                char == ',' && braceCount == 0 -> {
+                !inStringValue && char == ',' && braceCount == 0 -> {
                     if (currentParam.trim().isNotEmpty()) {
                         params.add(currentParam.trim())
                     }
@@ -2585,13 +2601,14 @@ object SelectorConverter {
                 itemId
             }
 
-            // 提取 Count
+            // 提取 Count（nbt中使用大写Count）
             val countPattern = "Count\\s*:\\s*(\\d+)b".toRegex()
             val countMatch = countPattern.find(itemData)
 
             val itemStr = mutableListOf("item=$cleanItemId")
 
             if (countMatch != null) {
+                // 转换为quantity（hasitem中使用quantity）
                 itemStr.add("quantity=${countMatch.groupValues[1]}")
             }
 
@@ -2632,7 +2649,7 @@ object SelectorConverter {
             itemId
         }
 
-        // 提取 Count
+        // 提取 Count（nbt中使用大写Count）
         val countPattern = "Count\\s*:\\s*(\\d+)b".toRegex()
         val countMatch = countPattern.find(itemData)
 
@@ -2641,6 +2658,7 @@ object SelectorConverter {
         itemStr.add("slot=$slot")
 
         if (countMatch != null) {
+            // 转换为quantity（hasitem中使用quantity）
             itemStr.add("quantity=${countMatch.groupValues[1]}")
         }
 
