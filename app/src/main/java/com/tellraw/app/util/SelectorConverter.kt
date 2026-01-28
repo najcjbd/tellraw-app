@@ -2067,6 +2067,8 @@ object SelectorConverter {
 
     /**
      * 解析 hasitem 数组
+     * 根据特别提醒.txt的要求:SelectedItem, Inventory, equipment这三大nbt参数不能放在同一个nbt大括里面
+     * 需要返回多个独立的nbt参数
      */
     private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context): String {
         // 如果内容为空，返回空字符串（表示移除该参数）
@@ -2181,28 +2183,29 @@ object SelectorConverter {
             }
         }
 
-        // 合并所有 NBT 参数
-        val nbtParts = mutableListOf<String>()
+        // 构建多个独立的nbt参数
+        // 根据特别提醒.txt:SelectedItem, Inventory, equipment这三大nbt参数不能放在同一个nbt大括里面
+        val nbtParams = mutableListOf<String>()
 
-        // 添加 SelectedItem
+        // 添加 SelectedItem (独立的nbt参数)
         if (selectedItem.isNotEmpty()) {
-            nbtParts.add("SelectedItem:${selectedItem[0]}")
+            nbtParams.add("nbt={SelectedItem:${selectedItem[0]}}")
         }
 
-        // 添加 equipment
+        // 添加 equipment (独立的nbt参数)
         if (equipmentItems.isNotEmpty()) {
             val equipmentParts = equipmentItems.map { (key, value) -> "$key:$value" }
-            nbtParts.add("equipment:{${equipmentParts.joinToString(",")}}")
+            nbtParams.add("nbt={equipment:{${equipmentParts.joinToString(",")}}}")
         }
 
-        // 添加 Inventory
+        // 添加 Inventory (独立的nbt参数)
         if (inventoryItems.isNotEmpty()) {
-            nbtParts.add("Inventory:[${inventoryItems.joinToString(",")}]")
+            nbtParams.add("nbt={Inventory:[${inventoryItems.joinToString(",")}]}")
         }
 
-        // 返回合并后的 nbt 参数
-        return if (nbtParts.isNotEmpty()) {
-            "nbt={${nbtParts.joinToString(",")}}"
+        // 返回多个独立的nbt参数,用逗号分隔
+        return if (nbtParams.isNotEmpty()) {
+            nbtParams.joinToString(",")
         } else {
             ""
         }
@@ -2244,27 +2247,63 @@ object SelectorConverter {
 
     /**
      * 处理 nbt 参数转换为 hasitem 参数（Java版到基岩版）
+     * 支持处理多个nbt参数,例如: @a[nbt={SelectedItem:{...}},nbt={Inventory:[...]}]
      */
     private fun convertNbtToHasitem(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
 
-        // 匹配 nbt 参数 - 使用更智能的方法来提取 nbt 内容
-        val nbtPattern = "nbt=\\{".toRegex()
-        val nbtMatch = nbtPattern.find(paramsPart)
+        // 收集所有nbt参数的内容
+        val allHasitemItems = mutableListOf<String>()
+        var nbtMatches = mutableListOf<Pair<Int, String>>()  // (startIndex, fullMatch)
 
-        if (nbtMatch != null) {
-            val startIndex = nbtMatch.range.first
+        // 查找所有nbt参数
+        val nbtPattern = "nbt=\\{".toRegex()
+        var match = nbtPattern.find(paramsPart)
+        
+        while (match != null) {
+            val startIndex = match.range.first
             // 找到匹配的 nbt 参数的完整内容
             val nbtContent = extractNbtContent(paramsPart.substring(startIndex + 5))
 
             if (nbtContent != null) {
                 val fullMatch = "nbt={$nbtContent}"
-                val hasitemResult = parseNbtToHasitem(nbtContent, reminders, context)
+                nbtMatches.add(Pair(startIndex, fullMatch))
+                
+                // 解析这个nbt参数
+                val hasitemItems = parseNbtToHasitemItems(nbtContent, reminders, context)
+                allHasitemItems.addAll(hasitemItems)
+            }
+            
+            // 查找下一个nbt参数
+            match = nbtPattern.find(paramsPart, startIndex + 1)
+        }
 
-                if (hasitemResult.isNotEmpty()) {
-                    result = result.replace(fullMatch, "hasitem=$hasitemResult")
-                }
+        // 如果有nbt参数被转换,替换所有的nbt参数为一个hasitem参数
+        if (nbtMatches.isNotEmpty() && allHasitemItems.isNotEmpty()) {
+            // 移除所有nbt参数
+            for ((_, fullMatch) in nbtMatches) {
+                result = result.replace(fullMatch, "")
+            }
+            
+            // 清理多余的逗号
+            result = result.replace(",,", ",")
+            result = result.replace(",\\]".toRegex(), "]")
+            
+            // 构建hasitem参数
+            val hasitemResult = if (allHasitemItems.size == 1) {
+                "hasitem={${allHasitemItems[0]}}"
+            } else {
+                "hasitem=[${allHasitemItems.joinToString(",") { "{$it}" }}]"
+            }
+            
+            // 添加hasitem参数
+            if (result.endsWith("]")) {
+                result = result.dropLast(1) + ",$hasitemResult]"
+            } else if (result.endsWith("[")) {
+                result = result.dropLast(1) + "$hasitemResult]"
+            } else {
+                result = "$result,$hasitemResult"
             }
         }
 
@@ -2303,9 +2342,10 @@ object SelectorConverter {
     }
 
     /**
-     * 解析 nbt 内容转换为 hasitem
+     * 解析 nbt 内容转换为 hasitem 物品列表
+     * 返回hasitem物品的字符串列表,不进行格式化拼接
      */
-    private fun parseNbtToHasitem(nbtContent: String, reminders: MutableList<String>, context: Context): String {
+    private fun parseNbtToHasitemItems(nbtContent: String, reminders: MutableList<String>, context: Context): List<String> {
         val hasitemItems = mutableListOf<String>()
 
         // 解析 SelectedItem
@@ -2349,6 +2389,16 @@ object SelectorConverter {
             val inventoryItems = parseInventoryContent(innerContent, reminders, context)
             hasitemItems.addAll(inventoryItems)
         }
+
+        return hasitemItems
+    }
+
+    /**
+     * 解析 nbt 内容转换为 hasitem
+     * 格式化输出为hasitem参数格式
+     */
+    private fun parseNbtToHasitem(nbtContent: String, reminders: MutableList<String>, context: Context): String {
+        val hasitemItems = parseNbtToHasitemItems(nbtContent, reminders, context)
 
         return if (hasitemItems.size == 1) {
             "{${hasitemItems[0]}}"
