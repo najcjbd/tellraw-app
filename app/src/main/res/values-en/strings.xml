@@ -93,9 +93,8 @@
     <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
     <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
     <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
-    <string name="hasitem_quantity_min_only">Note: quantity=%s.. converted to %sb</string>
-    <string name="hasitem_quantity_max_only">Note: quantity=..%s converted to %sb</string>
-    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s converted to %3$s (middle value)</string>
+    <string name="hasitem_quantity_min_only">Note: quantity=%1$s.. converted to %2$sb</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s converted to %3$s (middle value)</string>
     <string name="hasitem_quantity_negation_not_supported">Warning: quantity negation (!) not supported in Java, removed</string>
     <string name="hasitem_slot_min_only">Note: slot=%s..</string>
     <string name="hasitem_slot_max_only">Note: slot=..%s</string>

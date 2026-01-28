@@ -1589,7 +1589,7 @@ fun DirectoryPickerDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // 当前路径显示
                 Card(

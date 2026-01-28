@@ -97,8 +97,8 @@
     <string name="hasitem_conversion_failed">hasitem轉換失敗，保留原參數</string>
     <string name="nbt_converted">nbt已轉換為hasitem格式，可能無法完全保留原意</string>
     <string name="hasitem_location_not_supported">警告：基岩版location=%s在Java版無對應功能，已移除</string>
-    <string name="hasitem_quantity_min_only">注意：quantity=%s.. 已轉換為 %sb</string>
-    <string name="hasitem_quantity_max_only">注意：quantity=..%s 已轉換為 %sb</string>
+    <string name="hasitem_quantity_min_only">注意：quantity=%1$s.. 已轉換為 %2$sb</string>
+    <string name="hasitem_quantity_max_only">注意：quantity=..%1$s 已轉換為 %2$sb</string>
     <string name="hasitem_quantity_range">注意：quantity=%1$s..%2$s 已轉換為 %3$s（中間值）</string>
     <string name="hasitem_quantity_negation_not_supported">警告：quantity反選（！）在Java版不支援，已移除</string>
     <string name="hasitem_slot_min_only">注意：slot=%s..</string>

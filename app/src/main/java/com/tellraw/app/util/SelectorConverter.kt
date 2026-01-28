@@ -1853,7 +1853,7 @@ object SelectorConverter {
         var result = paramsPart
 
         // 处理数组格式：hasitem=[{...},{...}]
-        val arrayPattern = "hasitem=\\[".toRegex()
+        val arrayPattern = "hasitem=\\[\\{".toRegex()
         val arrayMatch = arrayPattern.find(paramsPart)
 
         if (arrayMatch != null) {
@@ -1866,10 +1866,26 @@ object SelectorConverter {
                 val nbtResult = parseHasitemArray(arrayContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
-                    result = result.replace(fullMatch, nbtResult)
+                    // 精确替换
+                    val index = result.indexOf(fullMatch)
+                    if (index >= 0) {
+                        result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
+                    }
                 } else {
                     // 空数组或转换失败，移除整个 hasitem 参数
-                    result = result.replace(fullMatch, "")
+                    val index = result.indexOf(fullMatch)
+                    if (index >= 0) {
+                        var replacement = ""
+                        // 检查前面是否有逗号
+                        if (index > 0 && result[index - 1] == ',') {
+                            replacement = result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                        } else if (index + fullMatch.length < result.length && result[index + fullMatch.length] == ',') {
+                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                        } else {
+                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length)
+                        }
+                        result = replacement
+                    }
                 }
             }
         }
@@ -1888,10 +1904,26 @@ object SelectorConverter {
                 val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
-                    result = result.replace(fullMatch, nbtResult)
+                    // 精确替换
+                    val index = result.indexOf(fullMatch)
+                    if (index >= 0) {
+                        result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
+                    }
                 } else {
                     // 无效参数或转换失败，移除整个 hasitem 参数
-                    result = result.replace(fullMatch, "")
+                    val index = result.indexOf(fullMatch)
+                    if (index >= 0) {
+                        var replacement = ""
+                        // 检查前面是否有逗号
+                        if (index > 0 && result[index - 1] == ',') {
+                            replacement = result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                        } else if (index + fullMatch.length < result.length && result[index + fullMatch.length] == ',') {
+                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                        } else {
+                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length)
+                        }
+                        result = replacement
+                    }
                 }
             }
         }
