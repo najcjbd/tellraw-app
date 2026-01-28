@@ -2482,8 +2482,9 @@ object SelectorConverter {
      * 例如从 "SelectedItem:{id:\"...\"}" 提取 "{id:\"...\"}"
      */
     private fun extractKeyValue(nbtContent: String, key: String): String? {
-        // 查找键的位置
-        val keyPattern = Regex("\\b$key\\s*:\\s*")
+        // 查找键的位置，使用更严格的边界匹配
+        // 确保不会匹配其他键名中包含此键名作为子串的情况（例如不会从 "SelectedItem" 中匹配 "Inventory"）
+        val keyPattern = Regex("(^|,)\\s*$key\\s*:\\s*")
         val match = keyPattern.find(nbtContent) ?: return null
 
         val startIndex = match.range.last
