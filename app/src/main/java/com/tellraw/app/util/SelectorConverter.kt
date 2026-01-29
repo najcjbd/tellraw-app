@@ -14,7 +14,7 @@ object SelectorConverter {
         "predicate", "advancements", "level", "gamemode", "attributes"
     )
     
-    // 基岩版特有参数
+    // 基岩版特有参数（注意：scores 参数在 Java 版和基岩版中都存在，但基岩版支持反选）
     private val BEDROCK_SPECIFIC_PARAMS = listOf(
         "r", "rm", "rx", "rxm", "ry", "rym", "hasitem", "family", "l", "lm",
         "m", "haspermission", "has_property", "c"
