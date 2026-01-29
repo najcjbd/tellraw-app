@@ -200,7 +200,7 @@
     <string name="java_sort_furthest_converted">Java版sort=furthest已轉換為基岩版c=%s</string>
     <string name="java_sort_furthest_converted_all">Java版sort=furthest已轉換為基岩版c=-9999。注意：sort=furthest是按順序從遠到近的全部，c=-9999是按順序從遠到近的最近9999個實體</string>
     <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版不支援，已移除</string>
-    <string name="java_sort_random_converted">Java版%s[sort=random]已轉換為基岩版@r[c=%s]</string>
+    <string name="java_sort_random_converted">Java版%1$s[sort=random]已轉換為基岩版@r[c=%2$s]</string>
     <string name="java_sort_random_to_c">Java版sort=random已轉換為基岩版c=%s</string>
     <string name="java_sort_not_supported">Java版sort=%s在基岩版不支援，已移除</string>
     <string name="java_limit_converted">Java版limit=%1$s已轉換為基岩版c=%2$s</string>

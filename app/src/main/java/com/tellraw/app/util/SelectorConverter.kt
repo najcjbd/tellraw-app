@@ -258,7 +258,7 @@ object SelectorConverter {
         }
         
         // 转换参数
-        val (convertedSelector, paramReminders) = filterSelectorParameters(newSelector, SelectorType.JAVA, context)
+        val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(newSelector, SelectorType.JAVA, context)
         reminders.addAll(paramReminders)
         
         // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertBedrockParametersToJava
@@ -286,7 +286,7 @@ object SelectorConverter {
         val reminders = mutableListOf<String>()
         
         // 转换参数
-        val (convertedSelector, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
+        val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
 
         // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertJavaParametersToBedrock
@@ -305,19 +305,19 @@ object SelectorConverter {
     /**
      * 转换选择器参数格式
      */
-    private fun convertSelectorParameters(selector: String, targetType: SelectorType, context: Context): Pair<String, List<String>> {
+    private fun convertSelectorParameters(selector: String): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
-        
+
         if ('[' !in selector || ']' !in selector) {
             return selector to reminders
         }
-        
+
         val selectorVar = selector.split('[')[0]
         var paramsPart = selector.substringAfter('[').substringBefore(']')
 
         // 去除不必要的空格
         paramsPart = removeUnnecessarySpaces(paramsPart)
-        
+
         return selectorVar + "[" + paramsPart + "]" to reminders
     }
     
@@ -326,7 +326,7 @@ object SelectorConverter {
      * 只有完全不支持的参数才被剔除
      * 与Python版本的filter_selector_parameters函数逻辑一致
      */
-    fun filterSelectorParameters(selector: String, targetVersion: SelectorType, context: android.content.Context): Pair<String, List<String>> {
+    fun filterSelectorParameters(selector: String, targetVersion: SelectorType, context: android.content.Context): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
         
         // Java版特有参数（完全不支持，无法转换）
@@ -668,7 +668,7 @@ object SelectorConverter {
             .replace(",\\]".toRegex(), "]")
             .replace("\\[".toRegex(), "[")
         
-        return finalSelector to conversionReminders
+        return Triple(finalSelector, removedParams, conversionReminders)
     }
     
     /**
@@ -1879,14 +1879,10 @@ object SelectorConverter {
             // 移除空数组
             val index = result.indexOf(fullMatch)
             if (index >= 0) {
-                var replacement = ""
-                // 检查前面是否有逗号
-                if (index > 0 && result[index - 1] == ',') {
-                    replacement = result.substring(0, index - 1) + result.substring(index + fullMatch.length)
-                } else if (index + fullMatch.length < result.length && result[index + fullMatch.length] == ',') {
-                    replacement = result.substring(0, index) + result.substring(index + fullMatch.length + 1)
-                } else {
-                    replacement = result.substring(0, index) + result.substring(index + fullMatch.length)
+                val replacement = when {
+                    index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                    index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                    else -> result.substring(0, index) + result.substring(index + fullMatch.length)
                 }
                 result = replacement
             }
@@ -1915,14 +1911,10 @@ object SelectorConverter {
                     // 空数组或转换失败，移除整个 hasitem 参数
                     val index = result.indexOf(fullMatch)
                     if (index >= 0) {
-                        var replacement = ""
-                        // 检查前面是否有逗号
-                        if (index > 0 && result[index - 1] == ',') {
-                            replacement = result.substring(0, index - 1) + result.substring(index + fullMatch.length)
-                        } else if (index + fullMatch.length < result.length && result[index + fullMatch.length] == ',') {
-                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length + 1)
-                        } else {
-                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length)
+                        val replacement = when {
+                            index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                            index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                            else -> result.substring(0, index) + result.substring(index + fullMatch.length)
                         }
                         result = replacement
                     }
@@ -1954,14 +1946,10 @@ object SelectorConverter {
                     // 无效参数或转换失败，移除整个 hasitem 参数
                     val index = result.indexOf(fullMatch)
                     if (index >= 0) {
-                        var replacement = ""
-                        // 检查前面是否有逗号
-                        if (index > 0 && result[index - 1] == ',') {
-                            replacement = result.substring(0, index - 1) + result.substring(index + fullMatch.length)
-                        } else if (index + fullMatch.length < result.length && result[index + fullMatch.length] == ',') {
-                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length + 1)
-                        } else {
-                            replacement = result.substring(0, index) + result.substring(index + fullMatch.length)
+                        val replacement = when {
+                            index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                            index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                            else -> result.substring(0, index) + result.substring(index + fullMatch.length)
                         }
                         result = replacement
                     }
@@ -2475,7 +2463,7 @@ object SelectorConverter {
         // 解析 SelectedItem - 使用智能提取方法
         val selectedItemMatch = extractKeyValue(nbtContent, "SelectedItem")
         if (selectedItemMatch != null) {
-            val hasitemItem = parseNbtItemToHasitem(selectedItemMatch, "slot.weapon.mainhand", "0", reminders, context)
+            val hasitemItem = parseNbtItemToHasitem(selectedItemMatch, "slot.weapon.mainhand", "0")
             if (hasitemItem.isNotEmpty()) {
                 hasitemItems.add(hasitemItem)
             }
@@ -2672,7 +2660,7 @@ object SelectorConverter {
                                 else -> null
                             }
                             if (location != null) {
-                                val hasitemItem = parseNbtItemToHasitem(currentValue, location, "0", reminders, context)
+                                val hasitemItem = parseNbtItemToHasitem(currentValue, location, "0")
                                 if (hasitemItem.isNotEmpty()) {
                                     items.add(hasitemItem)
                                 }
@@ -2800,7 +2788,7 @@ object SelectorConverter {
             "slot.inventory" to (slotNum - 9).toString()
         }
 
-        return parseNbtItemToHasitem(itemData, location, hasitemSlot, reminders, context)
+        return parseNbtItemToHasitem(itemData, location, hasitemSlot)
     }
 
     /**
@@ -2809,9 +2797,7 @@ object SelectorConverter {
     private fun parseNbtItemToHasitem(
         itemData: String,
         location: String,
-        slot: String,
-        reminders: MutableList<String>,
-        context: Context
+        slot: String
     ): String {
         // 提取 id
         val idPattern = "id\\s*:\\s*[\"']([^\"']+)[\"']".toRegex()

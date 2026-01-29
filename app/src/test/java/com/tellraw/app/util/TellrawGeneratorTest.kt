@@ -203,7 +203,7 @@ class TellrawGeneratorTest {
             "@a[c=-5]" to "limit=5,sort=furthest"
         )
         
-        for ((bedrockSelector, expectedJavaParam) in testCases) {
+        for ((bedrockSelector, _) in testCases) {
             val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
             assertTrue("应该检测到基岩版选择器: $bedrockSelector", conversion.wasConverted)
             assertNotNull("转换后的Java选择器不应为null: $bedrockSelector", conversion.javaSelector)
@@ -231,7 +231,7 @@ class TellrawGeneratorTest {
             "@a[limit=5,sort=furthest]" to "c=-5"
         )
         
-        for ((javaSelector, expectedBedrockParam) in testCases) {
+        for ((javaSelector, _) in testCases) {
             val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
             // Java版选择器转换后，基岩版选择器应该包含对应的参数
             assertNotNull("转换后的基岩版选择器不应为null: $javaSelector", conversion.bedrockSelector)
@@ -407,10 +407,10 @@ class TellrawGeneratorTest {
             "@a[gamemode=survival,m=0]" to listOf("Java版", "基岩版")
         )
         
-        for ((selector, expectedTypes) in testCases) {
+        for ((selector, _) in testCases) {
             val type = SelectorConverter.detectSelectorType(selector)
             val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-            
+
             assertNotNull("选择器类型不应为null: $selector", type)
             assertNotNull("转换结果不应为null: $selector", conversion)
         }
@@ -444,12 +444,12 @@ class TellrawGeneratorTest {
      */
     @Test
     fun testPerformanceWithManyParameters() {
-        val selector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={test1=10,test2=20,test3=30,test4=40,test5=50},tag=a,tag=b,tag=c,name=Steve,type=player,distance=10,team=red,gamemode=survival,level=5..10,sort=nearest,limit=5]"
+        val _ = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={test1=10,test2=20,test3=30,test4=40,test5=50},tag=a,tag=b,tag=c,name=Steve,type=player,distance=10,team=red,gamemode=survival,level=5..10,sort=nearest,limit=5]"
         val message = "§c§l这是一个包含大量参数的选择器测试"
-        
+
         val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
         val bedrockJson = TextFormatter.convertToBedrockJson(message, "none", false)
-        
+
         assertNotNull("Java版JSON不应为null", javaJson)
         assertNotNull("基岩版JSON不应为null", bedrockJson)
     }

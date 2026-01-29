@@ -359,7 +359,6 @@ class TextFormatterTest {
     @Test
     fun testColorCodeConversion_2() {
         // 基岩版material_redstone到Java版dark_red
-        val bedrockText = "§m深红"
         val javaCode = TextFormatter.convertColorCodes("§m", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§4", javaCode)
     }
@@ -367,7 +366,6 @@ class TextFormatterTest {
     @Test
     fun testColorCodeConversion_3() {
         // 基岩版material_copper到Java版red
-        val bedrockText = "§n红色"
         val javaCode = TextFormatter.convertColorCodes("§n", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§c", javaCode)
     }
@@ -375,7 +373,6 @@ class TextFormatterTest {
     @Test
     fun testColorCodeConversion_4() {
         // Java版颜色代码保持不变
-        val javaText = "§a绿色"
         val javaCode = TextFormatter.convertColorCodes("§a", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§a", javaCode)
     }
@@ -383,7 +380,6 @@ class TextFormatterTest {
     @Test
     fun testColorCodeConversion_5() {
         // 基岩版material_amethyst到Java版light_purple
-        val bedrockText = "§u紫色"
         val javaCode = TextFormatter.convertColorCodes("§u", com.tellraw.app.model.MinecraftVersion.JAVA)
         assertEquals("§d", javaCode)
     }

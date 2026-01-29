@@ -195,7 +195,7 @@
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted_all">Java sort=furthest converted to Bedrock c=-9999. Note: sort=furthest selects all entities from farthest to nearest, c=-9999 selects the nearest 9999 entities from farthest to nearest</string>
     <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary not supported in Bedrock, removed</string>
-    <string name="java_sort_random_converted">Java %s[sort=random] converted to Bedrock @r[c=%s]</string>
+    <string name="java_sort_random_converted">Java %1$s[sort=random] converted to Bedrock @r[c=%2$s]</string>
     <string name="java_sort_random_to_c">Java sort=random converted to Bedrock c=%s</string>
     <string name="java_sort_not_supported">Java sort=%s not supported in Bedrock, removed</string>
     <string name="java_limit_converted">Java limit=%1$s converted to Bedrock c=%2$s</string>

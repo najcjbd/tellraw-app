@@ -925,7 +925,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_1() {
         // 过滤Java版独有参数到基岩版
         val javaSelector = "@a[distance=10,team=red,gamemode=survival]"
-        val (filtered, removed) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK, context)
+        val (filtered, removed, reminders) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.BEDROCK, context)
         assertTrue("应移除team参数", removed.contains("team"))
         assertFalse("不应包含team参数", filtered.contains("team"))
     }
@@ -935,8 +935,7 @@ class SelectorConverterTest {
         // 过滤基岩版独有参数到Java版
         // hasitem 应该被转换为 nbt，r 应该被转换为 distance，family 参数会被移除
         val bedrockSelector = "@a[r=10,hasitem={item=diamond},family=zombie]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
-        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        val (filtered, removed, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
         // 检查转换后的选择器
         assertTrue("转换后的选择器应包含nbt", filtered.contains("nbt"))
         assertTrue("转换后的选择器应包含distance", filtered.contains("distance"))
@@ -949,8 +948,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_3() {
         // 保留通用参数
         val selector = "@e[type=cow,name=Test]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
-        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        val (filtered, removed, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
         // 检查转换后的选择器
         assertTrue("应保留type参数", filtered.contains("type"))
         assertTrue("应保留name参数", filtered.contains("name"))
@@ -962,8 +960,7 @@ class SelectorConverterTest {
         // 过滤scores反选（基岩版到Java版）
         // Java版不支持scores反选，所以整个scores参数应该被移除
         val bedrockSelector = "@e[scores={kills=!5}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
-        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        val (filtered, removed, reminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
         // 检查转换后的选择器
         assertFalse("转换后的选择器不应包含scores参数", filtered.contains("scores"))
         // 检查提醒信息中是否有scores反选移除的提醒
@@ -974,8 +971,7 @@ class SelectorConverterTest {
     fun testParameterFiltering_5() {
         // 保留scores非反选
         val selector = "@e[scores={kills=5}]"
-        val (filtered, reminders) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
-        // 第二个返回值是reminders（提醒信息），不是removed参数列表
+        val (filtered, removed, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
         // 检查转换后的选择器
         assertTrue("应保留scores参数", filtered.contains("scores"))
     }

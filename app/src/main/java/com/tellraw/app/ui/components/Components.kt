@@ -1719,7 +1719,7 @@ fun DirectoryPickerDialog(
         }
     } else {
         // 竖屏布局：上下分栏
-        androidx.compose.material3.AlertDialog(
+        androidx.compose.material3.BasicAlertDialog(
             onDismissRequest = onDismiss,
             modifier = Modifier
                 .fillMaxWidth(0.95f)
