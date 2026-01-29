@@ -1903,7 +1903,7 @@ object SelectorConverter {
         if (arrayMatch != null) {
             val startIndex = arrayMatch.range.first
             // 找到匹配的 hasitem 数组的完整内容
-            val arrayContent = extractArrayContent(result.substring(startIndex + 9))
+            val arrayContent = extractArrayContent(result.substring(startIndex))
 
             if (arrayContent != null) {
                 val fullMatch = "hasitem=[$arrayContent]"
