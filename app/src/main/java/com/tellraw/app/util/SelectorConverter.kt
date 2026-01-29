@@ -2380,7 +2380,7 @@ object SelectorConverter {
             val nbtIndex = result.indexOf("nbt={", searchStart)
             if (nbtIndex == -1) break
 
-            // 提取完整的nbt内容
+            // 提取完整的nbt内容（从第一个{开始到匹配的}结束）
             val nbtContent = extractNbtContent(result.substring(nbtIndex + 5))
             
             if (nbtContent != null) {
@@ -2529,7 +2529,7 @@ object SelectorConverter {
         val keyPattern = Regex("(^|,|\\{)\\s*$key\\s*:\\s*")
         val match = keyPattern.find(nbtContent) ?: return null
 
-        val startIndex = match.range.last
+        val startIndex = match.range.last + 1
         // 从键的后面开始解析
         val remaining = nbtContent.substring(startIndex).trim()
 
