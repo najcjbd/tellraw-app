@@ -2438,13 +2438,14 @@ object SelectorConverter {
 
     /**
      * 提取完整的 nbt 内容
-     * 提取从字符串开头开始到匹配的闭合花括号结束的所有内容
+     * 提取从字符串开头开始到匹配的闭合花括号或方括号结束的所有内容
      * 保留key、方括号和所有的内层花括号
      */
     private fun extractNbtContent(str: String): String? {
         if (str.isEmpty()) return null
         
         var braceCount = 0
+        var bracketCount = 0
         var result = StringBuilder()
 
         for (char in str) {
@@ -2456,8 +2457,20 @@ object SelectorConverter {
                 '}' -> {
                     result.append(char)
                     braceCount--
-                    if (braceCount == 0) {
+                    if (braceCount == 0 && bracketCount == 0) {
                         // 遇到外层的 '}'，结束
+                        return result.toString()
+                    }
+                }
+                '[' -> {
+                    bracketCount++
+                    result.append(char)
+                }
+                ']' -> {
+                    result.append(char)
+                    bracketCount--
+                    if (braceCount == 0 && bracketCount == 0) {
+                        // 遇到外层的 ']'，结束
                         return result.toString()
                     }
                 }
