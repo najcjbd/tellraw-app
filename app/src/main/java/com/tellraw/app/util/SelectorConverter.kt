@@ -1935,7 +1935,7 @@ object SelectorConverter {
         val simplePattern = "hasitem=\\{".toRegex()
         val simpleMatch = simplePattern.find(result)
 
-        if (simpleMatch != null && simpleMatch.range.first >= 0) {
+        if (simpleMatch != null) {
             val startIndex = simpleMatch.range.first
             // 找到匹配的 hasitem 对象的完整内容
             val objectContent = extractObjectContent(result.substring(startIndex + 9))
@@ -2371,26 +2371,30 @@ object SelectorConverter {
         val allHasitemItems = mutableListOf<String>()
         var nbtMatches = mutableListOf<Pair<Int, String>>()  // (startIndex, fullMatch)
 
-        // 查找所有nbt参数
-        val nbtPattern = "nbt=\\{".toRegex()
-        var match = nbtPattern.find(paramsPart)
+        // 查找所有nbt参数 - 使用更好的方法
+        var searchStart = 0
+        while (searchStart < result.length) {
+            // 查找下一个nbt={
+            val nbtIndex = result.indexOf("nbt={", searchStart)
+            if (nbtIndex == -1) break
 
-        while (match != null) {
-            val startIndex = match.range.first
-            // 找到匹配的 nbt 参数的完整内容
-            val nbtContent = extractNbtContent(paramsPart.substring(startIndex + 5))
-
+            // 提取完整的nbt内容
+            val nbtContent = extractNbtContent(result.substring(nbtIndex + 5))
+            
             if (nbtContent != null) {
                 val fullMatch = "nbt={$nbtContent}"
-                nbtMatches.add(Pair(startIndex, fullMatch))
+                nbtMatches.add(Pair(nbtIndex, fullMatch))
 
                 // 解析这个nbt参数
                 val hasitemItems = parseNbtToHasitemItems(nbtContent, reminders, context)
                 allHasitemItems.addAll(hasitemItems)
+                
+                // 从当前nbt参数结束位置开始搜索下一个
+                searchStart = nbtIndex + fullMatch.length
+            } else {
+                // 提取失败，跳过这个参数
+                searchStart = nbtIndex + 1
             }
-
-            // 查找下一个nbt参数
-            match = nbtPattern.find(paramsPart, startIndex + 1)
         }
 
         // 如果有nbt参数被转换,替换所有的nbt参数为一个hasitem参数
@@ -2432,6 +2436,7 @@ object SelectorConverter {
 
     /**
      * 提取完整的 nbt 内容
+     * 确保只提取第一个完整的nbt对象（从第一个{开始，到匹配的}结束）
      */
     private fun extractNbtContent(str: String): String? {
         var braceCount = 0
@@ -2450,7 +2455,7 @@ object SelectorConverter {
                 }
                 '}' -> {
                     braceCount--
-                    if (braceCount == 0) {
+                    if (braceCount == 0 && started) {
                         // 遇到外层的 '}'，结束
                         return result.toString()
                     } else {
