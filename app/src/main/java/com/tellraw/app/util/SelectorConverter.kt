@@ -2438,9 +2438,12 @@ object SelectorConverter {
 
     /**
      * 提取完整的 nbt 内容
-     * 确保只提取第一个完整的nbt对象（从第一个{开始，到匹配的}结束）
+     * 提取从第一个字符开始到匹配的闭合花括号结束的所有内容
+     * 保留key、方括号和所有的内层花括号
      */
     private fun extractNbtContent(str: String): String? {
+        if (str.isEmpty()) return null
+        
         var braceCount = 0
         var result = StringBuilder()
         var started = false
@@ -2450,18 +2453,16 @@ object SelectorConverter {
                 '{' -> {
                     braceCount++
                     if (!started) {
-                        started = true  // 跳过第一个 '{'
-                    } else {
-                        result.append(char)  // 保留内层的 '{'
+                        started = true  // 遇到第一个 '{'，开始记录
                     }
+                    result.append(char)  // 保留所有的 '{'
                 }
                 '}' -> {
+                    result.append(char)  // 保留所有的 '}'
                     braceCount--
                     if (braceCount == 0 && started) {
                         // 遇到外层的 '}'，结束
                         return result.toString()
-                    } else {
-                        result.append(char)  // 保留内层的 '}'
                     }
                 }
                 else -> {
