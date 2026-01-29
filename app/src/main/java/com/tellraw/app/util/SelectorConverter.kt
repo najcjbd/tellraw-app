@@ -443,28 +443,6 @@ object SelectorConverter {
             // 处理sort和limit参数
             if (sortValue != null) {
                 when (sortValue) {
-                    "nearest" -> {
-                        // 当limit=数字,sort=nearest时，基岩版转换为c=数字
-                        // 当只有sort=nearest，没有limit时，基岩版转换为c=9999
-                        val cValue = limitValue ?: "9999"
-                        paramsPart = paramsPart.replace(sortPattern, "")
-                        if (limitValue != null) {
-                            paramsPart = paramsPart.replace(limitPattern, "")
-                        }
-                        // 添加c参数
-                        if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
-                            paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
-                        } else {
-                            paramsPart = if (paramsPart.endsWith("[")) {
-                                paramsPart.dropLast(1) + "c=$cValue]"
-                            } else if (paramsPart.endsWith("]")) {
-                                paramsPart.dropLast(1) + ",c=$cValue]"
-                            } else {
-                                paramsPart + "c=$cValue"
-                            }
-                        }
-                        conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, cValue))
-                    }
                     "furthest" -> {
                         // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
                         // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
@@ -559,14 +537,6 @@ object SelectorConverter {
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
-        } else if (targetVersion == SelectorType.JAVA) {
-            // 基岩版到Java版的参数转换
-            paramsPart = convertR_RmToDistance(paramsPart, conversionReminders, context)
-            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders, context)
-            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders, context)
-            paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
-            paramsPart = convertMToGamemode(paramsPart, conversionReminders, context)
-            paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
         }
         
         // 分割参数，但要处理包含大括号的参数
@@ -1092,8 +1062,8 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val rPattern = "(?<!__SCORES_)\\br=([^,\\]]+)".toRegex()
-        val rmPattern = "(?<!__SCORES_)\\brm=([^,\\]]+)".toRegex()
+        val rPattern = "(?<!__SCORES_)\\b[Rr]=([^,\\]]+)".toRegex()
+        val rmPattern = "(?<!__SCORES_)\\b[Rr][Mm]=([^,\\]]+)".toRegex()
         
         val rMatch = rPattern.find(result)
         val rmMatch = rmPattern.find(result)
@@ -1283,8 +1253,9 @@ object SelectorConverter {
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
             // 此时scores参数已被替换为占位符，不会误匹配
-            val minPattern = "(?<!__SCORES_)\\b$minParam=([^,\\]]+)".toRegex()
-            val maxPattern = "(?<!__SCORES_)\\b$maxParam=([^,\\]]+)".toRegex()
+            // 构建不区分大小写的参数名匹配模式
+            val minPattern = "(?<!__SCORES_)\\b(?i)$minParam=([^,\\]]+)".toRegex()
+            val maxPattern = "(?<!__SCORES_)\\b(?i)$maxParam=([^,\\]]+)".toRegex()
             
             val minMatch = minPattern.find(result)
             val maxMatch = maxPattern.find(result)
@@ -1404,8 +1375,8 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val lPattern = "(?<!__SCORES_)\\bl=([^,\\]]+)".toRegex()
-        val lmPattern = "(?<!__SCORES_)\\blm=([^,\\]]+)".toRegex()
+        val lPattern = "(?<!__SCORES_)\\b[Ll]=([^,\\]]+)".toRegex()
+        val lmPattern = "(?<!__SCORES_)\\b[Ll][Mm]=([^,\\]]+)".toRegex()
         
         val lMatch = lPattern.find(result)
         val lmMatch = lmPattern.find(result)
@@ -1550,7 +1521,7 @@ object SelectorConverter {
         
         // 从m到gamemode的转换（基岩版到Java版）
         // 此时scores参数已被替换为占位符，不会误匹配
-        val mPattern = "(?<!__SCORES_)\\bm=(!?)([^,\\]]+)".toRegex()
+        val mPattern = "(?<!__SCORES_)\\b[Mm]=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(mPattern) { match ->
             val negation = match.groupValues[1]  // ! 或空
@@ -1651,7 +1622,7 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val cPattern = "(?<!__SCORES_)\\bc=([+-]?\\d+)".toRegex()
+        val cPattern = "(?<!__SCORES_)\\b[Cc]=([+-]?\\d+)".toRegex()
         
         val match = cPattern.find(result)
         if (match != null) {
