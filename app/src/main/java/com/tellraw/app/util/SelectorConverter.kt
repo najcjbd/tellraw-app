@@ -313,7 +313,7 @@ object SelectorConverter {
         }
 
         val selectorVar = selector.split('[')[0]
-        var paramsPart = selector.substringAfter('[').substringBefore(']')
+        var paramsPart = selector.substringAfter('[').substringBeforeLast(']')
 
         // 去除不必要的空格
         paramsPart = removeUnnecessarySpaces(paramsPart)
@@ -346,7 +346,7 @@ object SelectorConverter {
         
         // 提取参数部分
         var selectorVar = selector.split('[')[0]
-        var paramsPart = selector.substringAfter('[').substringBefore(']')
+        var paramsPart = selector.substringAfter('[').substringBeforeLast(']')
 
         // 注意：scores 参数内部的记分项不应该被当作选择器参数处理
         // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
@@ -1589,7 +1589,7 @@ object SelectorConverter {
         }
         
         val selectorVar = selector.split('[')[0]
-        var paramsPart = selector.substringAfter('[').substringBefore(']')
+        var paramsPart = selector.substringAfter('[').substringBeforeLast(']')
         
         // 特殊处理scores参数中的!=反选：在Java版输出中移除整个scores参数
         if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
