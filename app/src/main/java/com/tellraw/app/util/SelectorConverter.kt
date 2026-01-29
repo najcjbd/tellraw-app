@@ -1906,7 +1906,8 @@ object SelectorConverter {
             val arrayContent = extractArrayContent(result.substring(startIndex))
 
             if (arrayContent != null) {
-                val fullMatch = "hasitem=[$arrayContent]"
+                // 直接使用原始字符串中的完整匹配，而不是重新构建
+                val fullMatch = result.substring(startIndex, startIndex + 9 + arrayContent.length + 1)
                 val nbtResult = parseHasitemArray(arrayContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
