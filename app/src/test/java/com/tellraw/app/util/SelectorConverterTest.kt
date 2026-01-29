@@ -1603,4 +1603,706 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
     }
+    
+    /**
+     * 测试组24：基本选择器参数全面测试
+     */
+    @Test
+    fun testBasicSelectorParameters_1() {
+        // x, y, z原点参数
+        val selector = "@a[x=100,y=64,z=200]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_2() {
+        // distance参数（Java版）
+        val javaSelector = "@a[distance=10]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含r", conversion.bedrockSelector.contains("r="))
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_3() {
+        // r, rm参数（基岩版）
+        val bedrockSelector = "@a[r=10,rm=5]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含distance", conversion.javaSelector.contains("distance="))
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_4() {
+        // dx, dy, dz体积参数
+        val selector = "@a[dx=10,dy=5,dz=10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_5() {
+        // scores参数（单个值）
+        val selector = "@a[scores={kills=10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_6() {
+        // scores参数（范围）
+        val selector = "@a[scores={kills=5..10}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_7() {
+        // tag参数
+        val selector = "@a[tag=friendly]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_8() {
+        // tag参数（反向）
+        val selector = "@a[tag=!enemy]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_9() {
+        // team参数（Java版）
+        val javaSelector = "@a[team=red]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // team是Java版特有，应该移除并提醒
+        assertTrue("team参数应该被移除", !conversion.bedrockSelector.contains("team="))
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_10() {
+        // name参数
+        val selector = "@a[name=Steve]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_11() {
+        // type参数
+        val selector = "@e[type=zombie]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testBasicSelectorParameters_12() {
+        // type参数（反向）
+        val selector = "@e[type=!creeper]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    /**
+     * 测试组25：JAVA版特有选择器参数测试
+     */
+    @Test
+    fun testJavaSpecificParameters_1() {
+        // x_rotation参数（单个值）
+        val javaSelector = "@a[x_rotation=0]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rx", conversion.bedrockSelector.contains("rx="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_2() {
+        // x_rotation参数（范围）
+        val javaSelector = "@a[x_rotation=-30..30]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rx和rxm", conversion.bedrockSelector.contains("rx=") || conversion.bedrockSelector.contains("rxm="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_3() {
+        // y_rotation参数
+        val javaSelector = "@a[y_rotation=90]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry", conversion.bedrockSelector.contains("ry="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_4() {
+        // nbt参数（简单）
+        val javaSelector = "@a[nbt={Health:20f}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // nbt参数无法转换，应该移除并提醒
+        assertTrue("nbt参数应该被移除", !conversion.bedrockSelector.contains("nbt="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_5() {
+        // level参数（单个值）
+        val javaSelector = "@a[level=10]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含l", conversion.bedrockSelector.contains("l="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_6() {
+        // level参数（范围）
+        val javaSelector = "@a[level=5..15]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含l和lm", conversion.bedrockSelector.contains("l=") || conversion.bedrockSelector.contains("lm="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_7() {
+        // gamemode参数
+        val javaSelector = "@a[gamemode=survival]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含m", conversion.bedrockSelector.contains("m="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_8() {
+        // advancements参数
+        val javaSelector = "@a[advancements={story/form_obsidian=true}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // advancements是Java版特有，应该移除并提醒
+        assertTrue("advancements参数应该被移除", !conversion.bedrockSelector.contains("advancements="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_9() {
+        // predicate参数
+        val javaSelector = "@a[predicate=example:test]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // predicate是Java版特有，应该移除并提醒
+        assertTrue("predicate参数应该被移除", !conversion.bedrockSelector.contains("predicate="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_10() {
+        // limit参数
+        val javaSelector = "@a[limit=5]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含c", conversion.bedrockSelector.contains("c="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_11() {
+        // sort参数（nearest）
+        val javaSelector = "@a[sort=nearest]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // sort=nearest是默认值，应该移除
+        assertTrue("sort=nearest应该被移除", !conversion.bedrockSelector.contains("sort="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_12() {
+        // sort参数（furthest）
+        val javaSelector = "@a[sort=furthest]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含c=-9999", conversion.bedrockSelector.contains("c=-9999"))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_13() {
+        // sort参数（random）
+        val javaSelector = "@a[sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含@r", conversion.bedrockSelector.contains("@r"))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_14() {
+        // sort参数（arbitrary）
+        val javaSelector = "@a[sort=arbitrary]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // sort=arbitrary是@a和@e的默认值，应该移除
+        assertTrue("sort=arbitrary应该被移除", !conversion.bedrockSelector.contains("sort="))
+    }
+    
+    @Test
+    fun testJavaSpecificParameters_15() {
+        // limit和sort组合
+        val javaSelector = "@a[limit=5,sort=furthest]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含c=-5", conversion.bedrockSelector.contains("c=-5"))
+    }
+    
+    /**
+     * 测试组26：基岩版特有选择器参数测试
+     */
+    @Test
+    fun testBedrockSpecificParameters_1() {
+        // rx参数（单个值）
+        val bedrockSelector = "@a[rx=30]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含x_rotation", conversion.javaSelector.contains("x_rotation="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_2() {
+        // rxm参数
+        val bedrockSelector = "@a[rxm=-30]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含x_rotation", conversion.javaSelector.contains("x_rotation="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_3() {
+        // ry参数
+        val bedrockSelector = "@a[ry=90]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含y_rotation", conversion.javaSelector.contains("y_rotation="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_4() {
+        // hasitem参数（简单）
+        val bedrockSelector = "@a[hasitem={item=diamond}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含nbt", conversion.javaSelector.contains("nbt="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_5() {
+        // hasitem参数（数组）
+        val bedrockSelector = "@a[hasitem=[{item=diamond},{item=iron_ingot}]]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含nbt", conversion.javaSelector.contains("nbt="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_6() {
+        // l参数
+        val bedrockSelector = "@a[l=10]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含level", conversion.javaSelector.contains("level="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_7() {
+        // lm参数
+        val bedrockSelector = "@a[lm=5]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含level", conversion.javaSelector.contains("level="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_8() {
+        // m参数（survival）
+        val bedrockSelector = "@a[m=s]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含gamemode", conversion.javaSelector.contains("gamemode="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_9() {
+        // m参数（数字）
+        val bedrockSelector = "@a[m=1]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含gamemode", conversion.javaSelector.contains("gamemode="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_10() {
+        // c参数（正数）
+        val bedrockSelector = "@a[c=5]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含limit", conversion.javaSelector.contains("limit="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_11() {
+        // c参数（负数）
+        val bedrockSelector = "@a[c=-5]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含limit和sort=furthest", conversion.javaSelector.contains("limit=") && conversion.javaSelector.contains("sort=furthest"))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_12() {
+        // haspermission参数
+        val bedrockSelector = "@a[haspermission={movement=enabled}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // haspermission是基岩版特有，应该移除并提醒
+        assertTrue("haspermission参数应该被移除", !conversion.javaSelector.contains("haspermission="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_13() {
+        // has_property参数
+        val bedrockSelector = "@e[has_property={property=minecraft:is_baby}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // has_property是基岩版特有，应该移除并提醒
+        assertTrue("has_property参数应该被移除", !conversion.javaSelector.contains("has_property="))
+    }
+    
+    @Test
+    fun testBedrockSpecificParameters_14() {
+        // family参数
+        val bedrockSelector = "@e[family=monster]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // family是基岩版特有，应该移除并提醒
+        assertTrue("family参数应该被移除", !conversion.javaSelector.contains("family="))
+    }
+    
+    /**
+     * 测试组27：特殊组合测试
+     */
+    @Test
+    fun testSpecialCombinations_1() {
+        // 多个nbt参数（SelectedItem + Inventory）
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}},nbt={Inventory:[{id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+        assertTrue("应包含hasitem数组", conversion.bedrockSelector.contains("hasitem=["))
+    }
+    
+    @Test
+    fun testSpecialCombinations_2() {
+        // 多个nbt参数（SelectedItem + equipment + Inventory）
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}},nbt={equipment:{head:{id:\"minecraft:diamond_helmet\"}}},nbt={Inventory:[{id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+        assertTrue("应包含slot.weapon.mainhand", conversion.bedrockSelector.contains("slot.weapon.mainhand"))
+        assertTrue("应包含slot.armor.head", conversion.bedrockSelector.contains("slot.armor.head"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_3() {
+        // 多个hasitem参数（主手 + 副手）
+        val bedrockSelector = "@a[hasitem=[{item=diamond_sword,location=slot.weapon.mainhand,slot=0},{item=shield,location=slot.weapon.offhand,slot=0}]]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含SelectedItem", conversion.javaSelector.contains("SelectedItem"))
+        assertTrue("应包含equipment.offhand", conversion.javaSelector.contains("offhand"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_4() {
+        // 多个hasitem参数（多个装备槽）
+        val bedrockSelector = "@a[hasitem=[{item=diamond_helmet,location=slot.armor.head,slot=0},{item=diamond_chestplate,location=slot.armor.chest,slot=0},{item=diamond_leggings,location=slot.armor.legs,slot=0},{item=diamond_boots,location=slot.armor.feet,slot=0}]]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含equipment", conversion.javaSelector.contains("equipment"))
+        assertTrue("应包含head", conversion.javaSelector.contains("head"))
+        assertTrue("应包含chest", conversion.javaSelector.contains("chest"))
+        assertTrue("应包含legs", conversion.javaSelector.contains("legs"))
+        assertTrue("应包含feet", conversion.javaSelector.contains("feet"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_5() {
+        // 槽位映射：快捷栏（0-8）
+        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.hotbar", conversion.bedrockSelector.contains("slot.hotbar"))
+        assertTrue("应包含slot=0", conversion.bedrockSelector.contains("slot=0"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_6() {
+        // 槽位映射：物品栏（9-35）
+        val javaSelector = "@a[nbt={Inventory:[{Slot:21b,id:\"minecraft:netherite_ingot\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.inventory", conversion.bedrockSelector.contains("slot.inventory"))
+        assertTrue("应包含slot=12", conversion.bedrockSelector.contains("slot=12"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_7() {
+        // quantity范围：2..
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=2..}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_8() {
+        // quantity范围：..5
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=..5}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Count:5b", conversion.javaSelector.contains("Count:5b"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_9() {
+        // quantity范围：3..5（中间值4）
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=3..5}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Count:4b", conversion.javaSelector.contains("Count:4b"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_10() {
+        // quantity不等于：!5
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=!5}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // quantity不等于不支持，应该移除该条件
+        assertTrue("quantity不等于不支持", !conversion.javaSelector.contains("!5"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_11() {
+        // slot范围：0..
+        val bedrockSelector = "@a[hasitem={item=diamond,location=slot.hotbar,slot=0..}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Inventory数组", conversion.javaSelector.contains("Inventory:["))
+    }
+    
+    @Test
+    fun testSpecialCombinations_12() {
+        // slot范围：..8
+        val bedrockSelector = "@a[hasitem={item=diamond,location=slot.hotbar,slot=..8}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Inventory数组", conversion.javaSelector.contains("Inventory:["))
+    }
+    
+    @Test
+    fun testSpecialCombinations_13() {
+        // slot范围：0..8
+        val bedrockSelector = "@a[hasitem={item=diamond,location=slot.hotbar,slot=0..8}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Inventory数组", conversion.javaSelector.contains("Inventory:["))
+    }
+    
+    @Test
+    fun testSpecialCombinations_14() {
+        // slot不等于：!0
+        val bedrockSelector = "@a[hasitem={item=diamond,location=slot.hotbar,slot=!0}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // slot不等于不支持，应该移除该条件
+        assertTrue("slot不等于不支持", !conversion.javaSelector.contains("!0"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_15() {
+        // 混合参数：hasitem + scores + tag
+        val bedrockSelector = "@a[hasitem={item=diamond},scores={kills=10},tag=friendly]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含nbt", conversion.javaSelector.contains("nbt="))
+        assertTrue("应包含scores", conversion.javaSelector.contains("scores="))
+        assertTrue("应包含tag", conversion.javaSelector.contains("tag="))
+    }
+    
+    @Test
+    fun testSpecialCombinations_16() {
+        // 混合参数：nbt + level + gamemode
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}},level=10,gamemode=survival]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+        assertTrue("应包含l", conversion.bedrockSelector.contains("l="))
+        assertTrue("应包含m", conversion.bedrockSelector.contains("m="))
+    }
+    
+    @Test
+    fun testSpecialCombinations_17() {
+        // 混合参数：distance + dx + dy + dz
+        val javaSelector = "@a[distance=10,dx=5,dy=3,dz=5]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含r", conversion.bedrockSelector.contains("r="))
+        assertTrue("应包含dx", conversion.bedrockSelector.contains("dx="))
+    }
+    
+    @Test
+    fun testSpecialCombinations_18() {
+        // 混合参数：x_rotation + y_rotation
+        val javaSelector = "@a[x_rotation=-30..30,y_rotation=-45..45]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rx/rxm", conversion.bedrockSelector.contains("rx=") || conversion.bedrockSelector.contains("rxm="))
+        assertTrue("应包含ry/rym", conversion.bedrockSelector.contains("ry=") || conversion.bedrockSelector.contains("rym="))
+    }
+    
+    @Test
+    fun testSpecialCombinations_19() {
+        // 空Inventory数组
+        val javaSelector = "@a[nbt={Inventory:[]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+    }
+    
+    @Test
+    fun testSpecialCombinations_20() {
+        // 空hasitem数组
+        val bedrockSelector = "@a[hasitem=[]]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 空hasitem数组应该被移除
+        assertTrue("空hasitem数组应该被移除", !conversion.javaSelector.contains("hasitem"))
+    }
+    
+    /**
+     * 测试组28：边界情况和错误处理
+     */
+    @Test
+    fun testEdgeCases_1() {
+        // 没有物品ID的hasitem
+        val bedrockSelector = "@a[hasitem={quantity=5}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 没有item参数，应该被忽略
+        assertTrue("没有item的hasitem应该被忽略", !conversion.javaSelector.contains("nbt"))
+    }
+    
+    @Test
+    fun testEdgeCases_2() {
+        // 无效的物品ID
+        val bedrockSelector = "@a[hasitem={item=invalid_item_id}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 无效的物品ID应该仍然被处理
+        assertTrue("无效物品ID应该仍然被处理", conversion.javaSelector.contains("nbt"))
+    }
+    
+    @Test
+    fun testEdgeCases_3() {
+        // 无效的quantity范围
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=abc}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 无效的quantity应该被忽略
+        assertTrue("无效quantity应该被忽略", !conversion.javaSelector.contains("Count"))
+    }
+    
+    @Test
+    fun testEdgeCases_4() {
+        // 无效的slot范围
+        val bedrockSelector = "@a[hasitem={item=diamond,location=slot.hotbar,slot=abc}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 无效的slot应该被忽略
+        assertTrue("无效slot应该被忽略", !conversion.javaSelector.contains("Slot"))
+    }
+    
+    @Test
+    fun testEdgeCases_5() {
+        // 负数槽位
+        val javaSelector = "@a[nbt={Inventory:[{Slot:-1b,id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // 负数槽位应该被跳过
+        assertTrue("负数槽位应该被跳过", !conversion.bedrockSelector.contains("slot="))
+    }
+    
+    @Test
+    fun testEdgeCases_6() {
+        // 超大槽位
+        val javaSelector = "@a[nbt={Inventory:[{Slot:100b,id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        // 超大槽位应该被处理
+        assertTrue("超大槽位应该被处理", conversion.bedrockSelector.contains("slot="))
+    }
+    
+    @Test
+    fun testEdgeCases_7() {
+        // Count为0
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=0}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // Count为0应该被处理
+        assertTrue("Count=0应该被处理", conversion.javaSelector.contains("Count:0b"))
+    }
+    
+    @Test
+    fun testEdgeCases_8() {
+        // 超大Count
+        val bedrockSelector = "@a[hasitem={item=diamond,quantity=999999}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        // 超大Count应该被处理
+        assertTrue("超大Count应该被处理", conversion.javaSelector.contains("Count:"))
+    }
+    
+    @Test
+    fun testEdgeCases_9() {
+        // 嵌套的scores对象
+        val selector = "@a[scores={{kills=5}}]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_10() {
+        // 带引号的参数值
+        val selector = "@a[name=\"Player Name\"]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_11() {
+        // 特殊字符在参数值中
+        val selector = "@a[tag=special_tag_123]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_12() {
+        // 多个相同参数
+        val selector = "@a[tag=tag1,tag=tag2,tag=tag3]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_13() {
+        // 参数之间有空格
+        val selector = "@a[ scores = { kills = 10 } ]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_14() {
+        // 参数顺序不同
+        val selector1 = "@a[tag=friendly,scores={kills=10}]"
+        val selector2 = "@a[scores={kills=10},tag=friendly]"
+        val type1 = SelectorConverter.detectSelectorType(selector1)
+        val type2 = SelectorConverter.detectSelectorType(selector2)
+        assertEquals(SelectorType.UNIVERSAL, type1)
+        assertEquals(SelectorType.UNIVERSAL, type2)
+    }
+    
+    @Test
+    fun testEdgeCases_15() {
+        // 选择器变量大小写
+        val selector = "@A[tag=friendly]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals(SelectorType.UNIVERSAL, type)
+    }
+    
+    @Test
+    fun testEdgeCases_16() {
+        // 参数大小写（Java版）
+        val javaSelector = "@a[Level=10]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含l", conversion.bedrockSelector.contains("l="))
+    }
+    
+    @Test
+    fun testEdgeCases_17() {
+        // 参数大小写（基岩版）
+        val bedrockSelector = "@a[L=10]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含level", conversion.javaSelector.contains("level="))
+    }
+    
+    @Test
+    fun testEdgeCases_18() {
+        // 极限值：distance=0
+        val javaSelector = "@a[distance=0]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含r=0", conversion.bedrockSelector.contains("r=0"))
+    }
+    
+    @Test
+    fun testEdgeCases_19() {
+        // 极限值：level=0
+        val javaSelector = "@a[level=0]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含l=0", conversion.bedrockSelector.contains("l=0"))
+    }
+    
+    @Test
+    fun testEdgeCases_20() {
+        // 极限值：limit=1
+        val javaSelector = "@a[limit=1]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含c=1", conversion.bedrockSelector.contains("c=1"))
+    }
 }
