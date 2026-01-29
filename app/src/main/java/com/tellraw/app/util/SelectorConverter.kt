@@ -2457,7 +2457,7 @@ object SelectorConverter {
                 '}' -> {
                     result.append(char)
                     braceCount--
-                    if (braceCount == 0 && bracketCount == 0) {
+                    if (braceCount == 0) {
                         // 遇到外层的 '}'，结束
                         return result.toString()
                     }
@@ -2469,7 +2469,7 @@ object SelectorConverter {
                 ']' -> {
                     result.append(char)
                     bracketCount--
-                    if (braceCount == 0 && bracketCount == 0) {
+                    if (bracketCount == 0) {
                         // 遇到外层的 ']'，结束
                         return result.toString()
                     }
