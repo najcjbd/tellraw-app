@@ -423,6 +423,14 @@ object SelectorConverter {
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders, context)
 
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
+            // 根据sort.txt的要求:
+            // 1. sort=arbitrary直接删除(当大选择器为@a或@e时),否则提醒用户
+            // 2. sort=furthest没有limit时转c=-9999并提醒,有limit时转c=-limit值
+            // 3. c=-x转换成limit=x,sort=furthest(c=-9999也转为limit=9999,sort=furthest)
+            // 4. limit=数字没有sort时转c=数字并提醒
+            // 5. limit=数字,sort=random时,@a或@r转@r[c=数字],否则只保留c=数字并提醒
+            // 6. 只有sort=random没有limit时,@a或@r转@r[c=9999],否则删除sort=random并提醒
+            
             val sortPattern = "(^|,)sort=([^,\\]]+)".toRegex()
             val limitPattern = "(^|,)limit=([+-]?\\d+)".toRegex()
 
@@ -2139,7 +2147,7 @@ object SelectorConverter {
                 }
             }
             null -> {
-                // 没有指定位置，使用通用格式
+                // 没有指定位置，使用通用格式（不指定槽位）
                 "nbt={Inventory:[{id:\"$itemId\"}]}"
             }
             else -> {
@@ -2516,12 +2524,15 @@ object SelectorConverter {
     private fun extractKeyValue(nbtContent: String, key: String): String? {
         // 查找键的位置，使用更严格的边界匹配
         // 确保不会匹配其他键名中包含此键名作为子串的情况（例如不会从 "SelectedItem" 中匹配 "Inventory"）
-        val keyPattern = Regex("(^|,)\\s*$key\\s*:\\s*")
+        val keyPattern = Regex("(^|,|\\{)\\s*$key\\s*:\\s*")
         val match = keyPattern.find(nbtContent) ?: return null
 
         val startIndex = match.range.last
         // 从键的后面开始解析
         val remaining = nbtContent.substring(startIndex).trim()
+
+        // 如果remaining为空，返回null
+        if (remaining.isEmpty()) return null
 
         // 判断值的类型
         val firstChar = remaining.firstOrNull()
@@ -2539,12 +2550,48 @@ object SelectorConverter {
             }
             else -> {
                 // 其他值（数字、布尔值等）
-                val endPos = remaining.indexOfAny(charArrayOf(',', '}'))
-                if (endPos > 0) {
-                    remaining.substring(0, endPos).trim()
-                } else {
-                    remaining.trim()
+                // 提取直到遇到逗号、花括号或字符串结束
+                var braceCount = 0
+                var result = StringBuilder()
+                var inStringValue = false
+                var stringChar = '"'
+                
+                for (char in remaining) {
+                    when {
+                        !inStringValue && (char == '"' || char == '\'') -> {
+                            inStringValue = true
+                            stringChar = char
+                            result.append(char)
+                        }
+                        inStringValue && char == stringChar -> {
+                            inStringValue = false
+                            result.append(char)
+                        }
+                        !inStringValue && char == '{' -> {
+                            braceCount++
+                            result.append(char)
+                        }
+                        !inStringValue && char == '}' -> {
+                            if (braceCount > 0) {
+                                braceCount--
+                                result.append(char)
+                            } else {
+                                // 遇到外层的 '}'，结束
+                                break
+                            }
+                        }
+                        !inStringValue && char == ',' && braceCount == 0 -> {
+                            // 遇到分隔符，结束
+                            break
+                        }
+                        else -> {
+                            result.append(char)
+                        }
+                    }
                 }
+                
+                val resultStr = result.toString().trim()
+                if (resultStr.isEmpty()) null else resultStr
             }
         }
     }
