@@ -341,7 +341,7 @@ object SelectorConverter {
         
         // 如果没有参数部分，直接返回
         if ('[' !in selector || ']' !in selector) {
-            return selector to conversionReminders
+            return Triple(selector, emptyList(), conversionReminders)
         }
         
         // 提取参数部分
