@@ -2101,32 +2101,32 @@ object SelectorConverter {
         return when (location) {
             "slot.weapon.mainhand" -> {
                 // 主手 → SelectedItem
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
             }
             "slot.weapon.offhand" -> {
                 // 副手 → equipment.offhand
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.head" -> {
                 // 头盔 → equipment.head
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={equipment:{head:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.chest" -> {
                 // 胸甲 → equipment.chest
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={equipment:{chest:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.legs" -> {
                 // 护腿 → equipment.legs
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={equipment:{legs:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.feet" -> {
                 // 靴子 → equipment.feet
-                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                 "nbt={equipment:{feet:{id:\"$itemId\"$countPart}}}"
             }
             "slot.hotbar", "slot.inventory" -> {
@@ -2142,7 +2142,7 @@ object SelectorConverter {
                     // 构建多个槽位的 NBT
                     // parseSlotRange 已经返回了转换后的 Java 版槽位编号
                     val nbtItems = slotNumbers.map { slotNum ->
-                        val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                        val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
                         "{Slot:${slotNum}b,id:\"$itemId\"$countPart}"
                     }
                     "nbt={Inventory:[${nbtItems.joinToString(",")}]}"
@@ -2236,7 +2236,7 @@ object SelectorConverter {
 
             // 处理 quantity 范围
             val processedQuantity = processQuantityRange(quantity, reminders, context)
-            val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+            val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
 
             // 根据位置类型分类
             when (location) {
