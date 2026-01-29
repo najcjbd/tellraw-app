@@ -244,7 +244,7 @@ object SelectorConverter {
         
         val selectorVar = selector.split('[')[0]
         val paramsPart = if ('[' in selector && ']' in selector) {
-            selector.substringAfter('[').substringBefore(']')
+            selector.substringAfter('[').substringBeforeLast(']')
         } else ""
         
         var newSelector = selector
@@ -1009,7 +1009,7 @@ object SelectorConverter {
         }
         
         val selectorVar = result.split('[')[0]
-        var paramsPart = result.substringAfter('[').substringBefore(']')
+        var paramsPart = result.substringAfter('[').substringBeforeLast(']')
         
         // 转换r/rm参数到distance参数
         paramsPart = convertR_RmToDistance(paramsPart, reminders, context)
@@ -1043,7 +1043,7 @@ object SelectorConverter {
         }
         
         val selectorVar = result.split('[')[0]
-        var paramsPart = result.substringAfter('[').substringBefore(']')
+        var paramsPart = result.substringAfter('[').substringBeforeLast(']')
         
         // 转换distance参数到r/rm参数
         paramsPart = convertDistanceToR_Rm(paramsPart, reminders, context)
