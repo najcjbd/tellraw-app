@@ -444,7 +444,7 @@ class TellrawGeneratorTest {
      */
     @Test
     fun testPerformanceWithManyParameters() {
-        val _ = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={test1=10,test2=20,test3=30,test4=40,test5=50},tag=a,tag=b,tag=c,name=Steve,type=player,distance=10,team=red,gamemode=survival,level=5..10,sort=nearest,limit=5]"
+        val testSelector = "@a[x=10,y=20,z=30,dx=5,dy=5,dz=5,scores={test1=10,test2=20,test3=30,test4=40,test5=50},tag=a,tag=b,tag=c,name=Steve,type=player,distance=10,team=red,gamemode=survival,level=5..10,sort=nearest,limit=5]"
         val message = "§c§l这是一个包含大量参数的选择器测试"
 
         val javaJson = TextFormatter.convertToJavaJson(message, "none", false)
