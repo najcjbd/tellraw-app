@@ -1994,7 +1994,7 @@ object SelectorConverter {
                 }
                 ']' -> {
                     bracketCount--
-                    if (bracketCount == 0) {
+                    if (bracketCount == 0 && started) {
                         // 遇到外层的 ']'，结束
                         return result.toString()
                     } else {
@@ -2044,7 +2044,7 @@ object SelectorConverter {
                 }
                 '}' -> {
                     braceCount--
-                    if (braceCount == 0) {
+                    if (braceCount == 0 && started) {
                         // 遇到外层的 '}'，结束
                         return result.toString()
                     } else {
