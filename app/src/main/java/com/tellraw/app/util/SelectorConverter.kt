@@ -1995,11 +1995,15 @@ object SelectorConverter {
                 }
                 '{' -> {
                     braceCount++
-                    result.append(char)
+                    if (started) {
+                        result.append(char)
+                    }
                 }
                 '}' -> {
                     braceCount--
-                    result.append(char)
+                    if (started) {
+                        result.append(char)
+                    }
                 }
                 else -> {
                     if (started) {
@@ -2167,7 +2171,8 @@ object SelectorConverter {
                     braceCount++
                     if (braceCount == 1) {
                         currentObj = "{"
-                        continue
+                    } else {
+                        currentObj += char
                     }
                 }
                 '}' -> {
@@ -2176,12 +2181,14 @@ object SelectorConverter {
                     if (braceCount == 0 && currentObj.isNotEmpty()) {
                         // 去掉外层花括号
                         objects.add(currentObj.substring(1, currentObj.length - 1))
-                        continue
+                        currentObj = ""
                     }
                 }
-            }
-            if (braceCount > 0) {
-                currentObj += char
+                else -> {
+                    if (braceCount > 0) {
+                        currentObj += char
+                    }
+                }
             }
         }
 
