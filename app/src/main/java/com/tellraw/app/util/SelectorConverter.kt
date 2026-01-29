@@ -178,7 +178,7 @@ object SelectorConverter {
         }
         
         if ('[' in selector && ']' in selector) {
-            val paramsPart = selector.substringAfter('[').substringBefore(']')
+            val paramsPart = selector.substringAfter('[').substringBeforeLast(']')
             val params = paramsPart.split(',').map { it.trim() }
             
             var javaCount = 0
@@ -2447,6 +2447,18 @@ object SelectorConverter {
         var braceCount = 0
         var bracketCount = 0
         var result = StringBuilder()
+        
+        // 确定最外层的括号类型
+        var outerType: Char? = null
+        for (char in str) {
+            if (char == '{' && outerType == null) {
+                outerType = '{'
+                break
+            } else if (char == '[' && outerType == null) {
+                outerType = '['
+                break
+            }
+        }
 
         for (char in str) {
             when (char) {
@@ -2457,8 +2469,11 @@ object SelectorConverter {
                 '}' -> {
                     result.append(char)
                     braceCount--
-                    if (braceCount == 0) {
-                        // 遇到外层的 '}'，结束
+                    if (outerType == '{' && braceCount == 0) {
+                        // 最外层是花括号，遇到匹配的'}'，结束
+                        return result.toString()
+                    } else if (outerType == '[' && braceCount == 0 && bracketCount == 0) {
+                        // 最外层是方括号，所有括号都关闭，结束
                         return result.toString()
                     }
                 }
@@ -2469,8 +2484,11 @@ object SelectorConverter {
                 ']' -> {
                     result.append(char)
                     bracketCount--
-                    if (bracketCount == 0) {
-                        // 遇到外层的 ']'，结束
+                    if (outerType == '[' && bracketCount == 0) {
+                        // 最外层是方括号，遇到匹配的']'，结束
+                        return result.toString()
+                    } else if (outerType == '{' && braceCount == 0 && bracketCount == 0) {
+                        // 最外层是花括号，所有括号都关闭，结束
                         return result.toString()
                     }
                 }
