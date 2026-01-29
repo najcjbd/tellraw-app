@@ -1939,10 +1939,11 @@ object SelectorConverter {
         if (simpleMatch != null) {
             val startIndex = simpleMatch.range.first
             // 找到匹配的 hasitem 对象的完整内容
-            val objectContent = extractObjectContent(result.substring(startIndex + 9))
+            val objectContent = extractObjectContent(result.substring(startIndex))
 
             if (objectContent != null) {
-                val fullMatch = "hasitem={$objectContent}"
+                // 直接使用原始字符串中的完整匹配，而不是重新构建
+                val fullMatch = result.substring(startIndex, startIndex + 9 + objectContent.length + 1)
                 val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
