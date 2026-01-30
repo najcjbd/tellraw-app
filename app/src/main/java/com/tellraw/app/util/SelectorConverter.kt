@@ -442,8 +442,8 @@ object SelectorConverter {
             // 先查找sort和limit参数
             val sortMatch = sortPattern.find(paramsPart)
             val limitMatch = limitPattern.find(paramsPart)
-            val sortValue: String? = sortMatch?.groupValues?.get(3)
-            val limitValue: String? = limitMatch?.groupValues?.get(3)
+            val sortValue: String? = sortMatch?.groupValues?.get(2)
+            val limitValue: String? = limitMatch?.groupValues?.get(2)
 
             // 处理sort和limit参数
             if (sortValue != null) {
