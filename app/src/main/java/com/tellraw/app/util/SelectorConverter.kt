@@ -2536,7 +2536,7 @@ object SelectorConverter {
                 val value = quantity.substringBefore("..").toIntOrNull()
                 if (value != null) {
                     reminders.add(getStringSafely(context, R.string.hasitem_quantity_min_only, value))
-                    "${value}b"
+                    value.toString()
                 } else null
             }
             quantity.startsWith("..") -> {
@@ -2544,7 +2544,7 @@ object SelectorConverter {
                 val value = quantity.substringAfter("..").toIntOrNull()
                 if (value != null) {
                     reminders.add(getStringSafely(context, R.string.hasitem_quantity_max_only, value))
-                    "${value}b"
+                    value.toString()
                 } else null
             }
             ".." in quantity -> {
@@ -2556,7 +2556,7 @@ object SelectorConverter {
                     if (min != null && max != null) {
                         val midValue = ((min + max) / 2.0).roundToInt()
                         reminders.add(getStringSafely(context, R.string.hasitem_quantity_range, min, max, midValue))
-                        "${midValue}b"
+                        midValue.toString()
                     } else null
                 } else null
             }
@@ -2569,7 +2569,7 @@ object SelectorConverter {
                 // 单个数字，直接使用
                 val value = quantity.toIntOrNull()
                 if (value != null) {
-                    "${value}b"
+                    value.toString()
                 } else null
             }
         }
