@@ -1224,7 +1224,10 @@ object SelectorConverter {
                 }
                 
                 // 移除原有参数
-                result = result.replace(paramPattern, "")
+                result = result.replace(paramPattern) { match ->
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                    "$prefix"
+                }
                 
                 // 恢复scores参数
                 for ((placeholder, original) in scoresMatches) {
@@ -1468,10 +1471,16 @@ object SelectorConverter {
                 reminders.add(getStringSafely(context, R.string.bedrock_c_negative_converted, cValue, absCVal))
 
                 // 移除c参数和已有的sort参数
-                result = result.replace(cPattern, "")
+                result = result.replace(cPattern) { match ->
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                    "$prefix"
+                }
                 val existingSortPattern = "(^|,)sort=([^,\\]]+)".toRegex()
                 if (existingSortPattern.containsMatchIn(result)) {
-                    result = result.replace(existingSortPattern, "")
+                    result = result.replace(existingSortPattern) { match ->
+                        val prefix = match.groupValues[1]  // 前缀 (^或,)
+                        "$prefix"
+                    }
                 }
 
                 // 恢复scores参数
