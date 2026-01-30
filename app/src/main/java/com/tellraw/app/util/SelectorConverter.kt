@@ -2113,7 +2113,24 @@ object SelectorConverter {
                 }
             } else {
                 // 没有成功解析出hasitem物品，完全移除nbt参数并提醒用户
-                reminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
+                // 但是如果原始nbt参数是空对象（nbt={}），应该保留它
+                val isEmptyNbt = nbtMatches.any { (_, fullMatch) -> fullMatch == "nbt={}" }
+                if (isEmptyNbt) {
+                    // 恢复空nbt参数
+                    for ((_, fullMatch) in nbtMatches) {
+                        if (fullMatch == "nbt={}") {
+                            if (result.endsWith("]")) {
+                                result = result.dropLast(1) + ",$fullMatch]"
+                            } else if (result.endsWith("[")) {
+                                result = result.dropLast(1) + "$fullMatch]"
+                            } else {
+                                result = "$result,$fullMatch"
+                            }
+                        }
+                    }
+                } else {
+                    reminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
+                }
             }
         }
 
