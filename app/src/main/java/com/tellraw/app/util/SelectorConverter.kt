@@ -405,7 +405,9 @@ object SelectorConverter {
         // 根据目标版本进行参数转换
         if (targetVersion == SelectorType.JAVA) {
             // 基岩版到Java版的参数转换
+            android.util.Log.d("SelectorConverter", "filterSelectorParameters - convertR_RmToDistance前: $paramsPart")
             paramsPart = convertR_RmToDistance(paramsPart, conversionReminders, context)
+            android.util.Log.d("SelectorConverter", "filterSelectorParameters - convertR_RmToDistance后: $paramsPart")
             paramsPart = convertRotationParameter(paramsPart, "x_rotation", "rxm", "rx", conversionReminders, context, toJava = true)
             paramsPart = convertRotationParameter(paramsPart, "y_rotation", "rym", "ry", conversionReminders, context, toJava = true)
             paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
@@ -1020,9 +1022,14 @@ object SelectorConverter {
         // 此时scores参数已被替换为占位符，不会误匹配
         val rPattern = "(?<!__SCORES_)(^|,)r=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
         val rmPattern = "(?<!__SCORES_)(^|,)rm=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
-        
+
         val rMatch = rPattern.find(result)
         val rmMatch = rmPattern.find(result)
+
+        // 添加日志
+        android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 输入: $result")
+        android.util.Log.d("SelectorConverter", "convertR_RmToDistance - rMatch: $rMatch, rmMatch: $rmMatch")
+        android.util.Log.d("SelectorConverter", "convertR_RmToDistance - rValue: ${rMatch?.groupValues?.get(2)}, rmValue: ${rmMatch?.groupValues?.get(2)}")
         
         if (rMatch != null || rmMatch != null) {
             val rValue = rMatch?.groupValues?.get(2)
@@ -1046,8 +1053,10 @@ object SelectorConverter {
                 }
                 
                 // 移除原有的r和rm参数（包括前面的逗号）
+                android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 替换前: $result")
                 result = result.replace(rPattern, "")
                 result = result.replace(rmPattern, "")
+                android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 替换后: $result")
                 
                 // 恢复scores参数
                 for ((placeholder, original) in scoresMatches) {
@@ -1068,7 +1077,9 @@ object SelectorConverter {
                 result = result.replace(placeholder, original)
             }
         }
-        
+
+        android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 返回: $result")
+
         return result
     }
     
@@ -2018,7 +2029,7 @@ object SelectorConverter {
             result = result.replace(",,", ",")
             result = result.replace(",\\]".toRegex(), "]")
 
-            // 如果成功解析出了hasitem物品，或者存在 Inventory 键，添加hasitem参数
+            // 如果成功解析出了hasitem物品，添加hasitem参数
             if (allHasitemItems.isNotEmpty()) {
                 // 构建hasitem参数
                 val hasitemResult = if (allHasitemItems.size == 1) {
@@ -2035,20 +2046,8 @@ object SelectorConverter {
                 } else {
                     result = "$result,$hasitemResult"
                 }
-            } else if (hasInventoryKey) {
-                // 存在 Inventory 键但没有成功解析出hasitem物品，生成空的 hasitem 数组
-                val hasitemResult = "hasitem=[]"
-
-                // 添加hasitem参数
-                if (result.endsWith("]")) {
-                    result = result.dropLast(1) + ",$hasitemResult]"
-                } else if (result.endsWith("[")) {
-                    result = result.dropLast(1) + "$hasitemResult]"
-                } else {
-                    result = "$result,$hasitemResult"
-                }
             } else {
-                // 没有成功解析出hasitem物品，提醒用户
+                // 没有成功解析出hasitem物品，完全移除nbt参数并提醒用户
                 reminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
             }
         }
