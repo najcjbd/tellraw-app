@@ -2441,6 +2441,9 @@ object SelectorConverter {
         // 跳过 SelectedItem (Slot:-106)
         if (slotNum != null && slotNum == -106) return ""
 
+        // 跳过其他负数槽位
+        if (slotNum != null && slotNum < 0) return ""
+
         // 如果没有Slot，不添加location和slot参数
         if (slotNum == null) {
             // 提取 id
@@ -2532,6 +2535,10 @@ object SelectorConverter {
         return when {
             quantity == "0.." -> {
                 // 0.. 表示不做过滤，返回 null
+                null
+            }
+            quantity == "0" -> {
+                // 0 表示不做过滤，返回 null
                 null
             }
             quantity.endsWith("..") -> {
