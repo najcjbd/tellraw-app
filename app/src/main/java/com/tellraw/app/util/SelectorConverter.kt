@@ -994,15 +994,15 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val rPattern = "(?<!__SCORES_)\\b[Rr]=([^,\\]]+)".toRegex()
-        val rmPattern = "(?<!__SCORES_)\\b[Rr][Mm]=([^,\\]]+)".toRegex()
+        val rPattern = "(?<!__SCORES_)(^|,)r=([^,\\]]+)".toRegex()
+        val rmPattern = "(?<!__SCORES_)(^|,)rm=([^,\\]]+)".toRegex()
         
         val rMatch = rPattern.find(result)
         val rmMatch = rmPattern.find(result)
         
         if (rMatch != null || rmMatch != null) {
-            val rValue = rMatch?.groupValues?.get(1)
-            val rmValue = rmMatch?.groupValues?.get(1)
+            val rValue = rMatch?.groupValues?.get(2)
+            val rmValue = rmMatch?.groupValues?.get(2)
             
             val distanceValue = when {
                 rmValue != null && rValue != null -> rmValue + ".." + rValue
@@ -1021,7 +1021,7 @@ object SelectorConverter {
                         reminders.add(getStringSafely(context, R.string.bedrock_r_converted, rValue, distanceValue))
                 }
                 
-                // 移除原有的r和rm参数
+                // 移除原有的r和rm参数（包括前面的逗号）
                 result = result.replace(rPattern, "")
                 result = result.replace(rmPattern, "")
                 
@@ -1194,15 +1194,15 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val lPattern = "(?<!__SCORES_)\\b[Ll]=([^,\\]]+)".toRegex()
-        val lmPattern = "(?<!__SCORES_)\\b[Ll][Mm]=([^,\\]]+)".toRegex()
+        val lPattern = "(?<!__SCORES_)(^|,)l=([^,\\]]+)".toRegex()
+        val lmPattern = "(?<!__SCORES_)(^|,)lm=([^,\\]]+)".toRegex()
         
         val lMatch = lPattern.find(result)
         val lmMatch = lmPattern.find(result)
         
         if (lMatch != null || lmMatch != null) {
-            val lValue = lMatch?.groupValues?.get(1)
-            val lmValue = lmMatch?.groupValues?.get(1)
+            val lValue = lMatch?.groupValues?.get(2)
+            val lmValue = lmMatch?.groupValues?.get(2)
             
             val levelValue = when {
                 lmValue != null && lValue != null -> lmValue + ".." + lValue
@@ -1221,7 +1221,7 @@ object SelectorConverter {
                         reminders.add(getStringSafely(context, R.string.bedrock_l_converted, lValue, levelValue))
                 }
                 
-                // 移除原有的l和lm参数
+                // 移除原有的l和lm参数（包括前面的逗号）
                 result = result.replace(lPattern, "")
                 result = result.replace(lmPattern, "")
                 
@@ -1279,11 +1279,11 @@ object SelectorConverter {
         
         // 从m到gamemode的转换（基岩版到Java版）
         // 此时scores参数已被替换为占位符，不会误匹配
-        val mPattern = "(?<!__SCORES_)\\b[Mm]=(!?)([^,\\]]+)".toRegex()
+        val mPattern = "(?<!__SCORES_)(^|,)m=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(mPattern) { match ->
-            val negation = match.groupValues[1]  // ! 或空
-            val mValue = match.groupValues[2].trim()
+            val negation = match.groupValues[2]  // ! 或空
+            val mValue = match.groupValues[3].trim()
             
             // 如果是默认模式，需要提醒用户并转换为生存模式
             if (mValue == "default" || mValue == "d" || mValue == "5") {
@@ -1380,11 +1380,11 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val cPattern = "(?<!__SCORES_)\\b[Cc]=([+-]?\\d+)".toRegex()
+        val cPattern = "(?<!__SCORES_)(^|,)c=([+-]?\\d+)".toRegex()
         
         val match = cPattern.find(result)
         if (match != null) {
-            val cValue = match.groupValues[1]
+            val cValue = match.groupValues[2]
             
             if (cValue.startsWith("-")) {
                 val absCVal = cValue.substring(1)
