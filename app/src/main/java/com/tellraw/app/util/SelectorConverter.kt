@@ -1999,7 +1999,7 @@ object SelectorConverter {
             val nbtContent = extractNbtContent(result.substring(nbtIndex + 5))
 
             if (nbtContent != null) {
-                val fullMatch = "nbt={$nbtContent}"
+                val fullMatch = "nbt={" + nbtContent.substring(1, nbtContent.length - 1) + "}"
                 nbtMatches.add(Pair(nbtIndex, fullMatch))
 
                 // 检测是否存在 Inventory 键
