@@ -942,6 +942,7 @@ object SelectorConverter {
         val gamemodePattern = "(?<!__SCORES_)(^|,)gamemode=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(gamemodePattern) { match ->
+            val prefix = match.groupValues[1]  // 前缀 (^或,)
             val negation = match.groupValues[2]  // ! 或空
             val gamemodeValue = match.groupValues[3].trim()
 
@@ -951,10 +952,10 @@ object SelectorConverter {
                 } else {
                     conversionReminders.add(getStringSafely(context, R.string.java_spectator_converted, gamemodeValue))
                 }
-                "m=${negation}survival"
+                "$prefix" + "m=${negation}survival"
             } else if (gamemodeValue in javaToBedrockGamemode) {
                 conversionReminders.add(getStringSafely(context, R.string.java_gamemode_converted, gamemodeValue, javaToBedrockGamemode[gamemodeValue]!!))
-                "m=${negation}${javaToBedrockGamemode[gamemodeValue]!!}"
+                "$prefix" + "m=${negation}${javaToBedrockGamemode[gamemodeValue]!!}"
             } else {
                 // 保持原值
                 match.value
@@ -2037,6 +2038,19 @@ object SelectorConverter {
                 } else {
                     "hasitem=[${allHasitemItems.joinToString(",") { "{$it}" }}]"
                 }
+
+                // 添加hasitem参数
+                if (result.endsWith("]")) {
+                    result = result.dropLast(1) + ",$hasitemResult]"
+                } else if (result.endsWith("[")) {
+                    result = result.dropLast(1) + "$hasitemResult]"
+                } else {
+                    result = "$result,$hasitemResult"
+                }
+            } else if (hasInventoryKey) {
+                // 存在 Inventory 键但没有成功解析出hasitem物品，生成空的 hasitem 数组
+                // 例如：nbt={Inventory:[]} -> hasitem=[]
+                val hasitemResult = "hasitem=[]"
 
                 // 添加hasitem参数
                 if (result.endsWith("]")) {
