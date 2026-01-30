@@ -2537,10 +2537,6 @@ object SelectorConverter {
                 // 0.. 表示不做过滤，返回 null
                 null
             }
-            quantity == "0" -> {
-                // 0 表示不做过滤，返回 null
-                null
-            }
             quantity.endsWith("..") -> {
                 // 2.. 取 2
                 val value = quantity.substringBefore("..").toIntOrNull()
