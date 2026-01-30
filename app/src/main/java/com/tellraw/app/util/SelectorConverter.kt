@@ -455,12 +455,12 @@ object SelectorConverter {
                         // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
                         val cValue = if (limitValue != null) "-$limitValue" else "-9999"
                         paramsPart = paramsPart.replace(sortPattern) { match ->
-                            val prefix = match.groupValues[1)  // 前缀 (^或,)
+                            val prefix = match.groupValues[1]  // 前缀 (^或,)
                             "$prefix"
                         }
                         if (limitValue != null) {
                             paramsPart = paramsPart.replace(limitPattern) { match ->
-                                val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
                             }
                         }
@@ -485,7 +485,7 @@ object SelectorConverter {
                     }
                     "arbitrary" -> {
                         paramsPart = paramsPart.replace(sortPattern) { match ->
-                            val prefix = match.groupValues[1)  // 前缀 (^或,)
+                            val prefix = match.groupValues[1]  // 前缀 (^或,)
                             "$prefix"
                         }
                         // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
@@ -505,7 +505,7 @@ object SelectorConverter {
                             }
                             if (limitValue != null) {
                                 paramsPart = paramsPart.replace(limitPattern) { match ->
-                                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                    val prefix = match.groupValues[1]  // 前缀 (^或,)
                                     "$prefix"
                                 }
                             }
@@ -533,7 +533,7 @@ object SelectorConverter {
                             }
                             if (limitValue != null) {
                                 paramsPart = paramsPart.replace(limitPattern) { match ->
-                                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                    val prefix = match.groupValues[1]  // 前缀 (^或,)
                                     "$prefix"
                                 }
                             }
@@ -1080,7 +1080,7 @@ object SelectorConverter {
                 // 移除原有的r和rm参数（包括前面的逗号）
                 android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 替换前: $result")
                 result = result.replace(rPattern) { match ->
-                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
                     "$prefix"
                 }
                 result = result.replace(rmPattern) { match ->
@@ -1167,11 +1167,11 @@ object SelectorConverter {
                     
                     // 移除原有参数
                     result = result.replace(minPattern) { match ->
-                        val prefix = match.groupValues[1)  // 前缀 (^或,)
+                        val prefix = match.groupValues[1]  // 前缀 (^或,)
                         "$prefix"
                     }
                     result = result.replace(maxPattern) { match ->
-                        val prefix = match.groupValues[1)  // 前缀 (^或,)
+                        val prefix = match.groupValues[1]  // 前缀 (^或,)
                         "$prefix"
                     }
                     
