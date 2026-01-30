@@ -2047,7 +2047,7 @@ object SelectorConverter {
             if (nbtIndex == -1) break
 
             // 提取完整的nbt内容（从第一个{开始到匹配的}结束）
-            val nbtContent = extractNbtContent(result.substring(nbtIndex + 5))
+            val nbtContent = extractNbtContent(result.substring(nbtIndex + 4))
 
             if (nbtContent != null) {
                 val fullMatch = "nbt={" + nbtContent.substring(1, nbtContent.length - 1) + "}"
