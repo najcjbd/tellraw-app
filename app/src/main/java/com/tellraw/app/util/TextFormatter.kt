@@ -288,10 +288,22 @@ object TextFormatter {
                 // §m_f/§m_c/§n_f/§n_c格式（优先处理，因为它们是4字符代码）
                 else if (code.startsWith("§m_") || code.startsWith("§n_")) {
                     when (code) {
-                        "§m_f" -> currentFormat["strikethrough"] = true  // 删除线（字体方式）
-                        "§m_c" -> currentFormat["color"] = "dark_red"  // 深红色（颜色方式），保留strikethrough
-                        "§n_f" -> currentFormat["underlined"] = true  // 下划线（字体方式）
-                        "§n_c" -> currentFormat["color"] = "red"  // 红色（颜色方式），保留underlined
+                        "§m_f" -> {
+                            // 删除线（字体方式）：添加 strikethrough
+                            currentFormat["strikethrough"] = true
+                        }
+                        "§m_c" -> {
+                            // 深红色（颜色方式）：添加 color
+                            currentFormat["color"] = "dark_red"
+                        }
+                        "§n_f" -> {
+                            // 下划线（字体方式）：添加 underlined
+                            currentFormat["underlined"] = true
+                        }
+                        "§n_c" -> {
+                            // 红色（颜色方式）：添加 color
+                            currentFormat["color"] = "red"
+                        }
                     }
                 }
                 // 格式代码（包含m和n）
