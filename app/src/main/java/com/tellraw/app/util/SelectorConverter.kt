@@ -529,6 +529,18 @@ object SelectorConverter {
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
                         }
                     }
+                    "nearest" -> {
+                        // sort=nearest 是基岩版的默认排序方式，可以忽略
+                        // 但是 limit 仍然需要转换为 c
+                        if (limitValue != null) {
+                            paramsPart = paramsPart.replace(sortPattern, "")
+                            paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, limitValue))
+                        } else {
+                            // 没有limit，直接删除sort参数
+                            paramsPart = paramsPart.replace(sortPattern, "")
+                        }
+                    }
                     else -> {
                         paramsPart = paramsPart.replace(sortPattern, "")
                         conversionReminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValue))
