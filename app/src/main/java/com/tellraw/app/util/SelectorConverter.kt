@@ -676,10 +676,10 @@ object SelectorConverter {
         }
         
         // 处理distance参数（此时scores参数已被替换为占位符，不会误匹配）
-        val distancePattern = "(?<!__SCORES_)\\bdistance=([^,\\]]+)".toRegex()
+        val distancePattern = "(?<!__SCORES_)(^|,)distance=([^,\\]]+)".toRegex()
         
         result = result.replace(distancePattern) { match ->
-            val distanceValue = match.groupValues[1]
+            val distanceValue = match.groupValues[2]
             
             // 检查是否为范围格式
             if (".." in distanceValue) {
@@ -740,10 +740,10 @@ object SelectorConverter {
         }
         
         // 处理x_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
-        val xRotationPattern = "(?<!__SCORES_)\\bx_rotation=([^,\\]]+)".toRegex()
+        val xRotationPattern = "(?<!__SCORES_)(^|,)x_rotation=([^,\\]]+)".toRegex()
         
         result = result.replace(xRotationPattern) { match ->
-            val rotationValue = match.groupValues[1]
+            val rotationValue = match.groupValues[2]
             
             // 检查是否为范围格式
             if (".." in rotationValue) {
@@ -776,10 +776,10 @@ object SelectorConverter {
         }
         
         // 处理y_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
-        val yRotationPattern = "(?<!__SCORES_)\\by_rotation=([^,\\]]+)".toRegex()
+        val yRotationPattern = "(?<!__SCORES_)(^|,)y_rotation=([^,\\]]+)".toRegex()
         
         result = result.replace(yRotationPattern) { match ->
-            val rotationValue = match.groupValues[1]
+            val rotationValue = match.groupValues[2]
             
             // 检查是否为范围格式
             if (".." in rotationValue) {
@@ -840,10 +840,10 @@ object SelectorConverter {
         }
         
         // 处理level参数（此时scores参数已被替换为占位符，不会误匹配）
-        val levelPattern = "(?<!__SCORES_)\\blevel=([^,\\]]+)".toRegex()
+        val levelPattern = "(?<!__SCORES_)(^|,)level=([^,\\]]+)".toRegex()
         
         result = result.replace(levelPattern) { match ->
-            val levelValue = match.groupValues[1]
+            val levelValue = match.groupValues[2]
             
             // 检查是否为范围格式
             if (".." in levelValue) {
@@ -913,11 +913,11 @@ object SelectorConverter {
         
         // 从gamemode到m的转换（Java版到基岩版）
         // 此时scores参数已被替换为占位符，不会误匹配
-        val gamemodePattern = "(?<!__SCORES_)\\bgamemode=(!?)([^,\\]]+)".toRegex()
+        val gamemodePattern = "(?<!__SCORES_)(^|,)gamemode=(!?)([^,\\]]+)".toRegex()
         
         result = result.replace(gamemodePattern) { match ->
-            val negation = match.groupValues[1]  // ! 或空
-            val gamemodeValue = match.groupValues[2].trim()
+            val negation = match.groupValues[2]  // ! 或空
+            val gamemodeValue = match.groupValues[3].trim()
 
             if (gamemodeValue == "spectator") {
                 if (negation.isNotEmpty()) {
@@ -1072,16 +1072,15 @@ object SelectorConverter {
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
             // 此时scores参数已被替换为占位符，不会误匹配
-            // 构建不区分大小写的参数名匹配模式
-            val minPattern = "(?<!__SCORES_)\\b(?i)$minParam=([^,\\]]+)".toRegex()
-            val maxPattern = "(?<!__SCORES_)\\b(?i)$maxParam=([^,\\]]+)".toRegex()
-            
+            val minPattern = "(?<!__SCORES_)(^|,)$minParam=([^,\\]]+)".toRegex()
+            val maxPattern = "(?<!__SCORES_)(^|,)$maxParam=([^,\\]]+)".toRegex()
+
             val minMatch = minPattern.find(result)
             val maxMatch = maxPattern.find(result)
-            
+
             if (minMatch != null || maxMatch != null) {
-                val minValue = minMatch?.groupValues?.get(1)
-                val maxValue = maxMatch?.groupValues?.get(1)
+                val minValue = minMatch?.groupValues?.get(2)
+                val maxValue = maxMatch?.groupValues?.get(2)
                 
                 val rotationValue = when {
                     minValue != null && maxValue != null -> minValue + ".." + maxValue
@@ -1126,11 +1125,11 @@ object SelectorConverter {
         } else {
             // 从Java版转基岩版：将 paramName 拆分为 minParam 和 maxParam
             // 此时scores参数已被替换为占位符，不会误匹配
-            val paramPattern = "(?<!__SCORES_)\\b$paramName=([^,\\]]+)".toRegex()
+            val paramPattern = "(?<!__SCORES_)(^|,)$paramName=([^,\\]]+)".toRegex()
             val paramMatch = paramPattern.find(result)
-            
+
             if (paramMatch != null) {
-                val paramValue = paramMatch.groupValues[1]
+                val paramValue = paramMatch.groupValues[2]
                 
                 // 解析范围值
                 val rotationParts = if (".." in paramValue) {
