@@ -932,16 +932,18 @@ class SelectorConverterTest {
     
     @Test
     fun testParameterFiltering_2() {
-        // 过滤基岩版独有参数到Java版
-        // hasitem 应该被转换为 nbt，r 应该被转换为 distance，family 参数会被移除
+        // 测试基岩版选择器转换为Java版，并过滤Java不支持的参数
         val bedrockSelector = "@a[r=10,hasitem={item=diamond},family=zombie]"
         val (filtered, removed, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
         // 添加详细的断言，帮助调试
-        println("DEBUG: bedrockSelector = $bedrockSelector")
-        println("DEBUG: filtered = $filtered")
-        println("DEBUG: removed = $removed")
-        println("DEBUG: filtered contains 'r='? ${filtered.contains("r=")}")
-        println("DEBUG: filtered contains 'distance='? ${filtered.contains("distance=")}")
+        System.err.println("DEBUG: bedrockSelector = $bedrockSelector")
+        System.err.println("DEBUG: filtered = $filtered")
+        System.err.println("DEBUG: removed = $removed")
+        System.err.println("DEBUG: filtered contains 'r='? ${filtered.contains("r=")}")
+        System.err.println("DEBUG: filtered contains 'distance='? ${filtered.contains("distance=")}")
+        System.err.println("DEBUG: filtered contains 'nbt='? ${filtered.contains("nbt=")}")
+        System.err.println("DEBUG: filtered contains 'hasitem='? ${filtered.contains("hasitem=")}")
+        System.err.println("DEBUG: filtered contains 'family='? ${filtered.contains("family=")}")
         // 检查转换后的选择器
         assertTrue("转换后的选择器应包含nbt", filtered.contains("nbt"))
         assertTrue("转换后的选择器应包含distance", filtered.contains("distance"))
