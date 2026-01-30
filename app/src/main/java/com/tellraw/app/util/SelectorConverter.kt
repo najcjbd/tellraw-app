@@ -534,15 +534,24 @@ object SelectorConverter {
                         // 但是 limit 仍然需要转换为 c
                         if (limitValue != null) {
                             paramsPart = paramsPart.replace(sortPattern, "")
-                            paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
+                            paramsPart = paramsPart.replace(limitPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix" + "c=$limitValue"
+                            }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, limitValue))
                         } else {
                             // 没有limit，直接删除sort参数
-                            paramsPart = paramsPart.replace(sortPattern, "")
+                            paramsPart = paramsPart.replace(sortPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix"
+                            }
                         }
                     }
                     else -> {
-                        paramsPart = paramsPart.replace(sortPattern, "")
+                        paramsPart = paramsPart.replace(sortPattern) { match ->
+                            val prefix = match.groupValues[1]  // 前缀 (^或,)
+                            "$prefix"
+                        }
                         conversionReminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValue))
                     }
                 }
@@ -551,7 +560,10 @@ object SelectorConverter {
                 if (limitValue != null) {
                     conversionReminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
                     conversionReminders.add(getStringSafely(context, R.string.limit_description))
-                    paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
+                    paramsPart = paramsPart.replace(limitPattern) { match ->
+                        val prefix = match.groupValues[1]  // 前缀 (^或,)
+                        "$prefix" + "c=$limitValue"
+                    }
                 }
             }
         }
