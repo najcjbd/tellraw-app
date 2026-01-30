@@ -2117,16 +2117,10 @@ object SelectorConverter {
                 val isEmptyNbt = nbtMatches.any { (_, fullMatch) -> fullMatch == "nbt={}" }
                 if (isEmptyNbt) {
                     // 恢复空nbt参数
-                    for ((_, fullMatch) in nbtMatches) {
-                        if (fullMatch == "nbt={}") {
-                            if (result.endsWith("]")) {
-                                result = result.dropLast(1) + ",$fullMatch]"
-                            } else if (result.endsWith("[")) {
-                                result = result.dropLast(1) + "$fullMatch]"
-                            } else {
-                                result = "$result,$fullMatch"
-                            }
-                        }
+                    result = if (result.isEmpty()) {
+                        "nbt={}"
+                    } else {
+                        "$result,nbt={}"
                     }
                 } else {
                     reminders.add(getStringSafely(context, R.string.java_nbt_param_not_supported))
