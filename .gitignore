@@ -34,7 +34,6 @@ lint/tmp/
 
 # Test results
 test-results/
-test-results.zip
 *.hprof
 
 # Log files
