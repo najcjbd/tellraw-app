@@ -1739,7 +1739,8 @@ object SelectorConverter {
             }
             null -> {
                 // 没有指定位置，使用通用格式（不指定槽位）
-                "nbt={Inventory:[{id:\"$itemId\"}]}"
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
+                "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
             }
             else -> {
                 // 不支持的位置
