@@ -1949,6 +1949,7 @@ object SelectorConverter {
         // 收集所有nbt参数的内容
         val allHasitemItems = mutableListOf<String>()
         var nbtMatches = mutableListOf<Pair<Int, String>>()  // (startIndex, fullMatch)
+        var hasInventoryKey = false  // 标志：是否存在 Inventory 键
 
         // 查找所有nbt参数 - 使用更好的方法
         var searchStart = 0
@@ -1959,15 +1960,20 @@ object SelectorConverter {
 
             // 提取完整的nbt内容（从第一个{开始到匹配的}结束）
             val nbtContent = extractNbtContent(result.substring(nbtIndex + 5))
-            
+
             if (nbtContent != null) {
                 val fullMatch = "nbt={$nbtContent}"
                 nbtMatches.add(Pair(nbtIndex, fullMatch))
 
+                // 检测是否存在 Inventory 键
+                if ("Inventory" in nbtContent) {
+                    hasInventoryKey = true
+                }
+
                 // 解析这个nbt参数
                 val hasitemItems = parseNbtToHasitemItems(nbtContent, reminders, context)
                 allHasitemItems.addAll(hasitemItems)
-                
+
                 // 从当前nbt参数结束位置开始搜索下一个
                 searchStart = nbtIndex + fullMatch.length
             } else {
@@ -1987,7 +1993,7 @@ object SelectorConverter {
             result = result.replace(",,", ",")
             result = result.replace(",\\]".toRegex(), "]")
 
-            // 如果成功解析出了hasitem物品，添加hasitem参数
+            // 如果成功解析出了hasitem物品，或者存在 Inventory 键，添加hasitem参数
             if (allHasitemItems.isNotEmpty()) {
                 // 构建hasitem参数
                 val hasitemResult = if (allHasitemItems.size == 1) {
@@ -1995,6 +2001,18 @@ object SelectorConverter {
                 } else {
                     "hasitem=[${allHasitemItems.joinToString(",") { "{$it}" }}]"
                 }
+
+                // 添加hasitem参数
+                if (result.endsWith("]")) {
+                    result = result.dropLast(1) + ",$hasitemResult]"
+                } else if (result.endsWith("[")) {
+                    result = result.dropLast(1) + "$hasitemResult]"
+                } else {
+                    result = "$result,$hasitemResult"
+                }
+            } else if (hasInventoryKey) {
+                // 存在 Inventory 键但没有成功解析出hasitem物品，生成空的 hasitem 数组
+                val hasitemResult = "hasitem=[]"
 
                 // 添加hasitem参数
                 if (result.endsWith("]")) {
