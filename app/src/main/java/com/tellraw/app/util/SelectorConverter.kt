@@ -201,11 +201,6 @@ object SelectorConverter {
                 }
             }
             
-            // 检查坐标参数格式 - 基岩版允许空格
-            if (" = " in paramsPart || ", " in paramsPart) {
-                bedrockCount++
-            }
-            
             return when {
                 javaCount > bedrockCount -> SelectorType.JAVA
                 bedrockCount > javaCount -> SelectorType.BEDROCK
@@ -261,8 +256,7 @@ object SelectorConverter {
         val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(newSelector, SelectorType.JAVA, context)
         reminders.addAll(paramReminders)
         
-        // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertBedrockParametersToJava
-        // 直接返回转换后的选择器
+        // 返回转换后的选择器
         val javaSelector = convertedSelector
         
         // 如果参数发生了变化，也认为发生了转换
@@ -289,8 +283,7 @@ object SelectorConverter {
         val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
 
-        // 注意：filterSelectorParameters 已经处理了参数转换，所以不需要再次调用 convertJavaParametersToBedrock
-        // 直接返回转换后的选择器
+        // 返回转换后的选择器
         var bedrockSelector = convertedSelector
 
         return SelectorConversionResult(
@@ -325,25 +318,26 @@ object SelectorConverter {
      * 根据目标版本过滤选择器参数，对于可转换的参数进行转换，
      * 只有完全不支持的参数才被剔除
      * 与Python版本的filter_selector_parameters函数逻辑一致
+     * 返回: Triple<完整的选择器字符串(包括变量和参数), 移除的参数列表, 转换提醒>
      */
     fun filterSelectorParameters(selector: String, targetVersion: SelectorType, context: android.content.Context): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
-        
+
         // Java版特有参数（完全不支持，无法转换）
         val javaSpecificParams = listOf(
             "predicate", "advancements", "team"
         )
-        
+
         // 基岩版特有参数（完全不支持，无法转换）
         val bedrockSpecificParams = listOf(
             "haspermission", "has_property", "family"
         )
-        
+
         // 如果没有参数部分，直接返回
         if ('[' !in selector || ']' !in selector) {
             return Triple(selector, emptyList(), conversionReminders)
         }
-        
+
         // 提取参数部分
         var selectorVar = selector.split('[')[0]
         var paramsPart = selector.substringAfter('[').substringBeforeLast(']')
@@ -431,14 +425,24 @@ object SelectorConverter {
             // 5. limit=数字,sort=random时,@a或@r转@r[c=数字],否则只保留c=数字并提醒
             // 6. 只有sort=random没有limit时,@a或@r转@r[c=9999],否则删除sort=random并提醒
             
-            val sortPattern = "(^|,)sort=([^,\\]]+)".toRegex()
-            val limitPattern = "(^|,)limit=([+-]?\\d+)".toRegex()
+            // 先提取并保存scores参数，避免scores内部的参数名被误处理
+            val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
+            val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
+            
+            paramsPart = paramsPart.replace(scoresPattern) { match ->
+                val placeholder = "__SCORES_${scoresMatches.size}__"
+                scoresMatches.add(Pair(placeholder, match.value))
+                placeholder
+            }
+            
+            val sortPattern = "(?<!__SCORES_)(^|,)sort=([^,\\]]+)".toRegex()
+            val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
 
             // 先查找sort和limit参数
             val sortMatch = sortPattern.find(paramsPart)
             val limitMatch = limitPattern.find(paramsPart)
-            val sortValue: String? = sortMatch?.groupValues?.get(2)
-            val limitValue: String? = limitMatch?.groupValues?.get(2)
+            val sortValue: String? = sortMatch?.groupValues?.get(3)
+            val limitValue: String? = limitMatch?.groupValues?.get(3)
 
             // 处理sort和limit参数
             if (sortValue != null) {
@@ -537,6 +541,11 @@ object SelectorConverter {
                     paramsPart = paramsPart.replace(limitPattern, "c=$limitValue")
                 }
             }
+        }
+        
+        // 恢复scores参数
+        for ((placeholder, original) in scoresMatches) {
+            paramsPart = paramsPart.replace(placeholder, original)
         }
         
         // 分割参数，但要处理包含大括号的参数
@@ -639,13 +648,13 @@ object SelectorConverter {
             // 如果过滤后没有参数，只返回选择器变量
             selectorVar
         }
-        
+
         // 清理多余的逗号和空括号
         val finalSelector = newSelector
             .replace(",,", ",")
             .replace(",\\]".toRegex(), "]")
             .replace("\\[".toRegex(), "[")
-        
+
         return Triple(finalSelector, removedParams, conversionReminders)
     }
     
@@ -968,84 +977,6 @@ object SelectorConverter {
         return result
     }
     
-    /**
-     * 将基岩版参数转换为Java版参数
-     */
-    private fun convertBedrockParametersToJava(selector: String, reminders: MutableList<String>, context: Context): String {
-        var result = selector
-        
-        if ('[' !in result || ']' !in result) {
-            return result
-        }
-        
-        val selectorVar = result.split('[')[0]
-        var paramsPart = result.substringAfter('[').substringBeforeLast(']')
-        
-        // 转换r/rm参数到distance参数
-        paramsPart = convertR_RmToDistance(paramsPart, reminders, context)
-        
-        // 转换rx/rxm参数到x_rotation参数
-        paramsPart = convertRx_RxmToXRotation(paramsPart, reminders, context)
-        
-        // 转换ry/rym参数到y_rotation参数
-        paramsPart = convertRy_RymToYRotation(paramsPart, reminders, context)
-        
-        // 转换l/lm参数到level参数
-        paramsPart = convertL_LmToLevel(paramsPart, reminders, context)
-        
-        // 转换m参数到gamemode参数
-        paramsPart = convertMToGamemode(paramsPart, reminders, context)
-        
-        // 转换c参数到limit/sort参数
-        paramsPart = convertCToLimitSort(paramsPart, reminders, context)
-        
-        return selectorVar + "[" + paramsPart + "]"
-    }
-    
-    /**
-     * 将Java版参数转换为基岩版参数
-     */
-    private fun convertJavaParametersToBedrock(selector: String, reminders: MutableList<String>, context: Context): String {
-        var result = selector
-        
-        if ('[' !in result || ']' !in result) {
-            return result
-        }
-        
-        val selectorVar = result.split('[')[0]
-        var paramsPart = result.substringAfter('[').substringBeforeLast(']')
-        
-        // 转换distance参数到r/rm参数
-        paramsPart = convertDistanceToR_Rm(paramsPart, reminders, context)
-        
-        // 转换x_rotation参数到rx/rxm参数
-        paramsPart = convertXRotationToRx_Rxm(paramsPart, reminders, context)
-        
-        // 转换y_rotation参数到ry/rym参数
-        paramsPart = convertYRotationToRy_Rym(paramsPart, reminders, context)
-        
-        // 转换level参数到l/lm参数
-        paramsPart = convertLevelToL_Lm(paramsPart, reminders, context)
-        
-        // 转换gamemode参数到m参数
-        paramsPart = convertGamemodeToM(paramsPart, reminders, context)
-        
-        // 转换limit/sort参数到c参数
-        paramsPart = convertLimitSortToC(paramsPart, selectorVar, reminders, context)
-        
-        // 检查是否需要修改选择器变量（用于 sort=random 的 @a/@r 转换）
-        var finalSelectorVar = selectorVar
-        if (paramsPart.contains("__SELECTOR_VAR_CHANGE_TO__")) {
-            val matchResult = Regex("__SELECTOR_VAR_CHANGE_TO__([@\\w]+)__").find(paramsPart)
-            if (matchResult != null) {
-                finalSelectorVar = matchResult.groupValues[1]
-                paramsPart = paramsPart.replace(matchResult.value, "")
-            }
-        }
-        
-        return finalSelectorVar + "[" + paramsPart + "]"
-    }
-    
     // 以下是各种参数转换的具体实现
     
     private fun convertR_RmToDistance(paramsPart: String, reminders: MutableList<String>, context: Context): String {
@@ -1114,119 +1045,6 @@ object SelectorConverter {
         }
         
         return result
-    }
-    
-    private fun convertDistanceToR_Rm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        var result = paramsPart
-        
-        // 先提取并保存scores参数，避免scores内部的参数名被误处理
-        val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
-        
-        // 此时scores参数已被替换为占位符，不会误匹配
-        val distancePattern = "(?<!__SCORES_)\\bdistance=([^,\\]]+)".toRegex()
-        
-        val match = distancePattern.find(result)
-        if (match != null) {
-            val distanceValue = match.groupValues[1]
-            
-            val (rValue, rmValue) = when {
-                ".." in distanceValue -> {
-                    val parts = distanceValue.split("..")
-                    val rm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
-                    val r = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    r to rm
-                }
-                distanceValue.startsWith("..") -> {
-                    null to distanceValue.substring(2)
-                }
-                distanceValue.endsWith("..") -> {
-                    distanceValue.substring(0, distanceValue.length - 2) to null
-                }
-                else -> {
-                    distanceValue to distanceValue
-                }
-            }
-            
-            // 构建提醒信息
-            val reminderParts = mutableListOf<String>()
-            rmValue?.let { reminderParts.add("rm=$it") }
-            rValue?.let { reminderParts.add("r=$it") }
-            if (reminderParts.isNotEmpty()) {
-                reminders.add(getStringSafely(context, R.string.java_distance_to_bedrock, distanceValue, reminderParts.joinToString(",")))
-            }
-            
-            // 移除distance参数
-            result = result.replace(distancePattern, "")
-            
-            // 恢复scores参数
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-            
-            // 添加r和rm参数
-            rmValue?.let { result = addParameterToResult(result, "rm=$it") }
-            rValue?.let { result = addParameterToResult(result, "r=$it") }
-        } else {
-            // 恢复scores参数（如果没有匹配到distance）
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-        }
-        
-        return result
-    }
-    
-    private fun convertRx_RxmToXRotation(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "x_rotation",
-            minParam = "rxm",
-            maxParam = "rx",
-            reminders = reminders,
-            context = context
-        )
-    }
-    
-    private fun convertXRotationToRx_Rxm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "x_rotation",
-            minParam = "rxm",
-            maxParam = "rx",
-            reminders = reminders,
-            context = context,
-            toJava = false
-        )
-    }
-    
-    private fun convertRy_RymToYRotation(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "y_rotation",
-            minParam = "rym",
-            maxParam = "ry",
-            reminders = reminders,
-            context = context
-        )
-    }
-    
-    private fun convertYRotationToRy_Rym(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        return convertRotationParameter(
-            paramsPart = paramsPart,
-            paramName = "y_rotation",
-            minParam = "rym",
-            maxParam = "ry",
-            reminders = reminders,
-            context = context,
-            toJava = false
-        )
     }
     
     private fun convertRotationParameter(
@@ -1429,67 +1247,6 @@ object SelectorConverter {
         return result
     }
     
-    private fun convertLevelToL_Lm(paramsPart: String, reminders: MutableList<String>, context: Context): String {
-        var result = paramsPart
-        
-        // 先提取并保存scores参数，避免scores内部的参数名被误处理
-        val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
-        
-        // 此时scores参数已被替换为占位符，不会误匹配
-        val levelPattern = "(?<!__SCORES_)\\blevel=([^,\\]]+)".toRegex()
-        
-        val match = levelPattern.find(result)
-        if (match != null) {
-            val levelValue = match.groupValues[1]
-            
-            val (lValue, lmValue) = when {
-                ".." in levelValue -> {
-                    val parts = levelValue.split("..")
-                    val lm = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
-                    val l = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
-                    l to lm
-                }
-                levelValue.startsWith("..") -> {
-                    null to levelValue.substring(2)
-                }
-                levelValue.endsWith("..") -> {
-                    levelValue.substring(0, levelValue.length - 2) to null
-                }
-                else -> {
-                    levelValue to levelValue
-                }
-            }
-
-            reminders.add(getStringSafely(context, R.string.java_level_to_bedrock, levelValue, listOfNotNull(lmValue?.let { "lm=" + it }, lValue?.let { "l=" + it }).joinToString(",")))
-
-            // 移除level参数
-            result = result.replace(levelPattern, "")
-            
-            // 恢复scores参数
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-            
-            // 添加l和lm参数
-            lmValue?.let { result = addParameterToResult(result, "lm=$it") }
-            lValue?.let { result = addParameterToResult(result, "l=$it") }
-        } else {
-            // 恢复scores参数（如果没有匹配到level）
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-        }
-        
-        return result
-    }
-    
     private fun convertMToGamemode(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
         
@@ -1665,161 +1422,6 @@ object SelectorConverter {
             }
         }
         
-        return result
-    }
-    
-    private fun convertLimitSortToC(paramsPart: String, selectorVar: String, reminders: MutableList<String>, context: Context): String {
-        var result = paramsPart
-
-        // 先提取并保存scores参数，避免scores内部的参数名被误处理
-        val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
-
-        // 处理sort参数（此时scores参数已被替换为占位符，不会误匹配）
-        val sortPattern = "(?<!__SCORES_)(^|,)sort=([^,\\]]+)".toRegex()
-        val sortMatch = sortPattern.find(result)
-
-        if (sortMatch != null) {
-            val sortValue: String = sortMatch.groupValues[2]
-
-            // 查找limit参数（此时scores参数已被替换为占位符，不会误匹配）
-            val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
-            val limitMatch = limitPattern.find(result)
-            val limitValue: String? = limitMatch?.groupValues?.get(2)
-
-            when (sortValue) {
-                "nearest" -> {
-                    // 当limit=数字,sort=nearest时，基岩版转换为c=数字
-                    // 当只有sort=nearest，没有limit时，基岩版转换为c=9999
-                    val cValue = limitValue ?: "9999"
-                    result = result.replace(sortPattern, "")
-                    if (limitValue != null) {
-                        result = result.replace(limitPattern, "")
-                    }
-
-                    // 恢复scores参数
-                    for ((placeholder, original) in scoresMatches) {
-                        result = result.replace(placeholder, original)
-                    }
-
-                    result = addParameterToResult(result, "c=$cValue")
-                    reminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, cValue))
-                }
-                "furthest" -> {
-                    // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
-                    // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
-                    val cValue = if (limitValue != null) "-$limitValue" else "-9999"
-                    result = result.replace(sortPattern, "")
-                    if (limitValue != null) {
-                        result = result.replace(limitPattern, "")
-                    }
-
-                    // 恢复scores参数
-                    for ((placeholder, original) in scoresMatches) {
-                        result = result.replace(placeholder, original)
-                    }
-
-                    result = addParameterToResult(result, "c=$cValue")
-                    // 只有在转换为 c=-9999 时才显示说明
-                    if (cValue == "-9999") {
-                        reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted_all))
-                    } else {
-                        reminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
-                    }
-                }
-                "arbitrary" -> {
-                    result = result.replace(sortPattern, "")
-
-                    // 恢复scores参数
-                    for ((placeholder, original) in scoresMatches) {
-                        result = result.replace(placeholder, original)
-                    }
-
-                    // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
-                    // 当为其他大选择器时，删除并提醒用户
-                    if (selectorVar != "@a" && selectorVar != "@e") {
-                        reminders.add(getStringSafely(context, R.string.java_sort_arbitrary_not_supported))
-                    }
-                }
-                "random" -> {
-                    // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
-                    // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
-                    val cValue = limitValue ?: "9999"
-                    result = result.replace(sortPattern, "")
-                    if (limitValue != null) {
-                        result = result.replace(limitPattern, "")
-                    }
-
-                    // 恢复scores参数
-                    for ((placeholder, original) in scoresMatches) {
-                        result = result.replace(placeholder, original)
-                    }
-
-                    result = addParameterToResult(result, "c=$cValue")
-                    if (selectorVar == "@a" || selectorVar == "@r") {
-                        reminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
-                        // 在 result 开头添加特殊标记，表示需要修改选择器变量
-                        result = "__SELECTOR_VAR_CHANGE_TO__@r__" + result
-                    } else {
-                        reminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
-                    }
-                }
-                else -> {
-                    result = result.replace(sortPattern, "")
-
-                    // 恢复scores参数
-                    for ((placeholder, original) in scoresMatches) {
-                        result = result.replace(placeholder, original)
-                    }
-
-                    val sortValueForMessage = sortValue
-                    reminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValueForMessage))
-                }
-            }
-        } else {
-            // 恢复scores参数（如果没有匹配到sort）
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-
-            // 没有sort参数，只转换limit
-            // 再次提取并保存scores参数，避免scores内部的参数名被误处理
-            val scoresMatches2 = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-            val scoresPattern2 = "scores=\\{[^}]*\\}".toRegex()
-
-            result = result.replace(scoresPattern2) { match ->
-                val placeholder = "__SCORES_${scoresMatches2.size}__"
-                scoresMatches2.add(Pair(placeholder, match.value))
-                placeholder
-            }
-
-            // 此时scores参数已被替换为占位符，不会误匹配
-            val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
-            val limitMatch = limitPattern.find(result)
-            if (limitMatch != null) {
-                val limitValue = limitMatch.groupValues[2]
-                reminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
-                reminders.add(getStringSafely(context, R.string.limit_description))
-                result = result.replace(limitPattern, "c=$limitValue")
-
-                // 恢复scores参数
-                for ((placeholder, original) in scoresMatches2) {
-                    result = result.replace(placeholder, original)
-                }
-            } else {
-                // 恢复scores参数（如果没有匹配到limit）
-                for ((placeholder, original) in scoresMatches2) {
-                    result = result.replace(placeholder, original)
-                }
-            }
-        }
-
         return result
     }
     
@@ -2411,14 +2013,18 @@ object SelectorConverter {
      * 提取完整的 nbt 内容
      * 提取从字符串开头开始到匹配的闭合花括号或方括号结束的所有内容
      * 保留key、方括号和所有的内层花括号
+     * 正确处理字符串内容中的引号和转义字符
      */
     private fun extractNbtContent(str: String): String? {
         if (str.isEmpty()) return null
-        
+
         var braceCount = 0
         var bracketCount = 0
         var result = StringBuilder()
-        
+        var inStringValue = false
+        var stringChar = '"'
+        var escaped = false
+
         // 确定最外层的括号类型
         var outerType: Char? = null
         for (char in str) {
@@ -2432,12 +2038,30 @@ object SelectorConverter {
         }
 
         for (char in str) {
-            when (char) {
-                '{' -> {
+            // 处理转义字符
+            if (inStringValue && char == '\\' && !escaped) {
+                escaped = true
+                result.append(char)
+                continue
+            }
+
+            when {
+                inStringValue && char == stringChar && !escaped -> {
+                    // 字符串结束
+                    inStringValue = false
+                    result.append(char)
+                }
+                !inStringValue && (char == '"' || char == '\'') -> {
+                    // 字符串开始
+                    inStringValue = true
+                    stringChar = char
+                    result.append(char)
+                }
+                !inStringValue && char == '{' -> {
                     braceCount++
                     result.append(char)
                 }
-                '}' -> {
+                !inStringValue && char == '}' -> {
                     result.append(char)
                     braceCount--
                     if (outerType == '{' && braceCount == 0) {
@@ -2448,11 +2072,11 @@ object SelectorConverter {
                         return result.toString()
                     }
                 }
-                '[' -> {
+                !inStringValue && char == '[' -> {
                     bracketCount++
                     result.append(char)
                 }
-                ']' -> {
+                !inStringValue && char == ']' -> {
                     result.append(char)
                     bracketCount--
                     if (outerType == '[' && bracketCount == 0) {
@@ -2466,6 +2090,11 @@ object SelectorConverter {
                 else -> {
                     result.append(char)
                 }
+            }
+
+            // 重置转义标志
+            if (escaped) {
+                escaped = false
             }
         }
 
