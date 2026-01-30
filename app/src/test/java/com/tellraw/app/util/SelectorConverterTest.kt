@@ -948,7 +948,7 @@ class SelectorConverterTest {
         assertTrue("转换后的选择器应包含nbt", filtered.contains("nbt"))
         assertTrue("转换后的选择器应包含distance", filtered.contains("distance"))
         assertFalse("转换后的选择器不应包含hasitem", filtered.contains("hasitem"))
-        assertFalse("转换后的选择器不应包含r", filtered.contains("r"))
+        assertFalse("转换后的选择器不应包含r=", filtered.contains("r="))
         assertFalse("转换后的选择器不应包含family", filtered.contains("family"))
     }
     
