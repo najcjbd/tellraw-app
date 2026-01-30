@@ -2295,22 +2295,29 @@ object SelectorConverter {
     private fun extractBraceContent(str: String): String? {
         var braceCount = 0
         var result = StringBuilder()
+        var started = false  // 标志：是否已经开始收集内容
 
         for (char in str) {
             when (char) {
                 '{' -> {
                     braceCount++
-                    result.append(char)
+                    if (!started) {
+                        started = true  // 跳过第一个 '{'
+                    } else {
+                        result.append(char)  // 保留内层的 '{'
+                    }
                 }
                 '}' -> {
                     braceCount--
-                    result.append(char)
                     if (braceCount == 0) {
+                        // 最外层的 '}'，结束
                         return result.toString()
+                    } else {
+                        result.append(char)  // 保留内层的 '}'
                     }
                 }
                 else -> {
-                    if (braceCount > 0) {
+                    if (started) {
                         result.append(char)
                     }
                 }
