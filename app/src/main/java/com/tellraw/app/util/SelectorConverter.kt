@@ -1390,21 +1390,24 @@ object SelectorConverter {
                 val absCVal = cValue.substring(1)
                 reminders.add(getStringSafely(context, R.string.bedrock_c_negative_converted, cValue, absCVal))
 
-                // 移除c参数
+                // 移除c参数和已有的sort参数
                 result = result.replace(cPattern, "")
+                val existingSortPattern = "(^|,)sort=([^,\\]]+)".toRegex()
+                if (existingSortPattern.containsMatchIn(result)) {
+                    result = result.replace(existingSortPattern, "")
+                }
 
                 // 恢复scores参数
                 for ((placeholder, original) in scoresMatches) {
                     result = result.replace(placeholder, original)
                 }
 
-                // 添加limit和sort参数
+                // 添加limit和sort参数（sort=furthest应该覆盖原有的sort参数）
                 result = addParameterToResult(result, "limit=$absCVal")
-                if (!result.contains("sort=")) {
-                    result = addParameterToResult(result, "sort=furthest")
-                }
+                result = addParameterToResult(result, "sort=furthest")
             } else {
                 reminders.add(getStringSafely(context, R.string.bedrock_c_converted, cValue, cValue))
+                // 移除c参数
                 result = result.replace(cPattern, "limit=$cValue")
                 
                 // 恢复scores参数
@@ -1412,6 +1415,7 @@ object SelectorConverter {
                     result = result.replace(placeholder, original)
                 }
                 
+                // 添加sort=nearest参数（如果没有sort参数的话）
                 if (!result.contains("sort=")) {
                     result = addParameterToResult(result, "sort=nearest")
                 }
