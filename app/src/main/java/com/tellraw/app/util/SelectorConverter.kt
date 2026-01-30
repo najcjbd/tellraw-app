@@ -454,9 +454,15 @@ object SelectorConverter {
                         // 当limit=数字,sort=furthest时，基岩版转换为c=-数字
                         // 当只有sort=furthest，没有limit时，基岩版转换为c=-9999
                         val cValue = if (limitValue != null) "-$limitValue" else "-9999"
-                        paramsPart = paramsPart.replace(sortPattern, "")
+                        paramsPart = paramsPart.replace(sortPattern) { match ->
+                            val prefix = match.groupValues[1)  // 前缀 (^或,)
+                            "$prefix"
+                        }
                         if (limitValue != null) {
-                            paramsPart = paramsPart.replace(limitPattern, "")
+                            paramsPart = paramsPart.replace(limitPattern) { match ->
+                                val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                "$prefix"
+                            }
                         }
                         // 添加c参数
                         if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
@@ -478,7 +484,10 @@ object SelectorConverter {
                         }
                     }
                     "arbitrary" -> {
-                        paramsPart = paramsPart.replace(sortPattern, "")
+                        paramsPart = paramsPart.replace(sortPattern) { match ->
+                            val prefix = match.groupValues[1)  // 前缀 (^或,)
+                            "$prefix"
+                        }
                         // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
                         // 当为其他大选择器时，删除并提醒用户
                         if (selectorVar != "@a" && selectorVar != "@e") {
@@ -490,9 +499,15 @@ object SelectorConverter {
                         // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
                         val cValue = limitValue ?: "9999"
                         if (selectorVar == "@a" || selectorVar == "@r") {
-                            paramsPart = paramsPart.replace(sortPattern, "")
+                            paramsPart = paramsPart.replace(sortPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix"
+                            }
                             if (limitValue != null) {
-                                paramsPart = paramsPart.replace(limitPattern, "")
+                                paramsPart = paramsPart.replace(limitPattern) { match ->
+                                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                    "$prefix"
+                                }
                             }
                             // 添加c参数
                             if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
@@ -512,9 +527,15 @@ object SelectorConverter {
                                 selectorVar = "@r"
                             }
                         } else {
-                            paramsPart = paramsPart.replace(sortPattern, "")
+                            paramsPart = paramsPart.replace(sortPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix"
+                            }
                             if (limitValue != null) {
-                                paramsPart = paramsPart.replace(limitPattern, "")
+                                paramsPart = paramsPart.replace(limitPattern) { match ->
+                                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                                    "$prefix"
+                                }
                             }
                             // 添加c参数
                             if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
@@ -535,7 +556,10 @@ object SelectorConverter {
                         // sort=nearest 是基岩版的默认排序方式，可以忽略
                         // 但是 limit 仍然需要转换为 c
                         if (limitValue != null) {
-                            paramsPart = paramsPart.replace(sortPattern, "")
+                            paramsPart = paramsPart.replace(sortPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix"
+                            }
                             paramsPart = paramsPart.replace(limitPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix" + "c=$limitValue"
@@ -1055,8 +1079,14 @@ object SelectorConverter {
                 
                 // 移除原有的r和rm参数（包括前面的逗号）
                 android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 替换前: $result")
-                result = result.replace(rPattern, "")
-                result = result.replace(rmPattern, "")
+                result = result.replace(rPattern) { match ->
+                    val prefix = match.groupValues[1)  // 前缀 (^或,)
+                    "$prefix"
+                }
+                result = result.replace(rmPattern) { match ->
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                    "$prefix"
+                }
                 android.util.Log.d("SelectorConverter", "convertR_RmToDistance - 替换后: $result")
                 
                 // 恢复scores参数
@@ -1136,8 +1166,14 @@ object SelectorConverter {
                     }
                     
                     // 移除原有参数
-                    result = result.replace(minPattern, "")
-                    result = result.replace(maxPattern, "")
+                    result = result.replace(minPattern) { match ->
+                        val prefix = match.groupValues[1)  // 前缀 (^或,)
+                        "$prefix"
+                    }
+                    result = result.replace(maxPattern) { match ->
+                        val prefix = match.groupValues[1)  // 前缀 (^或,)
+                        "$prefix"
+                    }
                     
                     // 恢复scores参数
                     for ((placeholder, original) in scoresMatches) {
@@ -1257,8 +1293,14 @@ object SelectorConverter {
                 }
                 
                 // 移除原有的l和lm参数（包括前面的逗号）
-                result = result.replace(lPattern, "")
-                result = result.replace(lmPattern, "")
+                result = result.replace(lPattern) { match ->
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                    "$prefix"
+                }
+                result = result.replace(lmPattern) { match ->
+                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                    "$prefix"
+                }
                 
                 // 恢复scores参数
                 for ((placeholder, original) in scoresMatches) {
