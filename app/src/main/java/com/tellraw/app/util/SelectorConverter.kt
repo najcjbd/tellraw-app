@@ -398,12 +398,16 @@ object SelectorConverter {
             conversionReminders.addAll(nbtToHasitemReminders)
         }
         
+        // 先提取并保存scores参数，避免scores内部的参数名被误处理（Java到基岩版转换）
+        val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
+        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
+
         // 根据目标版本进行参数转换
         if (targetVersion == SelectorType.JAVA) {
             // 基岩版到Java版的参数转换
             paramsPart = convertR_RmToDistance(paramsPart, conversionReminders, context)
-            paramsPart = convertRx_RxmToXRotation(paramsPart, conversionReminders, context)
-            paramsPart = convertRy_RymToYRotation(paramsPart, conversionReminders, context)
+            paramsPart = convertRotationParameter(paramsPart, "x_rotation", "rxm", "rx", conversionReminders, context, toJava = true)
+            paramsPart = convertRotationParameter(paramsPart, "y_rotation", "rym", "ry", conversionReminders, context, toJava = true)
             paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
             paramsPart = convertMToGamemode(paramsPart, conversionReminders, context)
             paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
@@ -416,6 +420,13 @@ object SelectorConverter {
             // 处理gamemode到m的转换（Java版到基岩版）
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders, context)
 
+            // 提取scores参数到占位符，避免sort/limit转换时误匹配scores内部的参数名
+            paramsPart = paramsPart.replace(scoresPattern) { match ->
+                val placeholder = "__SCORES_${scoresMatches.size}__"
+                scoresMatches.add(Pair(placeholder, match.value))
+                placeholder
+            }
+
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
             // 根据sort.txt的要求:
             // 1. sort=arbitrary直接删除(当大选择器为@a或@e时),否则提醒用户
@@ -424,17 +435,7 @@ object SelectorConverter {
             // 4. limit=数字没有sort时转c=数字并提醒
             // 5. limit=数字,sort=random时,@a或@r转@r[c=数字],否则只保留c=数字并提醒
             // 6. 只有sort=random没有limit时,@a或@r转@r[c=9999],否则删除sort=random并提醒
-            
-            // 先提取并保存scores参数，避免scores内部的参数名被误处理
-            val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-            val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-            
-            paramsPart = paramsPart.replace(scoresPattern) { match ->
-                val placeholder = "__SCORES_${scoresMatches.size}__"
-                scoresMatches.add(Pair(placeholder, match.value))
-                placeholder
-            }
-            
+
             val sortPattern = "(?<!__SCORES_)(^|,)sort=([^,\\]]+)".toRegex()
             val limitPattern = "(?<!__SCORES_)(^|,)limit=([+-]?\\d+)".toRegex()
 
@@ -542,7 +543,7 @@ object SelectorConverter {
                 }
             }
         }
-        
+
         // 恢复scores参数
         for ((placeholder, original) in scoresMatches) {
             paramsPart = paramsPart.replace(placeholder, original)
