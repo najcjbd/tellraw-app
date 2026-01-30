@@ -936,9 +936,12 @@ class SelectorConverterTest {
         // hasitem 应该被转换为 nbt，r 应该被转换为 distance，family 参数会被移除
         val bedrockSelector = "@a[r=10,hasitem={item=diamond},family=zombie]"
         val (filtered, removed, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.JAVA, context)
-        // 添加调试日志
-        android.util.Log.d("SelectorConverterTest", "testParameterFiltering_2 - filtered: $filtered")
-        android.util.Log.d("SelectorConverterTest", "testParameterFiltering_2 - removed: $removed")
+        // 添加详细的断言，帮助调试
+        println("DEBUG: bedrockSelector = $bedrockSelector")
+        println("DEBUG: filtered = $filtered")
+        println("DEBUG: removed = $removed")
+        println("DEBUG: filtered contains 'r='? ${filtered.contains("r=")}")
+        println("DEBUG: filtered contains 'distance='? ${filtered.contains("distance=")}")
         // 检查转换后的选择器
         assertTrue("转换后的选择器应包含nbt", filtered.contains("nbt"))
         assertTrue("转换后的选择器应包含distance", filtered.contains("distance"))
