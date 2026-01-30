@@ -994,8 +994,8 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val rPattern = "(?<!__SCORES_)(^|,)r=([^,\\]]+)".toRegex()
-        val rmPattern = "(?<!__SCORES_)(^|,)rm=([^,\\]]+)".toRegex()
+        val rPattern = "(?<!__SCORES_)(^|,)r=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
+        val rmPattern = "(?<!__SCORES_)(^|,)rm=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
         
         val rMatch = rPattern.find(result)
         val rmMatch = rmPattern.find(result)
@@ -1072,8 +1072,8 @@ object SelectorConverter {
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
             // 此时scores参数已被替换为占位符，不会误匹配
-            val minPattern = "(?<!__SCORES_)(^|,)$minParam=([^,\\]]+)".toRegex()
-            val maxPattern = "(?<!__SCORES_)(^|,)$maxParam=([^,\\]]+)".toRegex()
+            val minPattern = "(?<!__SCORES_)(^|,)$minParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
+            val maxPattern = "(?<!__SCORES_)(^|,)$maxParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
 
             val minMatch = minPattern.find(result)
             val maxMatch = maxPattern.find(result)
@@ -1193,8 +1193,8 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val lPattern = "(?<!__SCORES_)(^|,)l=([^,\\]]+)".toRegex()
-        val lmPattern = "(?<!__SCORES_)(^|,)lm=([^,\\]]+)".toRegex()
+        val lPattern = "(?<!__SCORES_)(^|,)l=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
+        val lmPattern = "(?<!__SCORES_)(^|,)lm=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
         
         val lMatch = lPattern.find(result)
         val lmMatch = lmPattern.find(result)
@@ -1278,7 +1278,7 @@ object SelectorConverter {
         
         // 从m到gamemode的转换（基岩版到Java版）
         // 此时scores参数已被替换为占位符，不会误匹配
-        val mPattern = "(?<!__SCORES_)(^|,)m=(!?)([^,\\]]+)".toRegex()
+        val mPattern = "(?<!__SCORES_)(^|,)m=(!?)([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
         
         result = result.replace(mPattern) { match ->
             val negation = match.groupValues[2]  // ! 或空
@@ -1379,7 +1379,7 @@ object SelectorConverter {
         }
         
         // 此时scores参数已被替换为占位符，不会误匹配
-        val cPattern = "(?<!__SCORES_)(^|,)c=([+-]?\\d+)".toRegex()
+        val cPattern = "(?<!__SCORES_)(^|,)c=([+-]?\\d+)".toRegex(RegexOption.IGNORE_CASE)
         
         val match = cPattern.find(result)
         if (match != null) {
@@ -1678,32 +1678,32 @@ object SelectorConverter {
         return when (location) {
             "slot.weapon.mainhand" -> {
                 // 主手 → SelectedItem
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
             }
             "slot.weapon.offhand" -> {
                 // 副手 → equipment.offhand
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.head" -> {
                 // 头盔 → equipment.head
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={equipment:{head:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.chest" -> {
                 // 胸甲 → equipment.chest
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={equipment:{chest:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.legs" -> {
                 // 护腿 → equipment.legs
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={equipment:{legs:{id:\"$itemId\"$countPart}}}"
             }
             "slot.armor.feet" -> {
                 // 靴子 → equipment.feet
-                val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 "nbt={equipment:{feet:{id:\"$itemId\"$countPart}}}"
             }
             "slot.hotbar", "slot.inventory" -> {
@@ -1719,7 +1719,7 @@ object SelectorConverter {
                     // 构建多个槽位的 NBT
                     // parseSlotRange 已经返回了转换后的 Java 版槽位编号
                     val nbtItems = slotNumbers.map { slotNum ->
-                        val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+                        val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                         "{Slot:${slotNum}b,id:\"$itemId\"$countPart}"
                     }
                     "nbt={Inventory:[${nbtItems.joinToString(",")}]}"
@@ -1813,7 +1813,7 @@ object SelectorConverter {
 
             // 处理 quantity 范围
             val processedQuantity = processQuantityRange(quantity, reminders, context)
-            val countPart = if (processedQuantity != null) ",Count:$processedQuantity" else ""
+            val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
 
             // 根据位置类型分类
             when (location) {
