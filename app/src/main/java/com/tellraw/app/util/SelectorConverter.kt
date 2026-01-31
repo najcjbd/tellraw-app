@@ -887,15 +887,12 @@ object SelectorConverter {
                 result = addParameterToResult(result, "rx=$rxStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_to_rx, "multiple", rxStr))
             }
-            
+
             // 再次替换scores参数，因为后面还要处理y_rotation
-            result = result.replace(scoresPattern) { match ->
-                val placeholder = "__SCORES_${scoresMatches.size}__"
-                scoresMatches.add(Pair(placeholder, match.value))
-                placeholder
-            }
+            scoresMatches.clear()
+            result = extractComplexParameters(result, "scores", scoresMatches)
         }
-        
+
         // 处理y_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
         val yRotationPattern = "(?<!__SCORES_)(^|,)y_rotation=([^,\\]]+)".toRegex()
         val yRotationMatches = yRotationPattern.findAll(result).toList()
