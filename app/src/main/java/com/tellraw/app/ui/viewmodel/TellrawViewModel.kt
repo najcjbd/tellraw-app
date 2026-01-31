@@ -655,16 +655,6 @@ class TellrawViewModel @Inject constructor(
                 _javaCommand.value = javaCommand
                 _bedrockCommand.value = bedrockCommand
                 _warnings.value = emptyList()  // TODO: 可以在这里添加警告信息
-                
-                // 自动保存到历史记录文件
-                val historyItem = HistoryItem(
-                    selector = selector,
-                    message = message,
-                    javaCommand = javaCommand,
-                    bedrockCommand = bedrockCommand,
-                    timestamp = System.currentTimeMillis()
-                )
-                historyRepository.addHistory(historyItem)
             } catch (e: IllegalArgumentException) {
                 // 处理未知§组合的异常
                 _javaCommand.value = ""
@@ -791,27 +781,8 @@ class TellrawViewModel @Inject constructor(
     /**
      * 清空所有历史记录
      */
-    fun clearAllHistory() {
+    suspend fun clearAllHistory() {
         viewModelScope.launch {
-            // 在清空历史记录前，先保存当前输入的内容
-            val selector = _selectorInput.value
-            val message = _messageInput.value
-            val javaCommand = _javaCommand.value
-            val bedrockCommand = _bedrockCommand.value
-            
-            // 如果有内容，先保存到历史记录
-            if (selector.isNotEmpty() || message.isNotEmpty()) {
-                historyRepository.addHistory(
-                    HistoryItem(
-                        selector = selector,
-                        message = message,
-                        javaCommand = javaCommand,
-                        bedrockCommand = bedrockCommand,
-                        timestamp = System.currentTimeMillis()
-                    )
-                )
-            }
-            
             historyRepository.clearHistory()
         }
     }
@@ -978,19 +949,28 @@ class TellrawViewModel @Inject constructor(
             val file = java.io.File(uri, filename)
             
             if (file.exists()) {
-                // 文件已存在
-                _writeFileMessage.value = "文件已存在，将使用该文件存储历史记录"
+                // 文件已存在，在文件开头添加空行（如果是空的则添加）
+                try {
+                    val currentContent = file.readText()
+                    if (currentContent.isNotEmpty() && !currentContent.startsWith("\n")) {
+                        file.writeText("\n" + currentContent)
+                    }
+                    _writeFileMessage.value = "文件已存在，将使用该文件存储历史记录"
+                } catch (e: Exception) {
+                    _writeFileMessage.value = "文件已存在，但无法读取内容，将直接使用该文件存储历史记录"
+                }
             } else {
                 // 文件不存在，创建它
                 try {
                     file.createNewFile()
-                    // 在文件开头写入空行
-                    file.appendText("\n")
                     _writeFileMessage.value = "成功使用该目录，文件已创建"
                 } catch (e: Exception) {
                     _writeFileMessage.value = "创建文件失败：${e.message}，将使用应用沙盒存储"
                 }
             }
+            
+            // 重新加载历史记录
+            loadHistoryStorageSettings()
         }
     }
     
@@ -1030,8 +1010,6 @@ class TellrawViewModel @Inject constructor(
                     // 文件不存在，创建它
                     try {
                         file.createNewFile()
-                        // 在文件开头写入空行
-                        file.appendText("\n")
                         _writeFileMessage.value = "成功使用该目录，文件已创建"
                     } catch (e: Exception) {
                         _writeFileMessage.value = "创建文件失败：${e.message}，将使用应用沙盒存储"
@@ -1116,8 +1094,6 @@ class TellrawViewModel @Inject constructor(
                     // 文件不存在，创建它
                     try {
                         file.createNewFile()
-                        // 在文件开头写入空行
-                        file.appendText("\n")
                         _writeFileMessage.value = context.getString(R.string.file_created_successfully)
                     } catch (e: Exception) {
                         _writeFileMessage.value = context.getString(R.string.file_create_failed) + ": ${e.message}"

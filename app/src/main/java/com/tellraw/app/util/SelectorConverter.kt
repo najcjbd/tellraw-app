@@ -346,7 +346,12 @@ object SelectorConverter {
         // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
         // 只有独立的 level 参数（不在 scores 内部）才需要转换
         // 因此这里不需要处理 scores 参数内部的 level
-        
+
+        // 第一次参数合并：在参数转换之前合并输入的重复参数
+        // 这样可以减少需要转换的参数数量
+        // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
+        paramsPart = mergeDuplicateParameters(paramsPart)
+
         // 处理 scores 参数的反选（基岩版特有功能）
         if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
             // 查找所有scores参数并检查是否包含反选
@@ -701,10 +706,27 @@ object SelectorConverter {
         }
 
         // 清理多余的逗号和空括号
-        val finalSelector = newSelector
+        var finalSelector = newSelector
             .replace(",,", ",")
             .replace(",\\]".toRegex(), "]")
             .replace("\\[".toRegex(), "[")
+
+        // 第二次参数合并：在参数转换之后合并可能产生的重复参数
+        // 例如：转换过程可能产生新的重复参数，需要再次合并
+        if ('[' in finalSelector && ']' in finalSelector) {
+            val selectorVarPart = finalSelector.split('[')[0]
+            val paramsPart = finalSelector.substringAfter('[').substringBeforeLast(']')
+
+            // 合并重复参数
+            val mergedParamsPart = mergeDuplicateParameters(paramsPart)
+
+            // 重构选择器
+            finalSelector = if (mergedParamsPart.isNotEmpty()) {
+                "$selectorVarPart[$mergedParamsPart]"
+            } else {
+                selectorVarPart
+            }
+        }
 
         return Triple(finalSelector, removedParams, conversionReminders)
     }
@@ -1725,6 +1747,282 @@ object SelectorConverter {
         }
         
         return cleanParams + "," + newParam
+    }
+
+    /**
+     * 合并重复参数
+     *
+     * 规则：
+     * - 最大值类型（x, y, z, dx, dy, dz, r, rx, ry, l, c, limit）：取最大值
+     * - 最小值类型（rm, rxm, rym, lm）：取最小值
+     * - 范围类型（distance, x_rotation, y_rotation, level）：选择范围最大的（最小值更小且最大值更大）
+     *
+     * 输出时不加无意义的小数位（如.00）
+     *
+     * @param paramsPart 参数部分字符串（不包含方括号）
+     * @return 合并后的参数部分字符串
+     */
+    private fun mergeDuplicateParameters(paramsPart: String): String {
+        if (paramsPart.isEmpty()) {
+            return paramsPart
+        }
+
+        // 定义参数类型
+        val maxParams = setOf("x", "y", "z", "dx", "dy", "dz", "r", "rx", "ry", "l", "c", "limit")
+        val minParams = setOf("rm", "rxm", "rym", "lm")
+        val rangeParams = setOf("distance", "x_rotation", "y_rotation", "level")
+
+        // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
+        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
+        var result = paramsPart
+
+        result = result.replace(scoresPattern) { match ->
+            val placeholder = "__SCORES_${scoresMatches.size}__"
+            scoresMatches.add(Pair(placeholder, match.value))
+            placeholder
+        }
+
+        // 提取hasitem参数（避免被误处理）
+        val hasitemMatches = mutableListOf<Pair<String, String>>()
+        val hasitemPattern = "hasitem=\\[[^]]*\\]|hasitem=\\{[^}]*\\}".toRegex()
+        result = result.replace(hasitemPattern) { match ->
+            val placeholder = "__HASITEM_${hasitemMatches.size}__"
+            hasitemMatches.add(Pair(placeholder, match.value))
+            placeholder
+        }
+
+        // 提取nbt参数（避免被误处理）
+        val nbtMatches = mutableListOf<Pair<String, String>>()
+        val nbtPattern = "nbt=\\{[^}]*\\}".toRegex()
+        result = result.replace(nbtPattern) { match ->
+            val placeholder = "__NBT_${nbtMatches.size}__"
+            nbtMatches.add(Pair(placeholder, match.value))
+            placeholder
+        }
+
+        // 收集所有参数
+        val paramMap = mutableMapOf<String, MutableList<Pair<String, String>>>()  // (参数名, (原始值, 格式化后的值))
+
+        // 智能分割参数
+        val params = mutableListOf<String>()
+        var currentParam = ""
+        var braceCount = 0
+        var bracketCount = 0
+        var inStringValue = false
+        var stringChar = '"'
+        var escaped = false
+
+        for (char in result) {
+            when {
+                inStringValue && char == '\\' && !escaped -> {
+                    escaped = true
+                    currentParam += char
+                }
+                inStringValue && char == stringChar && !escaped -> {
+                    inStringValue = false
+                    currentParam += char
+                }
+                !inStringValue && (char == '"' || char == '\'') -> {
+                    inStringValue = true
+                    stringChar = char
+                    currentParam += char
+                }
+                !inStringValue && char == '{' -> {
+                    braceCount++
+                    currentParam += char
+                }
+                !inStringValue && char == '}' -> {
+                    braceCount--
+                    currentParam += char
+                }
+                !inStringValue && char == '[' -> {
+                    bracketCount++
+                    currentParam += char
+                }
+                !inStringValue && char == ']' -> {
+                    bracketCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 && bracketCount == 0 -> {
+                    if (currentParam.trim().isNotEmpty()) {
+                        params.add(currentParam.trim())
+                    }
+                    currentParam = ""
+                }
+                else -> {
+                    currentParam += char
+                }
+            }
+            if (escaped) escaped = false
+        }
+
+        if (currentParam.trim().isNotEmpty()) {
+            params.add(currentParam.trim())
+        }
+
+        // 分类参数
+        for (param in params) {
+            if ('=' in param) {
+                val equalIndex = param.indexOf('=')
+                val paramName = param.substring(0, equalIndex).trim()
+                // 跳过占位符参数
+                if (paramName.startsWith("__") && paramName.endsWith("__")) {
+                    continue
+                }
+                val paramValue = param.substring(equalIndex + 1).trim()
+
+                if (!paramMap.containsKey(paramName)) {
+                    paramMap[paramName] = mutableListOf()
+                }
+                paramMap[paramName]!!.add(Pair(paramValue, formatNumber(paramValue)))
+            }
+        }
+
+        // 合并参数
+        val mergedParams = mutableListOf<String>()
+        
+        for ((paramName, values) in paramMap) {
+            when {
+                paramName in maxParams -> {
+                    // 取最大值
+                    val maxValue = values.maxByOrNull { parseSingleValue(it.first) }
+                    if (maxValue != null) {
+                        mergedParams.add("$paramName=${maxValue.second}")
+                    }
+                }
+                paramName in minParams -> {
+                    // 取最小值
+                    val minValue = values.minByOrNull { parseSingleValue(it.first) }
+                    if (minValue != null) {
+                        mergedParams.add("$paramName=${minValue.second}")
+                    }
+                }
+                paramName in rangeParams -> {
+                    // 范围类型：收集所有范围的最小值和最大值，然后计算最终范围
+                    // 这与 convertDistanceParameters、convertRotationParameters、convertLevelParameters 中的逻辑相同
+                    val allMinValues = mutableListOf<Double>()
+                    val allMaxValues = mutableListOf<Double>()
+                    
+                    for (value in values) {
+                        val range = parseRange(value.first)
+                        if (range != null) {
+                            allMinValues.add(range.first)
+                            allMaxValues.add(range.second)
+                        }
+                    }
+                    
+                    val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
+                    val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
+                    
+                    // 格式化输出
+                    val rangeValue = when {
+                        finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
+                        finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
+                        finalMax != null -> "..${formatSingleNumber(finalMax.toString())}"
+                        else -> continue
+                    }
+                    
+                    mergedParams.add("$paramName=$rangeValue")
+                }
+                else -> {
+                    // 其他参数类型，保留第一个
+                    if (values.isNotEmpty()) {
+                        mergedParams.add("$paramName=${values[0].second}")
+                    }
+                }
+            }
+        }
+        
+        // 恢复占位符参数
+        for ((placeholder, original) in scoresMatches) {
+            mergedParams.add(original)
+        }
+        for ((placeholder, original) in hasitemMatches) {
+            mergedParams.add(original)
+        }
+        for ((placeholder, original) in nbtMatches) {
+            mergedParams.add(original)
+        }
+
+        return mergedParams.joinToString(",")
+    }
+
+    /**
+     * 格式化数字，去除无意义的小数位
+     * 例如：9.00 -> 9, 9.5 -> 9.5
+     */
+    private fun formatNumber(value: String): String {
+        // 检查是否是范围格式（如 "5..7"）
+        if (".." in value) {
+            val parts = value.split("..")
+            val minPart = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }
+            val maxPart = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }
+
+            return when {
+                minPart != null && maxPart != null -> "${formatSingleNumber(minPart)}..${formatSingleNumber(maxPart)}"
+                minPart != null -> "${formatSingleNumber(minPart)}.."
+                maxPart != null -> "..${formatSingleNumber(maxPart)}"
+                else -> value
+            }
+        }
+
+        // 单个值
+        return formatSingleNumber(value)
+    }
+
+    /**
+     * 格式化单个数字
+     */
+    private fun formatSingleNumber(value: String): String {
+        try {
+            val num = value.toDouble()
+            // 如果是整数，返回整数形式；否则返回原始形式
+            return if (num % 1.0 == 0.0) {
+                num.toInt().toString()
+            } else {
+                value
+            }
+        } catch (e: NumberFormatException) {
+            // 不是数字，返回原始值
+            return value
+        }
+    }
+
+    /**
+     * 解析单个值用于比较
+     */
+    private fun parseSingleValue(value: String): Double {
+        // 如果是范围格式，返回最大值（用于比较）
+        if (".." in value) {
+            val parts = value.split("..")
+            return parts.lastOrNull { it.isNotEmpty() }?.toDoubleOrNull() ?: 0.0
+        }
+        return value.toDoubleOrNull() ?: 0.0
+    }
+
+    /**
+     * 解析范围值
+     * 返回 Pair<最小值, 最大值>
+     */
+    private fun parseRange(value: String): Pair<Double, Double>? {
+        if (".." in value) {
+            val parts = value.split("..")
+            val minVal = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+            val maxVal = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+
+            if (minVal != null && maxVal != null) {
+                return Pair(minVal, maxVal)
+            } else if (minVal != null) {
+                return Pair(minVal, minVal)
+            } else if (maxVal != null) {
+                return Pair(maxVal, maxVal)
+            }
+        }
+
+        // 单个值，视为范围大小为0
+        val singleVal = value.toDoubleOrNull() ?: return null
+        return Pair(singleVal, singleVal)
     }
 
     /**
