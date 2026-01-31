@@ -405,7 +405,6 @@ object SelectorConverter {
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理（Java到基岩版转换）
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
 
         // 根据目标版本进行参数转换
         if (targetVersion == SelectorType.JAVA) {
@@ -428,11 +427,8 @@ object SelectorConverter {
             paramsPart = convertGamemodeToM(paramsPart, conversionReminders, context)
 
             // 提取scores参数到占位符，避免sort/limit转换时误匹配scores内部的参数名
-            paramsPart = paramsPart.replace(scoresPattern) { match ->
-                val placeholder = "__SCORES_${scoresMatches.size}__"
-                scoresMatches.add(Pair(placeholder, match.value))
-                placeholder
-            }
+            // 使用智能提取方法，正确处理嵌套的花括号
+            paramsPart = extractComplexParameters(paramsPart, "scores", scoresMatches)
 
             // 处理sort参数和limit参数的联合转换（Java版到基岩版）
             // 根据sort.txt的要求:
@@ -738,14 +734,9 @@ object SelectorConverter {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
         
         // 处理distance参数（此时scores参数已被替换为占位符，不会误匹配）
         val distancePattern = "(?<!__SCORES_)(^|,)distance=([^,\\]]+)".toRegex()
@@ -829,14 +820,9 @@ object SelectorConverter {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
         
         // 处理x_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
         val xRotationPattern = "(?<!__SCORES_)(^|,)x_rotation=([^,\\]]+)".toRegex()
@@ -990,14 +976,9 @@ object SelectorConverter {
         var result = paramsPart
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
         
         // 处理level参数（此时scores参数已被替换为占位符，不会误匹配）
         val levelPattern = "(?<!__SCORES_)(^|,)level=([^,\\]]+)".toRegex()
@@ -1087,14 +1068,9 @@ object SelectorConverter {
         )
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
         
         // 从gamemode到m的转换（Java版到基岩版）
         // 此时scores参数已被替换为占位符，不会误匹配
@@ -1271,14 +1247,9 @@ object SelectorConverter {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
 
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
@@ -1429,14 +1400,9 @@ object SelectorConverter {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
 
         // 此时scores参数已被替换为占位符，不会误匹配
         val lPattern = "(?<!__SCORES_)(^|,)l=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
@@ -1522,14 +1488,9 @@ object SelectorConverter {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
 
         // 基岩版游戏模式到Java版的映射
         val bedrockToJavaGamemode = mapOf(
@@ -1647,14 +1608,9 @@ object SelectorConverter {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "scores", scoresMatches)
 
         // 此时scores参数已被替换为占位符，不会误匹配
         val cPattern = "(?<!__SCORES_)(^|,)c=([+-]?\\d+)".toRegex(RegexOption.IGNORE_CASE)
@@ -1749,6 +1705,43 @@ object SelectorConverter {
         return cleanParams + "," + newParam
     }
 
+/**
+     * 智能提取包含嵌套括号的复杂参数
+     * 正确处理nbt和hasitem等参数中包含嵌套花括号和方括号的情况
+     *
+     * @param paramsPart 参数部分字符串
+     * @param paramName 参数名称（如"nbt"或"hasitem"）
+     * @param matches 用于存储提取结果的列表
+     * @return 替换为占位符后的参数部分字符串
+     */
+    private fun extractComplexParameters(paramsPart: String, paramName: String, matches: MutableList<Pair<String, String>>): String {
+        var result = paramsPart
+        var searchStart = 0
+
+        while (searchStart < result.length) {
+            // 查找下一个 paramName={
+            val paramIndex = result.indexOf("$paramName={", searchStart)
+            if (paramIndex == -1) break
+
+            // 从第一个{开始提取完整的nbt/hasitem内容
+            val braceContent = extractBraceContent(result.substring(paramIndex + paramName.length + 1))
+
+            if (braceContent != null) {
+                val fullMatch = "$paramName=" + braceContent
+                val placeholder = "__${paramName.uppercase()}_${matches.size}__"
+                matches.add(Pair(placeholder, fullMatch))
+                result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
+                // 从占位符位置继续搜索
+                searchStart = paramIndex + placeholder.length
+            } else {
+                // 提取失败，跳过这个位置
+                searchStart = paramIndex + 1
+            }
+        }
+
+        return result
+    }
+
     /**
      * 合并重复参数
      *
@@ -1773,33 +1766,19 @@ object SelectorConverter {
         val rangeParams = setOf("distance", "x_rotation", "y_rotation", "level")
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
+        // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
-        val scoresPattern = "scores=\\{[^}]*\\}".toRegex()
-        var result = paramsPart
-
-        result = result.replace(scoresPattern) { match ->
-            val placeholder = "__SCORES_${scoresMatches.size}__"
-            scoresMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        var result = extractComplexParameters(paramsPart, "scores", scoresMatches)
 
         // 提取hasitem参数（避免被误处理）
+        // 使用智能提取方法，正确处理嵌套的花括号和方括号
         val hasitemMatches = mutableListOf<Pair<String, String>>()
-        val hasitemPattern = "hasitem=\\[[^]]*\\]|hasitem=\\{[^}]*\\}".toRegex()
-        result = result.replace(hasitemPattern) { match ->
-            val placeholder = "__HASITEM_${hasitemMatches.size}__"
-            hasitemMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "hasitem", hasitemMatches)
 
         // 提取nbt参数（避免被误处理）
+        // 使用智能提取方法，正确处理嵌套的花括号
         val nbtMatches = mutableListOf<Pair<String, String>>()
-        val nbtPattern = "nbt=\\{[^}]*\\}".toRegex()
-        result = result.replace(nbtPattern) { match ->
-            val placeholder = "__NBT_${nbtMatches.size}__"
-            nbtMatches.add(Pair(placeholder, match.value))
-            placeholder
-        }
+        result = extractComplexParameters(result, "nbt", nbtMatches)
 
         // 收集所有参数
         val paramMap = mutableMapOf<String, MutableList<Pair<String, String>>>()  // (参数名, (原始值, 格式化后的值))
