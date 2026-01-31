@@ -2848,29 +2848,23 @@ object SelectorConverter {
     private fun extractBraceContent(str: String): String? {
         var braceCount = 0
         var result = StringBuilder()
-        var started = false  // 标志：是否已经开始收集内容
 
         for (char in str) {
             when (char) {
                 '{' -> {
                     braceCount++
-                    if (!started) {
-                        started = true  // 跳过第一个 '{'
-                    } else {
-                        result.append(char)  // 保留内层的 '{'
-                    }
+                    result.append(char)
                 }
                 '}' -> {
                     braceCount--
+                    result.append(char)
                     if (braceCount == 0) {
                         // 最外层的 '}'，结束
                         return result.toString()
-                    } else {
-                        result.append(char)  // 保留内层的 '}'
                     }
                 }
                 else -> {
-                    if (started) {
+                    if (braceCount > 0) {
                         result.append(char)
                     }
                 }
@@ -3016,11 +3010,7 @@ object SelectorConverter {
             when {
                 char == '{' -> {
                     braceCount++
-                    if (braceCount == 1) {
-                        currentItem = "{"
-                    } else {
-                        currentItem += char
-                    }
+                    currentItem += char
                 }
                 char == '}' -> {
                     braceCount--
