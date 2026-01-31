@@ -350,14 +350,17 @@ object SelectorConverter {
         // 第一次参数合并：在参数转换之前合并输入的重复参数
         // 这样可以减少需要转换的参数数量
         // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
+        android.util.Log.d("SelectorConverter", "filterSelectorParameters - 第一次参数合并前: $paramsPart")
         paramsPart = mergeDuplicateParameters(paramsPart)
+        android.util.Log.d("SelectorConverter", "filterSelectorParameters - 第一次参数合并后: $paramsPart")
 
         // 处理 scores 参数的反选（基岩版特有功能）
         if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
+            android.util.Log.d("SelectorConverter", "处理scores反选 - 输入: $paramsPart")
             // 查找所有scores参数并检查是否包含反选
             val scoresPattern = "scores=\\{".toRegex()
             val scoresToProcess = mutableListOf<Pair<Int, String>>()  // (startIndex, "scores={...}")
-            
+
             var match = scoresPattern.find(paramsPart)
             while (match != null) {
                 val startIndex = match.range.first
@@ -369,21 +372,24 @@ object SelectorConverter {
                 }
                 match = scoresPattern.find(paramsPart, startIndex + 1)
             }
-            
+
             // 处理每个scores参数
             for ((_, fullMatch) in scoresToProcess) {
                 val scoresContent = fullMatch.substring(8, fullMatch.length - 1)  // 去掉 "scores={" 和 "}"
-                
+
+                android.util.Log.d("SelectorConverter", "处理scores反选 - fullMatch: $fullMatch, scoresContent: $scoresContent")
                 // 检查是否有反选模式（!= 或 ! 在值部分）
                 val negationPattern = "\\w+\\s*=\\s*!".toRegex()
                 if (negationPattern.containsMatchIn(scoresContent)) {
                     // Java版不支持scores反选，直接移除整个scores参数
+                    android.util.Log.d("SelectorConverter", "处理scores反选 - 发现反选，移除: $fullMatch")
                     conversionReminders.add(getStringSafely(context, R.string.bedrock_scores_negation_removed, fullMatch))
                     paramsPart = paramsPart.replace(fullMatch, "")
                 }
                 // 如果没有反选，scores参数应该被保留（不做什么）
             }
-            
+
+            android.util.Log.d("SelectorConverter", "处理scores反选 - 输出: $paramsPart")
             // 清理可能的双逗号
             paramsPart = paramsPart.replace(",,", ",")
             paramsPart = paramsPart.replace(",\\]".toRegex(), "]")
@@ -710,11 +716,13 @@ object SelectorConverter {
         // 第二次参数合并：在参数转换之后合并可能产生的重复参数
         // 例如：转换过程可能产生新的重复参数，需要再次合并
         if ('[' in finalSelector && ']' in finalSelector) {
+            android.util.Log.d("SelectorConverter", "filterSelectorParameters - 第二次参数合并前: $finalSelector")
             val selectorVarPart = finalSelector.split('[')[0]
             val paramsPart = finalSelector.substringAfter('[').substringBeforeLast(']')
 
             // 合并重复参数
             val mergedParamsPart = mergeDuplicateParameters(paramsPart)
+            android.util.Log.d("SelectorConverter", "filterSelectorParameters - 第二次参数合并后: $mergedParamsPart")
 
             // 重构选择器
             finalSelector = if (mergedParamsPart.isNotEmpty()) {
@@ -1251,6 +1259,7 @@ object SelectorConverter {
         if (toJava) {
             // 从基岩版转Java版：将 minParam 和 maxParam 合并为 paramName
             // 此时scores参数已被替换为占位符，不会误匹配
+            android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - 输入: $result")
             val minPattern = "(?<!__SCORES_)(^|,)$minParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
             val maxPattern = "(?<!__SCORES_)(^|,)$maxParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
 
@@ -1271,6 +1280,7 @@ object SelectorConverter {
                     if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
                 } else null
             } else null
+            android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - minValue=$minValue, maxValue=$maxValue")
 
             if (minValue != null || maxValue != null) {
                 val rotationValue = when {
@@ -1314,17 +1324,20 @@ object SelectorConverter {
 
                     // 添加新参数
                     result = addParameterToResult(result, paramName + "=" + rotationValue)
+                    android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - 添加参数后: $result")
                 } else {
                     // 恢复scores参数（如果没有匹配到参数）
                     for ((placeholder, original) in scoresMatches) {
                         result = result.replace(placeholder, original)
                     }
+                    android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - 恢复scores后: $result")
                 }
             } else {
                 // 恢复scores参数（如果没有匹配到参数）
                 for ((placeholder, original) in scoresMatches) {
                     result = result.replace(placeholder, original)
                 }
+                android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - 无匹配时恢复scores后: $result")
             }
         } else {
             // 从Java版转基岩版：将 paramName 拆分为 minParam 和 maxParam
@@ -1390,9 +1403,10 @@ object SelectorConverter {
             }
         }
 
+        android.util.Log.d("SelectorConverter", "convertRotationParameter($paramName) - 返回: $result")
         return result
     }
-    
+
     private fun convertL_LmToLevel(paramsPart: String, reminders: MutableList<String>, context: Context): String {
         var result = paramsPart
 
@@ -1902,9 +1916,12 @@ object SelectorConverter {
                     mergedParams.add("$paramName=$rangeValue")
                 }
                 else -> {
-                    // 其他参数类型，保留第一个
-                    if (values.isNotEmpty()) {
-                        mergedParams.add("$paramName=${values[0].second}")
+                    // 其他参数类型，保留所有（不合并）
+                    // 特殊处理：nbt 参数可以有多个，不应该被合并
+                    // 根据特别提醒.txt的要求：SelectedItem, Inventory, equipment这三大nbt参数不能放在同一个nbt大括里面
+                    // 其他参数（如 tag, type, name 等）如果有多个，也应该全部保留
+                    for (value in values) {
+                        mergedParams.add("$paramName=${value.second}")
                     }
                 }
             }
