@@ -920,7 +920,7 @@ object SelectorConverter {
             
             // 移除所有y_rotation参数
             result = result.replace(yRotationPattern) { match ->
-                val prefix = match.groupValues[1)
+                val prefix = match.groupValues[1]
                 prefix
             }
             
@@ -1353,7 +1353,7 @@ object SelectorConverter {
             val paramMatch = paramPattern.find(result)
 
             if (paramMatch != null) {
-                val paramValue = paramMatch.groupValues[2)
+                val paramValue = paramMatch.groupValues[2]
 
                 // 解析范围值
                 val rotationParts = if (".." in paramValue) {
