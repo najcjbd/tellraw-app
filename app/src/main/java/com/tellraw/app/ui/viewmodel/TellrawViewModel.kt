@@ -781,7 +781,7 @@ class TellrawViewModel @Inject constructor(
     /**
      * 清空所有历史记录
      */
-    suspend fun clearAllHistory() {
+    fun clearAllHistory() {
         viewModelScope.launch {
             historyRepository.clearHistory()
         }
