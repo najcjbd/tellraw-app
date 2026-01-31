@@ -53,6 +53,9 @@
     <string name="mn_cf_enabled_description">用§m_f/§m_c/§n_f/§n_c指定处理方式</string>
     <string name="mn_handling_method">选择§m（删除线）和§n（下划线）的处理方式：</string>
     <string name="remember_choice">记住选择</string>
+    <string name="java_bedrock_mixed_mode">JAVA/基岩混合</string>
+    <string name="java_bedrock_mixed_mode_description">输入同时包含两版特有参数时，保留各自特有参数并转换对方参数</string>
+    <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式已激活：检测到同时包含两版特有参数，已进行智能转换</string>
     
     <!-- 颜色代码 -->
     <string name="color_black">黑色</string>
@@ -142,13 +145,17 @@
     <string name="select_directory">选择目录</string>
     <string name="clear_storage_settings">清除设置</string>
     <string name="write_to_file">写入文件</string>
+    <string name="select_or_create_file">选择/创建此文件</string>
     <string name="writing">写入中...</string>
     <string name="file_exists">文件已存在</string>
+    <string name="file_exists_hint">文件已存在，将使用该文件存储历史记录</string>
     <string name="use_existing_file">使用此文件</string>
     <string name="customize_filename">自定义文件名</string>
     <string name="append_to_file">追加到文件</string>
     <string name="file_exists_message">文件 "%1$s" 已存在。\n\n是否追加历史记录？\n\n选择"否"需自定义新文件名。</string>
     <string name="create_file_failed">创建失败</string>
+    <string name="file_create_failed">创建文件失败，将使用应用沙盒存储</string>
+    <string name="file_created_successfully">成功使用该目录，文件已创建</string>
     <string name="create_file_failed_permission">创建失败：请授予所有文件访问权限</string>
     <string name="create_file_failed_directory_not_supported">创建失败：选择的目录不支持创建文件，请选择其他目录</string>
     <string name="create_file_failed_invalid_uri">创建失败：无效的目录路径，请通过系统文件管理器选择目录</string>

@@ -316,10 +316,12 @@ fun SettingsDialog(
     useJavaFontStyle: Boolean,
     mnMixedMode: Boolean,
     mnCFEnabled: Boolean,
+    javaBedrockMixedMode: Boolean,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
     onMNMixedModeChanged: (Boolean) -> Unit,
-    onMNCFEnabledChanged: (Boolean) -> Unit
+    onMNCFEnabledChanged: (Boolean) -> Unit,
+    onJavaBedrockMixedModeChanged: (Boolean) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -499,6 +501,33 @@ fun SettingsDialog(
                             )
                         }
                     }
+                    
+                    // 分隔线
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    
+                    // JAVA/基岩混合模式开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = javaBedrockMixedMode,
+                            onCheckedChange = onJavaBedrockMixedModeChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.java_bedrock_mixed_mode),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.java_bedrock_mixed_mode_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
                 
                 // 底部操作栏
@@ -650,6 +679,31 @@ fun SettingsDialog(
                             )
                             Text(
                                 text = stringResource(R.string.mn_cf_enabled_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // 分隔线
+                    HorizontalDivider()
+                    
+                    // JAVA/基岩混合模式开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = javaBedrockMixedMode,
+                            onCheckedChange = onJavaBedrockMixedModeChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.java_bedrock_mixed_mode),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.java_bedrock_mixed_mode_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1248,7 +1302,7 @@ fun HistoryStorageSettingsDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
-                            Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
+                            Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.select_or_create_file))
                         }
                     }
                 }
@@ -1422,7 +1476,7 @@ fun HistoryStorageSettingsDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.write_to_file))
+                        Text(if (isWriting) stringResource(R.string.writing) else stringResource(R.string.select_or_create_file))
                     }
                 }
             }

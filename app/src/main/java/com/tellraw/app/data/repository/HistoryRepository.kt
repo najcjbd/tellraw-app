@@ -127,29 +127,29 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 获取历史记录文件
-     * 优先使用用户选择的目录，如果文件不存在则使用应用沙盒
+     * 只使用用户选择的目录，如果文件不存在则创建它
+     * 如果用户没有选择目录，返回null表示无法获取文件
      */
-    private fun getHistoryFile(): File {
+    private fun getHistoryFile(): File? {
         val uri = _storageUri.value
         val filename = _storageFilename.value
         
         return if (uri != null) {
             // 用户选择了存储目录
             val externalFile = File(uri, filename)
-            if (externalFile.exists()) {
-                externalFile
-            } else {
-                // 文件不存在，使用应用沙盒
-                File(context.filesDir, filename)
+            if (!externalFile.exists()) {
+                try {
+                    // 文件不存在，创建它
+                    externalFile.createNewFile()
+                } catch (e: Exception) {
+                    // 创建失败，返回null
+                    return null
+                }
             }
+            externalFile
         } else {
-            // 未选择存储目录，使用应用沙盒
-            val sandboxFile = File(context.filesDir, filename)
-            if (!sandboxFile.exists()) {
-                // 文件不存在，创建它
-                sandboxFile.createNewFile()
-            }
-            sandboxFile
+            // 未选择存储目录，返回null
+            null
         }
     }
     
@@ -160,7 +160,7 @@ class HistoryRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val file = getHistoryFile()
-                if (file.exists()) {
+                if (file != null && file.exists()) {
                     val content = file.readText()
                     val history = parseHistoryContent(content)
                     _historyList.value = history
@@ -174,8 +174,11 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 解析历史记录内容（精简格式）
-     * 格式：时间\n\n输入内容\n\nJava输出\n\n基岩版输出
+     * 解析历史记录内容（新格式）
+     * 格式：时间:年:月:日 时:分:秒 \u200B
+     * 输入文本:输入的文本
+     * JAVA版输出:JAVA版的指令
+     * 基岩版输出:基岩版的指令 \u200C
      */
     private fun parseHistoryContent(content: String): List<HistoryItem> {
         val history = mutableListOf<HistoryItem>()
@@ -187,26 +190,21 @@ class HistoryRepository @Inject constructor(
             if (section.trim().isEmpty()) continue
             
             try {
-                // 提取时间（第一行）
-                val lines = section.lines()
-                if (lines.isEmpty()) continue
+                val lines = section.lines().filter { it.isNotEmpty() }
+                if (lines.size < 4) continue
                 
-                val timeText = lines[0].trim()
-                val timestamp = parseTimestamp(timeText)
+                // 解析时间行（第一行，格式：时间:年:月:日 时:分:秒）
+                val timeLine = lines[0].trim()
+                val timestamp = parseTimestamp(timeLine.substringAfter("时间:"))
                 
-                // 提取内容（跳过时间行和空行）
-                val contentLines = lines.drop(1).filter { it.isNotEmpty() }
-                if (contentLines.size < 3) continue
+                // 解析输入文本行（格式：输入文本:xxx）
+                val message = lines[1].substringAfter("输入文本:").trim()
                 
-                // 解析：输入内容、Java输出、基岩版输出
-                // 输入内容是第一个非空行
-                val message = contentLines[0]
+                // 解析Java输出行（格式：JAVA版输出:xxx）
+                val javaCommand = lines[2].substringAfter("JAVA版输出:").trim()
                 
-                // Java输出是第二个非空行
-                val javaCommand = contentLines[1]
-                
-                // 基岩版输出是第三个非空行（移除结束标记）
-                val bedrockCommand = contentLines[2].replace(END_MARKER, "").trim()
+                // 解析基岩版输出行（格式：基岩版输出:xxx \u200C）
+                val bedrockCommand = lines[3].substringAfter("基岩版输出:").replace(END_MARKER, "").trim()
                 
                 // 选择器从Java命令中提取
                 val selector = extractSelectorFromCommand(javaCommand)
@@ -255,7 +253,7 @@ class HistoryRepository @Inject constructor(
     suspend fun saveHistory(historyList: List<HistoryItem>) {
         withContext(Dispatchers.IO) {
             try {
-                val file = getHistoryFile()
+                val file = getHistoryFile() ?: return@withContext
                 
                 // 清空文件并重新写入
                 file.writeText("")
@@ -276,8 +274,11 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 构建历史记录内容（精简格式）
-     * 格式：时间\n\n输入内容\n\nJava输出\n\n基岩版输出
+     * 构建历史记录内容（新格式）
+     * 格式：时间:年:月:日 时:分:秒 \u200B
+     * 输入文本:输入的文本
+     * JAVA版输出:JAVA版的指令
+     * 基岩版输出:基岩版的指令 \u200C
      */
     private fun buildHistoryContentInternal(historyList: List<HistoryItem>): String {
         val content = StringBuilder()
@@ -287,10 +288,10 @@ class HistoryRepository @Inject constructor(
         
         for (item in sortedList) {
             val timeText = dateFormat.format(Date(item.timestamp))
-            content.append(timeText).append(START_MARKER).append("\n\n")
-            content.append(item.message).append("\n\n")
-            content.append(item.javaCommand).append("\n\n")
-            content.append(item.bedrockCommand).append(END_MARKER).append("\n\n")
+            content.append("时间:$timeText$START_MARKER\n")
+            content.append("输入文本:").append(item.message).append("\n")
+            content.append("JAVA版输出:").append(item.javaCommand).append("\n")
+            content.append("基岩版输出:").append(item.bedrockCommand).append(END_MARKER).append("\n\n")
         }
         
         return content.toString()
@@ -302,7 +303,13 @@ class HistoryRepository @Inject constructor(
     suspend fun addHistory(item: HistoryItem) {
         withContext(Dispatchers.IO) {
             try {
-                val file = getHistoryFile()
+                val file = getHistoryFile() ?: return@withContext
+                
+                // 如果文件是空的（刚创建），先写入空行
+                if (file.length() == 0L) {
+                    file.appendText("\n")
+                }
+                
                 val content = buildSingleHistoryItem(item)
                 
                 // 追加到文件末尾
@@ -318,10 +325,14 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 构建单个历史记录项的内容
+     * 新格式：时间:年:月:日 时:分:秒 \u200B
+     * 输入文本:输入的文本
+     * JAVA版输出:JAVA版的指令
+     * 基岩版输出:基岩版的指令 \u200C
      */
     fun buildSingleHistoryItem(item: HistoryItem): String {
         val timeText = dateFormat.format(Date(item.timestamp))
-        return "$timeText$START_MARKER\n\n${item.message}\n\n${item.javaCommand}\n\n${item.bedrockCommand}$END_MARKER\n\n"
+        return "时间:$timeText$START_MARKER\n输入文本:${item.message}\nJAVA版输出:${item.javaCommand}\n基岩版输出:${item.bedrockCommand}$END_MARKER\n\n"
     }
     
     /**
@@ -330,7 +341,7 @@ class HistoryRepository @Inject constructor(
     suspend fun deleteHistory(item: HistoryItem) {
         withContext(Dispatchers.IO) {
             try {
-                val file = getHistoryFile()
+                val file = getHistoryFile() ?: return@withContext
                 if (!file.exists()) return@withContext
                 
                 var content = file.readText()
@@ -357,7 +368,7 @@ class HistoryRepository @Inject constructor(
     suspend fun clearHistory() {
         withContext(Dispatchers.IO) {
             try {
-                val file = getHistoryFile()
+                val file = getHistoryFile() ?: return@withContext
                 if (!file.exists()) return@withContext
                 
                 var content = file.readText()

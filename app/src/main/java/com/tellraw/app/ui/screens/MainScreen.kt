@@ -49,6 +49,7 @@ fun MainScreen(
     val useJavaFontStyle by viewModel.useJavaFontStyle.collectAsState()
     val mnMixedMode by viewModel.mnMixedMode.collectAsState()
     val mnCFEnabled by viewModel.mnCFEnabled.collectAsState()
+    val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
@@ -161,6 +162,7 @@ fun MainScreen(
             useJavaFontStyle = useJavaFontStyle,
             mnMixedMode = mnMixedMode,
             mnCFEnabled = mnCFEnabled,
+            javaBedrockMixedMode = javaBedrockMixedMode,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -170,6 +172,9 @@ fun MainScreen(
             },
             onMNCFEnabledChanged = { cfEnabled ->
                 viewModel.setMNCFEnabled(cfEnabled)
+            },
+            onJavaBedrockMixedModeChanged = { enabled ->
+                viewModel.setJavaBedrockMixedMode(enabled)
             }
         )
     }
@@ -210,7 +215,7 @@ fun MainScreen(
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
             onWriteToFile = {
-                viewModel.writeHistoryToFile(context, commandHistory.toList())
+                viewModel.writeHistoryToFile(context, emptyList())
             },
             onGrantAllFilesAccess = {
                 activity?.requestAllFilesAccessPermission()

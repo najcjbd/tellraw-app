@@ -1164,13 +1164,19 @@ object SelectorConverter {
         // 处理所有的r参数，取最大值
         val rMatches = rPattern.findAll(result).toList()
         val rValue: String? = if (rMatches.isNotEmpty()) {
-            rMatches.map { it.groupValues[2].toDouble() }.maxOrNull()?.toString()
+            val maxVal = rMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
+            if (maxVal != null) {
+                if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
+            } else null
         } else null
 
         // 处理所有的rm参数，取最小值
         val rmMatches = rmPattern.findAll(result).toList()
         val rmValue: String? = if (rmMatches.isNotEmpty()) {
-            rmMatches.map { it.groupValues[2].toDouble() }.minOrNull()?.toString()
+            val minVal = rmMatches.map { it.groupValues[2].toDouble() }.minOrNull()
+            if (minVal != null) {
+                if (minVal % 1.0 == 0.0) minVal.toInt().toString() else minVal.toString()
+            } else null
         } else null
 
         if (rValue != null || rmValue != null) {
@@ -1261,13 +1267,19 @@ object SelectorConverter {
             // 处理所有的minParam参数，取最小值
             val minMatches = minPattern.findAll(result).toList()
             val minValue: String? = if (minMatches.isNotEmpty()) {
-                minMatches.map { it.groupValues[2].toDouble() }.minOrNull()?.toString()
+                val minVal = minMatches.map { it.groupValues[2].toDouble() }.minOrNull()
+                if (minVal != null) {
+                    if (minVal % 1.0 == 0.0) minVal.toInt().toString() else minVal.toString()
+                } else null
             } else null
 
             // 处理所有的maxParam参数，取最大值
             val maxMatches = maxPattern.findAll(result).toList()
             val maxValue: String? = if (maxMatches.isNotEmpty()) {
-                maxMatches.map { it.groupValues[2].toDouble() }.maxOrNull()?.toString()
+                val maxVal = maxMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
+                if (maxVal != null) {
+                    if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
+                } else null
             } else null
 
             if (minValue != null || maxValue != null) {
@@ -1411,13 +1423,19 @@ object SelectorConverter {
         // 处理所有的l参数，取最大值
         val lMatches = lPattern.findAll(result).toList()
         val lValue: String? = if (lMatches.isNotEmpty()) {
-            lMatches.map { it.groupValues[2].toDouble() }.maxOrNull()?.toString()
+            val maxVal = lMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
+            if (maxVal != null) {
+                if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
+            } else null
         } else null
 
         // 处理所有的lm参数，取最小值
         val lmMatches = lmPattern.findAll(result).toList()
         val lmValue: String? = if (lmMatches.isNotEmpty()) {
-            lmMatches.map { it.groupValues[2].toDouble() }.minOrNull()?.toString()
+            val minVal = lmMatches.map { it.groupValues[2].toDouble() }.minOrNull()
+            if (minVal != null) {
+                if (minVal % 1.0 == 0.0) minVal.toInt().toString() else minVal.toString()
+            } else null
         } else null
 
         if (lValue != null || lmValue != null) {
@@ -2950,5 +2968,151 @@ object SelectorConverter {
                 else -> slotNum
             }
         }
+    }
+    
+    /**
+     * JAVA/基岩混合模式转换
+     * 当输入的选择器同时包含Java版和基岩版特有参数时：
+     * - Java版输出：保留Java版特有参数，转换基岩版参数，然后合并
+     * - 基岩版输出：保留基岩版特有参数，转换Java版参数，然后合并
+     */
+    fun convertForMixedMode(
+        selector: String,
+        context: Context,
+        reminders: MutableList<String>
+    ): Pair<String, String> {
+        // 提取选择器变量和参数
+        if ('[' !in selector || ']' !in selector) {
+            // 没有参数，直接返回
+            return selector to selector
+        }
+        
+        val selectorVar = selector.substringBefore('[')
+        val paramsPart = selector.substringAfter('[').substringBeforeLast(']')
+        
+        // 分割参数
+        val params = mutableListOf<String>()
+        var currentParam = ""
+        var braceCount = 0
+        var inStringValue = false
+        var stringChar = '"'
+        
+        for (char in paramsPart) {
+            when {
+                !inStringValue && (char == '"' || char == '\'') -> {
+                    inStringValue = true
+                    stringChar = char
+                    currentParam += char
+                }
+                inStringValue && char == stringChar -> {
+                    inStringValue = false
+                    currentParam += char
+                }
+                !inStringValue && char == '{' -> {
+                    braceCount++
+                    currentParam += char
+                }
+                !inStringValue && char == '}' -> {
+                    braceCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 -> {
+                    if (currentParam.trim().isNotEmpty()) {
+                        params.add(currentParam.trim())
+                    }
+                    currentParam = ""
+                }
+                else -> {
+                    currentParam += char
+                }
+            }
+        }
+        
+        if (currentParam.trim().isNotEmpty()) {
+            params.add(currentParam.trim())
+        }
+        
+        // 分类参数：Java版特有、基岩版特有、通用
+        val javaParams = mutableListOf<String>()
+        val bedrockParams = mutableListOf<String>()
+        val commonParams = mutableListOf<String>()
+        
+        for (param in params) {
+            if ('=' in param) {
+                val paramName = param.split('=')[0].trim()
+                when {
+                    paramName in JAVA_SPECIFIC_PARAMS -> javaParams.add(param)
+                    paramName in BEDROCK_SPECIFIC_PARAMS -> bedrockParams.add(param)
+                    else -> commonParams.add(param)
+                }
+            } else {
+                commonParams.add(param)
+            }
+        }
+        
+        // 只有同时包含Java版和基岩版特有参数时，才进行混合模式转换
+        if (javaParams.isEmpty() || bedrockParams.isEmpty()) {
+            // 没有同时包含两版特有参数，返回原始选择器
+            return selector to selector
+        }
+        
+        // 构建Java版输出：保留Java版特有参数，转换基岩版参数，合并通用参数
+        val javaConvertedParams = javaParams.toMutableList()
+        
+        // 转换基岩版参数到Java版
+        val tempBedrockParamsPart = bedrockParams.joinToString(",")
+        val (javaConvertedBedrock, _, _) = filterSelectorParameters(
+            "a[$tempBedrockParamsPart]",
+            SelectorType.JAVA,
+            context
+        )
+        // 提取转换后的参数
+        if ('[' in javaConvertedBedrock && ']' in javaConvertedBedrock) {
+            val convertedParams = javaConvertedBedrock.substringAfter('[').substringBeforeLast(']')
+            if (convertedParams.isNotEmpty()) {
+                javaConvertedParams.addAll(convertedParams.split(',').map { it.trim() })
+            }
+        }
+        
+        // 添加通用参数
+        javaConvertedParams.addAll(commonParams)
+        
+        val javaOutput = if (javaConvertedParams.isNotEmpty()) {
+            "$selectorVar[${javaConvertedParams.joinToString(",")}]"
+        } else {
+            selectorVar
+        }
+        
+        // 构建基岩版输出：保留基岩版特有参数，转换Java版参数，合并通用参数
+        val bedrockConvertedParams = bedrockParams.toMutableList()
+        
+        // 转换Java版参数到基岩版
+        val tempJavaParamsPart = javaParams.joinToString(",")
+        val (bedrockConvertedJava, _, _) = filterSelectorParameters(
+            "a[$tempJavaParamsPart]",
+            SelectorType.BEDROCK,
+            context
+        )
+        // 提取转换后的参数
+        if ('[' in bedrockConvertedJava && ']' in bedrockConvertedJava) {
+            val convertedParams = bedrockConvertedJava.substringAfter('[').substringBeforeLast(']')
+            if (convertedParams.isNotEmpty()) {
+                bedrockConvertedParams.addAll(convertedParams.split(',').map { it.trim() })
+            }
+        }
+        
+        // 添加通用参数
+        bedrockConvertedParams.addAll(commonParams)
+        
+        val bedrockOutput = if (bedrockConvertedParams.isNotEmpty()) {
+            "$selectorVar[${bedrockConvertedParams.joinToString(",")}]"
+        } else {
+            selectorVar
+        }
+        
+        // 添加提醒信息
+        reminders.add(getStringSafely(context, R.string.java_bedrock_mixed_mode_active))
+        
+        return javaOutput to bedrockOutput
     }
 }
