@@ -32,8 +32,8 @@
     
     <!-- 警告和提示 -->
     <string name="conversion_warnings">轉換提醒</string>
-    <string name="mn_code_detected">偵測到§m§n代碼</string>
-    <string name="mn_code_dialog_message">偵測到§m§n代碼，請選擇處理方式：
+    <string name="mn_code_detected">找到§m§n代碼</string>
+    <string name="mn_code_dialog_message">找到§m§n代碼，選處理方式：
 
 1. Java版用字體，基岩版用顏色代碼
 2. 兩版都用顏色代碼</string>
@@ -53,6 +53,9 @@
     <string name="mn_cf_enabled_description">用§m_f/§m_c/§n_f/§n_c指定處理方式</string>
     <string name="mn_handling_method">選擇§m（刪除線）和§n（底線）的處理方式：</string>
     <string name="remember_choice">記住選擇</string>
+    <string name="java_bedrock_mixed_mode">JAVA/基岩混合</string>
+    <string name="java_bedrock_mixed_mode_description">輸入有兩版特有參數時，保留各自的參數並改其他參數</string>
+    <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式開啟：找到兩版特有參數，自動轉換</string>
     
     <!-- 顏色代碼 -->
     <string name="color_black">黑色</string>
@@ -83,18 +86,18 @@
     <!-- 說明介面 -->
     <string name="help_title">說明</string>
     <string name="help_about">關於</string>
-    <string name="help_about_content">Tellraw指令產生器協助玩家產生tellraw指令。\n\n支援Java版和基岩版的選擇器轉換和文字格式化。</string>
+    <string name="help_about_content">Tellraw指令產生器幫玩家產生tellraw指令。\n\n支援Java版和基岩版的選擇器轉換和文字格式化。</string>
     <string name="help_selector_input">選擇器輸入</string>
-    <string name="help_selector_content">選擇器指定指令目標：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 隨機玩家\n• @e - 所有實體\n• @s - 指令執行者\n\n支援參數過濾：\n• @a[gamemode=survival] - 生存模式玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格內最近的玩家</string>
+    <string name="help_selector_content">選擇器選目標：\n\n• @a - 所有玩家\n• @p - 最近的玩家\n• @r - 隨機玩家\n• @e - 所有實體\n• @s - 指令執行者\n\n可用參數過濾：\n• @a[gamemode=survival] - 生存模式玩家\n• @e[type=cow] - 所有牛\n• @p[distance=..10] - 10格內最近的玩家</string>
     <string name="help_text_formatting">文字格式化</string>
     <string name="help_text_formatting_content">支援Minecraft顏色和格式代碼：\n\n顏色：\n• §0 黑色    §1 深藍   §2 深綠\n• §3 深青   §4 深紅   §5 深紫\n• §6 金色    §7 灰色   §8 深灰\n• §9 藍色    §a 綠色   §b 青色\n• §c 紅色    §d 粉色   §e 黃色\n• §f 白色\n\n格式：\n• §l 粗體    §m 刪除線 §n 底線\n• §o 斜體    §k 混亂   §r 重設</string>
     <string name="help_mixed_mode">混合模式</string>
     <string name="help_mixed_mode_content">混合模式允許為每個§m/§n代碼單獨選擇處理方式：\n\n方式一（推薦）：\n• Java版：使用字體方式（刪除線/底線）\n• 基岩版：使用顏色代碼方式（深紅色/紅色）\n\n方式二：\n• Java版：使用顏色代碼方式（深紅色/紅色）\n• 基岩版：使用顏色代碼方式（深紅色/紅色）\n\n注意：混合模式下，輸入框顯示原始§m/§n代碼，後台自動轉換為§m_f/§n_f（字體方式）或§m_c/§n_c（顏色方式）。</string>
     <string name="help_version_differences">版本差異</string>
     <string name="help_version_differences_content">Java版和基岩版在選擇器和格式化上有差異：\n\n選擇器：\n• Java版用distance，基岩版用r/rm\n• Java版用gamemode，基岩版用m\n• Java版支援nbt，基岩版支援hasitem\n\n格式化：\n• §m§n代碼處理方式不同\n• 某些顏色代碼在基岩版有特殊含義</string>
-    <string name="java_nbt_param_not_supported">警告：Java版nbt參數在基岩版不支援，已嘗試轉換為hasitem，失敗則移除</string>
-    <string name="hasitem_converted">hasitem已轉換為nbt格式，可能無法完全保留原意</string>
-    <string name="hasitem_conversion_failed">hasitem轉換失敗，保留原參數</string>
+    <string name="java_nbt_param_not_supported">警告：Java版nbt參數基岩版不支援，試過改成hasitem，失敗就移除</string>
+    <string name="hasitem_converted">hasitem改成nbt格式，可能不完全保留原意</string>
+    <string name="hasitem_conversion_failed">hasitem改不動，保留原參數</string>
     <string name="nbt_converted">nbt已轉換為hasitem格式，可能無法完全保留原意</string>
     <string name="hasitem_location_not_supported">警告：基岩版location=%s在Java版無對應功能，已移除</string>
     <string name="hasitem_quantity_min_only">注意：quantity=%1$s.. 已轉換為 %2$sb</string>
@@ -107,8 +110,8 @@
     <string name="help_usage_tips">使用提示</string>
     <string name="help_usage_tips_content">1. 輸入選擇器和訊息\n2. 自動偵測選擇器類型\n3. 產生Java版和基岩版指令\n4. 複製或分享指令\n5. 選擇器參數轉換需人工檢查\n\n遇到§m§n代碼時：\n• 字體方式：Java版保持原樣，基岩版用顏色代碼\n• 顏色代碼方式：兩版都用顏色代碼</string>
     <string name="help_history_storage">歷史記錄儲存</string>
-    <string name="help_history_storage_content">歷史記錄預設儲存在應用程式沙盒中，也可選擇自訂目錄。\n\n儲存格式：\n• 時間\n• 輸入內容\n• Java版輸出\n• 基岩版輸出\n\n注意事項：\n• 歷史記錄按時間從新到舊顯示\n• 轉移儲存位置後，舊位置的歷史記錄需要手動查看\n• 清除歷史記錄僅刪除應用程式產生的記錄，不影響原有內容\n• 如果自訂檔案不存在，會自動使用應用程式沙盒</string>
-    <string name="help_conversion_warning">選擇器參數轉換需人工檢查</string>
+    <string name="help_history_storage_content">歷史記錄預設存在應用程式沙盒，也可以選自訂目錄。\n\n儲存格式：\n• 時間\n• 輸入\n• Java版輸出\n• 基岩版輸出\n\n注意：\n• 歷史記錄按時間新到舊顯示\n• 改儲存位置後，舊記錄要自己看舊檔案\n• 清除歷史記錄只刪應用程式產生的，不影響原有內容\n• 如果自訂檔案不存在，自動用應用程式沙盒</string>
+    <string name="help_conversion_warning">選擇器參數要自己檢查</string>
     
     <!-- 通用 -->
     <string name="ok">確定</string>
@@ -149,21 +152,21 @@
     <string name="append_to_file">附加到檔案</string>
     <string name="file_exists_message">檔案 &quot;%s&quot; 已存在。\n\n是否附加歷史記錄？\n\n選擇&quot;否&quot;需自訂新檔名。</string>
     <string name="create_file_failed">建立失敗</string>
-    <string name="create_file_failed_permission">建立失敗：請授予所有檔案存取權限</string>
-    <string name="create_file_failed_directory_not_supported">建立失敗：選擇的目錄不支援建立檔案，請選擇其他目錄</string>
-    <string name="create_file_failed_invalid_uri">建立失敗：無效的目錄路徑，請透過系統檔案管理器選擇目錄</string>
+    <string name="create_file_failed_permission">建立失敗：請給檔案存取權限</string>
+    <string name="create_file_failed_directory_not_supported">建立失敗：這個目錄不能建檔案，選別的目錄</string>
+    <string name="create_file_failed_invalid_uri">建立失敗：無效路徑，用系統檔案管理器選目錄</string>
     <string name="grant_all_files_access">授予權限</string>
     <string name="append_file_failed">附加失敗</string>
     <string name="write_success">成功寫入 %d 筆記錄</string>
     <string name="append_success">成功附加 %d 筆記錄</string>
     <string name="file_not_found">檔案不存在</string>
-    <string name="please_set_directory">請先設定儲存目錄</string>
+    <string name="please_set_directory">先設定儲存目錄</string>
     <string name="permission_denied">權限被拒絕</string>
-    <string name="clear_settings_confirm">確定清除儲存設定嗎？</string>
+    <string name="clear_settings_confirm">確定清除儲存設定？</string>
     <string name="sandbox_storage_hint">未選擇目錄時儲存在應用程式沙盒中</string>
     <string name="success">成功</string>
     <string name="parent_directory">上層目錄</string>
-    <string name="filename_placeholder">請輸入檔名</string>
+    <string name="filename_placeholder">輸入檔名</string>
     <string name="selected_directory">已選中：%s</string>
     
     <!-- TextFormatter 錯誤和警告 -->
@@ -194,8 +197,8 @@
     <string name="server_error">伺服器錯誤: %s</string>
     
     <!-- SelectorConverter 轉換提醒 -->
-    <string name="bedrock_selector_converted">基岩版選擇器 %1$s 在Java版不支援，已轉換為 %2$s</string>
-    <string name="bedrock_scores_negation_removed">基岩版scores反選參數%s在Java版不支援，已移除</string>
+    <string name="bedrock_selector_converted">基岩版選擇器 %1$s Java版不支援，改成 %2$s</string>
+    <string name="bedrock_scores_negation_removed">基岩版scores反選參數%s Java版不支援，已移除</string>
     <string name="java_sort_nearest_converted">Java版sort=nearest已轉換為基岩版c=%s</string>
     <string name="java_sort_furthest_converted">Java版sort=furthest已轉換為基岩版c=%s</string>
     <string name="java_sort_furthest_converted_all">Java版sort=furthest已轉換為基岩版c=-9999。注意：sort=furthest是按順序從遠到近的全部，c=-9999是按順序從遠到近的最近9999個實體</string>
@@ -206,8 +209,8 @@
     <string name="java_limit_converted">Java版limit=%1$s已轉換為基岩版c=%2$s</string>
     <string name="limit_description">limit限制數量，c由近到遠</string>
     <string name="bedrock_param_not_supported">警告：基岩版%s參數在Java版不支援，已移除</string>
-    <string name="bedrock_param_no_equivalent">警告：基岩版%s參數在Java版無對應功能，已移除</string>
-    <string name="bedrock_family_param_not_supported">警告：基岩版%s參數在Java版無對應功能，已移除。建議用type參數指定實體類型</string>
+    <string name="bedrock_param_no_equivalent">警告：基岩版%s參數Java版沒對應功能，已移除</string>
+    <string name="bedrock_family_param_not_supported">警告：基岩版%s參數Java版沒對應功能，已移除。建議用type參數指定實體類型</string>
     <string name="java_team_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無隊伍系統</string>
     <string name="java_predicate_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無謂詞系統</string>
     <string name="java_advancements_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無進度系統</string>
@@ -244,8 +247,8 @@
     <string name="bedrock_lm_converted">基岩版lm=%1$s已轉換為Java版level=%2$s</string>
     <string name="bedrock_l_converted">基岩版l=%1$s已轉換為Java版level=%2$s</string>
     <string name="java_level_to_bedrock">Java版level=%1$s已轉換為基岩版%2$s</string>
-    <string name="bedrock_negation_default_converted">基岩版反選預設模式(m=!)在Java版不支援，已轉換為反選生存模式</string>
-    <string name="bedrock_default_converted">基岩版預設模式(m=%1$s)在Java版不支援，已轉換為生存模式</string>
+    <string name="bedrock_negation_default_converted">基岩版反選預設模式(m=!) Java版不支援，改成反選生存模式</string>
+    <string name="bedrock_default_converted">基岩版預設模式(m=%1$s) Java版不支援，改成生存模式</string>
     <string name="java_level_in_scores_converted">Java版level=%1$s已轉換為基岩版lm=%2$s,l=%3$s</string>
     <string name="bedrock_c_negative_converted">基岩版c=%1$s已轉換為Java版limit=%2$s,sort=furthest</string>
     <string name="bedrock_c_converted">基岩版c=%1$s已轉換為Java版limit=%2$s,sort=nearest</string>
@@ -299,11 +302,11 @@
     <string name="code_option_2_description">方式二：兩版都用顏色代碼</string>
     
     <!-- 檔名輸入對話框 -->
-    <string name="enter_filename">輸入歷史記錄檔名：</string>
+    <string name="enter_filename">輸入歷史記錄檔名</string>
     
     <!-- 代碼對話框 -->
-    <string name="detected_code">偵測到%s代碼</string>
-    <string name="code_dialog_message">偵測到%s格式代碼，選擇處理方式：\n\n1. 字體方式\n2. 顏色代碼方式</string>
+    <string name="detected_code">找到%s代碼</string>
+    <string name="code_dialog_message">找到%s格式代碼，選處理方式：\n\n1. 字體方式\n2. 顏色代碼方式</string>
     <string name="code_dialog_message_mixed">偵測到%s格式代碼，選擇處理方式：\n\n1. 字體方式\n2. 顏色代碼方式</string>
     <string name="code_dialog_message_full">偵測到%s格式代碼，選擇處理方式：\n\n1. Java版用字體，基岩版用顏色代碼\n2. 兩版都用顏色代碼</string>
     <string name="code_option_1">方式1</string>
@@ -315,12 +318,12 @@
     <!-- 更新對話框 -->
     <string name="new_version_found">發現新版本</string>
     <string name="new_version">新版本: %s</string>
-    <string name="version_number">版本號: %s</string>
-    <string name="release_date">發布日期: %s</string>
-    <string name="download_url">下載網址:</string>
-    <string name="update_notes">更新說明:</string>
+    <string name="version_number">版本: %s</string>
+    <string name="release_date">日期: %s</string>
+    <string name="download_url">下載:</string>
+    <string name="update_notes">更新內容:</string>
     <string name="open">開啟</string>
-    <string name="remind_later">稍後提醒</string>
+    <string name="remind_later">之後提醒</string>
     
     <!-- 停用檢查對話框 -->
     <string name="disable_version_check">停用版本檢查</string>
@@ -332,8 +335,8 @@
     <string name="java_edition_short">Java</string>
     <string name="filter_java_edition">Java版</string>
     <string name="filter_bedrock_edition">基岩版</string>
-    <string name="filter_param_converted">參數已轉換為</string>
-    <string name="filter_converted">已轉換為</string>
+    <string name="filter_param_converted">參數改成</string>
+    <string name="filter_converted">改成</string>
     
     <!-- §m§n代碼轉換警告 -->
     <string name="bedrock_font_to_color_warning">在基岩版中，§m_f/§n_f將被轉換為顏色代碼（§m/§n），而非字體格式（刪除線/底線）</string>

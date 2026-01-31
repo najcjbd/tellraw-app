@@ -50,6 +50,9 @@
     <string name="mn_cf_enabled_description">Use §m_f/§m_c/§n_f/§n_c to choose style</string>
     <string name="mn_handling_method">Choose how to use §m (strikethrough) and §n (underline) codes:</string>
     <string name="remember_choice">Remember choice</string>
+    <string name="java_bedrock_mixed_mode">Java/Bedrock Mixed</string>
+    <string name="java_bedrock_mixed_mode_description">When input has version params, keep each version\'s params and convert the rest</string>
+    <string name="java_bedrock_mixed_mode_active">Java/Bedrock mixed mode on: found version params, auto-converted</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>
@@ -82,27 +85,27 @@
     <string name="help_about">About</string>
     <string name="help_about_content">Tellraw Generator helps create tellraw commands.\n\nSupports Java and Bedrock selector conversion and text formatting.</string>
     <string name="help_selector_input">Selectors</string>
-    <string name="help_selector_content">Selectors pick targets:\n\n• @a - All players\n• @p - Nearest player\n• @r - Random player\n• @e - All entities\n• @s - Command sender\n\nUse filters like:\n• @a[gamemode=survival] - All survival players\n• @e[type=cow] - All cows\n• @p[distance=..10] - Nearest player in 10 blocks</string>
+    <string name="help_selector_content">Selectors choose targets:\n\n• @a - All players\n• @p - Nearest player\n• @r - Random player\n• @e - All entities\n• @s - Command sender\n\nUse filters like:\n• @a[gamemode=survival] - All survival players\n• @e[type=cow] - All cows\n• @p[distance=..10] - Nearest player in 10 blocks</string>
     <string name="help_text_formatting">Text Colors</string>
     <string name="help_text_formatting_content">Use Minecraft color and format codes:\n\nColors:\n• §0 Black    §1 Dark Blue   §2 Dark Green\n• §3 Dark Aqua §4 Dark Red    §5 Dark Purple\n• §6 Gold     §7 Gray        §8 Dark Gray\n• §9 Blue     §a Green       §b Aqua\n• §c Red      §d Light Purple §e Yellow\n• §f White\n\nFormats:\n• §l Bold     §m Strike      §n Underline\n• §o Italic   §k Random      §r Reset</string>
     <string name="help_mixed_mode">Mixed Mode</string>
     <string name="help_mixed_mode_content">Mixed mode allows choosing how to handle each §m/§n code individually:\n\nOption 1 (Recommended):\n• Java: Use font style (strikethrough/underline)\n• Bedrock: Use color codes (dark red/red)\n\nOption 2:\n• Java: Use color codes (dark red/red)\n• Bedrock: Use color codes (dark red/red)\n\nNote: In mixed mode, the input shows original §m/§n codes, and the backend automatically converts them to §m_f/§n_f (font style) or §m_c/§n_c (color style).</string>
     <string name="help_version_differences">Version Differences</string>
     <string name="help_version_differences_content">Java and Bedrock use different selectors:\n\n• Java: distance, Bedrock: r/rm\n• Java: gamemode, Bedrock: m\n• Java: nbt, Bedrock: hasitem\n\nText formats:\n• §m§n codes work differently\n• Some colors mean different things in Bedrock</string>
-    <string name="java_nbt_param_not_supported">Warning: Java nbt not supported in Bedrock, attempted conversion to hasitem, removed if failed</string>
-    <string name="hasitem_converted">hasitem converted to nbt format, may not fully retain meaning</string>
-    <string name="hasitem_conversion_failed">hasitem conversion failed, keeping original</string>    <string name="nbt_converted">nbt converted to hasitem format, may not fully retain meaning</string>
+    <string name="java_nbt_param_not_supported">Warning: Java nbt not supported in Bedrock, tried to change to hasitem, removed if failed</string>
+    <string name="hasitem_converted">hasitem changed to nbt format, may lose some meaning</string>
+    <string name="hasitem_conversion_failed">hasitem change failed, kept original</string>    <string name="nbt_converted">nbt changed to hasitem format, may lose some meaning</string>
     <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
     <string name="hasitem_quantity_min_only">Note: quantity=%1$s.. converted to %2$sb</string>
-    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s converted to %3$s (middle value)</string>
-    <string name="hasitem_quantity_negation_not_supported">Warning: quantity negation (!) not supported in Java, removed</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s changed to %3$s (middle value)</string>
+    <string name="hasitem_quantity_negation_not_supported">Warning: quantity (!) not supported in Java, removed</string>
     <string name="hasitem_slot_min_only">Note: slot=%s..</string>
     <string name="hasitem_slot_max_only">Note: slot=..%s</string>
-    <string name="hasitem_slot_negation_not_supported">Warning: slot negation (!) not supported in Java, removed</string>
+    <string name="hasitem_slot_negation_not_supported">Warning: slot (!) not supported in Java, removed</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
     <string name="help_history_storage">History Storage</string>
-    <string name="help_history_storage_content">History is saved in app sandbox by default, but you can choose a custom folder.\n\nStorage format:\n• Time\n• Input content\n• Java output\n• Bedrock output\n\nNotes:\n• History is displayed newest to oldest\n• After changing storage location, old history must be viewed manually in the original file\n• Clearing history only removes app-generated records, preserving original content\n• If custom file doesn\'t exist, app sandbox is used automatically</string>
+    <string name="help_history_storage_content">History saves to app sandbox by default, or you can pick a custom folder.\n\nStorage format:\n• Time\n• Input\n• Java output\n• Bedrock output\n\nNotes:\n• History shows newest first\n• After changing location, check old file for old history\n• Clearing history only removes app records, keeps original content\n• If custom file doesn\'t exist, uses app sandbox</string>
     <string name="help_conversion_warning">Check converted commands manually.</string>
     
     <!-- Common -->
@@ -144,9 +147,9 @@
     <string name="append_to_file">Append to file</string>
     <string name="file_exists_message">File "%s" already exists.\n\nAppend history to this file?\n\nChoose "No" to enter a new file name.</string>
     <string name="create_file_failed">Failed to create file</string>
-    <string name="create_file_failed_permission">Failed to create: Please grant all files access permission</string>
-    <string name="create_file_failed_directory_not_supported">Failed to create: The selected directory does not support file creation, please select another directory</string>
-    <string name="create_file_failed_invalid_uri">Failed to create: Invalid directory path, please select directory through system file manager</string>
+    <string name="create_file_failed_permission">Failed to create: Please allow file access</string>
+    <string name="create_file_failed_directory_not_supported">Failed to create: This folder doesn\'t support files, pick another one</string>
+    <string name="create_file_failed_invalid_uri">Failed to create: Invalid path, pick folder through file manager</string>
     <string name="grant_all_files_access">Grant permission</string>
     <string name="append_file_failed">Failed to append</string>
     <string name="write_success">Wrote %d records</string>
@@ -201,8 +204,8 @@
     <string name="java_limit_converted">Java limit=%1$s converted to Bedrock c=%2$s</string>
     <string name="limit_description">limit limits count, c sorts by distance</string>
     <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
-    <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no equivalent in Java, removed</string>
-    <string name="bedrock_family_param_not_supported">Warning: Bedrock %s has no equivalent in Java, removed. Use type parameter instead</string>
+    <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no match in Java, removed</string>
+    <string name="bedrock_family_param_not_supported">Warning: Bedrock %s has no match in Java, removed. Use type param instead</string>
     <string name="java_team_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no team system</string>
     <string name="java_predicate_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no predicate system</string>
     <string name="java_advancements_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no advancement system</string>
@@ -223,8 +226,8 @@
     <string name="java_level_to_lm">Java level=%1$s converted to Bedrock lm=%2$s</string>
     <string name="java_level_to_l">Java level=%1$s converted to Bedrock l=%2$s</string>
     <string name="java_level_exact">Java level=%1$s converted to Bedrock lm=%2$s,l=%3$s</string>
-    <string name="java_negation_spectator_converted">Java negation spectator mode (gamemode=!) not supported in Bedrock, converted to negation survival</string>
-    <string name="java_spectator_converted">Java spectator mode (gamemode=%1$s) not supported in Bedrock, converted to survival</string>
+    <string name="java_negation_spectator_converted">Java !spectator mode (gamemode=!) not supported in Bedrock, changed to !survival</string>
+    <string name="java_spectator_converted">Java spectator mode (gamemode=%1$s) not supported in Bedrock, changed to survival</string>
     <string name="java_gamemode_converted">Java gamemode=%1$s converted to Bedrock m=%2$s</string>
     <string name="bedrock_rm_r_converted">Bedrock rm=%1$s,r=%2$s converted to Java distance=%3$s</string>
     <string name="bedrock_rm_converted">Bedrock rm=%1$s converted to Java distance=%2$s</string>
@@ -240,8 +243,8 @@
     <string name="bedrock_lm_converted">Bedrock lm=%1$s converted to Java level=%2$s</string>
     <string name="bedrock_l_converted">Bedrock l=%1$s converted to Java level=%2$s</string>
     <string name="java_level_to_bedrock">Java level=%1$s converted to Bedrock %2$s</string>
-    <string name="bedrock_negation_default_converted">Bedrock negation default mode (m=!) not supported in Java, converted to negation survival</string>
-    <string name="bedrock_default_converted">Bedrock default mode (m=%1$s) not supported in Java, converted to survival</string>
+    <string name="bedrock_negation_default_converted">Bedrock !default mode (m=!) not supported in Java, changed to !survival</string>
+    <string name="bedrock_default_converted">Bedrock default mode (m=%1$s) not supported in Java, changed to survival</string>
     <string name="java_level_in_scores_converted">Java level=%1$s converted to Bedrock lm=%2$s,l=%3$s</string>
     <string name="bedrock_c_negative_converted">Bedrock c=%1$s converted to Java limit=%2$s,sort=furthest</string>
     <string name="bedrock_c_converted">Bedrock c=%1$s converted to Java limit=%2$s,sort=nearest</string>
