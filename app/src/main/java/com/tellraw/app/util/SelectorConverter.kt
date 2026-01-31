@@ -960,28 +960,6 @@ object SelectorConverter {
         
         return result
     }
-                } else {
-                    // 无效格式
-                    match.value
-                }
-            } else {
-                // 单个值：90 -> rym=90,ry=90（精确匹配）
-                conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_exact, rotationValue, rotationValue, rotationValue))
-                "rym=$rotationValue,ry=$rotationValue"
-            }
-        }
-        
-        // 恢复scores参数
-        for ((placeholder, original) in scoresMatches) {
-            result = result.replace(placeholder, original)
-        }
-        
-        // 清理多余的逗号和空括号
-        result = result.replace(",,", ",")
-        result = result.replace(",\\]".toRegex(), "]")
-        
-        return result
-    }
     
     /**
      * 将Java版的level参数转换为基岩版的l/lm参数
