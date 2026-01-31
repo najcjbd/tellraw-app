@@ -2057,30 +2057,33 @@ object SelectorConverter {
 
         if (arrayMatch != null) {
             val startIndex = arrayMatch.range.first
-            // 找到匹配的 hasitem 数组的完整内容
-            val arrayContent = extractArrayContent(result.substring(startIndex))
+            // 找到'['的位置，从那里开始提取数组内容
+            val bracketIndex = result.indexOf('[', startIndex)
+            if (bracketIndex >= 0) {
+                val arrayContent = extractArrayContent(result.substring(bracketIndex))
 
-            if (arrayContent != null) {
-                // 直接使用原始字符串中的完整匹配，而不是重新构建
-                val fullMatch = result.substring(startIndex, startIndex + 9 + arrayContent.length + 1)
-                val nbtResult = parseHasitemArray(arrayContent, reminders, context)
+                if (arrayContent != null) {
+                    // 直接使用原始字符串中的完整匹配，而不是重新构建
+                    val fullMatch = result.substring(startIndex, bracketIndex + arrayContent.length + 1)
+                    val nbtResult = parseHasitemArray(arrayContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
-                    // 精确替换
-                    val index = result.indexOf(fullMatch)
-                    if (index >= 0) {
-                        result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
-                    }
-                } else {
-                    // 空数组或转换失败，移除整个 hasitem 参数
-                    val index = result.indexOf(fullMatch)
-                    if (index >= 0) {
-                        val replacement = when {
-                            index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
-                            index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
-                            else -> result.substring(0, index) + result.substring(index + fullMatch.length)
+                        // 精确替换
+                        val index = result.indexOf(fullMatch)
+                        if (index >= 0) {
+                            result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
                         }
-                        result = replacement
+                    } else {
+                        // 空数组或转换失败，移除整个 hasitem 参数
+                        val index = result.indexOf(fullMatch)
+                        if (index >= 0) {
+                            val replacement = when {
+                                index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                                index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                                else -> result.substring(0, index) + result.substring(index + fullMatch.length)
+                            }
+                            result = replacement
+                        }
                     }
                 }
             }
@@ -2093,30 +2096,33 @@ object SelectorConverter {
 
         if (simpleMatch != null) {
             val startIndex = simpleMatch.range.first
-            // 找到匹配的 hasitem 对象的完整内容
-            val objectContent = extractObjectContent(result.substring(startIndex))
+            // 找到'{'的位置，从那里开始提取对象内容
+            val braceIndex = result.indexOf('{', startIndex)
+            if (braceIndex >= 0) {
+                val objectContent = extractObjectContent(result.substring(braceIndex))
 
-            if (objectContent != null) {
-                // 直接使用原始字符串中的完整匹配，而不是重新构建
-                val fullMatch = result.substring(startIndex, startIndex + 9 + objectContent.length + 1)
-                val nbtResult = parseHasitemSingle(objectContent, reminders, context)
+                if (objectContent != null) {
+                    // 直接使用原始字符串中的完整匹配，而不是重新构建
+                    val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 1)
+                    val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
-                    // 精确替换
-                    val index = result.indexOf(fullMatch)
-                    if (index >= 0) {
-                        result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
-                    }
-                } else {
-                    // 无效参数或转换失败，移除整个 hasitem 参数
-                    val index = result.indexOf(fullMatch)
-                    if (index >= 0) {
-                        val replacement = when {
-                            index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
-                            index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
-                            else -> result.substring(0, index) + result.substring(index + fullMatch.length)
+                        // 精确替换
+                        val index = result.indexOf(fullMatch)
+                        if (index >= 0) {
+                            result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
                         }
-                        result = replacement
+                    } else {
+                        // 无效参数或转换失败，移除整个 hasitem 参数
+                        val index = result.indexOf(fullMatch)
+                        if (index >= 0) {
+                            val replacement = when {
+                                index > 0 && result[index - 1] == ',' -> result.substring(0, index - 1) + result.substring(index + fullMatch.length)
+                                index + fullMatch.length < result.length && result[index + fullMatch.length] == ',' -> result.substring(0, index) + result.substring(index + fullMatch.length + 1)
+                                else -> result.substring(0, index) + result.substring(index + fullMatch.length)
+                            }
+                            result = replacement
+                        }
                     }
                 }
             }
@@ -3223,15 +3229,15 @@ object SelectorConverter {
                 }
             }
             ".." in slot -> {
-                // 0..8 取所有值
+                // 3..5 取中间值4
                 val parts = slot.split("..")
                 if (parts.size == 2) {
                     val min = parts[0].toIntOrNull()
                     val max = parts[1].toIntOrNull()
                     if (min != null && max != null) {
-                        for (i in min..max) {
-                            slotNumbers.add(i)
-                        }
+                        val midValue = ((min + max) / 2.0).roundToInt()
+                        slotNumbers.add(midValue)
+                        reminders.add(getStringSafely(context, R.string.hasitem_slot_range, min, max, midValue))
                     }
                 }
             }
