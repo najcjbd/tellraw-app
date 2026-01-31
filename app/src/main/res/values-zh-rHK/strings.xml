@@ -154,6 +154,7 @@
     <string name="append_to_file">附加到檔案</string>
     <string name="file_exists_message">檔案 "%s" 已存在。\n\n是否附加歷史紀錄？\n\n選擇"否"需自訂新檔名。</string>
     <string name="create_file_failed">建立檔案失敗，將使用應用程式沙盒儲存</string>
+    <string name="file_create_failed">建立檔案失敗，將使用應用程式沙盒儲存</string>
     <string name="create_file_failed_permission">建立失敗：請給檔案存取權限</string>
     <string name="create_file_failed_directory_not_supported">建立失敗：這個目錄不能建檔案，選別的目錄</string>
     <string name="file_created_successfully">成功使用該目錄，檔案已建立</string>

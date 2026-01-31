@@ -149,6 +149,7 @@
     <string name="append_to_file">Append to file</string>
     <string name="file_exists_message">File "%s" already exists.\n\nAppend history to this file?\n\nChoose "No" to enter a new file name.</string>
     <string name="create_file_failed">Failed to create file, will use app sandbox storage</string>
+    <string name="file_create_failed">Failed to create file, will use app sandbox storage</string>
     <string name="create_file_failed_permission">Failed to create: Please allow file access</string>
     <string name="create_file_failed_directory_not_supported">Failed to create: This folder doesn\'t support files, pick another one</string>
     <string name="file_created_successfully">Successfully using this directory, file created</string>
