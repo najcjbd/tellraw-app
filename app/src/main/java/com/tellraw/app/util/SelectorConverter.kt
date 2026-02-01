@@ -353,6 +353,7 @@ object SelectorConverter {
         paramsPart = mergeDuplicateParameters(paramsPart)
 
         // 处理 scores 参数的反选（基岩版特有功能）
+        // 注意：必须在 mergeDuplicateParameters 之后处理，因为mergeDuplicateParameters可能改变了参数格式
         if (targetVersion == SelectorType.JAVA && "scores=" in paramsPart) {
             // 查找所有scores参数并检查是否包含反选
             val scoresPattern = "scores=\\{".toRegex()
@@ -415,6 +416,11 @@ object SelectorConverter {
             paramsPart = paramsPart.replace(",\\]".toRegex(), "]")
             paramsPart = paramsPart.replace("\\[,".toRegex(), "[")
         }
+
+        // 第一次参数合并：在参数转换之前合并输入的重复参数
+        // 这样可以减少需要转换的参数数量
+        // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
+        paramsPart = mergeDuplicateParameters(paramsPart)
 
         // 处理hasitem到nbt的转换（基岩版到Java版）
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
