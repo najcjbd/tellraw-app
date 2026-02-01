@@ -32,18 +32,40 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
-    - name: Run unit tests
-      run: ./gradlew test
+    - name: Run unit tests with detailed output
+      run: ./gradlew test --info --stacktrace
       
     - name: Run lint
-      run: ./gradlew lint
+      run: ./gradlew lint --info
       
-    - name: Upload test results
+    - name: Prepare test results
+      if: always()
+      run: |
+        mkdir -p test-result
+        cp -r app/build/test-results/ test-result/ 2>/dev/null || true
+        cp -r app/build/reports/tests/ test-result/ 2>/dev/null || true
+        cp -r app/build/reports/lint-results* test-result/ 2>/dev/null || true
+        cp -r app/build/test-results/testDebugUnitTest/ test-result/ 2>/dev/null || true
+        cp -r app/build/outputs/androidTest-results/ test-result/ 2>/dev/null || true
+        cd test-result
+        find . -type f -name "*.xml" -o -name "*.html" | head -50
+        
+    - name: Upload test results as ZIP
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results
-        path: app/build/reports/tests/
+        name: test-result
+        path: test-result/
+        
+    - name: Generate test result summary
+      if: always()
+      run: |
+        echo "## 测试结果摘要" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- 测试XML结果: \`app/build/test-results/\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 测试HTML报告: \`app/build/reports/tests/\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Lint报告: \`app/build/reports/lint-results.html\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 下载完整test-result.zip查看详细信息" >> $GITHUB_STEP_SUMMARY
 
   build:
     needs: test
