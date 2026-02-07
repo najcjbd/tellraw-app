@@ -417,11 +417,6 @@ object SelectorConverter {
             paramsPart = paramsPart.replace("\\[,".toRegex(), "[")
         }
 
-        // 第一次参数合并：在参数转换之前合并输入的重复参数
-        // 这样可以减少需要转换的参数数量
-        // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
-        paramsPart = mergeDuplicateParameters(paramsPart)
-
         // 处理hasitem到nbt的转换（基岩版到Java版）
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
             val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
