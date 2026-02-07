@@ -365,7 +365,7 @@ object SelectorConverter {
                 // 提取完整的scores内容
                 val scoresContent = extractBraceContent(paramsPart.substring(startIndex + 7))
                 if (scoresContent != null) {
-                    val fullMatch = "scores={$scoresContent}"
+                    val fullMatch = "scores=" + scoresContent
                     scoresToProcess.add(Pair(startIndex, fullMatch))
                 }
                 match = scoresPattern.find(paramsPart, startIndex + 1)
@@ -1742,23 +1742,43 @@ object SelectorConverter {
         var searchStart = 0
 
         while (searchStart < result.length) {
-            // 查找下一个 paramName={
-            val paramIndex = result.indexOf("$paramName={", searchStart)
+            // 查找下一个 paramName=（支持数组格式 hasitem=[{...}] 和对象格式 hasitem={{...}}）
+            val paramIndex = result.indexOf("$paramName=", searchStart)
             if (paramIndex == -1) break
 
-            // 从第一个{开始提取完整的nbt/hasitem内容
-            val braceContent = extractBraceContent(result.substring(paramIndex + paramName.length + 1))
+            // 检查后面是否是=后跟{或[
+            val afterEqualsIndex = paramIndex + paramName.length + 1
+            if (afterEqualsIndex >= result.length) break
 
-            if (braceContent != null) {
-                val fullMatch = "$paramName=" + braceContent
-                val placeholder = "__${paramName.uppercase()}_${matches.size}__"
-                matches.add(Pair(placeholder, fullMatch))
-                result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
-                // 从占位符位置继续搜索
-                searchStart = paramIndex + placeholder.length
+            val nextChar = result[afterEqualsIndex]
+            
+            if (nextChar == '{') {
+                // 对象格式：paramName={{...}}
+                val braceContent = extractBraceContent(result.substring(afterEqualsIndex))
+                if (braceContent != null) {
+                    val fullMatch = "$paramName=" + braceContent
+                    val placeholder = "__${paramName.uppercase()}_${matches.size}__"
+                    matches.add(Pair(placeholder, fullMatch))
+                    result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
+                    searchStart = paramIndex + placeholder.length
+                } else {
+                    searchStart = paramIndex + 1
+                }
+            } else if (nextChar == '[') {
+                // 数组格式：paramName=[{...}]
+                val bracketContent = extractArrayContent(result.substring(afterEqualsIndex))
+                if (bracketContent != null) {
+                    val fullMatch = "$paramName=[" + bracketContent + "]"
+                    val placeholder = "__${paramName.uppercase()}_${matches.size}__"
+                    matches.add(Pair(placeholder, fullMatch))
+                    result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
+                    searchStart = paramIndex + placeholder.length
+                } else {
+                    searchStart = paramIndex + 1
+                }
             } else {
-                // 提取失败，跳过这个位置
-                searchStart = paramIndex + 1
+                // 不是 { 或 [，跳过
+                searchStart = afterEqualsIndex
             }
         }
 
