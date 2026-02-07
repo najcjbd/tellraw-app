@@ -1715,7 +1715,7 @@ object SelectorConverter {
             return newParam
         }
         
-        // 清理参数
+        // 清理参数，但保留占位符（如 __SCORES_0__）
         var cleanParams = paramsPart
         cleanParams = cleanParams.replace(",,", ",")
         cleanParams = cleanParams.replace("^,".toRegex(), "")
@@ -1751,7 +1751,7 @@ object SelectorConverter {
             if (afterEqualsIndex >= result.length) break
 
             val nextChar = result[afterEqualsIndex]
-            
+
             if (nextChar == '{') {
                 // 对象格式：paramName={{...}}
                 val braceContent = extractBraceContent(result.substring(afterEqualsIndex))
@@ -1762,7 +1762,18 @@ object SelectorConverter {
                     result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
                     searchStart = paramIndex + placeholder.length
                 } else {
-                    searchStart = paramIndex + 1
+                    // extractBraceContent 返回 null，尝试使用简单提取方法
+                    // 处理像 scores={health=10..20} 这样的简单参数
+                    val simpleContent = extractSimpleContent(result.substring(afterEqualsIndex))
+                    if (simpleContent != null) {
+                        val fullMatch = "$paramName=" + simpleContent
+                        val placeholder = "__${paramName.uppercase()}_${matches.size}__"
+                        matches.add(Pair(placeholder, fullMatch))
+                        result = result.substring(0, paramIndex) + placeholder + result.substring(paramIndex + fullMatch.length)
+                        searchStart = paramIndex + placeholder.length
+                    } else {
+                        searchStart = paramIndex + 1
+                    }
                 }
             } else if (nextChar == '[') {
                 // 数组格式：paramName=[{...}]
@@ -1783,6 +1794,44 @@ object SelectorConverter {
         }
 
         return result
+    }
+
+    /**
+     * 提取简单参数内容（不包含嵌套的花括号或方括号）
+     * 用于处理像 scores={health=10..20} 这样的简单参数
+     *
+     * @param str 从等号后面开始的字符串，例如 "{health=10..20}"
+     * @return 提取的内容，包含外层花括号，例如 "{health=10..20}"
+     */
+    private fun extractSimpleContent(str: String): String? {
+        if (str.isEmpty() || str.first() != '{') return null
+
+        var braceCount = 0
+        var result = StringBuilder()
+
+        for (char in str) {
+            when (char) {
+                '{' -> {
+                    braceCount++
+                    result.append(char)
+                }
+                '}' -> {
+                    braceCount--
+                    result.append(char)
+                    if (braceCount == 0) {
+                        // 找到匹配的结束括号
+                        return result.toString()
+                    }
+                }
+                else -> {
+                    if (braceCount > 0) {
+                        result.append(char)
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
     /**
@@ -2093,6 +2142,11 @@ object SelectorConverter {
                     val nbtResult = parseHasitemArray(arrayContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
+                        // 添加提醒信息：hasitem 已转换为 nbt 格式
+                        if (nbtResult.contains("nbt={SelectedItem:") || nbtResult.contains("nbt={equipment:") || nbtResult.contains("nbt={Inventory:")) {
+                            // 如果有多个独立的 nbt 参数，提醒用户这些参数不能放在同一个 nbt 大括号里
+                            reminders.add(getStringSafely(context, R.string.hasitem_converted))
+                        }
                         // 精确替换
                         val index = result.indexOf(fullMatch)
                         if (index >= 0) {
@@ -2877,6 +2931,8 @@ object SelectorConverter {
      * 提取花括号内容（包括外层花括号）
      */
     private fun extractBraceContent(str: String): String? {
+        if (str.isEmpty() || str.first() != '{') return null
+
         var braceCount = 0
         var result = StringBuilder()
 
@@ -3116,6 +3172,8 @@ object SelectorConverter {
         val (location, hasitemSlot) = if (slotNum >= 0 && slotNum <= 8) {
             "slot.hotbar" to slotNum.toString()
         } else {
+            // 添加提醒：Java版槽位编号转换为基岩版槽位编号
+            reminders.add("注意：Java版 Inventory Slot $slotNum 已转换为基岩版 slot.inventory Slot ${slotNum - 9}")
             "slot.inventory" to (slotNum - 9).toString()
         }
 
