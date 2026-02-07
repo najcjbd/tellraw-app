@@ -725,8 +725,13 @@ def convert_gamemode_parameters(java_selector, bedrock_selector):
         y_rotation_value = ""
         if rym_value and ry_value:
             # 两个参数都存在：rym..ry
-            y_rotation_value = f"{rym_value}..{ry_value}"
-            bedrock_reminders.append(f"基岩版rym={rym_value},ry={ry_value}参数已转换为Java版y_rotation={y_rotation_value}")
+            if rym_value == ry_value:
+                # 如果rym和rym相等，使用单个数字而非范围
+                y_rotation_value = f"{rym_value}"
+                bedrock_reminders.append(f"基岩版rym={rym_value},ry={ry_value}参数（相等值）已转换为Java版y_rotation={y_rotation_value}")
+            else:
+                y_rotation_value = f"{rym_value}..{ry_value}"
+                bedrock_reminders.append(f"基岩版rym={rym_value},ry={ry_value}参数已转换为Java版y_rotation={y_rotation_value}")
         elif rym_value:
             # 只有rym参数：rym..
             y_rotation_value = f"{rym_value}.."
@@ -2522,8 +2527,9 @@ def generate_tellraw_commands(selector, message, m_n_handling="none"):
                     # ry=最大值, rym=最小值 -> y_rotation=最小值..最大值
                     if original_ry_value == original_rym_value:
                         # 如果ry和rym相等，使用单个数字而非范围
+                        # 这种情况下，确保y_rotation参数一定被添加
                         y_rotation_param = f'y_rotation={original_rym_value}'
-                        java_reminders.append(f"基岩版ry/rym参数（相等值{original_ry_value}）已转换为Java版y_rotation={original_ry_value}")
+                        java_reminders.append(f"基岩版ry/rym参数（相等值{original_ry_value}）已转换为Java版y_rotation={original_rym_value}")
                     else:
                         y_rotation_param = f'y_rotation={original_rym_value}..{original_ry_value}'
                         java_reminders.append(f"基岩版ry/rym参数已转换为Java版{y_rotation_param}")
@@ -2546,6 +2552,8 @@ def generate_tellraw_commands(selector, message, m_n_handling="none"):
                         y_rotation_param = f'y_rotation={original_rym_value}..'
                         java_reminders.append(f"基岩版rym参数已转换为Java版{y_rotation_param}")
                 
+                # 如果生成了新的y_rotation参数，或者需要确保y_rotation参数存在
+                # 如果生成了新的y_rotation参数，或者需要确保y_rotation参数存在
                 if y_rotation_param:
                     # 先移除已存在的y_rotation参数，避免重复
                     params_part = re.sub(r'\by_rotation=[^,\]]+', '', params_part)
