@@ -1,13 +1,26 @@
 package com.tellraw.app.util
 
+import android.content.Context
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 /**
  * 文本格式化器测试
  * 测试颜色代码和格式代码的转换逻辑
  */
+@RunWith(RobolectricTestRunner::class)
 class TextFormatterTest {
+    
+    private lateinit var context: Context
+    
+    @Before
+    fun setup() {
+        context = RuntimeEnvironment.getApplication()
+    }
     
     /**
      * 测试组1：颜色代码测试
@@ -1283,7 +1296,7 @@ class TextFormatterTest {
     @Test
     fun testProcessMNCodes_1() {
         // Java版字体方式，基岩版颜色方式
-        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = true, android.content.Context())
+        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = true, context)
         assertEquals("文本应该保持不变", "§m§n文本", text)
         assertTrue("应该有警告信息", warnings.isNotEmpty())
     }
@@ -1291,7 +1304,7 @@ class TextFormatterTest {
     @Test
     fun testProcessMNCodes_2() {
         // 两版都用颜色方式
-        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = false, android.content.Context())
+        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = false, context)
         assertEquals("文本应该保持不变", "§m§n文本", text)
         assertTrue("应该有警告信息", warnings.isNotEmpty())
     }
@@ -1299,7 +1312,7 @@ class TextFormatterTest {
     @Test
     fun testProcessMNCodes_3() {
         // 没有§m§n代码
-        val (text, warnings) = TextFormatter.processMNCodes("§a绿色文本", useJavaFontStyle = true, android.content.Context())
+        val (text, warnings) = TextFormatter.processMNCodes("§a绿色文本", useJavaFontStyle = true, context)
         assertEquals("文本应该保持不变", "§a绿色文本", text)
         assertFalse("不应该有警告信息", warnings.isNotEmpty())
     }
@@ -1307,7 +1320,7 @@ class TextFormatterTest {
     @Test
     fun testProcessMNCodes_4() {
         // 只有§m代码
-        val (text, warnings) = TextFormatter.processMNCodes("§m删除线", useJavaFontStyle = true, android.content.Context())
+        val (text, warnings) = TextFormatter.processMNCodes("§m删除线", useJavaFontStyle = true, context)
         assertEquals("文本应该保持不变", "§m删除线", text)
         assertTrue("应该有警告信息", warnings.isNotEmpty())
     }
@@ -1315,7 +1328,7 @@ class TextFormatterTest {
     @Test
     fun testProcessMNCodes_5() {
         // 只有§n代码
-        val (text, warnings) = TextFormatter.processMNCodes("§n下划线", useJavaFontStyle = true, android.content.Context())
+        val (text, warnings) = TextFormatter.processMNCodes("§n下划线", useJavaFontStyle = true, context)
         assertEquals("文本应该保持不变", "§n下划线", text)
         assertTrue("应该有警告信息", warnings.isNotEmpty())
     }
@@ -1564,7 +1577,7 @@ class TextFormatterTest {
     @Test
     fun testGenerateTellrawCommand_1() {
         // 基本命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "普通文本", useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", "普通文本", useJavaFontStyle = true, context)
         assertTrue("Java版命令应以tellraw @a开头", command.javaCommand.startsWith("tellraw @a"))
         assertTrue("基岩版命令应以tellraw @a开头", command.bedrockCommand.startsWith("tellraw @a"))
     }
@@ -1572,7 +1585,7 @@ class TextFormatterTest {
     @Test
     fun testGenerateTellrawCommand_2() {
         // 带颜色代码的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§a绿色文本", useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", "§a绿色文本", useJavaFontStyle = true, context)
         assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
     }
@@ -1580,7 +1593,7 @@ class TextFormatterTest {
     @Test
     fun testGenerateTellrawCommand_3() {
         // 带§m§n代码的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§m§n删除线下划线", useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", "§m§n删除线下划线", useJavaFontStyle = true, context)
         assertTrue("应该有警告信息", command.warnings.isNotEmpty())
         assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
@@ -1591,7 +1604,7 @@ class TextFormatterTest {
         // 不同选择器的命令生成
         val selectors = listOf("@a", "@p", "@r", "@e", "@s")
         for (selector in selectors) {
-            val command = TextFormatter.generateTellrawCommand(selector, "文本", useJavaFontStyle = true, android.content.Context())
+            val command = TextFormatter.generateTellrawCommand(selector, "文本", useJavaFontStyle = true, context)
             assertTrue("命令应包含选择器 $selector", command.javaCommand.contains(selector))
             assertTrue("命令应包含选择器 $selector", command.bedrockCommand.contains(selector))
         }
@@ -1600,7 +1613,7 @@ class TextFormatterTest {
     @Test
     fun testGenerateTellrawCommand_5() {
         // 复杂文本的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§a§l绿色粗体§r§m_f删除线", useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", "§a§l绿色粗体§r§m_f删除线", useJavaFontStyle = true, context)
         assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
     }
@@ -1611,35 +1624,35 @@ class TextFormatterTest {
     @Test
     fun testValidateTellrawCommand_1() {
         // 有效的tellraw命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a {\"text\":\"测试\"}", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a {\"text\":\"测试\"}", context)
         assertTrue("有效命令不应该有错误", errors.isEmpty())
     }
 
     @Test
     fun testValidateTellrawCommand_2() {
         // 无效的命令格式
-        val errors = TextFormatter.validateTellrawCommand("say @a 测试", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("say @a 测试", context)
         assertTrue("应该有错误信息", errors.isNotEmpty())
     }
 
     @Test
     fun testValidateTellrawCommand_3() {
         // 缺少参数的命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a", context)
         assertTrue("应该有错误信息", errors.isNotEmpty())
     }
 
     @Test
     fun testValidateTellrawCommand_4() {
         // 无效的选择器
-        val errors = TextFormatter.validateTellrawCommand("tellraw test {\"text\":\"测试\"}", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("tellraw test {\"text\":\"测试\"}", context)
         assertTrue("应该有错误信息", errors.isNotEmpty())
     }
 
     @Test
     fun testValidateTellrawCommand_5() {
         // 无效的JSON格式
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a {text:测试}", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a {text:测试}", context)
         assertTrue("应该有错误信息", errors.isNotEmpty())
     }
 
@@ -1648,7 +1661,7 @@ class TextFormatterTest {
         // 有效的选择器
         val validSelectors = listOf("@a", "@p", "@r", "@e", "@s")
         for (selector in validSelectors) {
-            val errors = TextFormatter.validateTellrawCommand("tellraw $selector {\"text\":\"测试\"}", android.content.Context())
+            val errors = TextFormatter.validateTellrawCommand("tellraw $selector {\"text\":\"测试\"}", context)
             assertTrue("选择器 $selector 应该有效", errors.isEmpty())
         }
     }
@@ -1656,14 +1669,14 @@ class TextFormatterTest {
     @Test
     fun testValidateTellrawCommand_7() {
         // 空命令
-        val errors = TextFormatter.validateTellrawCommand("", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("", context)
         assertTrue("空命令应该有错误", errors.isNotEmpty())
     }
 
     @Test
     fun testValidateTellrawCommand_8() {
         // 只有tellraw的命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw", android.content.Context())
+        val errors = TextFormatter.validateTellrawCommand("tellraw", context)
         assertTrue("不完整的命令应该有错误", errors.isNotEmpty())
     }
 
@@ -1761,7 +1774,7 @@ class TextFormatterTest {
     fun testComprehensiveScenarios_1() {
         // 完整的tellraw命令场景
         val text = "§l§a欢迎来到服务器！§r§c请注意遵守规则。§r§e点击这里加入：§n§bdiscord.gg/example"
-        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, context)
         
         assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
@@ -1813,7 +1826,7 @@ class TextFormatterTest {
     fun testComprehensiveScenarios_5() {
         // 完整的游戏场景
         val text = "§l§c系统通知§r§f恭喜你获得了成就：§e§n点击这里领取奖励！§r§a请在§f§o聊天框§a中输入§b§l/reward claim§a来领取。"
-        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, android.content.Context())
+        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, context)
         
         assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
