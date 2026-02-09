@@ -1804,7 +1804,7 @@ class TextFormatterTest {
         assertTrue("Java版应包含white", javaJson.contains("\"white\""))
         assertTrue("Java版应包含gray", javaJson.contains("\"gray\""))
         assertTrue("Java版应包含dark_red或red", javaJson.contains("\"dark_red\"") || javaJson.contains("\"red\""))
-        assertTrue("Java版应包含green", json.contains("\"green\""))
+        assertTrue("Java版应包含green", javaJson.contains("\"green\""))
         assertTrue("Java版应包含aqua", javaJson.contains("\"aqua\""))
         assertTrue("基岩版应包含所有颜色代码", bedrockJson.contains("§g") && bedrockJson.contains("§h") && bedrockJson.contains("§i") && bedrockJson.contains("§m") && bedrockJson.contains("§n") && bedrockJson.contains("§a") && bedrockJson.contains("§b") && bedrockJson.contains("§c"))
     }
