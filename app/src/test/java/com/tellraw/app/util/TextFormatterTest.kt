@@ -895,4 +895,927 @@ class TextFormatterTest {
         assertTrue("应包含斜体", text.contains("§o"))
         assertTrue("应包含混乱", text.contains("§k"))
     }
+
+    /**
+     * 测试组19：convertToJavaJson 函数测试
+     */
+    @Test
+    fun testConvertToJavaJson_1() {
+        // 基本文本转换为JSON
+        val json = TextFormatter.convertToJavaJson("普通文本")
+        assertTrue("应包含text字段", json.contains("\"text\""))
+        assertTrue("应包含普通文本", json.contains("普通文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_2() {
+        // 颜色代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§a绿色文本")
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含绿色文本", json.contains("绿色文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_3() {
+        // 格式代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§l粗体文本")
+        assertTrue("应包含bold字段", json.contains("\"bold\""))
+        assertTrue("应包含true", json.contains("true"))
+        assertTrue("应包含粗体文本", json.contains("粗体文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_4() {
+        // §m代码（字体方式）转换为JSON
+        val json = TextFormatter.convertToJavaJson("§m删除线文本", mNHandling = "font")
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_5() {
+        // §m代码（颜色方式）转换为JSON
+        val json = TextFormatter.convertToJavaJson("§m删除线文本", mNHandling = "color")
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_6() {
+        // §n代码（字体方式）转换为JSON
+        val json = TextFormatter.convertToJavaJson("§n下划线文本", mNHandling = "font")
+        assertTrue("应包含underlined字段", json.contains("\"underlined\""))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_7() {
+        // §n代码（颜色方式）转换为JSON
+        val json = TextFormatter.convertToJavaJson("§n下划线文本", mNHandling = "color")
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_8() {
+        // §m_f代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§m_f删除线文本", mnCFEnabled = true)
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_9() {
+        // §m_c代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§m_c删除线文本", mnCFEnabled = true)
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_10() {
+        // §n_f代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§n_f下划线文本", mnCFEnabled = true)
+        assertTrue("应包含underlined字段", json.contains("\"underlined\""))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_11() {
+        // §n_c代码转换为JSON
+        val json = TextFormatter.convertToJavaJson("§n_c下划线文本", mnCFEnabled = true)
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_12() {
+        // 混合模式：mnCFEnabled=false且mNHandling="font"
+        val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c和§n_f下划线§n_c", mNHandling = "font", mnCFEnabled = false)
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
+        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含underlined字段", json.contains("\"underlined\""))
+        assertTrue("应包含red颜色", json.contains("\"red\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_13() {
+        // 多种格式组合
+        val json = TextFormatter.convertToJavaJson("§a§l绿色粗体§c§m红色删除线")
+        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含bold字段", json.contains("\"bold\""))
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_14() {
+        // §r重置代码
+        val json = TextFormatter.convertToJavaJson("§a绿色§r普通文本")
+        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含普通文本", json.contains("普通文本"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_15() {
+        // 基岩版颜色代码转换
+        val json = TextFormatter.convertToJavaJson("§g金色§h白色")
+        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
+        assertTrue("应包含gold颜色", json.contains("\"gold\""))
+        assertTrue("应包含white颜色", json.contains("\"white\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_16() {
+        // 所有格式代码
+        val json = TextFormatter.convertToJavaJson("§l粗体§m删除线§n下划线§o斜体§k混乱")
+        assertTrue("应包含bold字段", json.contains("\"bold\""))
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
+        assertTrue("应包含underlined字段", json.contains("\"underlined\""))
+        assertTrue("应包含italic字段", json.contains("\"italic\""))
+        assertTrue("应包含obfuscated字段", json.contains("\"obfuscated\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_17() {
+        // 空文本
+        val json = TextFormatter.convertToJavaJson("")
+        assertTrue("应包含空文本", json.contains("\"text\":\"\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_18() {
+        // 只有颜色代码
+        val json = TextFormatter.convertToJavaJson("§a")
+        assertTrue("应包含color字段", json.contains("\"color\""))
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_19() {
+        // 只有格式代码
+        val json = TextFormatter.convertToJavaJson("§l")
+        assertTrue("应包含bold字段", json.contains("\"bold\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_20() {
+        // 相同格式的文本合并
+        val json = TextFormatter.convertToJavaJson("§a绿色§a继续绿色")
+        // 相同颜色的文本应该合并在一起
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含绿色继续绿色", json.contains("绿色继续绿色"))
+    }
+
+    /**
+     * 测试组20：convertToBedrockJson 函数测试
+     */
+    @Test
+    fun testConvertToBedrockJson_1() {
+        // 基本文本转换为JSON
+        val json = TextFormatter.convertToBedrockJson("普通文本")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含普通文本", json.contains("普通文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_2() {
+        // 颜色代码转换
+        val json = TextFormatter.convertToBedrockJson("§a绿色文本")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含绿色文本", json.contains("绿色文本"))
+        assertTrue("应包含§a颜色代码", json.contains("§a"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_3() {
+        // §m代码转换为JSON（基岩版始终作为颜色代码）
+        val json = TextFormatter.convertToBedrockJson("§m删除线文本", mNHandling = "font")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_4() {
+        // §m代码转换为JSON（颜色方式）
+        val json = TextFormatter.convertToBedrockJson("§m删除线文本", mNHandling = "color")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_5() {
+        // §n代码转换为JSON（基岩版始终作为颜色代码）
+        val json = TextFormatter.convertToBedrockJson("§n下划线文本", mNHandling = "font")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_6() {
+        // §n代码转换为JSON（颜色方式）
+        val json = TextFormatter.convertToBedrockJson("§n下划线文本", mNHandling = "color")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_7() {
+        // §m_f代码转换为JSON（§m/§n_c/f模式）
+        val json = TextFormatter.convertToBedrockJson("§m_f删除线文本", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 在§m/§n_c/f模式下，§m_f应该转换为§m
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_8() {
+        // §m_c代码转换为JSON（§m/§n_c/f模式）
+        val json = TextFormatter.convertToBedrockJson("§m_c删除线文本", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 在§m/§n_c/f模式下，§m_c应该转换为§m
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含删除线文本", json.contains("删除线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_9() {
+        // §n_f代码转换为JSON（§m/§n_c/f模式）
+        val json = TextFormatter.convertToBedrockJson("§n_f下划线文本", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 在§m/§n_c/f模式下，§n_f应该转换为§n
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_10() {
+        // §n_c代码转换为JSON（§m/§n_c/f模式）
+        val json = TextFormatter.convertToBedrockJson("§n_c下划线文本", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 在§m/§n_c/f模式下，§n_c应该转换为§n
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+        assertTrue("应包含下划线文本", json.contains("下划线文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_11() {
+        // 混合模式：mnCFEnabled=false且mNHandling="font"
+        val json = TextFormatter.convertToBedrockJson("§m_f删除线§m_c和§n_f下划线§n_c", mNHandling = "font", mnCFEnabled = false)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 在混合模式下，§m_f/§m_c应该转换为§m，§n_f/§n_c应该转换为§n
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_12() {
+        // §m/§n_c/f模式：移除普通的§m/§n
+        val json = TextFormatter.convertToBedrockJson("§m普通§m_f删除线§m_c颜色", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 普通的§m应该被移除
+        assertFalse("不应包含普通§m文本", json.contains("普通"))
+        // §m_f/§m_c应该转换为§m
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含删除线", json.contains("删除线"))
+        assertTrue("应包含颜色", json.contains("颜色"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_13() {
+        // 基岩版特有颜色代码转换
+        val json = TextFormatter.convertToBedrockJson("§g金色§h白色§i灰色")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含金色", json.contains("金色"))
+        assertTrue("应包含白色", json.contains("白色"))
+        assertTrue("应包含灰色", json.contains("灰色"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_14() {
+        // §r重置代码
+        val json = TextFormatter.convertToBedrockJson("§a绿色§r普通文本")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§a颜色代码", json.contains("§a"))
+        assertTrue("应包含§r重置代码", json.contains("§r"))
+        assertTrue("应包含普通文本", json.contains("普通文本"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_15() {
+        // 所有格式代码
+        val json = TextFormatter.convertToBedrockJson("§l粗体§m删除线§n下划线§o斜体§k混乱§r重置")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§l", json.contains("§l"))
+        assertTrue("应包含§m", json.contains("§m"))
+        assertTrue("应包含§n", json.contains("§n"))
+        assertTrue("应包含§o", json.contains("§o"))
+        assertTrue("应包含§k", json.contains("§k"))
+        assertTrue("应包含§r", json.contains("§r"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_16() {
+        // 空文本
+        val json = TextFormatter.convertToBedrockJson("")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_17() {
+        // 多个颜色和格式代码
+        val json = TextFormatter.convertToBedrockJson("§a§l绿色粗体§c§m红色删除线§b§n青色下划线")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§a", json.contains("§a"))
+        assertTrue("应包含§l", json.contains("§l"))
+        assertTrue("应包含§c", json.contains("§c"))
+        assertTrue("应包含§m", json.contains("§m"))
+        assertTrue("应包含§b", json.contains("§b"))
+        assertTrue("应包含§n", json.contains("§n"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_18() {
+        // 非§m/§n_c/f模式：保留§m/§n作为颜色代码
+        val json = TextFormatter.convertToBedrockJson("§m删除线§n下划线", mNHandling = "color", mnCFEnabled = false)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§m颜色代码", json.contains("§m"))
+        assertTrue("应包含§n颜色代码", json.contains("§n"))
+    }
+
+    @Test
+    fun testConvertToBedrockJson_19() {
+        // 连续的§m_f/§m_c/§n_f/§n_c
+        val json = TextFormatter.convertToBedrockJson("§m_f§m_c§n_f§n_c", mnCFEnabled = true)
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        // 应该转换为§m§n§m§n
+        assertTrue("应包含多个§m", json.count { it == '§' && it == 'm' } >= 2)
+        assertTrue("应包含多个§n", json.count { it == '§' && it == 'n' } >= 2)
+    }
+
+    @Test
+    fun testConvertToBedrockJson_20() {
+        // 复杂的文本组合
+        val json = TextFormatter.convertToBedrockJson("§a绿色§l粗体§r§m_f删除线§m_c颜色§r§n_f下划线§n_c颜色")
+        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
+        assertTrue("应包含§a", json.contains("§a"))
+        assertTrue("应包含§l", json.contains("§l"))
+        assertTrue("应包含§r", json.contains("§r"))
+        assertTrue("应包含§m", json.contains("§m"))
+        assertTrue("应包含§n", json.contains("§n"))
+    }
+
+    /**
+     * 测试组21：processMNCodes 函数测试
+     */
+    @Test
+    fun testProcessMNCodes_1() {
+        // Java版字体方式，基岩版颜色方式
+        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = true, android.content.Context())
+        assertEquals("文本应该保持不变", "§m§n文本", text)
+        assertTrue("应该有警告信息", warnings.isNotEmpty())
+    }
+
+    @Test
+    fun testProcessMNCodes_2() {
+        // 两版都用颜色方式
+        val (text, warnings) = TextFormatter.processMNCodes("§m§n文本", useJavaFontStyle = false, android.content.Context())
+        assertEquals("文本应该保持不变", "§m§n文本", text)
+        assertTrue("应该有警告信息", warnings.isNotEmpty())
+    }
+
+    @Test
+    fun testProcessMNCodes_3() {
+        // 没有§m§n代码
+        val (text, warnings) = TextFormatter.processMNCodes("§a绿色文本", useJavaFontStyle = true, android.content.Context())
+        assertEquals("文本应该保持不变", "§a绿色文本", text)
+        assertFalse("不应该有警告信息", warnings.isNotEmpty())
+    }
+
+    @Test
+    fun testProcessMNCodes_4() {
+        // 只有§m代码
+        val (text, warnings) = TextFormatter.processMNCodes("§m删除线", useJavaFontStyle = true, android.content.Context())
+        assertEquals("文本应该保持不变", "§m删除线", text)
+        assertTrue("应该有警告信息", warnings.isNotEmpty())
+    }
+
+    @Test
+    fun testProcessMNCodes_5() {
+        // 只有§n代码
+        val (text, warnings) = TextFormatter.processMNCodes("§n下划线", useJavaFontStyle = true, android.content.Context())
+        assertEquals("文本应该保持不变", "§n下划线", text)
+        assertTrue("应该有警告信息", warnings.isNotEmpty())
+    }
+
+    /**
+     * 测试组22：§r重置代码完整测试
+     */
+    @Test
+    fun testResetCode_1() {
+        // §r清除颜色
+        val json = TextFormatter.convertToJavaJson("§a绿色§r普通")
+        assertTrue("应包含绿色部分", json.contains("\"color\":\"green\""))
+        assertTrue("应包含普通部分", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_2() {
+        // §r清除格式
+        val json = TextFormatter.convertToJavaJson("§l粗体§r普通")
+        assertTrue("应包含粗体部分", json.contains("\"bold\":true"))
+        assertTrue("应包含普通部分", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_3() {
+        // §r清除颜色和格式
+        val json = TextFormatter.convertToJavaJson("§a§l绿色粗体§r普通")
+        assertTrue("应包含绿色粗体部分", json.contains("\"color\":\"green\""))
+        assertTrue("应包含粗体字段", json.contains("\"bold\":true"))
+        assertTrue("应包含普通部分", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_4() {
+        // 多个§r
+        val json = TextFormatter.convertToJavaJson("§a绿色§r§c红色§r普通")
+        assertTrue("应包含绿色", json.contains("\"color\":\"green\""))
+        assertTrue("应包含红色", json.contains("\"color\":\"red\""))
+        assertTrue("应包含普通", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_5() {
+        // §r后重新应用格式
+        val json = TextFormatter.convertToJavaJson("§a绿色§r§l粗体")
+        assertTrue("应包含绿色", json.contains("\"color\":\"green\""))
+        assertTrue("应包含粗体", json.contains("\"bold\":true"))
+    }
+
+    @Test
+    fun testResetCode_6() {
+        // 基岩版§r
+        val json = TextFormatter.convertToBedrockJson("§a绿色§r普通")
+        assertTrue("应包含§a", json.contains("§a"))
+        assertTrue("应包含§r", json.contains("§r"))
+        assertTrue("应包含普通", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_7() {
+        // §r清除§m§n
+        val json = TextFormatter.convertToJavaJson("§m删除线§r普通", mNHandling = "font")
+        assertTrue("应包含删除线部分", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含普通部分", json.contains("普通"))
+    }
+
+    @Test
+    fun testResetCode_8() {
+        // §r清除所有格式
+        val json = TextFormatter.convertToJavaJson("§l§m§n§o§k所有格式§r清除")
+        assertTrue("应包含所有格式", json.contains("\"bold\":true"))
+        assertTrue("应包含删除线", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含下划线", json.contains("\"underlined\":true"))
+        assertTrue("应包含斜体", json.contains("\"italic\":true"))
+        assertTrue("应包含混乱", json.contains("\"obfuscated\":true"))
+        assertTrue("应包含清除", json.contains("清除"))
+    }
+
+    /**
+     * 测试组23：JAVA版基岩版混合模式测试
+     */
+    @Test
+    fun testJavaBedrockMixedMode_1() {
+        // Java版字体方式，基岩版颜色方式
+        val javaJson = TextFormatter.convertToJavaJson("§m删除线", mNHandling = "font")
+        val bedrockJson = TextFormatter.convertToBedrockJson("§m删除线", mNHandling = "font")
+        
+        assertTrue("Java版应包含strikethrough字段", javaJson.contains("\"strikethrough\":true"))
+        assertTrue("基岩版应包含§m颜色代码", bedrockJson.contains("§m"))
+    }
+
+    @Test
+    fun testJavaBedrockMixedMode_2() {
+        // 两版都用颜色方式
+        val javaJson = TextFormatter.convertToJavaJson("§m删除线", mNHandling = "color")
+        val bedrockJson = TextFormatter.convertToBedrockJson("§m删除线", mNHandling = "color")
+        
+        assertTrue("Java版应包含dark_red颜色", javaJson.contains("\"color\":\"dark_red\""))
+        assertTrue("基岩版应包含§m颜色代码", bedrockJson.contains("§m"))
+    }
+
+    @Test
+    fun testJavaBedrockMixedMode_3() {
+        // 复杂的混合文本
+        val javaJson = TextFormatter.convertToJavaJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mNHandling = "font", mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mNHandling = "font", mnCFEnabled = true)
+        
+        assertTrue("Java版应包含多个部分", javaJson.contains("\"extra\""))
+        assertTrue("基岩版应包含rawtext", bedrockJson.contains("\"rawtext\""))
+        assertTrue("Java版应包含strikethrough", javaJson.contains("\"strikethrough\""))
+        assertTrue("Java版应包含dark_red", javaJson.contains("\"dark_red\""))
+        assertTrue("Java版应包含underlined", javaJson.contains("\"underlined\""))
+        assertTrue("Java版应包含red", javaJson.contains("\"red\""))
+        assertTrue("基岩版应包含§m", bedrockJson.contains("§m"))
+        assertTrue("基岩版应包含§n", bedrockJson.contains("§n"))
+    }
+
+    @Test
+    fun testJavaBedrockMixedMode_4() {
+        // 相同文本在不同版本下的表现
+        val text = "§a§l绿色粗体§r§m_f删除线§m_c颜色§r§n_f下划线§n_c颜色"
+        
+        val javaJson = TextFormatter.convertToJavaJson(text, mNHandling = "font", mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, mNHandling = "font", mnCFEnabled = true)
+        
+        // Java版使用JSON格式
+        assertTrue("Java版应为JSON格式", javaJson.startsWith("{"))
+        // 基岩版使用rawtext格式
+        assertTrue("基岩版应包含rawtext", bedrockJson.contains("\"rawtext\""))
+    }
+
+    @Test
+    fun testJavaBedrockMixedMode_5() {
+        // 颜色代码在不同版本下的转换
+        val bedrockText = "§g金色§h白色§i灰色"
+        val javaJson = TextFormatter.convertToJavaJson(bedrockText)
+        val bedrockJson = TextFormatter.convertToBedrockJson(bedrockText)
+        
+        // Java版应该转换基岩版颜色代码
+        assertTrue("Java版应包含gold", javaJson.contains("\"gold\""))
+        assertTrue("Java版应包含white", javaJson.contains("\"white\""))
+        assertTrue("Java版应包含gray", javaJson.contains("\"gray\""))
+        
+        // 基岩版保留颜色代码
+        assertTrue("基岩版应包含金色", bedrockJson.contains("金色"))
+        assertTrue("基岩版应包含白色", bedrockJson.contains("白色"))
+        assertTrue("基岩版应包含灰色", bedrockJson.contains("灰色"))
+    }
+
+    /**
+     * 测试组24：§m/§n_c/f模式测试
+     */
+    @Test
+    fun testMNCFMode_1() {
+        // §m_f在Java版中作为字体方式
+        val json = TextFormatter.convertToJavaJson("§m_f删除线", mnCFEnabled = true)
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含删除线文本", json.contains("删除线"))
+    }
+
+    @Test
+    fun testMNCFMode_2() {
+        // §m_c在Java版中作为颜色方式
+        val json = TextFormatter.convertToJavaJson("§m_c删除线", mnCFEnabled = true)
+        assertTrue("应包含dark_red颜色", json.contains("\"color\":\"dark_red\""))
+        assertTrue("应包含删除线文本", json.contains("删除线"))
+    }
+
+    @Test
+    fun testMNCFMode_3() {
+        // §n_f在Java版中作为字体方式
+        val json = TextFormatter.convertToJavaJson("§n_f下划线", mnCFEnabled = true)
+        assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
+        assertTrue("应包含下划线文本", json.contains("下划线"))
+    }
+
+    @Test
+    fun testMNCFMode_4() {
+        // §n_c在Java版中作为颜色方式
+        val json = TextFormatter.convertToJavaJson("§n_c下划线", mnCFEnabled = true)
+        assertTrue("应包含red颜色", json.contains("\"color\":\"red\""))
+        assertTrue("应包含下划线文本", json.contains("下划线"))
+    }
+
+    @Test
+    fun testMNCFMode_5() {
+        // 在§m/§n_c/f模式下，普通的§m/§n应该被移除（Java版）
+        val json = TextFormatter.convertToJavaJson("§m普通§m_f删除线", mnCFEnabled = true)
+        assertTrue("应包含删除线", json.contains("删除线"))
+        // 普通的§m应该被移除
+        assertFalse("不应包含普通文本", json.contains("普通"))
+    }
+
+    @Test
+    fun testMNCFMode_6() {
+        // 在§m/§n_c/f模式下，普通的§m/§n应该被移除（基岩版）
+        val json = TextFormatter.convertToBedrockJson("§m普通§m_f删除线", mnCFEnabled = true)
+        assertTrue("应包含删除线", json.contains("删除线"))
+        // 普通的§m应该被移除
+        assertFalse("不应包含普通文本", json.contains("普通"))
+    }
+
+    @Test
+    fun testMNCFMode_7() {
+        // §m_f和§m_c同时使用
+        val json = TextFormatter.convertToJavaJson("§m_f删除线字体§m_c删除线颜色", mnCFEnabled = true)
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含dark_red颜色", json.contains("\"color\":\"dark_red\""))
+        assertTrue("应包含删除线字体", json.contains("删除线字体"))
+        assertTrue("应包含删除线颜色", json.contains("删除线颜色"))
+    }
+
+    @Test
+    fun testMNCFMode_8() {
+        // §n_f和§n_c同时使用
+        val json = TextFormatter.convertToJavaJson("§n_f下划线字体§n_c下划线颜色", mnCFEnabled = true)
+        assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
+        assertTrue("应包含red颜色", json.contains("\"color\":\"red\""))
+        assertTrue("应包含下划线字体", json.contains("下划线字体"))
+        assertTrue("应包含下划线颜色", json.contains("下划线颜色"))
+    }
+
+    @Test
+    fun testMNCFMode_9() {
+        // 所有§m/§n_c/f代码组合
+        val json = TextFormatter.convertToJavaJson("§m_f§m_c§n_f§n_c", mnCFEnabled = true)
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
+        assertTrue("应包含red颜色", json.contains("\"red\""))
+    }
+
+    @Test
+    fun testMNCFMode_10() {
+        // §m/§n_c/f模式与普通颜色代码混合
+        val json = TextFormatter.convertToJavaJson("§a绿色§m_f删除线§b青色§n_f下划线", mnCFEnabled = true)
+        assertTrue("应包含green颜色", json.contains("\"color\":\"green\""))
+        assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
+        assertTrue("应包含aqua颜色", json.contains("\"color\":\"aqua\""))
+        assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
+    }
+
+    /**
+     * 测试组25：generateTellrawCommand 函数测试
+     */
+    @Test
+    fun testGenerateTellrawCommand_1() {
+        // 基本命令生成
+        val command = TextFormatter.generateTellrawCommand("@a", "普通文本", useJavaFontStyle = true, android.content.Context())
+        assertTrue("Java版命令应以tellraw @a开头", command.javaCommand.startsWith("tellraw @a"))
+        assertTrue("基岩版命令应以tellraw @a开头", command.bedrockCommand.startsWith("tellraw @a"))
+    }
+
+    @Test
+    fun testGenerateTellrawCommand_2() {
+        // 带颜色代码的命令生成
+        val command = TextFormatter.generateTellrawCommand("@a", "§a绿色文本", useJavaFontStyle = true, android.content.Context())
+        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+    }
+
+    @Test
+    fun testGenerateTellrawCommand_3() {
+        // 带§m§n代码的命令生成
+        val command = TextFormatter.generateTellrawCommand("@a", "§m§n删除线下划线", useJavaFontStyle = true, android.content.Context())
+        assertTrue("应该有警告信息", command.warnings.isNotEmpty())
+        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+    }
+
+    @Test
+    fun testGenerateTellrawCommand_4() {
+        // 不同选择器的命令生成
+        val selectors = listOf("@a", "@p", "@r", "@e", "@s")
+        for (selector in selectors) {
+            val command = TextFormatter.generateTellrawCommand(selector, "文本", useJavaFontStyle = true, android.content.Context())
+            assertTrue("命令应包含选择器 $selector", command.javaCommand.contains(selector))
+            assertTrue("命令应包含选择器 $selector", command.bedrockCommand.contains(selector))
+        }
+    }
+
+    @Test
+    fun testGenerateTellrawCommand_5() {
+        // 复杂文本的命令生成
+        val command = TextFormatter.generateTellrawCommand("@a", "§a§l绿色粗体§r§m_f删除线", useJavaFontStyle = true, android.content.Context())
+        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+    }
+
+    /**
+     * 测试组26：validateTellrawCommand 函数测试
+     */
+    @Test
+    fun testValidateTellrawCommand_1() {
+        // 有效的tellraw命令
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a {\"text\":\"测试\"}", android.content.Context())
+        assertTrue("有效命令不应该有错误", errors.isEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_2() {
+        // 无效的命令格式
+        val errors = TextFormatter.validateTellrawCommand("say @a 测试", android.content.Context())
+        assertTrue("应该有错误信息", errors.isNotEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_3() {
+        // 缺少参数的命令
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a", android.content.Context())
+        assertTrue("应该有错误信息", errors.isNotEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_4() {
+        // 无效的选择器
+        val errors = TextFormatter.validateTellrawCommand("tellraw test {\"text\":\"测试\"}", android.content.Context())
+        assertTrue("应该有错误信息", errors.isNotEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_5() {
+        // 无效的JSON格式
+        val errors = TextFormatter.validateTellrawCommand("tellraw @a {text:测试}", android.content.Context())
+        assertTrue("应该有错误信息", errors.isNotEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_6() {
+        // 有效的选择器
+        val validSelectors = listOf("@a", "@p", "@r", "@e", "@s")
+        for (selector in validSelectors) {
+            val errors = TextFormatter.validateTellrawCommand("tellraw $selector {\"text\":\"测试\"}", android.content.Context())
+            assertTrue("选择器 $selector 应该有效", errors.isEmpty())
+        }
+    }
+
+    @Test
+    fun testValidateTellrawCommand_7() {
+        // 空命令
+        val errors = TextFormatter.validateTellrawCommand("", android.content.Context())
+        assertTrue("空命令应该有错误", errors.isNotEmpty())
+    }
+
+    @Test
+    fun testValidateTellrawCommand_8() {
+        // 只有tellraw的命令
+        val errors = TextFormatter.validateTellrawCommand("tellraw", android.content.Context())
+        assertTrue("不完整的命令应该有错误", errors.isNotEmpty())
+    }
+
+    /**
+     * 测试组27：边界情况和特殊场景测试
+     */
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_1() {
+        // 极长的文本
+        val longText = "§a测试".repeat(100)
+        val json = TextFormatter.convertToJavaJson(longText)
+        assertTrue("应包含大量测试文本", json.contains("测试"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_2() {
+        // 特殊字符
+        val specialText = "§a特殊字符：\\\"\'@#$%^&*()"
+        val json = TextFormatter.convertToJavaJson(specialText)
+        assertTrue("应包含特殊字符", json.contains("特殊字符"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_3() {
+        // Unicode字符
+        val unicodeText = "§a中文文本日本語한국어"
+        val json = TextFormatter.convertToJavaJson(unicodeText)
+        assertTrue("应包含中文", json.contains("中文"))
+        assertTrue("应包含日语", json.contains("日本語"))
+        assertTrue("应包含韩语", json.contains("한국어"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_4() {
+        // Emoji
+        val emojiText = "§a😀😁😂🤣😃😄😅😆😉"
+        val json = TextFormatter.convertToJavaJson(emojiText)
+        assertTrue("应包含emoji", json.contains("😀"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_5() {
+        // 换行符
+        val newlineText = "§a第一行\n第二行\n第三行"
+        val json = TextFormatter.convertToJavaJson(newlineText)
+        assertTrue("应包含换行符", json.contains("\n"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_6() {
+        // 制表符
+        val tabText = "§a第一列\t第二列\t第三列"
+        val json = TextFormatter.convertToJavaJson(tabText)
+        assertTrue("应包含制表符", json.contains("\t"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_7() {
+        // 连续的颜色代码
+        val continuousColors = "§a§b§c§d§e§f"
+        val json = TextFormatter.convertToJavaJson(continuousColors)
+        assertTrue("应包含多个颜色代码", json.count { it == '§' } >= 6)
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_8() {
+        // 连续的格式代码
+        val continuousFormats = "§l§m§n§o§k"
+        val json = TextFormatter.convertToJavaJson(continuousFormats)
+        assertTrue("应包含多个格式代码", json.count { it == '§' } >= 5)
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_9() {
+        // 无效的颜色代码
+        val invalidColors = "§z§x§y§w"
+        val json = TextFormatter.convertToJavaJson(invalidColors)
+        // 无效的颜色代码应该被跳过
+        assertTrue("应包含无效颜色代码", json.contains("§z"))
+    }
+
+    @Test
+    fun testEdgeCasesAndSpecialScenarios_10() {
+        // 不完整的颜色代码
+        val incompleteColor = "§"
+        val json = TextFormatter.convertToJavaJson(incompleteColor)
+        // 不完整的颜色代码应该被跳过
+        assertTrue("应包含§", json.contains("§"))
+    }
+
+    /**
+     * 测试组28：综合场景测试
+     */
+    @Test
+    fun testComprehensiveScenarios_1() {
+        // 完整的tellraw命令场景
+        val text = "§l§a欢迎来到服务器！§r§c请注意遵守规则。§r§e点击这里加入：§n§bdiscord.gg/example"
+        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, android.content.Context())
+        
+        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+    }
+
+    @Test
+    fun testComprehensiveScenarios_2() {
+        // 多种格式组合的场景
+        val text = "§a§l重要通知§r§m删除线文本§n§b下划线链接§o§c斜体提示§k§d混乱密码"
+        val javaJson = TextFormatter.convertToJavaJson(text)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text)
+        
+        assertTrue("Java版应包含所有格式", javaJson.contains("\"extra\""))
+        assertTrue("基岩版应包含所有代码", bedrockJson.contains("§a") && bedrockJson.contains("§l") && bedrockJson.contains("§m") && bedrockJson.contains("§n") && bedrockJson.contains("§o") && bedrockJson.contains("§k"))
+    }
+
+    @Test
+    fun testComprehensiveScenarios_3() {
+        // §m/§n_c/f模式下的复杂场景
+        val text = "§a§l绿色粗体§r§m_f删除线字体§m_c删除线颜色§r§n_f下划线字体§n_c下划线颜色"
+        val javaJson = TextFormatter.convertToJavaJson(text, mNHandling = "font", mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, mNHandling = "font", mnCFEnabled = true)
+        
+        assertTrue("Java版应包含strikethrough", javaJson.contains("\"strikethrough\""))
+        assertTrue("Java版应包含dark_red", javaJson.contains("\"dark_red\""))
+        assertTrue("Java版应包含underlined", javaJson.contains("\"underlined\""))
+        assertTrue("Java版应包含red", javaJson.contains("\"red\""))
+        assertTrue("基岩版应包含§m", bedrockJson.contains("§m"))
+        assertTrue("基岩版应包含§n", bedrockJson.contains("§n"))
+    }
+
+    @Test
+    fun testComprehensiveScenarios_4() {
+        // JAVA版基岩版混合模式的复杂场景
+        val text = "§g金色§h白色§i灰色§m删除线§n下划线§a绿色§b青色§c红色"
+        val javaJson = TextFormatter.convertToJavaJson(text)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text)
+        
+        assertTrue("Java版应包含gold", javaJson.contains("\"gold\""))
+        assertTrue("Java版应包含white", javaJson.contains("\"white\""))
+        assertTrue("Java版应包含gray", javaJson.contains("\"gray\""))
+        assertTrue("Java版应包含dark_red或red", javaJson.contains("\"dark_red\"") || javaJson.contains("\"red\""))
+        assertTrue("Java版应包含green", json.contains("\"green\""))
+        assertTrue("Java版应包含aqua", javaJson.contains("\"aqua\""))
+        assertTrue("基岩版应包含所有颜色代码", bedrockJson.contains("§g") && bedrockJson.contains("§h") && bedrockJson.contains("§i") && bedrockJson.contains("§m") && bedrockJson.contains("§n") && bedrockJson.contains("§a") && bedrockJson.contains("§b") && bedrockJson.contains("§c"))
+    }
+
+    @Test
+    fun testComprehensiveScenarios_5() {
+        // 完整的游戏场景
+        val text = "§l§c系统通知§r§f恭喜你获得了成就：§e§n点击这里领取奖励！§r§a请在§f§o聊天框§a中输入§b§l/reward claim§a来领取。"
+        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, android.content.Context())
+        
+        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+    }
 }

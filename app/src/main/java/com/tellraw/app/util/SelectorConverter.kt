@@ -128,6 +128,7 @@ object SelectorConverter {
         R.string.hasitem_quantity_negation_not_supported to "警告：quantity反选（!）在Java版不支持，已移除",
         R.string.hasitem_slot_min_only to "注意：slot=%s.. 已转换为 %s",
         R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
+        R.string.hasitem_slot_range to "注意：slot=%1\$s..%2\$s 已转换为 %3\$s（中间值）",
         R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除"
     )
 
@@ -844,24 +845,24 @@ object SelectorConverter {
      */
     private fun convertRotationParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
-        
+
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
         // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
         result = extractComplexParameters(result, "scores", scoresMatches)
-        
+
         // 处理x_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
         val xRotationPattern = "(?<!__SCORES_)(^|,)x_rotation=([^,\\]]+)".toRegex()
         val xRotationMatches = xRotationPattern.findAll(result).toList()
-        
+
         if (xRotationMatches.isNotEmpty()) {
             // 提取所有x_rotation值
             val allRxmValues = mutableListOf<Double>()
             val allRxValues = mutableListOf<Double>()
-            
+
             for (match in xRotationMatches) {
                 val rotationValue = match.groupValues[2]
-                
+
                 if (".." in rotationValue) {
                     val parts = rotationValue.split("..")
                     if (parts[0].isNotEmpty()) {
@@ -875,30 +876,25 @@ object SelectorConverter {
                     allRxValues.add(rotationValue.toDouble())
                 }
             }
-            
+
             // 计算最终范围
             val finalRxm = if (allRxmValues.isNotEmpty()) allRxmValues.minOrNull() else null
             val finalRx = if (allRxValues.isNotEmpty()) allRxValues.maxOrNull() else null
-            
+
             // 移除所有x_rotation参数
             result = result.replace(xRotationPattern) { match ->
                 val prefix = match.groupValues[1]
                 prefix
             }
-            
+
             // 清理多余的逗号
             while (",," in result) {
                 result = result.replace(",,", ",")
             }
             result = result.replace("^,".toRegex(), "")
             result = result.replace(",$".toRegex(), "")
-            
-            // 恢复scores参数
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-            
-            // 添加rx和rxm参数
+
+            // 添加rx和rxm参数（不要立即恢复scores参数，等y_rotation处理完再恢复）
             if (finalRxm != null && finalRx != null) {
                 val rxmStr = if (finalRxm % 1.0 == 0.0) finalRxm.toInt().toString() else finalRxm.toString()
                 val rxStr = if (finalRx % 1.0 == 0.0) finalRx.toInt().toString() else finalRx.toString()
@@ -913,24 +909,20 @@ object SelectorConverter {
                 result = addParameterToResult(result, "rx=$rxStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_x_rotation_to_rx, "multiple", rxStr))
             }
-
-            // 再次替换scores参数，因为后面还要处理y_rotation
-            scoresMatches.clear()
-            result = extractComplexParameters(result, "scores", scoresMatches)
         }
 
-        // 处理y_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
+        // 处理y_rotation参数（此时scores参数仍为占位符，不会误匹配）
         val yRotationPattern = "(?<!__SCORES_)(^|,)y_rotation=([^,\\]]+)".toRegex()
         val yRotationMatches = yRotationPattern.findAll(result).toList()
-        
+
         if (yRotationMatches.isNotEmpty()) {
             // 提取所有y_rotation值
             val allRymValues = mutableListOf<Double>()
             val allRyValues = mutableListOf<Double>()
-            
+
             for (match in yRotationMatches) {
                 val rotationValue = match.groupValues[2]
-                
+
                 if (".." in rotationValue) {
                     val parts = rotationValue.split("..")
                     if (parts[0].isNotEmpty()) {
@@ -944,30 +936,25 @@ object SelectorConverter {
                     allRyValues.add(rotationValue.toDouble())
                 }
             }
-            
+
             // 计算最终范围
             val finalRym = if (allRymValues.isNotEmpty()) allRymValues.minOrNull() else null
             val finalRy = if (allRyValues.isNotEmpty()) allRyValues.maxOrNull() else null
-            
+
             // 移除所有y_rotation参数
             result = result.replace(yRotationPattern) { match ->
                 val prefix = match.groupValues[1]
                 prefix
             }
-            
+
             // 清理多余的逗号
             while (",," in result) {
                 result = result.replace(",,", ",")
             }
             result = result.replace("^,".toRegex(), "")
             result = result.replace(",$".toRegex(), "")
-            
-            // 恢复scores参数
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
-            
-            // 添加ry和rym参数
+
+            // 添加ry和rym参数（不要立即恢复scores参数）
             if (finalRym != null && finalRy != null) {
                 val rymStr = if (finalRym % 1.0 == 0.0) finalRym.toInt().toString() else finalRym.toString()
                 val ryStr = if (finalRy % 1.0 == 0.0) finalRy.toInt().toString() else finalRy.toString()
@@ -982,13 +969,13 @@ object SelectorConverter {
                 result = addParameterToResult(result, "ry=$ryStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_ry, "multiple", ryStr))
             }
-        } else {
-            // 恢复scores参数
-            for ((placeholder, original) in scoresMatches) {
-                result = result.replace(placeholder, original)
-            }
         }
-        
+
+        // 在x_rotation和y_rotation都处理完后，统一恢复scores参数
+        for ((placeholder, original) in scoresMatches) {
+            result = result.replace(placeholder, original)
+        }
+
         return result
     }
     
@@ -3233,30 +3220,30 @@ object SelectorConverter {
                 null
             }
             quantity.endsWith("..") -> {
-                // 2.. 取 2
-                val value = quantity.substringBefore("..").toIntOrNull()
+                // 2.. 或 2.5.. 取四舍五入后的值
+                val value = quantity.substringBefore("..").toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     reminders.add(getStringSafely(context, R.string.hasitem_quantity_min_only, value))
                     value.toString()
                 } else null
             }
             quantity.startsWith("..") -> {
-                // ..5 取 5
-                val value = quantity.substringAfter("..").toIntOrNull()
+                // ..5 或 ..5.6 取四舍五入后的值
+                val value = quantity.substringAfter("..").toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     reminders.add(getStringSafely(context, R.string.hasitem_quantity_max_only, value))
                     value.toString()
                 } else null
             }
             ".." in quantity -> {
-                // 3..5 取中间值
+                // 3..5 取中间值（四舍五入）
                 val parts = quantity.split("..")
                 if (parts.size == 2) {
-                    val min = parts[0].toIntOrNull()
-                    val max = parts[1].toIntOrNull()
+                    val min = parts[0].toDoubleOrNull()
+                    val max = parts[1].toDoubleOrNull()
                     if (min != null && max != null) {
                         val midValue = ((min + max) / 2.0).roundToInt()
-                        reminders.add(getStringSafely(context, R.string.hasitem_quantity_range, min, max, midValue))
+                        reminders.add(getStringSafely(context, R.string.hasitem_quantity_range, min.roundToInt(), max.roundToInt(), midValue))
                         midValue.toString()
                     } else null
                 } else null
@@ -3267,8 +3254,8 @@ object SelectorConverter {
                 null
             }
             else -> {
-                // 单个数字，直接使用
-                val value = quantity.toIntOrNull()
+                // 单个数字，直接使用（四舍五入）
+                val value = quantity.toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     value.toString()
                 } else null
@@ -3279,7 +3266,7 @@ object SelectorConverter {
     /**
      * 解析 slot 范围（基岩版到Java版）
      * 返回Java版的槽位编号列表
-     * 
+     *
      * 转换规则：
      * - 基岩版 slot.hotbar,slot=0-8 → Java版 Inventory Slot 0-8（直接对应）
      * - 基岩版 slot.inventory,slot=0 → Java版 Inventory Slot 9（需要 +9）
@@ -3296,31 +3283,31 @@ object SelectorConverter {
 
         when {
             slot.endsWith("..") -> {
-                // 0.. 取 0
-                val value = slot.substringBefore("..").toIntOrNull()
+                // 0.. 或 0.5.. 取四舍五入后的值
+                val value = slot.substringBefore("..").toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     slotNumbers.add(value)
                     reminders.add(getStringSafely(context, R.string.hasitem_slot_min_only, value))
                 }
             }
             slot.startsWith("..") -> {
-                // ..8 取 8
-                val value = slot.substringAfter("..").toIntOrNull()
+                // ..8 或 ..8.6 取四舍五入后的值
+                val value = slot.substringAfter("..").toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     slotNumbers.add(value)
                     reminders.add(getStringSafely(context, R.string.hasitem_slot_max_only, value))
                 }
             }
             ".." in slot -> {
-                // 3..5 取中间值4
+                // 3..5 取中间值（四舍五入）
                 val parts = slot.split("..")
                 if (parts.size == 2) {
-                    val min = parts[0].toIntOrNull()
-                    val max = parts[1].toIntOrNull()
+                    val min = parts[0].toDoubleOrNull()
+                    val max = parts[1].toDoubleOrNull()
                     if (min != null && max != null) {
                         val midValue = ((min + max) / 2.0).roundToInt()
                         slotNumbers.add(midValue)
-                        reminders.add(getStringSafely(context, R.string.hasitem_slot_range, min, max, midValue))
+                        reminders.add(getStringSafely(context, R.string.hasitem_slot_range, min.roundToInt(), max.roundToInt(), midValue))
                     }
                 }
             }
@@ -3329,8 +3316,8 @@ object SelectorConverter {
                 reminders.add(getStringSafely(context, R.string.hasitem_slot_negation_not_supported))
             }
             else -> {
-                // 单个槽位
-                val value = slot.toIntOrNull()
+                // 单个槽位（四舍五入）
+                val value = slot.toDoubleOrNull()?.roundToInt()
                 if (value != null) {
                     slotNumbers.add(value)
                 }
