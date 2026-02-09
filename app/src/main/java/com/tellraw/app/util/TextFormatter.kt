@@ -9,6 +9,36 @@ import com.tellraw.app.model.MinecraftVersion
 
 object TextFormatter {
     
+    // 字符串资源的默认值映射（用于测试环境中资源不可用时）
+    private val STRING_DEFAULTS = mapOf(
+        R.string.java_font_bedrock_color to "Java版用字体，基岩版用颜色代码",
+        R.string.both_color_mode to "两版都用颜色代码",
+        R.string.command_must_start_with_tellraw to "命令必须以 'tellraw ' 开头",
+        R.string.command_format_incorrect to "格式错误，应为: tellraw <选择器> <消息>",
+        R.string.selector_must_start_with_at to "选择器必须以 @ 开头",
+        R.string.selector_invalid to "选择器无效，必须是 @a、@p、@r、@e 或 @s",
+        R.string.message_json_invalid to "消息JSON格式无效",
+        R.string.message_json_invalid_with_error to "消息JSON格式无效: %s"
+    )
+    
+    /**
+     * 安全地获取字符串资源，如果资源不可用则使用默认值
+     */
+    private fun getStringSafely(context: Context, resId: Int, vararg formatArgs: Any): String {
+        return try {
+            context.getString(resId, *formatArgs)
+        } catch (e: Exception) {
+            // 资源不可用时，使用默认值
+            val defaultTemplate = STRING_DEFAULTS[resId] ?: "警告：资源ID $resId 不可用"
+            return try {
+                String.format(defaultTemplate, *formatArgs)
+            } catch (e: Exception) {
+                // 格式化失败时返回原始模板
+                defaultTemplate
+            }
+        }
+    }
+    
     // Gson实例，用于JSON序列化，与Python版本保持一致
     private val gson = GsonBuilder()
         .disableHtmlEscaping()
@@ -113,10 +143,10 @@ object TextFormatter {
         if (containsMNCodes(text)) {
             if (useJavaFontStyle) {
                 // Java版使用字体方式（删除线/下划线），基岩版使用颜色代码方式（深红色/铜色）
-                warnings.add(context.getString(R.string.java_font_bedrock_color))
+                warnings.add(getStringSafely(context, R.string.java_font_bedrock_color))
             } else {
                 // Java版和基岩版都使用颜色代码方式
-                warnings.add(context.getString(R.string.both_color_mode))
+                warnings.add(getStringSafely(context, R.string.both_color_mode))
             }
             // 不修改原始文本，保留§m§n代码，在convertToJavaJson和convertToBedrockJson中根据mNHandling参数处理
         }
@@ -434,10 +464,8 @@ object TextFormatter {
             processedText = processedText.replace("§n_c", "§n")
         } else if (isMixedMode) {
             // 混合模式：将§m_f/§m_c/§n_f/§n_c统一转换为§m/§n（颜色代码）
-            // 先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
-            processedText = processedText.replace(Regex("§m(?![_fn])"), "")
-            processedText = processedText.replace(Regex("§n(?![_fn])"), "")
-            // 然后将§m_f/§m_c统一转换为§m（material_redstone）
+            // 不移除普通的§m/§n，因为基岩版中它们也是有效的颜色代码
+            // 只是将§m_f/§m_c统一转换为§m（material_redstone）
             processedText = processedText.replace("§m_f", "§m")
             processedText = processedText.replace("§m_c", "§m")
             // 将§n_f/§n_c统一转换为§n（material_copper）
@@ -580,13 +608,13 @@ object TextFormatter {
         val errors = mutableListOf<String>()
         
         if (!command.startsWith("tellraw ")) {
-            errors.add(context.getString(R.string.command_must_start_with_tellraw))
+            errors.add(getStringSafely(context, R.string.command_must_start_with_tellraw))
             return errors
         }
         
         val parts = command.split(" ", limit = 3)
         if (parts.size < 3) {
-            errors.add(context.getString(R.string.command_format_incorrect))
+            errors.add(getStringSafely(context, R.string.command_format_incorrect))
             return errors
         }
         
@@ -595,12 +623,12 @@ object TextFormatter {
         
         // 验证选择器
         if (!selector.startsWith("@")) {
-            errors.add(context.getString(R.string.selector_must_start_with_at))
+            errors.add(getStringSafely(context, R.string.selector_must_start_with_at))
         } else {
             // 验证选择器是否为有效的Minecraft选择器
             val validSelectors = setOf("@a", "@p", "@r", "@e", "@s")
             if (selector !in validSelectors) {
-                errors.add(context.getString(R.string.selector_invalid))
+                errors.add(getStringSafely(context, R.string.selector_invalid))
             }
         }
         
@@ -610,10 +638,10 @@ object TextFormatter {
             try {
                 // 简单的JSON验证
                 if (!isValidJson(message)) {
-                    errors.add(context.getString(R.string.message_json_invalid))
+                    errors.add(getStringSafely(context, R.string.message_json_invalid))
                 }
             } catch (e: Exception) {
-                errors.add(context.getString(R.string.message_json_invalid_with_error, e.message ?: ""))
+                errors.add(getStringSafely(context, R.string.message_json_invalid_with_error, e.message ?: ""))
             }
         }
         

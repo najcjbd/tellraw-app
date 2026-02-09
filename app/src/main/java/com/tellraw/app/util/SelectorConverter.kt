@@ -21,7 +21,7 @@ object SelectorConverter {
     )
     
     // 基岩版特有选择器变量
-    private val BEDROCK_SPECIFIC_SELECTORS = listOf("@initiator", "@c", "@v")
+    private val BEDROCK_SPECIFIC_SELECTORS = listOf("@initiator", "@c", "@v", "@n")
     
     // 颜色代码映射表 - Java版到基岩版的对应关系
     private val JAVA_COLORS = mapOf(
@@ -129,7 +129,16 @@ object SelectorConverter {
         R.string.hasitem_slot_min_only to "注意：slot=%s.. 已转换为 %s",
         R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
         R.string.hasitem_slot_range to "注意：slot=%1\$s..%2\$s 已转换为 %3\$s（中间值）",
-        R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除"
+        R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除",
+        // TextFormatter 中使用的资源
+        R.string.java_font_bedrock_color to "Java版用字体，基岩版用颜色代码",
+        R.string.both_color_mode to "两版都用颜色代码",
+        R.string.command_must_start_with_tellraw to "命令必须以 'tellraw ' 开头",
+        R.string.command_format_incorrect to "格式错误，应为: tellraw <选择器> <消息>",
+        R.string.selector_must_start_with_at to "选择器必须以 @ 开头",
+        R.string.selector_invalid to "选择器无效，必须是 @a、@p、@r、@e 或 @s",
+        R.string.message_json_invalid to "消息JSON格式无效",
+        R.string.message_json_invalid_with_error to "消息JSON格式无效: %s"
     )
 
     /**
@@ -235,7 +244,8 @@ object SelectorConverter {
         val selectorMapping = mapOf(
             "@initiator" to "@a",
             "@c" to "@a",
-            "@v" to "@a"
+            "@v" to "@a",
+            "@n" to "@e"
         )
         
         val selectorVar = selector.split('[')[0]
