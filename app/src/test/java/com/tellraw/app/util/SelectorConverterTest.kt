@@ -2580,7 +2580,7 @@ class SelectorConverterTest {
         assertTrue("应包含Count:3b（2.5四舍五入）", conversion.javaSelector.contains("Count:3b"))
         assertFalse("不应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2591,7 +2591,7 @@ class SelectorConverterTest {
         assertTrue("应包含Count:6b（5.6四舍五入）", conversion.javaSelector.contains("Count:6b"))
         assertFalse("不应包含Count:5b", conversion.javaSelector.contains("Count:5b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2602,7 +2602,7 @@ class SelectorConverterTest {
         assertTrue("应包含Count:5b（中间值4.5四舍五入）", conversion.javaSelector.contains("Count:5b"))
         assertFalse("不应包含Count:4b", conversion.javaSelector.contains("Count:4b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2612,7 +2612,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Count:0b（0.4四舍五入）", conversion.javaSelector.contains("Count:0b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2622,7 +2622,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Count:1b（0.5四舍五入）", conversion.javaSelector.contains("Count:1b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2632,7 +2632,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Slot:0b（0.4四舍五入）", conversion.javaSelector.contains("Slot:0b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2642,7 +2642,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Slot:9b（8.6四舍五入）", conversion.javaSelector.contains("Slot:9b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2652,7 +2652,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Slot:5b（中间值5）", conversion.javaSelector.contains("Slot:5b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2662,7 +2662,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Slot:11b（中间值10.95四舍五入）", conversion.javaSelector.contains("Slot:11b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2673,7 +2673,7 @@ class SelectorConverterTest {
         assertTrue("应包含Count:4b（3.7四舍五入）", conversion.javaSelector.contains("Count:4b"))
         assertTrue("应包含Slot:2b（2.4四舍五入）", conversion.javaSelector.contains("Slot:2b"))
         // 验证提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
@@ -2711,7 +2711,7 @@ class SelectorConverterTest {
         // 验证提醒信息（如果有槽位编号转换）
         if (conversion.bedrockSelector.contains("slot.inventory")) {
             // 槽位编号从21转换为12，应该有提醒
-            assertTrue("应包含槽位编号转换提醒", conversion.reminders.any { it.contains("槽位") })
+            assertTrue("应包含槽位编号转换提醒", conversion.bedrockReminders.any { it.contains("槽位") })
         }
     }
 
@@ -2771,7 +2771,7 @@ class SelectorConverterTest {
         assertTrue("应包含第二个物品的Count:3b", conversion.javaSelector.contains("Count:3b"))
         assertTrue("应包含第二个物品的Slot:16b", conversion.javaSelector.contains("Slot:16b"))
         // 验证有提醒信息
-        assertTrue("应包含提醒信息", conversion.reminders.isNotEmpty())
+        assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
 
     /**
