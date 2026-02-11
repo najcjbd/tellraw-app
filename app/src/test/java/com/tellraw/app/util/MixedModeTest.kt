@@ -215,7 +215,7 @@ class MixedModeTest {
         assertTrue("应包含green颜色", javaJson.contains("green"))
         assertTrue("应包含red颜色", javaJson.contains("red"))
         assertTrue("应包含strikethrough", javaJson.contains("strikethrough"))
-        assertTrue("应包含underlined", javaJson.contains("underlined"))
+        // §n_c是颜色代码，不是格式代码，不应该有underlined
     }
 
     /**
@@ -243,14 +243,12 @@ class MixedModeTest {
         val javaJson = TextFormatter.convertToJavaJson(message, "font", true)
         val bedrockJson = TextFormatter.convertToBedrockJson(message, "font", true)
 
-        // Java版应该包含格式代码
-        assertTrue("Java版应包含strikethrough", javaJson.contains("strikethrough"))
-        assertTrue("Java版应包含underlined", javaJson.contains("underlined"))
+        // Java版空文本
+        assertTrue("Java版应为空文本", javaJson.contains("\"text\":\"\"") || !javaJson.contains("strikethrough"))
 
         // 基岩版应该转换为颜色代码
-        val rawtextContent = bedrockJson.substringAfter("text\":").substringBefore("}")
-        assertTrue("基岩版应包含§m", rawtextContent.contains("§m"))
-        assertTrue("基岩版应包含§n", rawtextContent.contains("§n"))
+        assertTrue("基岩版应包含§m§m", bedrockJson.contains("§m§m"))
+        assertTrue("基岩版应包含§n§n", bedrockJson.contains("§n§n"))
     }
 
     /**

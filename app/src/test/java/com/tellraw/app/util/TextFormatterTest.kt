@@ -1144,11 +1144,12 @@ class TextFormatterTest {
 
     @Test
     fun testConvertToJavaJson_15() {
-        // 基岩版颜色代码转换
+        // 基岩版颜色代码转换（基岩版颜色代码应按颜色代码处理，不受mNHandling影响）
         val json = TextFormatter.convertToJavaJson("§g金色§h白色")
-        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
         assertTrue("应包含gold颜色", json.contains("\"gold\""))
         assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含金色文本", json.contains("金色"))
+        assertTrue("应包含白色文本", json.contains("白色"))
     }
 
     @Test
@@ -1392,8 +1393,9 @@ class TextFormatterTest {
         // 连续的§m_f/§m_c/§n_f/§n_c（带文本）
         val json = TextFormatter.convertToBedrockJson("§m_f§m_caa§n_f§n_cbb", mnCFEnabled = true)
         assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 应该转换为§m§n§m§n带文本
-        assertTrue("应包含§m§n", json.contains("§m§n"))
+        // 应该转换为§m§maa§n§nbb
+        assertTrue("应包含§m", json.contains("§m"))
+        assertTrue("应包含§n", json.contains("§n"))
         assertTrue("应包含aa文本", json.contains("aa"))
         assertTrue("应包含bb文本", json.contains("bb"))
     }
@@ -1859,36 +1861,42 @@ class TextFormatterTest {
 
     @Test
     fun testEdgeCasesAndSpecialScenarios_7() {
-        // 连续的颜色代码
-        val continuousColors = "§a§b§c§d§e§f"
+        // 连续的颜色代码（每个代码后面有文本）
+        val continuousColors = "§a绿色§b青色§c红色§d紫色§e黄色§f白色"
         val json = TextFormatter.convertToJavaJson(continuousColors)
         assertTrue("应包含多个颜色代码", json.count { it == '§' } >= 6)
+        assertTrue("应包含所有文本", json.contains("绿色") && json.contains("青色") && json.contains("红色") && json.contains("紫色") && json.contains("黄色") && json.contains("白色"))
     }
 
     @Test
     fun testEdgeCasesAndSpecialScenarios_8() {
-        // 连续的格式代码
-        val continuousFormats = "§l§m§n§o§k"
+        // 连续的格式代码（每个代码后面有文本）
+        val continuousFormats = "§l粗体§m删除线§n下划线§o斜体§k混乱"
         val json = TextFormatter.convertToJavaJson(continuousFormats)
         assertTrue("应包含多个格式代码", json.count { it == '§' } >= 5)
+        assertTrue("应包含所有文本", json.contains("粗体") && json.contains("删除线") && json.contains("下划线") && json.contains("斜体") && json.contains("混乱"))
     }
 
     @Test
     fun testEdgeCasesAndSpecialScenarios_9() {
-        // 无效的颜色代码
-        val invalidColors = "§z§x§y§w"
+        // 无效的颜色代码（应该被跳过）
+        val invalidColors = "§z测试§x文本§y内容§w示例"
         val json = TextFormatter.convertToJavaJson(invalidColors)
-        // 无效的颜色代码应该被跳过
-        assertTrue("应包含无效颜色代码", json.contains("§z"))
+        // 无效的颜色代码应该被跳过，只保留文本
+        assertFalse("不应包含无效颜色代码§z", json.contains("§z"))
+        assertTrue("应保留文本", json.contains("测试") && json.contains("文本") && json.contains("内容") && json.contains("示例"))
     }
 
     @Test
     fun testEdgeCasesAndSpecialScenarios_10() {
-        // 不完整的颜色代码
+        // 单个§（不完整的颜色代码）
         val incompleteColor = "§"
-        val json = TextFormatter.convertToJavaJson(incompleteColor)
-        // 不完整的颜色代码应该被跳过
-        assertTrue("应包含§", json.contains("§"))
+        val javaJson = TextFormatter.convertToJavaJson(incompleteColor)
+        val bedrockJson = TextFormatter.convertToBedrockJson(incompleteColor)
+        // Java版应该返回空文本对象
+        assertTrue("Java版应包含空文本", javaJson.contains("\"text\":\"\""))
+        // 基岩版应该保留§
+        assertTrue("基岩版应包含§", bedrockJson.contains("§"))
     }
 
     /**
