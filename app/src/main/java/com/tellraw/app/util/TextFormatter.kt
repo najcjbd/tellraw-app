@@ -199,7 +199,7 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false): String {
         var jsonText = text
         var currentFormat = mutableMapOf<String, Any>()
 
@@ -441,7 +441,7 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "color", mnCFEnabled: Boolean = false): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false): String {
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）

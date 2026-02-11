@@ -193,10 +193,10 @@ class TellrawGeneratorTest {
             "@a[l=5]" to "level=5",
             "@a[lm=5]" to "level=5..",
             "@a[lm=5,l=10]" to "level=5..10",
-            "@a[rx=-45]" to "x_rotation=-45..",
+            "@a[rx=-45]" to "x_rotation=..-45",
             "@a[rx=45]" to "x_rotation=..45",
             "@a[rxm=-45,rx=45]" to "x_rotation=-45..45",
-            "@a[ry=-90]" to "y_rotation=-90..",
+            "@a[ry=-90]" to "y_rotation=..-90",
             "@a[ry=90]" to "y_rotation=..90",
             "@a[rym=-90,ry=90]" to "y_rotation=-90..90",
             "@a[c=5]" to "limit=5,sort=nearest",
@@ -216,13 +216,13 @@ class TellrawGeneratorTest {
     @Test
     fun testJavaToBedrockConversion() {
         val testCases = listOf(
-            "@a[distance=10]" to "r=10",
+            "@a[distance=10]" to "rm=10,r=10",
             "@a[distance=5..]" to "rm=5",
             "@a[distance=5..10]" to "rm=5,r=10",
             "@a[gamemode=survival]" to "m=0",
             "@a[gamemode=creative]" to "m=1",
             "@a[gamemode=adventure]" to "m=2",
-            "@a[level=5]" to "l=5",
+            "@a[level=5]" to "lm=5,l=5",
             "@a[level=5..]" to "lm=5",
             "@a[level=5..10]" to "lm=5,l=10",
             "@a[x_rotation=-45..45]" to "rxm=-45,rx=45",
@@ -230,7 +230,7 @@ class TellrawGeneratorTest {
             "@a[limit=5,sort=nearest]" to "c=5",
             "@a[limit=5,sort=furthest]" to "c=-5"
         )
-        
+
         for ((javaSelector, _) in testCases) {
             val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
             // Java版选择器转换后，基岩版选择器应该包含对应的参数

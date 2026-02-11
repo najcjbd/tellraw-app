@@ -3494,7 +3494,7 @@ class SelectorConverterTest {
         // 查找附近的玩家
         val bedrockSelector = "@p[r=10]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含distance=10", conversion.javaSelector.contains("distance=10"))
+        assertTrue("应包含distance=..10", conversion.javaSelector.contains("distance=..10"))
     }
 
     @Test
