@@ -1848,7 +1848,7 @@ class TextFormatterTest {
         // 换行符
         val newlineText = "§a第一行\n第二行\n第三行"
         val json = TextFormatter.convertToJavaJson(newlineText)
-        assertTrue("应包含换行符", json.contains("\n"))
+        assertTrue("应包含转义的换行符", json.contains("\\n"))
     }
 
     @Test
@@ -1856,7 +1856,7 @@ class TextFormatterTest {
         // 制表符
         val tabText = "§a第一列\t第二列\t第三列"
         val json = TextFormatter.convertToJavaJson(tabText)
-        assertTrue("应包含制表符", json.contains("\t"))
+        assertTrue("应包含转义的制表符", json.contains("\\t"))
     }
 
     @Test

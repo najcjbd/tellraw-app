@@ -1,12 +1,14 @@
 package com.tellraw.app.util
 
 import android.content.Context
+import android.util.Log
 import com.tellraw.app.R
 import com.tellraw.app.model.*
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
 object SelectorConverter {
+    private const val TAG = "SelectorConverter"
     
     // Java版特有参数
     private val JAVA_SPECIFIC_PARAMS = listOf(
@@ -252,6 +254,8 @@ object SelectorConverter {
      */
     fun convertBedrockToJava(selector: String, context: android.content.Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
+        Log.d(TAG, "=== convertBedrockToJava START ===")
+        Log.d(TAG, "Input selector: $selector")
         
         // 基岩版特有选择器变量到Java版的映射
         val selectorMapping = mapOf(
@@ -268,6 +272,8 @@ object SelectorConverter {
         
         var newSelector = selector
         var wasConverted = false
+        
+        Log.d(TAG, "Selector var: $selectorVar, paramsPart: $paramsPart")
         
         // 转换选择器变量
         if (selectorVar in selectorMapping) {
@@ -302,10 +308,16 @@ object SelectorConverter {
      */
     fun convertJavaToBedrock(selector: String, context: Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
+        Log.d(TAG, "=== convertJavaToBedrock START ===")
+        Log.d(TAG, "Input selector: $selector")
         
         // 转换参数
         val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
+        
+        Log.d(TAG, "Output selector: $convertedSelector")
+        Log.d(TAG, "Removed params: $removedParams")
+        Log.d(TAG, "=== convertJavaToBedrock END ===")
 
         // 返回转换后的选择器
         var bedrockSelector = convertedSelector
@@ -782,6 +794,8 @@ object SelectorConverter {
      */
     private fun convertDistanceParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
+        Log.d(TAG, "=== convertDistanceParameters START ===")
+        Log.d(TAG, "Input paramsPart: $paramsPart")
         
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
         // 使用智能提取方法，正确处理嵌套的花括号
@@ -793,6 +807,7 @@ object SelectorConverter {
         
         // 处理所有的distance参数，提取所有的值并计算范围
         val distanceMatches = distancePattern.findAll(result).toList()
+        Log.d(TAG, "Found ${distanceMatches.size} distance matches")
         
         if (distanceMatches.isNotEmpty()) {
             // 提取所有distance值
@@ -801,6 +816,7 @@ object SelectorConverter {
             
             for (match in distanceMatches) {
                 val distanceValue = match.groupValues[2]
+                Log.d(TAG, "  - distanceValue: $distanceValue")
                 
                 if (".." in distanceValue) {
                     val parts = distanceValue.split("..")
@@ -860,6 +876,8 @@ object SelectorConverter {
             }
         }
         
+        Log.d(TAG, "Output paramsPart: $result")
+        Log.d(TAG, "=== convertDistanceParameters END ===")
         return result
     }
     
