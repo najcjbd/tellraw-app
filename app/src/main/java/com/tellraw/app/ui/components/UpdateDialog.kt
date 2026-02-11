@@ -3,7 +3,7 @@ package com.tellraw.app.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.tellraw.app.R
 import com.tellraw.app.data.remote.GithubRelease
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,7 +157,7 @@ fun JavaBedrockMixedModeWarningDialog(
     
     LaunchedEffect(countdown) {
         while (countdown > 0) {
-            kotlinx.coroutines.delay(1000L)
+            delay(1000L)
             countdown--
         }
     }
