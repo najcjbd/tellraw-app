@@ -1346,7 +1346,6 @@ class TextFormatterTest {
         assertTrue("应包含白色", json.contains("白色"))
         assertTrue("应包含灰色", json.contains("灰色"))
     }
-    }
 
     @Test
     fun testConvertToBedrockJson_8() {
