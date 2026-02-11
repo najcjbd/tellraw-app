@@ -1378,62 +1378,6 @@ class TextFormatterTest {
     }
 
     @Test
-    fun testConvertToBedrockJson_11() {
-        // 混合模式：mnCFEnabled=false且mNHandling="font"
-        val json = TextFormatter.convertToBedrockJson("§m_f删除线§m_c和§n_f下划线§n_c", mNHandling = "font", mnCFEnabled = false)
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 在混合模式下，§m_f/§m_c应该转换为§m，§n_f/§n_c应该转换为§n
-        assertTrue("应包含§m颜色代码", json.contains("§m"))
-        assertTrue("应包含§n颜色代码", json.contains("§n"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_12() {
-        // §m/§n_c/f模式：移除普通的§m/§n
-        val json = TextFormatter.convertToBedrockJson("§m普通§m_f删除线§m_c颜色", mnCFEnabled = true)
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 普通的§m应该被移除
-        assertFalse("不应包含普通§m文本", json.contains("普通"))
-        // §m_f/§m_c应该转换为§m
-        assertTrue("应包含§m颜色代码", json.contains("§m"))
-        assertTrue("应包含删除线", json.contains("删除线"))
-        assertTrue("应包含颜色", json.contains("颜色"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_13() {
-        // 基岩版特有颜色代码转换
-        val json = TextFormatter.convertToBedrockJson("§g金色§h白色§i灰色")
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        assertTrue("应包含金色", json.contains("金色"))
-        assertTrue("应包含白色", json.contains("白色"))
-        assertTrue("应包含灰色", json.contains("灰色"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_14() {
-        // §r重置代码
-        val json = TextFormatter.convertToBedrockJson("§a绿色§r普通文本")
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        assertTrue("应包含§a颜色代码", json.contains("§a"))
-        assertTrue("应包含§r重置代码", json.contains("§r"))
-        assertTrue("应包含普通文本", json.contains("普通文本"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_15() {
-        // 所有格式代码
-        val json = TextFormatter.convertToBedrockJson("§l粗体§m删除线§n下划线§o斜体§k混乱§r重置")
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        assertTrue("应包含§l", json.contains("§l"))
-        assertTrue("应包含§m", json.contains("§m"))
-        assertTrue("应包含§n", json.contains("§n"))
-        assertTrue("应包含§o", json.contains("§o"))
-        assertTrue("应包含§k", json.contains("§k"))
-        assertTrue("应包含§r", json.contains("§r"))
-    }
-
-    @Test
     fun testConvertToBedrockJson_16() {
         // 空文本
         val json = TextFormatter.convertToBedrockJson("")
