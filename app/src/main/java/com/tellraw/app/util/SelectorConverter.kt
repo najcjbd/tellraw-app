@@ -481,9 +481,8 @@ object SelectorConverter {
             paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
         } else if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
-            println("DEBUG filterSelectorParameters: before convertRotationParameters: $paramsPart")
+            paramsPart = convertDistanceParameters(paramsPart, conversionReminders, context)
             paramsPart = convertRotationParameters(paramsPart, conversionReminders, context)
-            println("DEBUG filterSelectorParameters: after convertRotationParameters: $paramsPart")
             paramsPart = convertLevelParameters(paramsPart, conversionReminders, context)
 
             // 处理gamemode到m的转换（Java版到基岩版）
