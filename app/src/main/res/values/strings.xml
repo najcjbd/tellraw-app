@@ -345,4 +345,14 @@
     
     <!-- §m§n代码转换警告 -->
     <string name="bedrock_font_to_color_warning">基岩版中§m_f/§n_f将被转换为颜色代码（§m/§n），而非字体格式（删除线/下划线）</string>
+    
+    <!-- JAVA/基岩混合模式警告 -->
+    <string name="java_bedrock_mixed_mode_warning">JAVA/基岩混合模式警告</string>
+    <string name="java_bedrock_mixed_mode_not_mature">当前JAVA/基岩混合模式并不健全，可能存在以下问题：
+
+• 转换结果可能不完全准确
+• 某些参数组合可能无法正确处理
+• 提醒信息可能不完整</string>
+    <string name="java_bedrock_mixed_mode_warning_message">警告：请在正式使用前先测试转换结果，确保符合预期！</string>
+    <string name="please_wait_seconds">请等待 %d 秒后再点击确定</string>
 </resources>

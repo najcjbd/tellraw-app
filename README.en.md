@@ -171,6 +171,54 @@ Mixed mode allows selecting handling method for each §m/§n code:
 - Backend automatically converts to §m_f/§m_c/§n_f/§n_c
 - Dialog pops up for each §m/§n input to select handling method
 
+## ⚠️ Java-Bedrock Mixed Mode Warning
+
+The current Java-Bedrock mixed mode is not fully mature and may have the following issues:
+- Conversion results may not be completely accurate
+- Some parameter combinations may not be handled correctly
+- Warning messages may be incomplete
+
+It is recommended to test the conversion results before actual use to ensure they meet your expectations.
+
+## 🔄 Merge Mode Explanation
+
+When selector parameters appear multiple times, the app merges them based on parameter type:
+
+### Merge Logic Selection
+
+The app supports two merge logic modes:
+
+**Mode 1: Source Code Merge Logic (Mixed Mode)**
+- Suitable for complex scenarios with both Java and Bedrock specific parameters
+- Range parameters (distance, x_rotation, y_rotation, level): Takes the minimum of all minimum values and the maximum of all maximum values
+- Example: distance=5..7, distance=3..9 → distance=3..9
+
+**Mode 2: New Merge Logic (Default)**
+- Suitable for most scenarios
+- Range parameters (distance, x_rotation, y_rotation, level): Selects the range with the largest absolute difference
+- Example: distance=5..7 (diff=2), distance=3..9 (diff=6) → distance=3..9
+
+### Parameter Merge Rules
+
+**Parameters that take maximum value**: x, y, z, dx, dy, dz, r, rx, ry, l, c, limit
+- Example: x=8, x=9.5, y=5, y=6 → x=9.5, y=6
+
+**Parameters that take minimum value**: rm, rxm, rym, lm
+- Example: rm=1, rm=3.5, rxm=-5.5, rxm=-1 → rm=1, rxm=-5.5
+
+**Range Parameters (Java Edition)**: distance, x_rotation, y_rotation, level
+- Processed according to the selected merge logic
+
+**Negative Number Support**:
+- Parameters that can reach negative numbers (range-related): rx, rxm, ry, rym, x_rotation, y_rotation
+- Parameters that can be negative (value-related): c, x, y, z, dx, dy, dz
+
+### Merge Timing
+
+The app performs parameter merging at the following times:
+1. **Pre-conversion merge**: Merge duplicate input parameters before parameter conversion
+2. **Post-conversion merge**: Merge duplicate parameters that may have been generated after parameter conversion
+
 ## 📚 History Management
 
 ### Local Storage
@@ -295,6 +343,16 @@ jobs:
 - 📱 **Download**: [GitHub Releases](https://github.com/najcjbd/tellraw-app/releases)
 - 📧 **Issues**: [GitHub Issues](https://github.com/najcjbd/tellraw-app/issues)
 
+## 🤖 About This Project
+
+This project was primarily developed with AI (Artificial Intelligence) assistance. AI provided important support in the following areas:
+- Core feature implementation
+- Code writing and optimization
+- Test case design
+- Documentation writing
+
+AI-assisted development greatly improved development efficiency, allowing the project to be completed and released in a short time.
+
 ---
 
-**🤖 Developer**: By AI🤖🤖🤖
+**🤖 Developer**: Developed with AI assistance🤖🤖🤖

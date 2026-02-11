@@ -69,10 +69,10 @@ class SelectorConverterTest {
     
     @Test
     fun testSelectorVariables_6() {
-        // @n - 最近的实体
+        // @n - 最近的实体（基岩版特有）
         val selector = "@n"
         val type = SelectorConverter.detectSelectorType(selector)
-        assertEquals(SelectorType.UNIVERSAL, type)
+        assertEquals(SelectorType.BEDROCK, type)
     }
     
     @Test
@@ -615,81 +615,120 @@ class SelectorConverterTest {
      * 测试组10：选择器转换测试
      */
     @Test
+    fun testSelectorConversion_0() {
+        // 基岩版到Java版：@n -> @e
+        val bedrockSelector = "@n"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
+        assertTrue("@n应转换为@e", conversion.javaSelector.startsWith("@e"))
+        assertTrue("应包含@n->@e的转换提醒", conversion.javaReminders.any { it.contains("@n") && it.contains("@e") })
+    }
+
+    @Test
     fun testSelectorConversion_1() {
+        // 基岩版到Java版：@c -> @a
+        val bedrockSelector = "@c"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
+        assertTrue("@c应转换为@a", conversion.javaSelector.startsWith("@a"))
+        assertTrue("应包含@c->@a的转换提醒", conversion.javaReminders.any { it.contains("@c") && it.contains("@a") })
+    }
+
+    @Test
+    fun testSelectorConversion_1b() {
+        // 基岩版到Java版：@v -> @a
+        val bedrockSelector = "@v"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
+        assertTrue("@v应转换为@a", conversion.javaSelector.startsWith("@a"))
+        assertTrue("应包含@v->@a的转换提醒", conversion.javaReminders.any { it.contains("@v") && it.contains("@a") })
+    }
+
+    @Test
+    fun testSelectorConversion_1c() {
+        // 基岩版到Java版：@initiator -> @a
+        val bedrockSelector = "@initiator"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
+        assertTrue("@initiator应转换为@a", conversion.javaSelector.startsWith("@a"))
+        assertTrue("应包含@initiator->@a的转换提醒", conversion.javaReminders.any { it.contains("@initiator") && it.contains("@a") })
+    }
+
+    @Test
+    fun testSelectorConversion_2() {
         // 基岩版到Java版：r/rm -> distance
         val bedrockSelector = "@a[r=10]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应该检测到基岩版选择器", conversion.wasConverted)
         assertTrue("Java版选择器应包含distance", conversion.javaSelector.contains("distance"))
     }
     
     @Test
-    fun testSelectorConversion_2() {
+    fun testSelectorConversion_3() {
         // Java版到基岩版：distance -> r/rm
         val javaSelector = "@a[distance=10]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含r", conversion.bedrockSelector.contains("r"))
     }
-    
+
     @Test
-    fun testSelectorConversion_3() {
+    fun testSelectorConversion_4() {
         // 基岩版到Java版：m -> gamemode
         val bedrockSelector = "@a[m=0]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("Java版选择器应包含gamemode", conversion.javaSelector.contains("gamemode"))
     }
-    
+
     @Test
-    fun testSelectorConversion_4() {
+    fun testSelectorConversion_5() {
         // Java版到基岩版：gamemode -> m
         val javaSelector = "@a[gamemode=survival]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含m", conversion.bedrockSelector.contains("m"))
     }
-    
+
     @Test
-    fun testSelectorConversion_5() {
+    fun testSelectorConversion_6() {
         // 基岩版到Java版：c -> limit/sort
         val bedrockSelector = "@a[c=5]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("Java版选择器应包含limit", conversion.javaSelector.contains("limit"))
         assertTrue("Java版选择器应包含sort", conversion.javaSelector.contains("sort"))
     }
-    
+
     @Test
-    fun testSelectorConversion_6() {
+    fun testSelectorConversion_7() {
         // Java版到基岩版：limit/sort -> c
         val javaSelector = "@a[limit=5,sort=nearest]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含c", conversion.bedrockSelector.contains("c"))
     }
-    
+
     @Test
-    fun testSelectorConversion_7() {
+    fun testSelectorConversion_8() {
         // Java版到基岩版：sort=random (无limit) - @a转换为@r
         val javaSelector = "@a[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
     }
-    
+
     @Test
-    fun testSelectorConversion_8() {
+    fun testSelectorConversion_9() {
         // Java版到基岩版：sort=random + limit - @a转换为@r
         val javaSelector = "@a[limit=5,sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=5]", "@r[c=5]", conversion.bedrockSelector)
     }
-    
+
     @Test
-    fun testSelectorConversion_9() {
+    fun testSelectorConversion_10() {
         // Java版到基岩版：sort=random - @r保持@r
         val javaSelector = "@r[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("基岩版选择器应为@r[c=9999]", "@r[c=9999]", conversion.bedrockSelector)
     }
-    
+
     @Test
-    fun testSelectorConversion_10() {
+    fun testSelectorConversion_11() {
         // Java版到基岩版：sort=random - @e转换为c参数
         val javaSelector = "@e[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
@@ -976,7 +1015,247 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组15：事例转换测试
+     * 测试组15：合并逻辑测试
+     */
+    @Test
+    fun testMergeLogic_1() {
+        // 新合并逻辑（默认）：范围参数选取差的绝对值最大的范围
+        // 测试：distance=5..10 和 distance=2..15，应选取 2..15（差值13）
+        SelectorConverter.setMergeLogicMode(false) // 使用新的合并逻辑
+        val selector1 = "@a[distance=5..10]"
+        val selector2 = "@a[distance=2..15]"
+        val combined = selector1 + "," + selector2.substringAfter('[')
+        val type = SelectorConverter.detectSelectorType(combined)
+        assertEquals("应为Java版选择器", SelectorType.JAVA, type)
+    }
+
+    @Test
+    fun testMergeLogic_2() {
+        // 新合并逻辑：测试多个相同参数的合并
+        SelectorConverter.setMergeLogicMode(false) // 使用新的合并逻辑
+        val selector = "@a[x=8,x=9.5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为Java版选择器（默认行为）", SelectorType.JAVA, type)
+    }
+
+    @Test
+    fun testMergeLogic_3() {
+        // 源代码合并逻辑（混合模式）：范围参数取所有最小值的最小值和所有最大值的最大值
+        SelectorConverter.setMergeLogicMode(true) // 使用源代码合并逻辑
+        val selector = "@a[distance=5..10,distance=2..15]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为Java版选择器", SelectorType.JAVA, type)
+    }
+
+    @Test
+    fun testMergeLogic_4() {
+        // 切换合并逻辑模式
+        SelectorConverter.setMergeLogicMode(false)
+        SelectorConverter.setMergeLogicMode(true)
+        SelectorConverter.setMergeLogicMode(false)
+        val selector = "@a[distance=5..10]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为Java版选择器", SelectorType.JAVA, type)
+    }
+
+    @Test
+    fun testMergeLogic_5() {
+        // 新合并逻辑：测试负坐标
+        SelectorConverter.setMergeLogicMode(false)
+        val selector = "@a[x=-10,x=-5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为通用版选择器", SelectorType.UNIVERSAL, type)
+    }
+
+    @Test
+    fun testMergeLogic_6() {
+        // 新合并逻辑：测试小数值
+        SelectorConverter.setMergeLogicMode(false)
+        val selector = "@a[x=1.5,x=2.5]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为通用版选择器", SelectorType.UNIVERSAL, type)
+    }
+
+    @Test
+    fun testMergeLogic_7() {
+        // 新合并逻辑：测试混合参数类型
+        SelectorConverter.setMergeLogicMode(false)
+        val selector = "@a[distance=5..10,r=8,r=12]"
+        val type = SelectorConverter.detectSelectorType(selector)
+        assertEquals("应为基岩版选择器（包含r参数）", SelectorType.BEDROCK, type)
+    }
+
+    /**
+     * 测试组16：y_rotation参数边界测试
+     */
+    @Test
+    fun testYRotationBoundary_1() {
+        // y_rotation最小值边界
+        val javaSelector = "@a[y_rotation=-180]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+    }
+
+    @Test
+    fun testYRotationBoundary_2() {
+        // y_rotation最大值边界
+        val javaSelector = "@a[y_rotation=180]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+    }
+
+    @Test
+    fun testYRotationBoundary_3() {
+        // y_rotation范围边界（完整范围）
+        val javaSelector = "@a[y_rotation=-180..180]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_4() {
+        // y_rotation范围边界（负数）
+        val javaSelector = "@a[y_rotation=-90..-45]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_5() {
+        // y_rotation范围边界（正数）
+        val javaSelector = "@a[y_rotation=45..90]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_6() {
+        // y_rotation在复杂场景下不应丢失
+        val javaSelector = "@a[distance=10,x_rotation=45,y_rotation=90,gamemode=survival]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("y_rotation参数不应丢失", conversion.bedrockSelector.contains("ry="))
+    }
+
+    @Test
+    fun testYRotationBoundary_7() {
+        // y_rotation + 其他旋转参数
+        val javaSelector = "@a[x_rotation=-45..45,y_rotation=-90..90]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rx参数", conversion.bedrockSelector.contains("rx="))
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+        assertTrue("应包含rxm参数", conversion.bedrockSelector.contains("rxm="))
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_8() {
+        // y_rotation小数值
+        val javaSelector = "@a[y_rotation=90.5]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+    }
+
+    @Test
+    fun testYRotationBoundary_9() {
+        // y_rotation负小数值
+        val javaSelector = "@a[y_rotation=-90.5]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_10() {
+        // y_rotation范围只有下限
+        val javaSelector = "@a[y_rotation=-90..]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含rym参数", conversion.bedrockSelector.contains("rym="))
+    }
+
+    @Test
+    fun testYRotationBoundary_11() {
+        // y_rotation范围只有上限
+        val javaSelector = "@a[y_rotation=..90]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含ry参数", conversion.bedrockSelector.contains("ry="))
+    }
+
+    /**
+     * 测试组17：槽位编号转换测试
+     */
+    @Test
+    fun testSlotConversion_1() {
+        // Java版到基岩版：Slot 21 → slot.inventory Slot 12
+        val javaSelector = "@a[nbt={Inventory:[{Slot:21b,id:\"minecraft:netherite_ingot\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+        assertTrue("应包含slot.inventory", conversion.bedrockSelector.contains("slot.inventory"))
+        assertTrue("应包含slot=12", conversion.bedrockSelector.contains("slot=12"))
+    }
+
+    @Test
+    fun testSlotConversion_2() {
+        // 基岩版到Java版：slot.inventory Slot 12 → Slot 21
+        val bedrockSelector = "@a[hasitem={item=netherite_ingot,location=slot.inventory,slot=12}]"
+        val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
+        assertTrue("应包含Inventory", conversion.javaSelector.contains("Inventory"))
+        assertTrue("应包含Slot:21b", conversion.javaSelector.contains("Slot:21b"))
+    }
+
+    @Test
+    fun testSlotConversion_3() {
+        // 快捷栏槽位：Slot 0-8 → slot.hotbar Slot 0-8
+        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.hotbar", conversion.bedrockSelector.contains("slot.hotbar"))
+        assertTrue("应包含slot=0", conversion.bedrockSelector.contains("slot=0"))
+    }
+
+    @Test
+    fun testSlotConversion_4() {
+        // 装备槽位：head → slot.armor.head
+        val javaSelector = "@a[nbt={equipment:{head:{id:\"minecraft:diamond_helmet\"}}}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.armor.head", conversion.bedrockSelector.contains("slot.armor.head"))
+    }
+
+    @Test
+    fun testSlotConversion_5() {
+        // 主手槽位：SelectedItem → slot.weapon.mainhand
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.weapon.mainhand", conversion.bedrockSelector.contains("slot.weapon.mainhand"))
+    }
+
+    @Test
+    fun testSlotConversion_6() {
+        // 副手槽位：offhand → slot.weapon.offhand
+        val javaSelector = "@a[nbt={equipment:{offhand:{id:\"minecraft:shield\"}}}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.weapon.offhand", conversion.bedrockSelector.contains("slot.weapon.offhand"))
+    }
+
+    @Test
+    fun testSlotConversion_7() {
+        // 多个槽位转换
+        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\"},{Slot:21b,id:\"minecraft:netherite_ingot\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含slot.hotbar", conversion.bedrockSelector.contains("slot.hotbar"))
+        assertTrue("应包含slot.inventory", conversion.bedrockSelector.contains("slot.inventory"))
+    }
+
+    @Test
+    fun testSlotConversion_8() {
+        // 槽位边界测试：最大槽位
+        val javaSelector = "@a[nbt={Inventory:[{Slot:35b,id:\"minecraft:diamond\"}]}]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+    }
+
+    /**
+     * 测试组18：事例转换测试
      */
     @Test
     fun testExampleConversions_1() {
@@ -1070,7 +1349,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组16：参数组合深度测试
+     * 测试组19：参数组合深度测试
      */
     @Test
     fun testDeepParameterCombinations_1() {
@@ -1128,7 +1407,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组17：边界情况扩展测试
+     * 测试组20：边界情况扩展测试
      */
     @Test
     fun testExtendedEdgeCases_1() {
@@ -1196,7 +1475,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组18：目标选择器与参数的全面组合测试
+     * 测试组21：目标选择器与参数的全面组合测试
      */
     @Test
     fun testSelectorParameterCombinations_1() {
@@ -1281,7 +1560,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组19：hasitem-nbt 转换的更多边界情况
+     * 测试组22：hasitem-nbt 转换的更多边界情况
      */
     @Test
     fun testHasitemNbtEdgeCases_1() {
@@ -1383,7 +1662,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组20：特殊字符和转义测试
+     * 测试组23：特殊字符和转义测试
      */
     @Test
     fun testSpecialCharacters_1() {
@@ -1450,7 +1729,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组21：空值和无效输入测试
+     * 测试组24：空值和无效输入测试
      */
     @Test
     fun testEmptyInvalidInputs_1() {
@@ -1517,7 +1796,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组22：多个相同参数测试
+     * 测试组25：多个相同参数测试
      */
     @Test
     fun testMultipleSameParameters_1() {
@@ -1561,7 +1840,7 @@ class SelectorConverterTest {
     }
     
     /**
-     * 测试组23：嵌套参数测试
+     * 测试组26：嵌套参数测试
      */
     @Test
     fun testNestedParameters_1() {

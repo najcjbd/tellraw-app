@@ -54,6 +54,7 @@ fun MainScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
+    val showJavaBedrockMixedModeWarningDialog by viewModel.showJavaBedrockMixedModeWarningDialog.collectAsState()
     
     // 历史记录存储相关状态
     val showStorageSettingsDialog by viewModel.showStorageSettingsDialog.collectAsState()
@@ -193,6 +194,14 @@ fun MainScreen(
         DisableCheckDialog(
             onConfirm = { viewModel.disableVersionCheck() },
             onDismiss = { viewModel.dismissDisableCheckDialog() }
+        )
+    }
+    
+    // JAVA/基岩混合模式警告对话框
+    if (showJavaBedrockMixedModeWarningDialog) {
+        JavaBedrockMixedModeWarningDialog(
+            onConfirm = { viewModel.confirmJavaBedrockMixedMode() },
+            onDismiss = { viewModel.dismissJavaBedrockMixedModeWarningDialog() }
         )
     }
     

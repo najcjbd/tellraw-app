@@ -141,6 +141,19 @@ object SelectorConverter {
         R.string.message_json_invalid_with_error to "消息JSON格式无效: %s"
     )
 
+    // 控制是否使用混合模式合并逻辑
+    // true: 使用源代码合并逻辑（取所有最小值的最小值和所有最大值的最大值）
+    // false: 使用新的合并逻辑（选取差的绝对值最大的范围）
+    private var useMixedModeMergeLogic = false
+
+    /**
+     * 设置是否使用混合模式合并逻辑
+     * @param useMixedMode true: 使用源代码合并逻辑，false: 使用新的合并逻辑
+     */
+    fun setMergeLogicMode(useMixedMode: Boolean) {
+        useMixedModeMergeLogic = useMixedMode
+    }
+
     /**
      * 安全地获取字符串资源
      * 如果资源不可用（例如在测试环境中），返回默认值
@@ -1967,31 +1980,55 @@ object SelectorConverter {
                     }
                 }
                 paramName in rangeParams -> {
-                    // 范围类型：收集所有范围的最小值和最大值，然后计算最终范围
-                    // 这与 convertDistanceParameters、convertRotationParameters、convertLevelParameters 中的逻辑相同
-                    val allMinValues = mutableListOf<Double>()
-                    val allMaxValues = mutableListOf<Double>()
-                    
-                    for (value in values) {
-                        val range = parseRange(value.first)
-                        if (range != null) {
-                            allMinValues.add(range.first)
-                            allMaxValues.add(range.second)
+                    // 范围类型：根据 useMixedModeMergeLogic 选择不同的合并逻辑
+                    if (useMixedModeMergeLogic) {
+                        // 使用源代码合并逻辑（取所有最小值的最小值和所有最大值的最大值）
+                        // 这与 convertDistanceParameters、convertRotationParameters、convertLevelParameters 中的逻辑相同
+                        val allMinValues = mutableListOf<Double>()
+                        val allMaxValues = mutableListOf<Double>()
+
+                        for (value in values) {
+                            val range = parseRange(value.first)
+                            if (range != null) {
+                                allMinValues.add(range.first)
+                                allMaxValues.add(range.second)
+                            }
+                        }
+
+                        val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
+                        val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
+
+                        // 格式化输出
+                        val rangeValue = when {
+                            finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
+                            finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
+                            finalMax != null -> "..${formatSingleNumber(finalMax.toString())}"
+                            else -> continue
+                        }
+
+                        mergedParams.add("$paramName=$rangeValue")
+                    } else {
+                        // 使用新的合并逻辑（选取差的绝对值最大的范围）
+                        var selectedRange: Pair<Double, Double>? = null
+                        var maxDiff = 0.0
+
+                        for (value in values) {
+                            val range = parseRange(value.first)
+                            if (range != null) {
+                                val diff = kotlin.math.abs(range.second - range.first)
+                                if (diff > maxDiff) {
+                                    maxDiff = diff
+                                    selectedRange = range
+                                }
+                            }
+                        }
+
+                        if (selectedRange != null) {
+                            // 格式化输出
+                            val rangeValue = "${formatSingleNumber(selectedRange.first.toString())}..${formatSingleNumber(selectedRange.second.toString())}"
+                            mergedParams.add("$paramName=$rangeValue")
                         }
                     }
-                    
-                    val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
-                    val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
-                    
-                    // 格式化输出
-                    val rangeValue = when {
-                        finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
-                        finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
-                        finalMax != null -> "..${formatSingleNumber(finalMax.toString())}"
-                        else -> continue
-                    }
-                    
-                    mergedParams.add("$paramName=$rangeValue")
                 }
                 else -> {
                     // 其他参数类型，保留所有（不合并）
@@ -3456,7 +3493,21 @@ object SelectorConverter {
         } else {
             selectorVar
         }
-        
+
+        // 合并Java版输出中的重复参数
+        val javaOutputWithMergedParams = if ('[' in javaOutput && ']' in javaOutput) {
+            val javaSelectorVarPart = javaOutput.substringBefore('[')
+            val javaParamsPart = javaOutput.substringAfter('[').substringBeforeLast(']')
+            val mergedJavaParams = mergeDuplicateParameters(javaParamsPart)
+            if (mergedJavaParams.isNotEmpty()) {
+                "$javaSelectorVarPart[$mergedJavaParams]"
+            } else {
+                javaSelectorVarPart
+            }
+        } else {
+            javaOutput
+        }
+
         // 构建基岩版输出：保留基岩版特有参数，转换Java版参数，合并通用参数
         val bedrockConvertedParams = bedrockParams.toMutableList()
         
@@ -3483,10 +3534,24 @@ object SelectorConverter {
         } else {
             selectorVar
         }
-        
+
+        // 合并基岩版输出中的重复参数
+        val bedrockOutputWithMergedParams = if ('[' in bedrockOutput && ']' in bedrockOutput) {
+            val bedrockSelectorVarPart = bedrockOutput.substringBefore('[')
+            val bedrockParamsPart = bedrockOutput.substringAfter('[').substringBeforeLast(']')
+            val mergedBedrockParams = mergeDuplicateParameters(bedrockParamsPart)
+            if (mergedBedrockParams.isNotEmpty()) {
+                "$bedrockSelectorVarPart[$mergedBedrockParams]"
+            } else {
+                bedrockSelectorVarPart
+            }
+        } else {
+            bedrockOutput
+        }
+
         // 添加提醒信息
         reminders.add(getStringSafely(context, R.string.java_bedrock_mixed_mode_active))
-        
-        return javaOutput to bedrockOutput
+
+        return javaOutputWithMergedParams to bedrockOutputWithMergedParams
     }
 }

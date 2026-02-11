@@ -192,6 +192,17 @@ class TellrawViewModel @Inject constructor(
     private val _showDisableCheckDialog = MutableStateFlow(false)
     val showDisableCheckDialog: StateFlow<Boolean> = _showDisableCheckDialog.asStateFlow()
     
+    private val _showJavaBedrockMixedModeWarningDialog = MutableStateFlow(false)
+    val showJavaBedrockMixedModeWarningDialog: StateFlow<Boolean> = _showJavaBedrockMixedModeWarningDialog.asStateFlow()
+    
+    fun showJavaBedrockMixedModeWarningDialog() {
+        _showJavaBedrockMixedModeWarningDialog.value = true
+    }
+
+    fun dismissJavaBedrockMixedModeWarningDialog() {
+        _showJavaBedrockMixedModeWarningDialog.value = false
+    }
+    
     // 历史记录相关状态
     val commandHistory: Flow<List<HistoryItem>> = historyRepository.historyList
     
@@ -453,13 +464,34 @@ class TellrawViewModel @Inject constructor(
     }
     
     fun setJavaBedrockMixedMode(enabled: Boolean) {
-        _javaBedrockMixedMode.value = enabled
-        // 保存设置到数据库
+        if (enabled) {
+            // 开启混合模式时显示警告对话框
+            showJavaBedrockMixedModeWarningDialog()
+        } else {
+            // 直接关闭混合模式
+            _javaBedrockMixedMode.value = enabled
+            // 关闭混合模式时，使用新合并逻辑
+            SelectorConverter.setMergeLogicMode(false)
+            viewModelScope.launch {
+                settingsRepository.setJavaBedrockMixedMode(enabled)
+                settingsRepository.saveConfig()
+            }
+            generateCommands()
+        }
+    }
+
+    /**
+     * 确认开启JAVA/基岩混合模式（在警告对话框中点击确定后调用）
+     */
+    fun confirmJavaBedrockMixedMode() {
+        _javaBedrockMixedMode.value = true
+        // 开启混合模式时，使用源代码合并逻辑
+        SelectorConverter.setMergeLogicMode(true)
         viewModelScope.launch {
-            settingsRepository.setJavaBedrockMixedMode(enabled)
-            // 自动保存配置到JSON文件
+            settingsRepository.setJavaBedrockMixedMode(true)
             settingsRepository.saveConfig()
         }
+        dismissJavaBedrockMixedModeWarningDialog()
         generateCommands()
     }
     

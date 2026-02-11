@@ -146,3 +146,67 @@ private fun formatDate(dateString: String): String {
         dateString
     }
 }
+
+@Composable
+fun JavaBedrockMixedModeWarningDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var countdown by remember { mutableStateOf(2) }
+    
+    LaunchedEffect(countdown) {
+        while (countdown > 0) {
+            kotlinx.coroutines.delay(1000L)
+            countdown--
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.java_bedrock_mixed_mode_warning),
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.java_bedrock_mixed_mode_not_mature),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.java_bedrock_mixed_mode_warning_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                if (countdown > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.please_wait_seconds, countdown),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = countdown == 0
+            ) {
+                if (countdown > 0) {
+                    Text("$countdown")
+                } else {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}

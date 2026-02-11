@@ -32,14 +32,14 @@
 ## 🏗️ 技术架构
 
 ### 技术栈
-- **语言**: Kotlin
+- **语言**: Kotlin 1.9.22
 - **UI框架**: Jetpack Compose
 - **架构**: MVVM + Repository模式
-- **依赖注入**: Hilt
+- **依赖注入**: Hilt 2.48
 - **数据库**: Room (SQLite)
-- **网络**: Retrofit + OkHttp + GitHub API
-- **JSON处理**: Gson
-- **构建工具**: Gradle 8.1.2
+- **网络**: Retrofit 2.9.0 + OkHttp 4.12.0 + GitHub API
+- **JSON处理**: Gson 2.10.1
+- **构建工具**: Gradle 8.5 + Android Gradle Plugin 8.1.2
 
 ### 项目架构图
 ```
@@ -173,6 +173,54 @@ TEXT_COLOR_CODES = mapOf(
 - 后台自动转换为§m_f/§m_c/§n_f/§n_c
 - 每次输入§m/§n时弹出对话框选择处理方式
 
+## ⚠️ JAVA基岩混合模式提示
+
+当前JAVA基岩混合模式并不健全，可能存在以下问题：
+- 转换结果可能不完全准确
+- 某些参数组合可能无法正确处理
+- 提醒信息可能不完整
+
+建议在正式使用前先测试转换结果，确保符合预期。
+
+## 🔄 合并模式说明
+
+当选择器参数出现多次时，应用会根据参数类型进行合并：
+
+### 合并逻辑选择
+
+应用支持两种合并逻辑模式：
+
+**模式一：源代码合并逻辑（混合模式）**
+- 适用于同时包含Java版和基岩版特有参数的复杂场景
+- 范围参数（distance, x_rotation, y_rotation, level）：取所有最小值的最小值和所有最大值的最大值
+- 示例：distance=5..7, distance=3..9 → distance=3..9
+
+**模式二：新合并逻辑（默认）**
+- 适用于大多数场景
+- 范围参数（distance, x_rotation, y_rotation, level）：选取差的绝对值最大的范围
+- 示例：distance=5..7 (差2), distance=3..9 (差6) → distance=3..9
+
+### 参数合并规则
+
+**选取最大值的参数**：x, y, z, dx, dy, dz, r, rx, ry, l, c, limit
+- 示例：x=8, x=9.5, y=5, y=6 → x=9.5, y=6
+
+**选取最小值的参数**：rm, rxm, rym, lm
+- 示例：rm=1, rm=3.5, rxm=-5.5, rxm=-1 → rm=1, rxm=-5.5
+
+**范围参数（JAVA版）**：distance, x_rotation, y_rotation, level
+- 根据所选合并逻辑进行处理
+
+**负数支持**：
+- 可以触及负数的参数（范围相关）：rx, rxm, ry, rym, x_rotation, y_rotation
+- 可以是负数的参数（值相关）：c, x, y, z, dx, dy, dz
+
+### 合并时机
+
+应用会在以下时机进行参数合并：
+1. **转换前合并**：在参数转换之前合并输入的重复参数
+2. **转换后合并**：在参数转换之后合并可能产生的重复参数
+
 ## 📚 历史记录管理
 
 ### 本地存储
@@ -197,11 +245,11 @@ TEXT_COLOR_CODES = mapOf(
 ## 🛠️ 构建说明
 
 ### 环境要求
-- **IDE**: Android Studio Arctic Fox 或更高版本
-- **JDK**: JDK 17 或更高版本
+- **IDE**: Android Studio Ladybug | 2024.2.1 或更高版本
+- **JDK**: JDK 8 或更高版本（推荐 JDK 17+）
 - **Android SDK**: API 24+ (Android 7.0)
-- **Gradle**: 8.1.2+
-- **Kotlin**: 1.9.10+
+- **Gradle**: 8.5+
+- **Kotlin**: 1.9.22+
 
 ### 构建步骤
 1. 📥 克隆项目到本地
@@ -223,9 +271,6 @@ TEXT_COLOR_CODES = mapOf(
 
 # 运行测试
 ./gradlew test
-
-# 生成测试报告
-./gradlew jacocoTestReport
 ```
 
 ### 文件访问
@@ -274,11 +319,6 @@ jobs:
 ./gradlew connectedAndroidTest
 ```
 
-### 测试覆盖率
-```bash
-./gradlew jacocoTestReport
-```
-
 ## 📦 部署
 
 ### 构建变体
@@ -292,15 +332,17 @@ jobs:
 ```kotlin
 android {
     signingConfigs {
-        create release {
+        release {
             storeFile file('path/to/keystore')
             storePassword 'password'
             keyAlias 'keyAlias'
             keyPassword 'keyPassword'
         }
     }
-    buildTypes.release {
-        signingConfig signingConfigs.create.release
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
     }
 }
 ```
@@ -313,6 +355,16 @@ android {
 - 🌐 **GitHub仓库**: [najcjbd/tellraw-app](https://github.com/najcjbd/tellraw-app)
 - 📱 **下载页面**: [GitHub Releases](https://github.com/najcjbd/tellraw-app/releases)
 - 📧 **问题反馈**: [GitHub Issues](https://github.com/najcjbd/tellraw-app/issues)
+
+## 🤖 关于本项目
+
+本项目主要由AI（人工智能）辅助开发完成。AI在以下方面提供了重要支持：
+- 核心功能实现
+- 代码编写和优化
+- 测试用例设计
+- 文档编写
+
+AI辅助开发大大提高了开发效率，使项目能够在短时间内完成并发布。
 
 ---
 
