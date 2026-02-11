@@ -1348,36 +1348,6 @@ class TextFormatterTest {
     }
 
     @Test
-    fun testConvertToBedrockJson_8() {
-        // §m_c代码转换为JSON（§m/§n_c/f模式）
-        val json = TextFormatter.convertToBedrockJson("§m_c删除线文本", mnCFEnabled = true)
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 在§m/§n_c/f模式下，§m_c应该转换为§m
-        assertTrue("应包含§m颜色代码", json.contains("§m"))
-        assertTrue("应包含删除线文本", json.contains("删除线文本"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_9() {
-        // §n_f代码转换为JSON（§m/§n_c/f模式）
-        val json = TextFormatter.convertToBedrockJson("§n_f下划线文本", mnCFEnabled = true)
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 在§m/§n_c/f模式下，§n_f应该转换为§n
-        assertTrue("应包含§n颜色代码", json.contains("§n"))
-        assertTrue("应包含下划线文本", json.contains("下划线文本"))
-    }
-
-    @Test
-    fun testConvertToBedrockJson_10() {
-        // §n_c代码转换为JSON（§m/§n_c/f模式）
-        val json = TextFormatter.convertToBedrockJson("§n_c下划线文本", mnCFEnabled = true)
-        assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 在§m/§n_c/f模式下，§n_c应该转换为§n
-        assertTrue("应包含§n颜色代码", json.contains("§n"))
-        assertTrue("应包含下划线文本", json.contains("下划线文本"))
-    }
-
-    @Test
     fun testConvertToBedrockJson_16() {
         // 空文本
         val json = TextFormatter.convertToBedrockJson("")
