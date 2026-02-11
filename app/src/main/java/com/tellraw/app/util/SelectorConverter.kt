@@ -481,8 +481,9 @@ object SelectorConverter {
             paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
         } else if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
-            paramsPart = convertDistanceParameters(paramsPart, conversionReminders, context)
+            println("DEBUG filterSelectorParameters: before convertRotationParameters: $paramsPart")
             paramsPart = convertRotationParameters(paramsPart, conversionReminders, context)
+            println("DEBUG filterSelectorParameters: after convertRotationParameters: $paramsPart")
             paramsPart = convertLevelParameters(paramsPart, conversionReminders, context)
 
             // 处理gamemode到m的转换（Java版到基岩版）
@@ -891,6 +892,9 @@ object SelectorConverter {
         // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
         result = extractComplexParameters(result, "scores", scoresMatches)
+        
+        // DEBUG: 打印输入
+        println("DEBUG convertRotationParameters: input=$result")
 
         // 处理x_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
         val xRotationPattern = "(?<!__SCORES_)(^|,)x_rotation=([^,\\]]+)".toRegex()
@@ -955,6 +959,8 @@ object SelectorConverter {
         // 处理y_rotation参数（此时scores参数仍为占位符，不会误匹配）
         val yRotationPattern = "(?<!__SCORES_)(^|,)y_rotation=([^,\\]]+)".toRegex()
         val yRotationMatches = yRotationPattern.findAll(result).toList()
+        
+        println("DEBUG convertRotationParameters: found ${yRotationMatches.size} y_rotation matches")
 
         if (yRotationMatches.isNotEmpty()) {
             // 提取所有y_rotation值
@@ -1000,14 +1006,17 @@ object SelectorConverter {
                 val rymStr = if (finalRym % 1.0 == 0.0) finalRym.toInt().toString() else finalRym.toString()
                 val ryStr = if (finalRy % 1.0 == 0.0) finalRy.toInt().toString() else finalRy.toString()
                 result = addParameterToResult(result, "rym=$rymStr,ry=$ryStr")
+                println("DEBUG convertRotationParameters: added rym=$rymStr,ry=$ryStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_converted, "multiple", rymStr, ryStr))
             } else if (finalRym != null) {
                 val rymStr = if (finalRym % 1.0 == 0.0) finalRym.toInt().toString() else finalRym.toString()
                 result = addParameterToResult(result, "rym=$rymStr")
+                println("DEBUG convertRotationParameters: added rym=$rymStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_rym, "multiple", rymStr))
             } else if (finalRy != null) {
                 val ryStr = if (finalRy % 1.0 == 0.0) finalRy.toInt().toString() else finalRy.toString()
                 result = addParameterToResult(result, "ry=$ryStr")
+                println("DEBUG convertRotationParameters: added ry=$ryStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_ry, "multiple", ryStr))
             }
         }
@@ -1016,7 +1025,8 @@ object SelectorConverter {
         for ((placeholder, original) in scoresMatches) {
             result = result.replace(placeholder, original)
         }
-
+        
+        println("DEBUG convertRotationParameters: output=$result")
         return result
     }
     
