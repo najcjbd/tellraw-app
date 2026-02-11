@@ -209,7 +209,7 @@ class MixedModeTest {
     @Test
     fun testMixedModeColorCombination() {
         val message = "§a§m_f绿色字体删除线§r§c§n_c红色颜色下划线"
-        val javaJson = TextFormatter.convertToJavaJson(message, "font", false)
+        val javaJson = TextFormatter.convertToJavaJson(message, "font", true)
 
         // 验证颜色代码和格式代码正确组合
         assertTrue("应包含green颜色", javaJson.contains("green"))
@@ -240,8 +240,8 @@ class MixedModeTest {
     @Test
     fun testMixedModeOnlyMNCodes() {
         val message = "§m_f§m_c§n_f§n_c"
-        val javaJson = TextFormatter.convertToJavaJson(message, "font", false)
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, "font", false)
+        val javaJson = TextFormatter.convertToJavaJson(message, "font", true)
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, "font", true)
 
         // Java版应该包含格式代码
         assertTrue("Java版应包含strikethrough", javaJson.contains("strikethrough"))

@@ -1105,8 +1105,8 @@ class TextFormatterTest {
 
     @Test
     fun testConvertToJavaJson_12() {
-        // 混合模式：mnCFEnabled=false且mNHandling="font"
-        val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c和§n_f下划线§n_c", mNHandling = "font", mnCFEnabled = false)
+        // §m/§n_c/f模式：mnCFEnabled=true且mNHandling="font"
+        val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c和§n_f下划线§n_c", mNHandling = "font", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
         assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
         assertTrue("应包含underlined字段", json.contains("\"underlined\""))
@@ -1163,16 +1163,18 @@ class TextFormatterTest {
     @Test
     fun testConvertToJavaJson_18() {
         // 只有颜色代码
-        val json = TextFormatter.convertToJavaJson("§a")
+        val json = TextFormatter.convertToJavaJson("§a文本")
         assertTrue("应包含color字段", json.contains("\"color\""))
         assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含文本内容", json.contains("文本"))
     }
 
     @Test
     fun testConvertToJavaJson_19() {
         // 只有格式代码
-        val json = TextFormatter.convertToJavaJson("§l")
+        val json = TextFormatter.convertToJavaJson("§l文本")
         assertTrue("应包含bold字段", json.contains("\"bold\""))
+        assertTrue("应包含文本内容", json.contains("文本"))
     }
 
     @Test
