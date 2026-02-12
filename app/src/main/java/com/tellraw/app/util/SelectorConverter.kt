@@ -3341,6 +3341,11 @@ object SelectorConverter {
                 // 单个数字，直接使用（四舍五入）
                 val value = quantity.toDoubleOrNull()?.roundToInt()
                 if (value != null) {
+                    val originalValue = quantity.toDoubleOrNull()
+                    if (originalValue != null && originalValue % 1.0 != 0.0) {
+                        // 如果是小数，添加提醒信息
+                        reminders.add(getStringSafely(context, R.string.hasitem_quantity_rounded, originalValue, value))
+                    }
                     value.toString()
                 } else null
             }
@@ -3403,6 +3408,11 @@ object SelectorConverter {
                 // 单个槽位（四舍五入）
                 val value = slot.toDoubleOrNull()?.roundToInt()
                 if (value != null) {
+                    val originalValue = slot.toDoubleOrNull()
+                    if (originalValue != null && originalValue % 1.0 != 0.0) {
+                        // 如果是小数，添加提醒信息
+                        reminders.add(getStringSafely(context, R.string.hasitem_slot_rounded, originalValue, value))
+                    }
                     slotNumbers.add(value)
                 }
             }
