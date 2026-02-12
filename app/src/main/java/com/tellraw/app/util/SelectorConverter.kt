@@ -2095,11 +2095,12 @@ object SelectorConverter {
         for ((placeholder, original) in nbtMatches) {
             mergedParams.add(original)
         }
-        
-                val result = mergedParams.joinToString(",")
-                println("DEBUG mergeDuplicateParameters: output=$result")
-                return result
-            }
+
+        val result = mergedParams.joinToString(",")
+        println("DEBUG mergeDuplicateParameters: output=$result")
+        return result
+    }
+
     /**
      * 格式化数字，去除无意义的小数位
      * 例如：9.00 -> 9, 9.5 -> 9.5
