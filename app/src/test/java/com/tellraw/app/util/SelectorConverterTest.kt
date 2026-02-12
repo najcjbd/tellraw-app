@@ -3046,9 +3046,9 @@ class SelectorConverterTest {
         // 第一个物品：quantity=(2.3+5.7)/2=4.0, slot=(1.2+8.8)/2=5.0
         assertTrue("应包含第一个物品的Count:4b", conversion.javaSelector.contains("Count:4b"))
         assertTrue("应包含第一个物品的Slot:5b", conversion.javaSelector.contains("Slot:5b"))
-        // 第二个物品：quantity=(0.8+4.2)/2=2.5四舍五入为3, slot=(10.3+20.7)/2=15.5四舍五入为16
+        // 第二个物品：quantity=(0.8+4.2)/2=2.5四舍五入为3, slot=(10.3+20.7)/2=15.5四舍五入为16，Java版Inventory槽位=16+9=25
         assertTrue("应包含第二个物品的Count:3b", conversion.javaSelector.contains("Count:3b"))
-        assertTrue("应包含第二个物品的Slot:16b", conversion.javaSelector.contains("Slot:16b"))
+        assertTrue("应包含第二个物品的Slot:25b", conversion.javaSelector.contains("Slot:25b"))
         // 验证有提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }

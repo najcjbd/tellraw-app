@@ -288,12 +288,14 @@ object SelectorConverter {
         
         // 返回转换后的选择器
         val javaSelector = convertedSelector
-        
+
         // 如果参数发生了变化，也认为发生了转换
         if (javaSelector != newSelector) {
             wasConverted = true
         }
-        
+
+        println("DEBUG convertBedrockToJava: output javaSelector=$javaSelector")
+
         return SelectorConversionResult(
             javaSelector = javaSelector,
             bedrockSelector = selector,
