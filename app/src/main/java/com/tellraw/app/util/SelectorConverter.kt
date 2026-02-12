@@ -2363,7 +2363,9 @@ object SelectorConverter {
                     braceCount--
                     if (braceCount == 0 && started) {
                         // 遇到外层的 '}'，结束
-                        return result.toString()
+                        val extracted = result.toString()
+                        println("DEBUG extractObjectContent: str=$str, extracted=$extracted")
+                        return extracted
                     } else {
                         result.append(char)  // 保留内层的 '}'
                     }
@@ -2383,6 +2385,7 @@ object SelectorConverter {
      * 解析单个 hasitem 条目
      */
     private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context): String {
+        println("DEBUG parseHasitemSingle: content=$content")
         val params = mutableMapOf<String, String>()
         val parts = parseHasitemObjectParams(content)
 
@@ -2466,7 +2469,9 @@ object SelectorConverter {
             null -> {
                 // 没有指定位置，使用通用格式（不指定槽位）
                 val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
-                "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
+                val nbtStr = "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
+                println("DEBUG parseHasitemSingle: returning=$nbtStr")
+                nbtStr
             }
             else -> {
                 // 不支持的位置
