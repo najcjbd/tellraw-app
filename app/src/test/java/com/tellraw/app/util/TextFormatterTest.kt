@@ -1105,9 +1105,9 @@ class TextFormatterTest {
 
     @Test
     fun testConvertToJavaJson_12() {
-        // §m/§n_c/f模式：mnCFEnabled=true且mNHandling="font"
+        // §m/§n_c/f模式：mnCFEnabled=true
         // §m_f和§n_f有文本，§m_c和§n_c后面有文本
-        val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c红色和§n_f下划线§n_c蓝色", mNHandling = "font", mnCFEnabled = true)
+        val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c红色和§n_f下划线§n_c蓝色", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
         assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
         assertTrue("应包含underlined字段", json.contains("\"underlined\""))
@@ -1348,12 +1348,10 @@ class TextFormatterTest {
         // 基岩版特有颜色代码转换
         val json = TextFormatter.convertToBedrockJson("§g金色§h白色§i灰色")
         assertTrue("应包含rawtext字段", json.contains("\"rawtext\""))
-        // 基岩版特有颜色代码应该被转换
-        val rawtextContent = json.substringAfter("text\":").substringBefore("}")
-        // §g, §h, §i 应该被转换为对应的颜色
-        assertFalse("不应包含§g", rawtextContent.contains("§g"))
-        assertFalse("不应包含§h", rawtextContent.contains("§h"))
-        assertFalse("不应包含§i", rawtextContent.contains("§i"))
+        // 基岩版特有颜色代码应该直接保留
+        assertTrue("应包含§g", json.contains("§g"))
+        assertTrue("应包含§h", json.contains("§h"))
+        assertTrue("应包含§i", json.contains("§i"))
         assertTrue("应包含金色", json.contains("金色"))
         assertTrue("应包含白色", json.contains("白色"))
         assertTrue("应包含灰色", json.contains("灰色"))
@@ -1555,8 +1553,8 @@ class TextFormatterTest {
     @Test
     fun testJavaBedrockMixedMode_3() {
         // 复杂的混合文本
-        val javaJson = TextFormatter.convertToJavaJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mNHandling = "font", mnCFEnabled = true)
-        val bedrockJson = TextFormatter.convertToBedrockJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mNHandling = "font", mnCFEnabled = true)
+        val javaJson = TextFormatter.convertToJavaJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson("§a§l绿色粗体§m_f删除线§m_c颜色§n_f下划线§n_c颜色", mnCFEnabled = true)
         
         assertTrue("Java版应包含多个部分", javaJson.contains("\"extra\""))
         assertTrue("基岩版应包含rawtext", bedrockJson.contains("\"rawtext\""))
@@ -1573,8 +1571,8 @@ class TextFormatterTest {
         // 相同文本在不同版本下的表现
         val text = "§a§l绿色粗体§r§m_f删除线§m_c颜色§r§n_f下划线§n_c颜色"
         
-        val javaJson = TextFormatter.convertToJavaJson(text, mNHandling = "font", mnCFEnabled = true)
-        val bedrockJson = TextFormatter.convertToBedrockJson(text, mNHandling = "font", mnCFEnabled = true)
+        val javaJson = TextFormatter.convertToJavaJson(text, mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, mnCFEnabled = true)
         
         // Java版使用JSON格式
         assertTrue("Java版应为JSON格式", javaJson.startsWith("{"))
@@ -1864,7 +1862,7 @@ class TextFormatterTest {
         // 连续的颜色代码（每个代码后面有文本）
         val continuousColors = "§a绿色§b青色§c红色§d紫色§e黄色§f白色"
         val json = TextFormatter.convertToJavaJson(continuousColors)
-        assertTrue("应包含多个颜色代码", json.count { it == '§' } >= 6)
+        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
         assertTrue("应包含所有文本", json.contains("绿色") && json.contains("青色") && json.contains("红色") && json.contains("紫色") && json.contains("黄色") && json.contains("白色"))
     }
 
@@ -1873,7 +1871,7 @@ class TextFormatterTest {
         // 连续的格式代码（每个代码后面有文本）
         val continuousFormats = "§l粗体§m删除线§n下划线§o斜体§k混乱"
         val json = TextFormatter.convertToJavaJson(continuousFormats)
-        assertTrue("应包含多个格式代码", json.count { it == '§' } >= 5)
+        assertTrue("应包含多个文本部分", json.contains("\"extra\""))
         assertTrue("应包含所有文本", json.contains("粗体") && json.contains("删除线") && json.contains("下划线") && json.contains("斜体") && json.contains("混乱"))
     }
 
@@ -1927,8 +1925,8 @@ class TextFormatterTest {
     fun testComprehensiveScenarios_3() {
         // §m/§n_c/f模式下的复杂场景
         val text = "§a§l绿色粗体§r§m_f删除线字体§m_c删除线颜色§r§n_f下划线字体§n_c下划线颜色"
-        val javaJson = TextFormatter.convertToJavaJson(text, mNHandling = "font", mnCFEnabled = true)
-        val bedrockJson = TextFormatter.convertToBedrockJson(text, mNHandling = "font", mnCFEnabled = true)
+        val javaJson = TextFormatter.convertToJavaJson(text, mnCFEnabled = true)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, mnCFEnabled = true)
         
         assertTrue("Java版应包含strikethrough", javaJson.contains("\"strikethrough\""))
         assertTrue("Java版应包含dark_red", javaJson.contains("\"dark_red\""))

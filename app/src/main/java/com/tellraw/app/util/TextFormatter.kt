@@ -700,6 +700,8 @@ object TextFormatter {
         var bracketCount = 0
         var inString = false
         var escapeNext = false
+        var expectingKey = true  // 期望键（在对象开始时或逗号后）
+        var expectingValue = false  // 期望值（在冒号后）
         
         for (char in json) {
             when {
@@ -715,15 +717,46 @@ object TextFormatter {
                 !inString -> {
                     when (char) {
                         '{' -> braceCount++
-                        '}' -> braceCount--
+                        '}' -> {
+                            braceCount--
+                            expectingKey = false  // 对象结束
+                        }
                         '[' -> bracketCount++
                         ']' -> bracketCount--
+                        ':' -> {
+                            expectingValue = true  // 冒号后期望值
+                        }
+                        ',' -> {
+                            expectingKey = true  // 逗号后期望键
+                        }
                     }
                 }
             }
         }
-        
+
         // 检查括号是否平衡，以及字符串是否正确闭合
+        // 简单检查：如果有文本内容但没有引号包围，说明JSON无效
+        val hasUnquotedContent = json.any { it.isLetter() || it.isCJKLetterPart() }
+        val hasQuotes = json.contains("\"")
+        
+        // 如果有文本内容但没有引号，则JSON无效
+        if (hasUnquotedContent && !hasQuotes) {
+            return false
+        }
+
         return braceCount == 0 && bracketCount == 0 && !inString && !escapeNext
+    }
+    
+    /**
+     * 判断字符是否可能是汉字或CJK字符的一部分
+     */
+    private fun Char.isCJKLetterPart(): Boolean {
+        return this.code in 0x4E00..0x9FFF ||  // 基本汉字
+               this.code in 0x3400..0x4DBF ||  // 扩展A
+               this.code in 0x20000..0x2A6DF ||  // 扩展B-F
+               this.code in 0x2A700..0x2B73F ||  // 扩展G
+               this.code in 0x2B740..0x2B81F ||  // 扩展H
+               this.code in 0x2B820..0x2CEAF ||  // 扩展I
+               this.code in 0x2CEB0..0x2EBEF    // 扩展J
     }
 }
