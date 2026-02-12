@@ -2048,7 +2048,7 @@ object SelectorConverter {
                             val range = parseRange(value.first)
                             if (range != null) {
                                 val diff = kotlin.math.abs(range.second - range.first)
-                                if (diff > maxDiff) {
+                                if (diff >= maxDiff) {
                                     maxDiff = diff
                                     selectedRange = range
                                 }
