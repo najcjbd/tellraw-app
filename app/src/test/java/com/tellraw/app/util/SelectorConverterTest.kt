@@ -1035,7 +1035,7 @@ class SelectorConverterTest {
         SelectorConverter.setMergeLogicMode(false) // 使用新的合并逻辑
         val selector = "@a[x=8,x=9.5]"
         val type = SelectorConverter.detectSelectorType(selector)
-        assertEquals("应为Java版选择器（默认行为）", SelectorType.JAVA, type)
+        assertEquals("应为通用版选择器（默认行为）", SelectorType.UNIVERSAL, type)
     }
 
     @Test
