@@ -1386,7 +1386,9 @@ object SelectorConverter {
                     }
 
                     // 添加新参数
+                    println("DEBUG convertRotationParameter: before addParameterToResult, result=$result, newParam=${paramName}=${rotationValue}")
                     result = addParameterToResult(result, paramName + "=" + rotationValue)
+                    println("DEBUG convertRotationParameter: after addParameterToResult, result=$result")
                 } else {
                     // 恢复scores参数（如果没有匹配到参数）
                     for ((placeholder, original) in scoresMatches) {
