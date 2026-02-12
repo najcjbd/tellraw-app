@@ -2067,8 +2067,21 @@ object SelectorConverter {
                         }
 
                         if (selectedRange != null) {
-                            // 格式化输出
-                            val rangeValue = "${formatSingleNumber(selectedRange.first.toString())}..${formatSingleNumber(selectedRange.second.toString())}"
+                            // 格式化输出，处理特殊情况
+                            val rangeValue = when {
+                                selectedRange.first == Double.POSITIVE_INFINITY -> {
+                                    // 只有上限，如 ..10
+                                    "..${formatSingleNumber(selectedRange.second.toString())}"
+                                }
+                                selectedRange.second == Double.MAX_VALUE -> {
+                                    // 只有下限，如 5..
+                                    "${formatSingleNumber(selectedRange.first.toString())}.."
+                                }
+                                else -> {
+                                    // 正常范围，如 5..10
+                                    "${formatSingleNumber(selectedRange.first.toString())}..${formatSingleNumber(selectedRange.second.toString())}"
+                                }
+                            }
                             mergedParams.add("$paramName=$rangeValue")
                         }
                     }
@@ -2130,6 +2143,10 @@ object SelectorConverter {
     private fun formatSingleNumber(value: String): String {
         try {
             val num = value.toDouble()
+            // 如果是特殊值，返回空字符串（用于范围格式化）
+            if (num == Double.POSITIVE_INFINITY || num == Double.MAX_VALUE) {
+                return ""
+            }
             // 如果是整数，返回整数形式；否则返回原始形式
             return if (num % 1.0 == 0.0) {
                 num.toInt().toString()
@@ -2171,9 +2188,11 @@ object SelectorConverter {
             if (minVal != null && maxVal != null) {
                 return Pair(minVal, maxVal)
             } else if (minVal != null) {
-                return Pair(minVal, minVal)
+                // 只有下限，如 5..，表示从5到正无穷
+                return Pair(minVal, Double.MAX_VALUE)
             } else if (maxVal != null) {
-                return Pair(maxVal, maxVal)
+                // 只有上限，如 ..10，返回特殊值表示只有上限
+                return Pair(Double.POSITIVE_INFINITY, maxVal)
             }
         }
 
