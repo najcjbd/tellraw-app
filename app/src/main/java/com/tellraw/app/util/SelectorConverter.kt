@@ -2256,7 +2256,8 @@ object SelectorConverter {
 
                 if (objectContent != null) {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
-                    val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 1)
+                    // +2 是为了包含 objectContent 后面的 '}' 字符
+                    val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 2)
                     println("DEBUG convertHasitemToNbt: fullMatch='$fullMatch', startIndex=$startIndex, braceIndex=$braceIndex, objectContent='$objectContent', fullMatch.length=${fullMatch.length}")
                     println("DEBUG convertHasitemToNbt: fullMatch.lastChar='${fullMatch.lastOrNull()}'")
                     val nbtResult = parseHasitemSingle(objectContent, reminders, context)
