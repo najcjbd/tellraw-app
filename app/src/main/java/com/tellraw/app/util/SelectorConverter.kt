@@ -389,7 +389,9 @@ object SelectorConverter {
         // 第一次参数合并：在参数转换之前合并输入的重复参数
         // 这样可以减少需要转换的参数数量
         // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
-        paramsPart = mergeDuplicateParameters(paramsPart)
+        val mergedParamsPart = mergeDuplicateParameters(paramsPart)
+        println("DEBUG filterSelectorParameters: before merge=$paramsPart, after merge=$mergedParamsPart, useMixedModeMergeLogic=$useMixedModeMergeLogic")
+        paramsPart = mergedParamsPart
 
         // 处理 scores 参数的反选（基岩版特有功能）
         // 注意：必须在 mergeDuplicateParameters 之后处理，因为mergeDuplicateParameters可能改变了参数格式
