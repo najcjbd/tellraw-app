@@ -322,12 +322,15 @@ object SelectorConverter {
         // 返回转换后的选择器
         var bedrockSelector = convertedSelector
 
+        // 如果参数发生了变化，也认为发生了转换
+        val wasConverted = bedrockSelector != selector || removedParams.isNotEmpty()
+
         return SelectorConversionResult(
             javaSelector = selector,
             bedrockSelector = bedrockSelector,
             javaReminders = emptyList(),
             bedrockReminders = reminders,
-            wasConverted = false
+            wasConverted = wasConverted
         )
     }
     
