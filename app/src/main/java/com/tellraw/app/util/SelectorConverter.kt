@@ -2257,13 +2257,16 @@ object SelectorConverter {
                 if (objectContent != null) {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 1)
+                    println("DEBUG convertHasitemToNbt: fullMatch=$fullMatch, startIndex=$startIndex, braceIndex=$braceIndex, objectContent=$objectContent, fullMatch.length=${fullMatch.length}")
                     val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
                         // 精确替换
                         val index = result.indexOf(fullMatch)
                         if (index >= 0) {
+                            println("DEBUG convertHasitemToNbt: before replace, index=$index, fullMatch=$fullMatch, nbtResult=$nbtResult")
                             result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
+                            println("DEBUG convertHasitemToNbt: after replace, result=$result")
                         }
                     } else {
                         // 无效参数或转换失败，移除整个 hasitem 参数
