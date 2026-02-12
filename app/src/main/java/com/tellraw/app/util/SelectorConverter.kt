@@ -2096,9 +2096,9 @@ object SelectorConverter {
             mergedParams.add(original)
         }
 
-        val result = mergedParams.joinToString(",")
-        println("DEBUG mergeDuplicateParameters: output=$result")
-        return result
+        val mergedResult = mergedParams.joinToString(",")
+        println("DEBUG mergeDuplicateParameters: output=$mergedResult")
+        return mergedResult
     }
 
     /**
