@@ -2179,6 +2179,7 @@ object SelectorConverter {
     private fun convertHasitemToNbt(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
+        println("DEBUG convertHasitemToNbt: input=$result")
 
         // 处理空数组格式：hasitem=[]
         val emptyArrayPattern = "hasitem=\\[\\]".toRegex()
@@ -2285,6 +2286,7 @@ object SelectorConverter {
         result = result.replace(",\\]".toRegex(), "]")
         result = result.replace("\\[".toRegex(), "[")
 
+        println("DEBUG convertHasitemToNbt: output=$result")
         return result to reminders
     }
 
