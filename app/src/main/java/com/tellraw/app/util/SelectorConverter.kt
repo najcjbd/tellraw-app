@@ -1899,6 +1899,8 @@ object SelectorConverter {
      * @return 合并后的参数部分字符串
      */
     private fun mergeDuplicateParameters(paramsPart: String): String {
+        println("DEBUG mergeDuplicateParameters: input=$paramsPart")
+
         if (paramsPart.isEmpty()) {
             return paramsPart
         }
@@ -2093,10 +2095,11 @@ object SelectorConverter {
         for ((placeholder, original) in nbtMatches) {
             mergedParams.add(original)
         }
-
-        return mergedParams.joinToString(",")
-    }
-
+        
+                val result = mergedParams.joinToString(",")
+                println("DEBUG mergeDuplicateParameters: output=$result")
+                return result
+            }
     /**
      * 格式化数字，去除无意义的小数位
      * 例如：9.00 -> 9, 9.5 -> 9.5
@@ -2155,10 +2158,14 @@ object SelectorConverter {
      * 返回 Pair<最小值, 最大值>
      */
     private fun parseRange(value: String): Pair<Double, Double>? {
+        println("DEBUG parseRange: input=$value")
+
         if (".." in value) {
             val parts = value.split("..")
             val minVal = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
             val maxVal = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+
+            println("DEBUG parseRange: parts=$parts, minVal=$minVal, maxVal=$maxVal")
 
             if (minVal != null && maxVal != null) {
                 return Pair(minVal, maxVal)
