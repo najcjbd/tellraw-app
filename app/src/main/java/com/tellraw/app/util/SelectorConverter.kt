@@ -3288,7 +3288,7 @@ object SelectorConverter {
             "slot.hotbar" to slotNum.toString()
         } else {
             // 添加提醒：Java版槽位编号转换为基岩版槽位编号
-            reminders.add("注意：Java版 Inventory Slot $slotNum 已转换为基岩版 slot.inventory Slot ${slotNum - 9}")
+            reminders.add("注意：Java版 Inventory 槽位 $slotNum 已转换为基岩版 slot.inventory 槽位 ${slotNum - 9}")
             "slot.inventory" to (slotNum - 9).toString()
         }
 
