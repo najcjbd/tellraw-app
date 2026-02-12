@@ -2257,7 +2257,8 @@ object SelectorConverter {
                 if (objectContent != null) {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 1)
-                    println("DEBUG convertHasitemToNbt: fullMatch=$fullMatch, startIndex=$startIndex, braceIndex=$braceIndex, objectContent=$objectContent, fullMatch.length=${fullMatch.length}")
+                    println("DEBUG convertHasitemToNbt: fullMatch='$fullMatch', startIndex=$startIndex, braceIndex=$braceIndex, objectContent='$objectContent', fullMatch.length=${fullMatch.length}")
+                    println("DEBUG convertHasitemToNbt: fullMatch.lastChar='${fullMatch.lastOrNull()}'")
                     val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
@@ -2265,6 +2266,7 @@ object SelectorConverter {
                         val index = result.indexOf(fullMatch)
                         if (index >= 0) {
                             println("DEBUG convertHasitemToNbt: before replace, index=$index, fullMatch=$fullMatch, nbtResult=$nbtResult")
+                            println("DEBUG convertHasitemToNbt: result.substring(index + fullMatch.length)='${result.substring(index + fullMatch.length)}'")
                             result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
                             println("DEBUG convertHasitemToNbt: after replace, result=$result")
                         }
