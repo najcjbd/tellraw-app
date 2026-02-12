@@ -97,11 +97,14 @@
     <string name="hasitem_conversion_failed">hasitem change failed, kept original</string>    <string name="nbt_converted">nbt changed to hasitem format, may lose some meaning</string>
     <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
     <string name="hasitem_quantity_min_only">Note: quantity=%1$s.. converted to %2$sb</string>
-    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s changed to %3$s (middle value)</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>
+    <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s changed to %3$s (middle value)</string>
+    <string name="hasitem_quantity_rounded">Note: quantity=%1$s rounded to %2$sb</string>
     <string name="hasitem_quantity_negation_not_supported">Warning: quantity (!) not supported in Java, removed</string>
     <string name="hasitem_slot_min_only">Note: slot=%s..</string>
     <string name="hasitem_slot_max_only">Note: slot=..%s</string>
     <string name="hasitem_slot_range">Note: slot=%1$s..%2$s changed to %3$s (middle value)</string>
+    <string name="hasitem_slot_rounded">Note: slot=%1$s rounded to %2$s</string>
     <string name="hasitem_slot_negation_not_supported">Warning: slot (!) not supported in Java, removed</string>
     <string name="help_usage_tips">How to Use</string>
     <string name="help_usage_tips_content">1. Enter selector and message\n2. Auto-detects selector type\n3. Generate Java and Bedrock commands\n4. Copy or share commands\n\nFor §m§n codes:\n• Font style: Java keeps format, Bedrock uses colors\n• Color style: Both use colors</string>
