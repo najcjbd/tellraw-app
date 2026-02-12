@@ -1310,6 +1310,7 @@ object SelectorConverter {
         toJava: Boolean = true
     ): String {
         var result = paramsPart
+        println("DEBUG convertRotationParameter: paramName=$paramName, minParam=$minParam, maxParam=$maxParam, toJava=$toJava, input=$result")
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
         // 使用智能提取方法，正确处理嵌套的花括号
@@ -1324,6 +1325,7 @@ object SelectorConverter {
 
             // 处理所有的minParam参数，取最小值
             val minMatches = minPattern.findAll(result).toList()
+            println("DEBUG convertRotationParameter: minPattern=$minPattern, minMatches.size=${minMatches.size}")
             val minValue: String? = if (minMatches.isNotEmpty()) {
                 val minVal = minMatches.map { it.groupValues[2].toDouble() }.minOrNull()
                 if (minVal != null) {
@@ -1333,12 +1335,15 @@ object SelectorConverter {
 
             // 处理所有的maxParam参数，取最大值
             val maxMatches = maxPattern.findAll(result).toList()
+            println("DEBUG convertRotationParameter: maxPattern=$maxPattern, maxMatches.size=${maxMatches.size}")
             val maxValue: String? = if (maxMatches.isNotEmpty()) {
                 val maxVal = maxMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
                 if (maxVal != null) {
                     if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
                 } else null
             } else null
+
+            println("DEBUG convertRotationParameter: minValue=$minValue, maxValue=$maxValue")
 
             if (minValue != null || maxValue != null) {
                 val rotationValue = when {
