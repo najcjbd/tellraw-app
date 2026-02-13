@@ -344,4 +344,14 @@
     
     <!-- §m§n Code conversion warning -->
     <string name="bedrock_font_to_color_warning">In Bedrock, §m_f/§n_f will be converted to color codes (§m/§n), not font styles (strikethrough/underline)</string>
+    
+    <!-- Java/Bedrock Mixed Mode Warnings -->
+    <string name="java_bedrock_mixed_mode_warning">Java/Bedrock Mixed Mode Warning</string>
+    <string name="java_bedrock_mixed_mode_not_mature">The current Java/Bedrock mixed mode is not fully mature and may have the following issues:
+
+• Conversion results may not be fully accurate
+• Certain parameter combinations may not be handled correctly
+• Warning messages may be incomplete</string>
+    <string name="java_bedrock_mixed_mode_warning_message">Warning: Please test the conversion results before official use to ensure they meet your expectations!</string>
+    <string name="please_wait_seconds">Please wait %d seconds before clicking OK</string>
 </resources>

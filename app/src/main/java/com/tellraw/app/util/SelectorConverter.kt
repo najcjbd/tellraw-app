@@ -196,19 +196,6 @@ object SelectorConverter {
         R.string.message_json_invalid_with_error to "消息JSON格式无效: %s"
     )
 
-    // 控制是否使用混合模式合并逻辑
-    // true: 使用源代码合并逻辑（取所有最小值的最小值和所有最大值的最大值）
-    // false: 使用新的合并逻辑（选取差的绝对值最大的范围）
-    private var useMixedModeMergeLogic = false
-
-    /**
-     * 设置是否使用混合模式合并逻辑
-     * @param useMixedMode true: 使用源代码合并逻辑，false: 使用新的合并逻辑
-     */
-    fun setMergeLogicMode(useMixedMode: Boolean) {
-        useMixedModeMergeLogic = useMixedMode
-    }
-
     /**
      * 安全地获取字符串资源
      * 如果资源不可用（例如在测试环境中），返回默认值
