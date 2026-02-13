@@ -1,0 +1,173 @@
+混合模式测试输出规范（修正版）
+========================================
+
+## 正确的参数转换逻辑
+
+### 基岩版 → Java版
+- **r和rm → distance**：取rm最小值和r最大值，合并为`rm最小值..r最大值`
+  - 示例：`rm=2, rm=5, r=10` → `distance=2..10`
+  - 示例：`rm=2, r=10` → `distance=2..10`
+  - 示例：`r=8` → `distance=..8`
+  - 示例：`rm=2` → `distance=2..`
+
+- **rx和rxm → x_rotation**：取rxm最小值和rx最大值，合并为`rxm最小值..rx最大值`
+  - 示例：`rxm=-45, rx=30` → `x_rotation=-45..30`
+  - 示例：`rxm=-5.5, rxm=-1` → `x_rotation=-5.5..-1`
+
+- **ry和rym → y_rotation**：取rym最小值和ry最大值，合并为`rym最小值..ry最大值`
+  - 示例：`rym=-90, ry=90` → `y_rotation=-90..90`
+
+- **l和lm → level**：取lm最小值和l最大值，合并为`lm最小值..l最大值`
+  - 示例：`lm=2, l=8` → `level=2..8`
+
+- **c → limit + sort**：c转换为limit和sort
+  - 示例：`c=5` → `limit=5, sort=nearest`
+  - 示例：`c=-10` → `limit=10, sort=furthest`
+
+### Java版 → 基岩版
+- **distance → r和rm**：取左边最小值作为rm，右边最大值作为r
+  - 示例：`distance=5..7, distance=2..8` → `rm=2, r=8`
+  - 示例：`distance=3..5` → `rm=3, r=5`
+
+- **x_rotation → rx和rxm**：取左边最小值作为rxm，右边最大值作为rx
+  - 示例：`x_rotation=-45..45` → `rxm=-45, rx=45`
+
+- **y_rotation → ry和rym**：取左边最小值作为rym，右边最大值作为ry
+  - 示例：`y_rotation=-90..90` → `rym=-90, ry=90`
+
+- **level → l和lm**：取左边最小值作为lm，右边最大值作为l
+  - 示例：`level=5..10` → `lm=5, l=10`
+
+- **limit → c**：直接转换
+  - 示例：`limit=5` → `c=5`
+
+---
+
+## testJavaBedrockMixedMode_1-4
+
+### testJavaBedrockMixedMode_1
+- **输入选择器**：@a[r=8,distance=..9,y_rotation=..150]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
+- **基岩版输出**：@a[r=9,ry=150]（distance=..9转换为r=9，y_rotation=..150转换为ry=150）
+
+### testJavaBedrockMixedMode_2
+- **输入选择器**：@a[r=9,nbt={Inventory:[{Slot:21b,id:"minecraft:netherite_ingot"}]}]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[distance=..9,nbt={Inventory:[{Slot:21b,id:"minecraft:netherite_ingot"}]}]
+- **基岩版输出**：@a[r=9,hasitem={item=netherite_ingot,location=slot.inventory,slot=12}]
+
+### testJavaBedrockMixedMode_3
+- **输入选择器**：@a[hasitem={item=diamond},distance=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[distance=10,nbt={...}]（hasitem转换为nbt）
+- **基岩版输出**：@a[hasitem={item=diamond},r=10]
+
+### testJavaBedrockMixedMode_4
+- **输入选择器**：@a[rx=30,rxm=-45,x_rotation=-90..90]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[x_rotation=-90..90]（rxm=-45, rx=30转换为x_rotation=-45..30，与x_rotation=-90..90合并）
+- **基岩版输出**：@a[rx=-45,rx=90]（x_rotation=-90..90拆分为rxm=-90, rx=90）
+
+---
+
+## testJavaBedrockMixedModeMerge_1-5
+
+### testJavaBedrockMixedModeMerge_1
+- **输入选择器**：@a[distance=5,r=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[distance=5..10]（r=10转换为distance=..10，合并为5..10）
+- **基岩版输出**：@a[r=10]（distance=5转换为r=5，合并为r=10）
+
+### testJavaBedrockMixedModeMerge_2
+- **输入选择器**：@a[x_rotation=-45..45,rx=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[x_rotation=-45..45]（rx=10转换为x_rotation=..10，合并为-45..10）
+- **基岩版输出**：@a[rx=-45,rx=45]（x_rotation=-45..45拆分为rxm=-45, rx=45）
+
+### testJavaBedrockMixedModeMerge_3
+- **输入选择器**：@a[level=5..15,l=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[level=5..15]（l=10转换为level=..10，合并为5..15）
+- **基岩版输出**：@a[l=5..15]（level=5..15转换为l=5..15）
+
+### testJavaBedrockMixedModeMerge_4
+- **输入选择器**：@a[limit=3,c=5]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[limit=5,sort=nearest]（c=5转换为limit=5, sort=nearest，合并为limit=5, sort=nearest）
+- **基岩版输出**：@a[c=5,sort=nearest]（limit=3转换为c=3，合并为c=5, sort=nearest）
+
+### testJavaBedrockMixedModeMerge_5
+- **输入选择器**：@a[y_rotation=-90..90,ry=45]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[y_rotation=-90..90]（ry=45转换为y_rotation=..45，合并为-90..90）
+- **基岩版输出**：@a[rym=-90,ry=90]（y_rotation=-90..90拆分为rym=-90, ry=90）
+
+---
+
+## testMixedModeMergeLogicWithJavaBedrock_5
+
+### testMixedModeMergeLogicWithJavaBedrock_5
+- **输入选择器**：@a[distance=5..7,distance=3..9,r=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[distance=3..10]
+  - distance=5..7和distance=3..9先合并（默认逻辑，差的绝对值最大）：distance=3..9
+  - r=10转换为distance=..10
+  - 合并（混合模式逻辑）：distance=3..10
+- **基岩版输出**：@a[rm=3,r=10]
+  - distance=5..7和distance=3..9转换为：rm=3, r=7和rm=3, r=9
+  - 合并：rm=3, r=10
+
+---
+
+## testAllParamsCombination_2,4,5
+
+### testAllParamsCombination_2
+- **输入选择器**：@a[x=5,x=10,dx=3,dx=8,rm=2,rm=5,distance=3..5,distance=1..8]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[x=10,dx=8,distance=1..8]
+  - x合并：x=10
+  - dx合并：dx=8
+  - distance=3..5和distance=1..8先合并：distance=1..8
+  - rm=2和rm=5转换为distance=2..和distance=5..
+  - 合并（混合模式逻辑）：distance=1..8
+- **基岩版输出**：@a[x=10,dx=8,rm=1,r=8]
+  - x合并：x=10
+  - dx合并：dx=8
+  - distance=3..5和distance=1..8转换为：rm=3, r=5和rm=1, r=8
+  - rm=2和rm=5合并：rm=2
+  - 合并：rm=1, r=8
+
+### testAllParamsCombination_4
+- **输入选择器**：@a[x=5,x=10,y=3,y=8,dx=2,dx=7,dy=1,dy=6,dz=4,dz=9,distance=5..7,distance=2..9,x_rotation=-45..45,x_rotation=-30..30,y_rotation=-90..90,y_rotation=0..180,level=5..10,level=3..15]
+- **测试环境**：不启用JAVA/基岩混合模式（只包含Java版参数）
+- **Java版输出**：@a[x=10,y=8,dx=7,dy=6,dz=9,distance=2..9,x_rotation=-45..45,y_rotation=0..180,level=3..15]
+  - x=10, y=8
+  - dx=7, dy=6, dz=9
+  - distance=2..9
+  - x_rotation=-45..45
+  - y_rotation=0..180（差的绝对值相等，选择最后一个）
+  - level=3..15
+- **基岩版输出**：@a[x=10,y=8,dx=7,dy=6,dz=9,rm=2,r=9,rxm=-45,rx=45,rym=-90,ry=180,l=3,l=15]
+
+### testAllParamsCombination_5
+- **输入选择器**：@a[x=5,x=10,dx=3,dx=8,rm=2,rm=5,distance=3..5,distance=1..8,r=10]
+- **测试环境**：启用JAVA/基岩混合模式
+- **Java版输出**：@a[x=10,dx=8,distance=1..10]
+  - x合并：x=10
+  - dx合并：dx=8
+  - distance=3..5和distance=1..8先合并：distance=1..8
+  - rm=2和rm=5转换为distance=2..和distance=5..
+  - r=10转换为distance=..10
+  - 合并（混合模式逻辑）：distance=1..10
+- **基岩版输出**：@a[x=10,dx=8,rm=1,r=10]
+  - x合并：x=10
+  - dx合并：dx=8
+  - distance=3..5和distance=1..8转换为：rm=3, r=5和rm=1, r=8
+  - rm=2和rm=5合并：rm=2
+  - r=10
+  - 合并：rm=1, r=10
+
+---
+
+更新时间：2026-02-13
