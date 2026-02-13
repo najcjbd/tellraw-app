@@ -2063,11 +2063,13 @@ object SelectorConverter {
                         for (value in values) {
                             val range = parseRange(value.first)
                             if (range != null) {
-                                if (range.first != null) {
-                                    allMinValues.add(range.first)
+                                val minVal = range.first
+                                val maxVal = range.second
+                                if (minVal != null) {
+                                    allMinValues.add(minVal)
                                 }
-                                if (range.second != null) {
-                                    allMaxValues.add(range.second)
+                                if (maxVal != null) {
+                                    allMaxValues.add(maxVal)
                                 }
                             }
                         }
@@ -2096,11 +2098,13 @@ object SelectorConverter {
                         for (value in values) {
                             val range = parseRange(value.first)
                             if (range != null) {
-                                if (range.first != null) {
-                                    allMinValues.add(range.first)
+                                val minVal = range.first
+                                val maxVal = range.second
+                                if (minVal != null) {
+                                    allMinValues.add(minVal)
                                 }
-                                if (range.second != null) {
-                                    allMaxValues.add(range.second)
+                                if (maxVal != null) {
+                                    allMaxValues.add(maxVal)
                                 }
                             }
                         }
