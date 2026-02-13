@@ -472,8 +472,8 @@ object TextFormatter {
         if (mnCFEnabled) {
             // 在§m/§n_c/f模式下，先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
             // 只移除后面不是下划线（即不是_f/_c）的§m和§n
-            processedText = processedText.replace(Regex("§m(?![a-z])"), "")
-            processedText = processedText.replace(Regex("§n(?![a-z])"), "")
+            processedText = processedText.replace(Regex("§m(?!_)"), "")
+            processedText = processedText.replace(Regex("§n(?!_)"), "")
             // 然后将§m_f/§m_c统一转换为§m（material_redstone）
             processedText = processedText.replace("§m_f", "§m")
             processedText = processedText.replace("§m_c", "§m")
