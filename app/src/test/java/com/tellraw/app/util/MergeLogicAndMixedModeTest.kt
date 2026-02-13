@@ -102,13 +102,21 @@ class MergeLogicAndMixedModeTest {
     
     @Test
     fun testDefaultMergeLogic_8() {
+        // 启用JAVA/基岩混合模式
+        SelectorConverter.setJavaBedrockMixedModeEnabled(true)
+        
         // 基岩版特有参数转换为Java版参数后的合并逻辑：c和l
-        val selector = "@a[c=-10,l=-5,limit=-3]"
+        val selector = "@a[c=10,l=5,limit=3]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        // c=-10, limit=-3 转换为 limit=-3（取最大值-3）
-        // l=-5 转换为 level=-5
-        assertTrue("应包含limit=-3", conversion.javaSelector.contains("limit=-3"))
-        assertTrue("应包含level=-5", conversion.javaSelector.contains("level=-5"))
+        // c=10 转换为 limit=10,sort=nearest
+        // limit=3 与 limit=10 合并，取最大值 10
+        // l=5 转换为 level=5
+        assertTrue("应包含limit=10", conversion.javaSelector.contains("limit=10"))
+        assertTrue("应包含sort=nearest", conversion.javaSelector.contains("sort=nearest"))
+        assertTrue("应包含level=5", conversion.javaSelector.contains("level=5"))
+        
+        // 重置
+        SelectorConverter.setJavaBedrockMixedModeEnabled(false)
     }
     
     @Test
