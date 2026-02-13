@@ -193,7 +193,8 @@ object SelectorConverter {
         R.string.selector_must_start_with_at to "选择器必须以 @ 开头",
         R.string.selector_invalid to "选择器无效，必须是 @a、@p、@r、@e 或 @s",
         R.string.message_json_invalid to "消息JSON格式无效",
-        R.string.message_json_invalid_with_error to "消息JSON格式无效: %s"
+        R.string.message_json_invalid_with_error to "消息JSON格式无效: %s",
+        R.string.java_bedrock_mixed_mode_active to "JAVA/基岩混合模式开启：找到两版特有参数，自动转换"
     )
 
     /**
