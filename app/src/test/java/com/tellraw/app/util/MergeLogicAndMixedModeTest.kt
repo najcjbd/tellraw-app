@@ -1169,9 +1169,6 @@ class MergeLogicAndMixedModeTest {
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含level=0..10", conversion.javaSelector.contains("level=0..10"))
     }
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含distance=1..6", conversion.javaSelector.contains("distance=1..6"))
-    }
     
     /**
      * 测试组7：混合模式下的单边范围合并
