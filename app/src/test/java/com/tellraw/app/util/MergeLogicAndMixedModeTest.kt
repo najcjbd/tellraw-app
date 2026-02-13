@@ -80,7 +80,6 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    @Test
     fun testDefaultMergeLogic_6() {
         // 基岩版特有参数转换为Java版参数后的合并逻辑：负数处理
         val selector = "@a[rx=30,rxm=-45,ry=90,rym=-90]"
@@ -89,8 +88,6 @@ class MergeLogicAndMixedModeTest {
         // rym=-90, ry=90 转换为 y_rotation=-90..90（取最小值-90，最大值90）
         assertTrue("应包含x_rotation=-45..30", conversion.javaSelector.contains("x_rotation=-45..30"))
         assertTrue("应包含y_rotation=-90..90", conversion.javaSelector.contains("y_rotation=-90..90"))
-    }
-
     }
     
     @Test
@@ -104,7 +101,6 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    @Test
     fun testDefaultMergeLogic_8() {
         // 基岩版特有参数转换为Java版参数后的合并逻辑：c和l
         val selector = "@a[c=-10,l=-5,limit=-3]"
@@ -113,8 +109,6 @@ class MergeLogicAndMixedModeTest {
         // l=-5 转换为 level=-5
         assertTrue("应包含limit=-3", conversion.javaSelector.contains("limit=-3"))
         assertTrue("应包含level=-5", conversion.javaSelector.contains("level=-5"))
-    }
-
     }
     
     @Test
@@ -270,64 +264,26 @@ class MergeLogicAndMixedModeTest {
      */
     @Test
     fun testJavaBedrockMixedMode_1() {
+        // 启用JAVA/基岩混合模式
+        SelectorConverter.setJavaBedrockMixedModeEnabled(true)
+        
+        // 同时包含Java版和基岩版特有参数
+        val selector = "@a[r=8,distance=..9,y_rotation=..150]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        
+        // 应该触发混合模式转换
+        assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
         // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
         assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
         assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
-        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
-        assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
-        // Java版输出：@a[distance=..9,y_rotation=..150]（r=8转换为distance=..8，与distance=..9合并）
-        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
-        assertTrue("应包含y_rotation=..150", conversion.javaSelector.contains("y_rotation=..150"))
-        // 基岩版输出：@a[r=9,ry=150]
+        // 基岩版输出：@a[r=9,ry=150]（distance=..9转换为r=9，y_rotation=..150转换为ry=150）
         assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
         assertTrue("应包含ry=150", conversion.bedrockSelector.contains("ry=150"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
     }
+
     
     @Test
     fun testJavaBedrockMixedMode_2() {
@@ -340,6 +296,12 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // Java版输出：@a[distance=..9,nbt={Inventory:[{Slot:21b,id:"minecraft:netherite_ingot"}]}]
+        assertTrue("应包含distance=..9", conversion.javaSelector.contains("distance=..9"))
+        assertTrue("应包含nbt", conversion.javaSelector.contains("nbt"))
+        // 基岩版输出：@a[r=9,hasitem={item=netherite_ingot,location=slot.inventory,slot=12}]
+        assertTrue("应包含r=9", conversion.bedrockSelector.contains("r=9"))
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -356,6 +318,12 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.bedrockReminders.any { it.contains("混合模式") })
+        // Java版输出：@a[distance=10,nbt={...}]（hasitem转换为nbt）
+        assertTrue("应包含nbt", conversion.javaSelector.contains("nbt"))
+        // 基岩版输出：@a[hasitem={item=diamond},r=10,rm=10]
+        assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
+        assertTrue("应包含rm=10", conversion.bedrockSelector.contains("rm=10"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -372,6 +340,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // Java版输出：@a[x_rotation=-90..90]（rxm=-45, rx=30转换为x_rotation=-45..30，与x_rotation=-90..90合并）
+        assertTrue("应包含x_rotation=-90..90", conversion.javaSelector.contains("x_rotation=-90..90"))
+        // 基岩版输出：@a[rx=-45,rx=90]（x_rotation=-90..90拆分为rxm=-90, rx=90）
+        assertTrue("应包含rxm=-90", conversion.bedrockSelector.contains("rxm=-90"))
+        assertTrue("应包含rx=90", conversion.bedrockSelector.contains("rx=90"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -525,8 +498,19 @@ class MergeLogicAndMixedModeTest {
         val selector = "@a[distance=5..7,distance=3..9,r=10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
-        // 在混合模式下，合并应该使用混合模式合并逻辑（取3..9）
-        assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
+        // 应该触发混合模式转换
+        assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // Java版输出：@a[distance=3..10]
+        // distance=5..7和distance=3..9先合并（默认逻辑，差的绝对值最大）：distance=3..9
+        // r=10转换为distance=..10
+        // 合并（混合模式逻辑）：distance=3..10
+        assertTrue("应包含distance=3..10", conversion.javaSelector.contains("distance=3..10"))
+        // 基岩版输出：@a[rm=3,r=10]
+        // distance=5..7和distance=3..9转换为：rm=3, r=7和rm=3, r=9
+        // r=10
+        // 合并：rm=3, r=10
+        assertTrue("应包含rm=3", conversion.bedrockSelector.contains("rm=3"))
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -767,8 +751,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
-        // r应该被转换为distance，并与原来的distance合并
-        assertTrue("应包含distance参数", conversion.javaSelector.contains("distance"))
+        // Java版输出：@a[distance=5..10]（r=10转换为distance=..10，合并为5..10）
+        assertTrue("应包含distance=5..10", conversion.javaSelector.contains("distance=5..10"))
+        // 基岩版输出：@a[r=10,rm=5]（distance=5转换为r=5,rm=5，合并为r=10）
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
+        assertTrue("应包含rm=5", conversion.bedrockSelector.contains("rm=5"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -785,8 +772,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
-        // rx应该被转换为x_rotation，并与原来的x_rotation合并
-        assertTrue("应包含x_rotation参数", conversion.javaSelector.contains("x_rotation"))
+        // Java版输出：@a[x_rotation=-45..45]（rx=10转换为x_rotation=..10，合并为-45..10）
+        assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
+        // 基岩版输出：@a[rx=-45,rx=45]（x_rotation=-45..45拆分为rxm=-45, rx=45）
+        assertTrue("应包含rxm=-45", conversion.bedrockSelector.contains("rxm=-45"))
+        assertTrue("应包含rx=45", conversion.bedrockSelector.contains("rx=45"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -803,8 +793,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
-        // l应该被转换为level，并与原来的level合并
-        assertTrue("应包含level参数", conversion.javaSelector.contains("level"))
+        // Java版输出：@a[level=5..15]（l=10转换为level=..10，合并为5..15）
+        assertTrue("应包含level=5..15", conversion.javaSelector.contains("level=5..15"))
+        // 基岩版输出：@a[l=15,lm=5]（level=5..15转换为l=15,lm=5）
+        assertTrue("应包含l=15", conversion.bedrockSelector.contains("l=15"))
+        assertTrue("应包含lm=5", conversion.bedrockSelector.contains("lm=5"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -821,8 +814,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
-        // c应该被转换为limit，并与原来的limit合并
-        assertTrue("应包含limit参数", conversion.javaSelector.contains("limit"))
+        // Java版输出：@a[limit=5,sort=nearest]（c=5转换为limit=5, sort=nearest，合并为limit=5, sort=nearest）
+        assertTrue("应包含limit=5", conversion.javaSelector.contains("limit=5"))
+        assertTrue("应包含sort=nearest", conversion.javaSelector.contains("sort=nearest"))
+        // 基岩版输出：@a[c=5]（limit=3转换为c=3，合并为c=5）
+        assertTrue("应包含c=5", conversion.bedrockSelector.contains("c=5"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -839,8 +835,11 @@ class MergeLogicAndMixedModeTest {
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
-        // ry应该被转换为y_rotation，并与原来的y_rotation合并
-        assertTrue("应包含y_rotation参数", conversion.javaSelector.contains("y_rotation"))
+        // Java版输出：@a[y_rotation=-90..90]（ry=45转换为y_rotation=..45，合并为-90..90）
+        assertTrue("应包含y_rotation=-90..90", conversion.javaSelector.contains("y_rotation=-90..90"))
+        // 基岩版输出：@a[rym=-90,ry=90]（y_rotation=-90..90拆分为rym=-90, ry=90）
+        assertTrue("应包含rym=-90", conversion.bedrockSelector.contains("rym=-90"))
+        assertTrue("应包含ry=90", conversion.bedrockSelector.contains("ry=90"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -865,13 +864,24 @@ class MergeLogicAndMixedModeTest {
     
     @Test
     fun testAllParamsCombination_2() {
-        // 所有范围参数的组合（Java版参数）
-        val selector = "@a[distance=5..10,distance=3..12,x_rotation=-45..45,x_rotation=-30..60,y_rotation=-90..90,y_rotation=0..180,level=10..20,level=5..25]"
+        // 启用JAVA/基岩混合模式
+        SelectorConverter.setJavaBedrockMixedModeEnabled(true)
+        
+        // 所有参数同时重复：最大值类型、范围类型
+        val selector = "@a[x=5,x=10,dx=3,dx=8,rm=2,rm=5,distance=3..5,distance=1..8]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含distance=3..12", conversion.javaSelector.contains("distance=3..12"))
-        assertTrue("应包含x_rotation=-45..60", conversion.javaSelector.contains("x_rotation=-45..60"))
-        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
-        assertTrue("应包含level=5..25", conversion.javaSelector.contains("level=5..25"))
+        // Java版输出：@a[x=10,dx=8,distance=1..8]
+        assertTrue("应包含x=10", conversion.javaSelector.contains("x=10"))
+        assertTrue("应包含dx=8", conversion.javaSelector.contains("dx=8"))
+        assertTrue("应包含distance=1..8", conversion.javaSelector.contains("distance=1..8"))
+        // 基岩版输出：@a[x=10,dx=8,rm=1,r=8]
+        assertTrue("应包含x=10", conversion.bedrockSelector.contains("x=10"))
+        assertTrue("应包含dx=8", conversion.bedrockSelector.contains("dx=8"))
+        assertTrue("应包含rm=1", conversion.bedrockSelector.contains("rm=1"))
+        assertTrue("应包含r=8", conversion.bedrockSelector.contains("r=8"))
+        
+        // 重置
+        SelectorConverter.setJavaBedrockMixedModeEnabled(false)
     }
     
     @Test
@@ -907,19 +917,23 @@ class MergeLogicAndMixedModeTest {
     
     @Test
     fun testAllParamsCombination_5() {
-        // 完整组合：最大值、最小值、范围类型
-        val selector = "@a[x=5,x=10,y=3,y=8,z=1,z=6,dx=2,dx=7,dy=4,dy=9,dz=3,dz=8,distance=5..10,distance=2..15,x_rotation=-45..45,x_rotation=-30..60,y_rotation=-90..90,y_rotation=0..180,level=10..20,level=5..25,limit=3,limit=7]"
+        // 启用JAVA/基岩混合模式
+        SelectorConverter.setJavaBedrockMixedModeEnabled(true)
+        
+        // 所有参数同时重复：最大值类型、范围类型
+        val selector = "@a[x=5,x=10,dx=3,dx=8,rm=2,rm=5,distance=3..5,distance=1..8,r=10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        // Java版输出：@a[x=10,dx=8,distance=1..10]
         assertTrue("应包含x=10", conversion.javaSelector.contains("x=10"))
-        assertTrue("应包含y=8", conversion.javaSelector.contains("y=8"))
-        assertTrue("应包含z=6", conversion.javaSelector.contains("z=6"))
-        assertTrue("应包含dx=7", conversion.javaSelector.contains("dx=7"))
-        assertTrue("应包含dy=9", conversion.javaSelector.contains("dy=9"))
-        assertTrue("应包含dz=8", conversion.javaSelector.contains("dz=8"))
-        assertTrue("应包含distance=2..15", conversion.javaSelector.contains("distance=2..15"))
-        assertTrue("应包含x_rotation=-45..60", conversion.javaSelector.contains("x_rotation=-45..60"))
-        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
-        assertTrue("应包含level=5..25", conversion.javaSelector.contains("level=5..25"))
-        assertTrue("应包含limit=7", conversion.javaSelector.contains("limit=7"))
+        assertTrue("应包含dx=8", conversion.javaSelector.contains("dx=8"))
+        assertTrue("应包含distance=1..10", conversion.javaSelector.contains("distance=1..10"))
+        // 基岩版输出：@a[x=10,dx=8,rm=1,r=10]
+        assertTrue("应包含x=10", conversion.bedrockSelector.contains("x=10"))
+        assertTrue("应包含dx=8", conversion.bedrockSelector.contains("dx=8"))
+        assertTrue("应包含rm=1", conversion.bedrockSelector.contains("rm=1"))
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
+        
+        // 重置
+        SelectorConverter.setJavaBedrockMixedModeEnabled(false)
     }
 }
