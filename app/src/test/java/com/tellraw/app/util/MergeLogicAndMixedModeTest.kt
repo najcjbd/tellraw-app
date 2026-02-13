@@ -715,7 +715,7 @@ class MergeLogicAndMixedModeTest {
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
         assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
-        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=0..180"))
         assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
     }
     
@@ -741,7 +741,7 @@ class MergeLogicAndMixedModeTest {
         assertTrue("应包含dz=9", conversion.javaSelector.contains("dz=9"))
         assertTrue("应包含distance=2..9", conversion.javaSelector.contains("distance=2..9"))
         assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
-        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=0..180"))
         assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
     }
     

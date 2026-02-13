@@ -2068,8 +2068,12 @@ object SelectorConverter {
                             }
                         }
 
-                        val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
-                        val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
+                        // 优先使用有限的最小值，如果没有有限值才使用无限值
+                        val finiteMinValues = allMinValues.filter { it != Double.MAX_VALUE && it != Double.POSITIVE_INFINITY }
+                        val finalMin = if (finiteMinValues.isNotEmpty()) finiteMinValues.minOrNull() else allMinValues.minOrNull()
+                        // 优先使用有限的最大值，如果没有有限值才使用无限值
+                        val finiteMaxValues = allMaxValues.filter { it != Double.MAX_VALUE && it != Double.POSITIVE_INFINITY }
+                        val finalMax = if (finiteMaxValues.isNotEmpty()) finiteMaxValues.maxOrNull() else allMaxValues.maxOrNull()
 
                         // 格式化输出
                         val rangeValue = when {
