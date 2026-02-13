@@ -1373,12 +1373,18 @@ object SelectorConverter {
             val minPattern = "(?<!__SCORES_)(^|,)$minParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
             val maxPattern = "(?<!__SCORES_)(^|,)$maxParam=([^,\\]]+)".toRegex(RegexOption.IGNORE_CASE)
 
-            // 处理所有的minParam参数，取最小值
+            // 处理所有的minParam参数，取最小值和最大值（如果只有一个minParam则只取最小值）
             val minMatches = minPattern.findAll(result).toList()
             val minValue: String? = if (minMatches.isNotEmpty()) {
                 val minVal = minMatches.map { it.groupValues[2].toDouble() }.minOrNull()
                 if (minVal != null) {
                     if (minVal % 1.0 == 0.0) minVal.toInt().toString() else minVal.toString()
+                } else null
+            } else null
+            val minMaxValue: String? = if (minMatches.size > 1) {
+                val maxVal = minMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
+                if (maxVal != null) {
+                    if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
                 } else null
             } else null
 
@@ -1391,9 +1397,11 @@ object SelectorConverter {
                 } else null
             } else null
 
-            if (minValue != null || maxValue != null) {
+            if (minValue != null || minMaxValue != null || maxValue != null) {
                 val rotationValue = when {
+                    minValue != null && minMaxValue != null -> minValue + ".." + minMaxValue  // 多个minParam参数创建范围
                     minValue != null && maxValue != null -> minValue + ".." + maxValue
+                    minMaxValue != null && maxValue != null -> minMaxValue + ".." + maxValue
                     minValue != null -> minValue + ".."
                     maxValue != null -> "..$maxValue"
                     else -> ""
@@ -1401,6 +1409,8 @@ object SelectorConverter {
 
                 if (rotationValue.isNotEmpty()) {
                     when {
+                        minValue != null && minMaxValue != null ->
+                            reminders.add(getStringSafely(context, R.string.bedrock_rotation_converted, minParam, minValue, minParam, minMaxValue, paramName, rotationValue))
                         minValue != null && maxValue != null ->
                             reminders.add(getStringSafely(context, R.string.bedrock_rotation_converted, minParam, minValue, maxParam, maxValue, paramName, rotationValue))
                         minValue != null ->
