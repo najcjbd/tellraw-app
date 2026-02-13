@@ -10,6 +10,59 @@ import kotlin.math.roundToInt
 object SelectorConverter {
     private const val TAG = "SelectorConverter"
     
+    // 控制是否使用JAVA/基岩混合模式
+    // true: 当同时存在Java版和基岩版特有参数时，调用convertForMixedMode
+    // false: 使用单向转换逻辑
+    private var javaBedrockMixedModeEnabled = false
+    
+    // 控制是否使用混合模式合并逻辑
+    // true: 使用源代码合并逻辑（取所有最小值的最小值和所有最大值的最大值）
+    // false: 使用新的合并逻辑（选取差的绝对值最大的范围）
+    private var useMixedModeMergeLogic = false
+    
+    /**
+     * 设置是否启用JAVA/基岩混合模式
+     * @param enabled true表示启用混合模式，false表示使用单向转换
+     */
+    fun setJavaBedrockMixedModeEnabled(enabled: Boolean) {
+        javaBedrockMixedModeEnabled = enabled
+    }
+    
+    /**
+     * 设置是否使用混合模式合并逻辑
+     * @param useMixedMode true: 使用源代码合并逻辑，false: 使用新的合并逻辑
+     */
+    fun setMergeLogicMode(useMixedMode: Boolean) {
+        useMixedModeMergeLogic = useMixedMode
+    }
+    
+    /**
+     * 检测选择器是否同时包含Java版和基岩版特有参数
+     */
+    private fun hasBothJavaAndBedrockParams(selector: String): Boolean {
+        if ('[' !in selector || ']' !in selector) {
+            return false
+        }
+        
+        val paramsPart = selector.substringAfter('[').substringBeforeLast(']')
+        var javaCount = 0
+        var bedrockCount = 0
+        
+        for (param in paramsPart.split(',')) {
+            val trimmedParam = param.trim()
+            if ('=' in trimmedParam) {
+                val paramName = trimmedParam.split('=')[0].trim()
+                if (paramName in JAVA_SPECIFIC_PARAMS) {
+                    javaCount++
+                } else if (paramName in BEDROCK_SPECIFIC_PARAMS) {
+                    bedrockCount++
+                }
+            }
+        }
+        
+        return javaCount > 0 && bedrockCount > 0
+    }
+    
     // Java版特有参数
     private val JAVA_SPECIFIC_PARAMS = listOf(
         "distance", "x_rotation", "y_rotation", "nbt", "team", "limit", "sort",
@@ -254,8 +307,6 @@ object SelectorConverter {
      */
     fun convertBedrockToJava(selector: String, context: android.content.Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
-        Log.d(TAG, "=== convertBedrockToJava START ===")
-        Log.d(TAG, "Input selector: $selector")
         
         // 基岩版特有选择器变量到Java版的映射
         val selectorMapping = mapOf(
@@ -273,8 +324,6 @@ object SelectorConverter {
         var newSelector = selector
         var wasConverted = false
         
-        Log.d(TAG, "Selector var: $selectorVar, paramsPart: $paramsPart")
-        
         // 转换选择器变量
         if (selectorVar in selectorMapping) {
             newSelector = selectorMapping[selectorVar]!! + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
@@ -287,14 +336,20 @@ object SelectorConverter {
         reminders.addAll(paramReminders)
         
         // 返回转换后的选择器
-        val javaSelector = convertedSelector
+        var javaSelector = convertedSelector
 
         // 如果参数发生了变化，也认为发生了转换
         if (javaSelector != newSelector) {
             wasConverted = true
         }
-
-        println("DEBUG convertBedrockToJava: output javaSelector=$javaSelector")
+        
+        // 检测是否需要使用JAVA/基岩混合模式
+        if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
+            // 使用混合模式转换
+            val (javaMixedOutput, _) = convertForMixedMode(selector, context, reminders)
+            javaSelector = javaMixedOutput
+            wasConverted = true
+        }
 
         return SelectorConversionResult(
             javaSelector = javaSelector,
@@ -310,22 +365,24 @@ object SelectorConverter {
      */
     fun convertJavaToBedrock(selector: String, context: Context): SelectorConversionResult {
         val reminders = mutableListOf<String>()
-        Log.d(TAG, "=== convertJavaToBedrock START ===")
-        Log.d(TAG, "Input selector: $selector")
         
         // 转换参数
         val (convertedSelector, removedParams, paramReminders) = filterSelectorParameters(selector, SelectorType.BEDROCK, context)
         reminders.addAll(paramReminders)
-        
-        Log.d(TAG, "Output selector: $convertedSelector")
-        Log.d(TAG, "Removed params: $removedParams")
-        Log.d(TAG, "=== convertJavaToBedrock END ===")
 
         // 返回转换后的选择器
         var bedrockSelector = convertedSelector
 
         // 如果参数发生了变化，也认为发生了转换
-        val wasConverted = bedrockSelector != selector || removedParams.isNotEmpty()
+        var wasConverted = bedrockSelector != selector || removedParams.isNotEmpty()
+        
+        // 检测是否需要使用JAVA/基岩混合模式
+        if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
+            // 使用混合模式转换
+            val (_, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
+            bedrockSelector = bedrockMixedOutput
+            wasConverted = true
+        }
 
         return SelectorConversionResult(
             javaSelector = selector,
@@ -392,7 +449,6 @@ object SelectorConverter {
         // 这样可以减少需要转换的参数数量
         // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
         val mergedParamsPart = mergeDuplicateParameters(paramsPart)
-        println("DEBUG filterSelectorParameters: before merge=$paramsPart, after merge=$mergedParamsPart, useMixedModeMergeLogic=$useMixedModeMergeLogic")
         paramsPart = mergedParamsPart
 
         // 处理 scores 参数的反选（基岩版特有功能）
@@ -801,9 +857,6 @@ object SelectorConverter {
      */
     private fun convertDistanceParameters(paramsPart: String, conversionReminders: MutableList<String>, context: Context): String {
         var result = paramsPart
-        Log.d(TAG, "=== convertDistanceParameters START ===")
-        Log.d(TAG, "Input paramsPart: $paramsPart")
-        
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
         // 使用智能提取方法，正确处理嵌套的花括号
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
@@ -814,7 +867,6 @@ object SelectorConverter {
         
         // 处理所有的distance参数，提取所有的值并计算范围
         val distanceMatches = distancePattern.findAll(result).toList()
-        Log.d(TAG, "Found ${distanceMatches.size} distance matches")
         
         if (distanceMatches.isNotEmpty()) {
             // 提取所有distance值
@@ -823,7 +875,6 @@ object SelectorConverter {
             
             for (match in distanceMatches) {
                 val distanceValue = match.groupValues[2]
-                Log.d(TAG, "  - distanceValue: $distanceValue")
                 
                 if (".." in distanceValue) {
                     val parts = distanceValue.split("..")
@@ -883,8 +934,6 @@ object SelectorConverter {
             }
         }
         
-        Log.d(TAG, "Output paramsPart: $result")
-        Log.d(TAG, "=== convertDistanceParameters END ===")
         return result
     }
     
@@ -899,9 +948,6 @@ object SelectorConverter {
         val scoresMatches = mutableListOf<Pair<String, String>>()  // (placeholder, original)
         result = extractComplexParameters(result, "scores", scoresMatches)
         
-        // DEBUG: 打印输入
-        println("DEBUG convertRotationParameters: input=$result")
-
         // 处理x_rotation参数（此时scores参数已被替换为占位符，不会误匹配）
         val xRotationPattern = "(?<!__SCORES_)(^|,)x_rotation=([^,\\]]+)".toRegex()
         val xRotationMatches = xRotationPattern.findAll(result).toList()
@@ -965,8 +1011,6 @@ object SelectorConverter {
         // 处理y_rotation参数（此时scores参数仍为占位符，不会误匹配）
         val yRotationPattern = "(?<!__SCORES_)(^|,)y_rotation=([^,\\]]+)".toRegex()
         val yRotationMatches = yRotationPattern.findAll(result).toList()
-        
-        println("DEBUG convertRotationParameters: found ${yRotationMatches.size} y_rotation matches")
 
         if (yRotationMatches.isNotEmpty()) {
             // 提取所有y_rotation值
@@ -1012,17 +1056,14 @@ object SelectorConverter {
                 val rymStr = if (finalRym % 1.0 == 0.0) finalRym.toInt().toString() else finalRym.toString()
                 val ryStr = if (finalRy % 1.0 == 0.0) finalRy.toInt().toString() else finalRy.toString()
                 result = addParameterToResult(result, "rym=$rymStr,ry=$ryStr")
-                println("DEBUG convertRotationParameters: added rym=$rymStr,ry=$ryStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_converted, "multiple", rymStr, ryStr))
             } else if (finalRym != null) {
                 val rymStr = if (finalRym % 1.0 == 0.0) finalRym.toInt().toString() else finalRym.toString()
                 result = addParameterToResult(result, "rym=$rymStr")
-                println("DEBUG convertRotationParameters: added rym=$rymStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_rym, "multiple", rymStr))
             } else if (finalRy != null) {
                 val ryStr = if (finalRy % 1.0 == 0.0) finalRy.toInt().toString() else finalRy.toString()
                 result = addParameterToResult(result, "ry=$ryStr")
-                println("DEBUG convertRotationParameters: added ry=$ryStr")
                 conversionReminders.add(getStringSafely(context, R.string.java_y_rotation_to_ry, "multiple", ryStr))
             }
         }
@@ -1032,7 +1073,6 @@ object SelectorConverter {
             result = result.replace(placeholder, original)
         }
         
-        println("DEBUG convertRotationParameters: output=$result")
         return result
     }
     
@@ -1312,7 +1352,6 @@ object SelectorConverter {
         toJava: Boolean = true
     ): String {
         var result = paramsPart
-        println("DEBUG convertRotationParameter: paramName=$paramName, minParam=$minParam, maxParam=$maxParam, toJava=$toJava, input=$result")
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
         // 使用智能提取方法，正确处理嵌套的花括号
@@ -1327,7 +1366,6 @@ object SelectorConverter {
 
             // 处理所有的minParam参数，取最小值
             val minMatches = minPattern.findAll(result).toList()
-            println("DEBUG convertRotationParameter: minPattern=$minPattern, minMatches.size=${minMatches.size}")
             val minValue: String? = if (minMatches.isNotEmpty()) {
                 val minVal = minMatches.map { it.groupValues[2].toDouble() }.minOrNull()
                 if (minVal != null) {
@@ -1337,15 +1375,12 @@ object SelectorConverter {
 
             // 处理所有的maxParam参数，取最大值
             val maxMatches = maxPattern.findAll(result).toList()
-            println("DEBUG convertRotationParameter: maxPattern=$maxPattern, maxMatches.size=${maxMatches.size}")
             val maxValue: String? = if (maxMatches.isNotEmpty()) {
                 val maxVal = maxMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
                 if (maxVal != null) {
                     if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
                 } else null
             } else null
-
-            println("DEBUG convertRotationParameter: minValue=$minValue, maxValue=$maxValue")
 
             if (minValue != null || maxValue != null) {
                 val rotationValue = when {
@@ -1388,9 +1423,7 @@ object SelectorConverter {
                     }
 
                     // 添加新参数
-                    println("DEBUG convertRotationParameter: before addParameterToResult, result=$result, newParam=${paramName}=${rotationValue}")
                     result = addParameterToResult(result, paramName + "=" + rotationValue)
-                    println("DEBUG convertRotationParameter: after addParameterToResult, result=$result")
                 } else {
                     // 恢复scores参数（如果没有匹配到参数）
                     for ((placeholder, original) in scoresMatches) {
@@ -1899,8 +1932,6 @@ object SelectorConverter {
      * @return 合并后的参数部分字符串
      */
     private fun mergeDuplicateParameters(paramsPart: String): String {
-        println("DEBUG mergeDuplicateParameters: input=$paramsPart")
-
         if (paramsPart.isEmpty()) {
             return paramsPart
         }
@@ -2110,7 +2141,6 @@ object SelectorConverter {
         }
 
         val mergedResult = mergedParams.joinToString(",")
-        println("DEBUG mergeDuplicateParameters: output=$mergedResult")
         return mergedResult
     }
 
@@ -2176,14 +2206,10 @@ object SelectorConverter {
      * 返回 Pair<最小值, 最大值>
      */
     private fun parseRange(value: String): Pair<Double, Double>? {
-        println("DEBUG parseRange: input=$value")
-
         if (".." in value) {
             val parts = value.split("..")
             val minVal = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
             val maxVal = parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
-
-            println("DEBUG parseRange: parts=$parts, minVal=$minVal, maxVal=$maxVal")
 
             if (minVal != null && maxVal != null) {
                 return Pair(minVal, maxVal)
@@ -2208,7 +2234,6 @@ object SelectorConverter {
     private fun convertHasitemToNbt(paramsPart: String, context: Context): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
-        println("DEBUG convertHasitemToNbt: input=$result")
 
         // 处理空数组格式：hasitem=[]
         val emptyArrayPattern = "hasitem=\\[\\]".toRegex()
@@ -2287,18 +2312,13 @@ object SelectorConverter {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     // +2 是为了包含 objectContent 后面的 '}' 字符
                     val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 2)
-                    println("DEBUG convertHasitemToNbt: fullMatch='$fullMatch', startIndex=$startIndex, braceIndex=$braceIndex, objectContent='$objectContent', fullMatch.length=${fullMatch.length}")
-                    println("DEBUG convertHasitemToNbt: fullMatch.lastChar='${fullMatch.lastOrNull()}'")
                     val nbtResult = parseHasitemSingle(objectContent, reminders, context)
 
                 if (nbtResult.isNotEmpty()) {
                         // 精确替换
                         val index = result.indexOf(fullMatch)
                         if (index >= 0) {
-                            println("DEBUG convertHasitemToNbt: before replace, index=$index, fullMatch=$fullMatch, nbtResult=$nbtResult")
-                            println("DEBUG convertHasitemToNbt: result.substring(index + fullMatch.length)='${result.substring(index + fullMatch.length)}'")
                             result = result.substring(0, index) + nbtResult + result.substring(index + fullMatch.length)
-                            println("DEBUG convertHasitemToNbt: after replace, result=$result")
                         }
                     } else {
                         // 无效参数或转换失败，移除整个 hasitem 参数
@@ -2321,7 +2341,6 @@ object SelectorConverter {
         result = result.replace(",\\]".toRegex(), "]")
         result = result.replace("\\[".toRegex(), "[")
 
-        println("DEBUG convertHasitemToNbt: output=$result")
         return result to reminders
     }
 
@@ -2399,7 +2418,6 @@ object SelectorConverter {
                     if (braceCount == 0 && started) {
                         // 遇到外层的 '}'，结束
                         val extracted = result.toString()
-                        println("DEBUG extractObjectContent: str=$str, extracted=$extracted")
                         return extracted
                     } else {
                         result.append(char)  // 保留内层的 '}'
@@ -2420,7 +2438,6 @@ object SelectorConverter {
      * 解析单个 hasitem 条目
      */
     private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context): String {
-        println("DEBUG parseHasitemSingle: content=$content")
         val params = mutableMapOf<String, String>()
         val parts = parseHasitemObjectParams(content)
 
@@ -2505,7 +2522,6 @@ object SelectorConverter {
                 // 没有指定位置，使用通用格式（不指定槽位）
                 val countPart = if (processedQuantity != null) ",Count:${processedQuantity}b" else ""
                 val nbtStr = "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
-                println("DEBUG parseHasitemSingle: returning=$nbtStr")
                 nbtStr
             }
             else -> {
@@ -3586,6 +3602,9 @@ object SelectorConverter {
         }
 
         // 合并Java版输出中的重复参数
+        // 在JAVA/基岩混合模式下，使用混合模式合并逻辑（取所有最小值的最小值和所有最大值的最大值）
+        val originalMergeLogic = useMixedModeMergeLogic
+        useMixedModeMergeLogic = true
         val javaOutputWithMergedParams = if ('[' in javaOutput && ']' in javaOutput) {
             val javaSelectorVarPart = javaOutput.substringBefore('[')
             val javaParamsPart = javaOutput.substringAfter('[').substringBeforeLast(']')
@@ -3639,6 +3658,9 @@ object SelectorConverter {
         } else {
             bedrockOutput
         }
+        
+        // 恢复原始合并逻辑
+        useMixedModeMergeLogic = originalMergeLogic
 
         // 添加提醒信息
         reminders.add(getStringSafely(context, R.string.java_bedrock_mixed_mode_active))
