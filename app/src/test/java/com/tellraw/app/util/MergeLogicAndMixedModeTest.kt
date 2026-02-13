@@ -80,14 +80,17 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
+    @Test
     fun testDefaultMergeLogic_6() {
-        // 负数处理：rx, rxm, ry, rym
+        // 基岩版特有参数转换为Java版参数后的合并逻辑：负数处理
         val selector = "@a[rx=30,rxm=-45,ry=90,rym=-90]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含rx=30", conversion.javaSelector.contains("rx=30"))
-        assertTrue("应包含rxm=-45", conversion.javaSelector.contains("rxm=-45"))
-        assertTrue("应包含ry=90", conversion.javaSelector.contains("ry=90"))
-        assertTrue("应包含rym=-90", conversion.javaSelector.contains("rym=-90"))
+        // rxm=-45, rx=30 转换为 x_rotation=-45..30（取最小值-45，最大值30）
+        // rym=-90, ry=90 转换为 y_rotation=-90..90（取最小值-90，最大值90）
+        assertTrue("应包含x_rotation=-45..30", conversion.javaSelector.contains("x_rotation=-45..30"))
+        assertTrue("应包含y_rotation=-90..90", conversion.javaSelector.contains("y_rotation=-90..90"))
+    }
+
     }
     
     @Test
@@ -101,13 +104,17 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
+    @Test
     fun testDefaultMergeLogic_8() {
-        // 无关范围：值可以是负数
+        // 基岩版特有参数转换为Java版参数后的合并逻辑：c和l
         val selector = "@a[c=-10,l=-5,limit=-3]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含c=-10", conversion.javaSelector.contains("c=-10"))
-        assertTrue("应包含l=-5", conversion.javaSelector.contains("l=-5"))
+        // c=-10, limit=-3 转换为 limit=-3（取最大值-3）
+        // l=-5 转换为 level=-5
         assertTrue("应包含limit=-3", conversion.javaSelector.contains("limit=-3"))
+        assertTrue("应包含level=-5", conversion.javaSelector.contains("level=-5"))
+    }
+
     }
     
     @Test
@@ -671,7 +678,7 @@ class MergeLogicAndMixedModeTest {
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
         assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
-        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=-90..180"))
         assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
     }
     
@@ -697,7 +704,7 @@ class MergeLogicAndMixedModeTest {
         assertTrue("应包含dz=9", conversion.javaSelector.contains("dz=9"))
         assertTrue("应包含distance=2..9", conversion.javaSelector.contains("distance=2..9"))
         assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
-        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=-90..180"))
         assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
     }
     

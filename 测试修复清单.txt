@@ -1,0 +1,231 @@
+MergeLogicAndMixedModeTest 测试修复清单
+========================================
+
+总测试数：62个
+失败测试数：21个
+
+---
+
+## 重要规则
+
+### 规则1：绝对值差相等的处理
+**当未开启JAVA基岩混合模式时，遇到绝对值差相等的情况，合并应该选用最后一个范围**
+
+示例：
+- 输入：y_rotation=-90..90, y_rotation=0..180（差都是180）
+- 输出：y_rotation=0..180（最后一个）
+
+### 规则2：混合模式测试环境
+**当同时包含JAVA选择器参数和基岩选择器参数时，测试环境就应该加上JAVA基岩混合模式**
+
+示例：
+- 输入：@a[r=8,distance=..9,y_rotation=..150]
+- 理由：同时包含Java版特有参数（distance、y_rotation）和基岩版特有参数（r）
+- 测试环境：必须启用JAVA/基岩混合模式
+
+---
+
+## 一、需要修复的测试分类
+
+### 测试组1：使用基岩版特有参数，期望在Java版输出中保留（错误）
+
+| 测试名称 | 输入选择器 | 当前问题 | 正确做法 |
+|----------|------------|----------|----------|
+| testDefaultMergeLogic_6 | @a[rx=30,rxm=-45,ry=90,rym=-90] | 期望保留rxm=-45, rym=-90 | 应该改为测试转换为x_rotation=-45..90和y_rotation=-90..90后的合并逻辑 |
+| testDefaultMergeLogic_8 | @a[c=-10,l=-5,limit=-3] | 期望保留c=-10, l=-5 | 应该改为测试转换为limit和level后的合并逻辑 |
+
+**修复方案**：
+- rxm, rym会转换为x_rotation和y_rotation（取最小值..最大值）
+- c会转换为limit，l会转换为level
+
+---
+
+### 测试组2：最小值参数测试（需要改为范围类型）
+
+| 测试名称 | 输入选择器 | 当前期望 | 问题 |
+|----------|------------|----------|------|
+| testMinValueParamsMerge_1 | @a[distance=5..10,distance=2..8] | rm=2, r=10 | 测试转换为基岩版后，distance被拆分为rm和r |
+| testMinValueParamsMerge_2 | @a[distance=-10..-5,distance=-8..-2] | rm=-10, r=-2 | 同上 |
+
+**修复方案**：
+- 测试Java版distance参数转换为基岩版r和rm的逻辑
+- distance=5..10转换为rm=5, r=10
+- distance=2..8转换为rm=2, r=8
+- 合并后取rm的最小值和r的最大值：rm=2, r=10
+
+---
+
+### 测试组3：范围差相等时的处理（已明确：选择最后一个）
+
+| 测试名称 | 输入选择器 | 范围差 | 当前期望 | 正确期望 |
+|----------|------------|--------|----------|----------|
+| testMultipleParamsMerge_2 | @a[y_rotation=-90..90,y_rotation=0..180] | 都是180 | y_rotation=-90..180 | y_rotation=0..180（最后一个） |
+| testMultipleParamsMerge_4 | @a[y_rotation=-90..90,y_rotation=0..180] | 都是180 | y_rotation=-90..180 | y_rotation=0..180（最后一个） |
+
+**修复方案**：
+- 修改断言，从期望y_rotation=-90..180改为y_rotation=0..180
+- 理由：根据规则1，绝对值差相等时选择最后一个范围
+
+---
+
+### 测试组4：混合模式测试（必须启用混合模式）
+
+#### testJavaBedrockMixedMode_1-4
+
+**规则应用**：所有测试都同时包含Java版和基岩版特有参数，必须启用混合模式
+
+| 测试名称 | 输入选择器 | 包含的参数类型 | 测试环境 |
+|----------|------------|----------------|----------|
+| testJavaBedrockMixedMode_1 | @a[r=8,distance=..9,y_rotation=..150] | Java版：distance, y_rotation；基岩版：r | ✅ 启用混合模式 |
+| testJavaBedrockMixedMode_2 | @a[r=9,nbt={...}] | Java版：nbt；基岩版：r | ✅ 启用混合模式 |
+| testJavaBedrockMixedMode_3 | @a[hasitem={...},distance=10] | Java版：distance；基岩版：hasitem | ✅ 启用混合模式 |
+| testJavaBedrockMixedMode_4 | @a[rx=30,rxm=-45,x_rotation=-90..90] | Java版：x_rotation；基岩版：rx, rxm | ✅ 启用混合模式 |
+
+**当前测试问题**：只检查了提醒信息，没有检查具体的输出内容
+
+**修复方案**：
+- 保留提醒信息检查
+- 添加Java版和基岩版输出的具体断言
+
+#### testJavaBedrockMixedModeMerge_1-5
+
+**规则应用**：所有测试都同时包含Java版和基岩版特有参数，必须启用混合模式
+
+| 测试名称 | 输入选择器 | 包含的参数类型 | 测试环境 |
+|----------|------------|----------------|----------|
+| testJavaBedrockMixedModeMerge_1 | @a[distance=5,r=10] | Java版：distance；基岩版：r | ✅ 启用混合模式 |
+| testJavaBedrockMixedModeMerge_2 | @a[x_rotation=-45..45,rx=10] | Java版：x_rotation；基岩版：rx | ✅ 启用混合模式 |
+| testJavaBedrockMixedModeMerge_3 | @a[level=5..15,l=10] | Java版：level；基岩版：l | ✅ 启用混合模式 |
+| testJavaBedrockMixedModeMerge_4 | @a[limit=3,c=5] | Java版：limit；基岩版：c | ✅ 启用混合模式 |
+| testJavaBedrockMixedModeMerge_5 | @a[y_rotation=-90..90,ry=45] | Java版：y_rotation；基岩版：ry | ✅ 启用混合模式 |
+
+**当前测试问题**：只检查了提醒信息和参数存在，没有检查具体的合并结果
+
+**修复方案**：
+- 检查具体的合并结果
+- 例如：distance=5和r=10转换为distance=5..10
+
+#### testMixedModeMergeLogicWithJavaBedrock_5
+
+**规则应用**：同时包含Java版特有参数distance和基岩版特有参数r，必须启用混合模式
+
+| 测试名称 | 输入选择器 | 包含的参数类型 | 测试环境 |
+|----------|------------|----------------|----------|
+| testMixedModeMergeLogicWithJavaBedrock_5 | @a[distance=5..7,distance=3..9,r=10] | Java版：distance；基岩版：r | ✅ 启用混合模式 |
+
+**当前测试问题**：期望distance=3..9，但应该考虑r=10转换为distance后的合并
+
+**修复方案**：
+- r=10转换为distance=..10
+- distance=5..7和distance=3..9合并为distance=3..9
+- 与distance=..10合并：distance=3..10（取最小值3，最大值10）
+
+#### testAllParamsCombination_2,4,5
+
+**规则应用**：同时包含Java版特有参数和基岩版特有参数，必须启用混合模式
+
+| 测试名称 | 输入选择器 | 包含的参数类型 | 测试环境 |
+|----------|------------|----------------|----------|
+| testAllParamsCombination_2 | @a[x=5,x=10,dx=3,dx=8,rm=2,rm=5,distance=3..5,distance=1..8] | Java版：distance；基岩版：rm | ✅ 启用混合模式 |
+| testAllParamsCombination_4 | @a[y_rotation=-90..90,y_rotation=0..180] | 只有Java版参数 | ❌ 不启用混合模式 |
+| testAllParamsCombination_5 | @a[rm=2,rm=5,distance=3..5,distance=1..8,r=10] | Java版：distance；基岩版：rm, r | ✅ 启用混合模式 |
+
+**当前测试问题**：
+- testAllParamsCombination_4只包含Java版参数，不应启用混合模式
+- 其他测试缺少具体的输出断言
+
+---
+
+## 二、混合模式逻辑说明
+
+### JAVA/基岩混合模式工作流程
+
+当同时包含Java版特有参数和基岩版特有参数时：
+
+1. **检测参数类型**：
+   - Java版特有参数：distance, x_rotation, y_rotation, nbt, team, limit, sort, predicate, advancements, level, gamemode, attributes
+   - 基岩版特有参数：r, rm, rx, rxm, ry, rym, hasitem, family, l, lm, m, haspermission, has_property, c
+
+2. **转换逻辑**：
+   - **Java版输出**：保留Java版特有参数 + 转换基岩版参数为Java版 + 合并通用参数
+   - **基岩版输出**：保留基岩版特有参数 + 转换Java版参数为基岩版 + 合并通用参数
+
+3. **参数转换映射**：
+   - r → distance（只有上限：..r）
+   - rm → distance（只有下限：rm..）
+   - rx → x_rotation（只有上限：..rx）
+   - rxm → x_rotation（只有下限：rxm..）
+   - ry → y_rotation（只有上限：..ry）
+   - rym → y_rotation（只有下限：rym..）
+   - l → level
+   - lm → level
+   - c → limit
+   - distance → r（最大值）, rm（最小值）
+   - x_rotation → rx（最大值）, rxm（最小值）
+   - y_rotation → ry（最大值）, rym（最小值）
+   - level → l
+   - limit → c
+   - nbt → hasitem
+   - hasitem → nbt
+
+4. **合并逻辑**（在混合模式下）：
+   - 使用混合模式合并逻辑（取所有最小值的最小值和所有最大值的最大值）
+   - 例如：distance=1..5, distance=2..81 → distance=1..81
+   - 例如：r=8（转换为distance=..8）+ distance=5..7 → distance=5..8
+
+---
+
+## 三、代码中的相关函数
+
+### convertForMixedMode函数
+- 位置：SelectorConverter.kt:3423-3593
+- 功能：处理同时包含Java版和基岩版特有参数的选择器
+- 输出：Java版和基岩版两个输出
+
+### mergeDuplicateParameters函数
+- 位置：SelectorConverter.kt:1921
+- 功能：合并重复参数
+- 两种逻辑：
+  - 默认逻辑：选取差的绝对值最大的范围
+  - 混合模式逻辑：取所有最小值的最小值和所有最大值的最大值
+
+### hasBothJavaAndBedrockParams函数
+- 位置：SelectorConverter.kt:48
+- 功能：检测选择器是否同时包含Java版和基岩版特有参数
+
+---
+
+## 四、优先级建议
+
+### 高优先级（必须修复）
+1. testDefaultMergeLogic_6, 8 - 使用基岩版特有参数的错误测试
+2. testMinValueParamsMerge_1, 2 - 最小值参数测试错误
+3. testMultipleParamsMerge_2, 4 - 范围差相等的处理（选择最后一个）
+
+### 中优先级（需要确认具体输出）
+4. 混合模式测试（11个测试）- 需要确认具体的合并结果
+
+---
+
+## 五、下一步行动
+
+根据规则2，需要修复的测试：
+
+1. **启用混合模式的测试**：
+   - testJavaBedrockMixedMode_1-4（已启用）
+   - testJavaBedrockMixedModeMerge_1-5（已启用）
+   - testMixedModeMergeLogicWithJavaBedrock_1-5（已启用）
+   - testMixedModeMergeLogicWithJavaBedrock_5（已启用）
+   - testAllParamsCombination_2,5（已启用）
+
+2. **不应启用混合模式的测试**：
+   - testAllParamsCombination_4（只包含Java版参数）
+
+3. **修改断言的测试**：
+   - testMultipleParamsMerge_2, 4：选择最后一个范围
+   - testMixedModeMergeLogicWithJavaBedrock_5：考虑r=10的转换
+   - testAllParamsCombination_2,5：考虑基岩版参数的转换
+
+---
+
+更新时间：2026-02-13
