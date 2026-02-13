@@ -331,18 +331,18 @@ object SelectorConverter {
         }
         
         // 检测是否需要使用JAVA/基岩混合模式
-        Log.d(TAG, "DEBUG: javaBedrockMixedModeEnabled=$javaBedrockMixedModeEnabled")
-        Log.d(TAG, "DEBUG: selector=$selector")
-        Log.d(TAG, "DEBUG: hasBothJavaAndBedrockParams=${hasBothJavaAndBedrockParams(selector)}")
+        println("DEBUG: javaBedrockMixedModeEnabled=$javaBedrockMixedModeEnabled")
+        println("DEBUG: selector=$selector")
+        println("DEBUG: hasBothJavaAndBedrockParams=${hasBothJavaAndBedrockParams(selector)}")
         if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
-            Log.d(TAG, "DEBUG: 调用convertForMixedMode")
+            println("DEBUG: 调用convertForMixedMode")
             // 使用混合模式转换
             val (javaMixedOutput, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
             javaSelector = javaMixedOutput
             wasConverted = true
-            Log.d(TAG, "DEBUG: javaMixedOutput=$javaMixedOutput")
-            Log.d(TAG, "DEBUG: bedrockMixedOutput=$bedrockMixedOutput")
-            Log.d(TAG, "DEBUG: reminders=$reminders")
+            println("DEBUG: javaMixedOutput=$javaMixedOutput")
+            println("DEBUG: bedrockMixedOutput=$bedrockMixedOutput")
+            println("DEBUG: reminders=$reminders")
         }
 
         return SelectorConversionResult(
