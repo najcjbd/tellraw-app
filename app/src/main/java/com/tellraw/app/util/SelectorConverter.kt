@@ -1274,29 +1274,39 @@ object SelectorConverter {
             } else null
         } else null
 
-        // 处理所有的rm参数，取最小值
+        // 处理所有的rm参数，取最小值和最大值（如果只有一个rm则只取最小值）
         val rmMatches = rmPattern.findAll(result).toList()
-        val rmValue: String? = if (rmMatches.isNotEmpty()) {
+        val rmMinValue: String? = if (rmMatches.isNotEmpty()) {
             val minVal = rmMatches.map { it.groupValues[2].toDouble() }.minOrNull()
             if (minVal != null) {
                 if (minVal % 1.0 == 0.0) minVal.toInt().toString() else minVal.toString()
             } else null
         } else null
+        val rmMaxValue: String? = if (rmMatches.size > 1) {
+            val maxVal = rmMatches.map { it.groupValues[2].toDouble() }.maxOrNull()
+            if (maxVal != null) {
+                if (maxVal % 1.0 == 0.0) maxVal.toInt().toString() else maxVal.toString()
+            } else null
+        } else null
 
-        if (rValue != null || rmValue != null) {
+        if (rValue != null || rmMinValue != null || rmMaxValue != null) {
             val distanceValue = when {
-                rmValue != null && rValue != null -> rmValue + ".." + rValue
-                rmValue != null -> rmValue + ".."
+                rmMinValue != null && rmMaxValue != null -> rmMinValue + ".." + rmMaxValue  // 多个rm参数创建范围
+                rmMinValue != null && rValue != null -> rmMinValue + ".." + rValue
+                rmMaxValue != null && rValue != null -> rmMaxValue + ".." + rValue
+                rmMinValue != null -> rmMinValue + ".."
                 rValue != null -> "..$rValue"
                 else -> ""
             }
 
             if (distanceValue.isNotEmpty()) {
                 when {
-                    rmValue != null && rValue != null ->
-                        reminders.add(getStringSafely(context, R.string.bedrock_rm_r_converted, rmValue, rValue, distanceValue))
-                    rmValue != null ->
-                        reminders.add(getStringSafely(context, R.string.bedrock_rm_converted, rmValue, distanceValue))
+                    rmMinValue != null && rmMaxValue != null ->
+                        reminders.add(getStringSafely(context, R.string.bedrock_rm_r_converted, rmMinValue, rmMaxValue, distanceValue))
+                    rmMinValue != null && rValue != null ->
+                        reminders.add(getStringSafely(context, R.string.bedrock_rm_r_converted, rmMinValue, rValue, distanceValue))
+                    rmMinValue != null ->
+                        reminders.add(getStringSafely(context, R.string.bedrock_rm_converted, rmMinValue, distanceValue))
                     rValue != null ->
                         reminders.add(getStringSafely(context, R.string.bedrock_r_converted, rValue, distanceValue))
                 }
