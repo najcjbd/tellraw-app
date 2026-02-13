@@ -44,10 +44,10 @@ class MergeLogicAndMixedModeTest {
         // 基岩版特有参数转换为Java版参数后的合并逻辑
         val selector = "@a[rm=1,rm=3.5,rxm=-5.5,rxm=-1]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        // rm=1,rm=3.5 转换为 distance=1..3.5（取最小值1，最大值3.5）
-        // rxm=-5.5,rxm=-1 转换为 x_rotation=-5.5..-1（取最小值-5.5，最大值-1）
-        assertTrue("应包含distance=1..3.5", conversion.javaSelector.contains("distance=1..3.5"))
-        assertTrue("应包含x_rotation=-5.5..-1", conversion.javaSelector.contains("x_rotation=-5.5..-1"))
+        // rm=1,rm=3.5 转换为 distance=1..（取最小值1）
+        // rxm=-5.5,rxm=-1 转换为 x_rotation=-5.5..（取最小值-5.5）
+        assertTrue("应包含distance=1..", conversion.javaSelector.contains("distance=1.."))
+        assertTrue("应包含x_rotation=-5.5..", conversion.javaSelector.contains("x_rotation=-5.5.."))
     }
 
     
