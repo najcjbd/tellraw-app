@@ -335,11 +335,13 @@ object SelectorConverter {
         println("DEBUG: javaBedrockMixedModeEnabled=$javaBedrockMixedModeEnabled")
         println("DEBUG: selector=$selector")
         println("DEBUG: hasBothJavaAndBedrockParams=${hasBothJavaAndBedrockParams(selector)}")
+        var bedrockSelector = selector  // 初始化bedrockSelector为原始选择器
         if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
             println("DEBUG: 调用convertForMixedMode")
             // 使用混合模式转换
             val (javaMixedOutput, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
             javaSelector = javaMixedOutput
+            bedrockSelector = bedrockMixedOutput  // 更新bedrockSelector
             wasConverted = true
             println("DEBUG: javaMixedOutput=$javaMixedOutput")
             println("DEBUG: bedrockMixedOutput=$bedrockMixedOutput")
@@ -348,7 +350,7 @@ object SelectorConverter {
 
         return SelectorConversionResult(
             javaSelector = javaSelector,
-            bedrockSelector = selector,
+            bedrockSelector = bedrockSelector,
             javaReminders = reminders,
             bedrockReminders = emptyList(),
             wasConverted = wasConverted
@@ -372,15 +374,17 @@ object SelectorConverter {
         var wasConverted = bedrockSelector != selector || removedParams.isNotEmpty()
         
         // 检测是否需要使用JAVA/基岩混合模式
+        var javaSelector = selector  // 初始化javaSelector为原始选择器
         if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
             // 使用混合模式转换
-            val (_, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
+            val (javaMixedOutput, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
+            javaSelector = javaMixedOutput  // 更新javaSelector
             bedrockSelector = bedrockMixedOutput
             wasConverted = true
         }
 
         return SelectorConversionResult(
-            javaSelector = selector,
+            javaSelector = javaSelector,
             bedrockSelector = bedrockSelector,
             javaReminders = emptyList(),
             bedrockReminders = reminders,
