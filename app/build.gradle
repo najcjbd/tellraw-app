@@ -121,7 +121,7 @@ dependencies {
     testImplementation "com.google.dagger:hilt-android-testing:$hilt_version"
     kaptTest "com.google.dagger:hilt-compiler:$hilt_version"
     testImplementation 'org.robolectric:robolectric:4.11.1'
-    
+
     // MTDataFilesProvider - 只在debug版本中注入，允许MT管理器访问应用私有目录
     debugImplementation 'com.github.L-JINBIN:MTDataFilesProvider:v1.0.0'
     

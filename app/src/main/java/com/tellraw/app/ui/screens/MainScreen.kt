@@ -83,9 +83,9 @@ fun MainScreen(
     val showHistoryDialog = remember { mutableStateOf(false) }
     val showSettingsDialog = remember { mutableStateOf(false) }
 
-    // 设置Context到ViewModel
+    // 初始化ViewModel
     LaunchedEffect(context) {
-        viewModel.setContext(context)
+        viewModel.initialize()
     }
 
     // 根据屏幕方向选择布局
@@ -224,7 +224,7 @@ fun MainScreen(
             onEditFilename = { viewModel.showFilenameDialog() },
             onClearSettings = { viewModel.clearHistoryStorageSettings() },
             onWriteToFile = {
-                viewModel.writeHistoryToFile(context, emptyList())
+                viewModel.writeHistoryToFile(context)
             },
             onGrantAllFilesAccess = {
                 activity?.requestAllFilesAccessPermission()

@@ -20,6 +20,7 @@ import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,21 +32,18 @@ import javax.inject.Inject
 class TellrawViewModel @Inject constructor(
     private val versionCheckRepository: VersionCheckRepository,
     private val settingsRepository: SettingsRepository,
-    private val historyRepository: HistoryRepository
+    private val historyRepository: HistoryRepository,
+    @Suppress("StaticFieldLeak")
+    @ApplicationContext private val applicationContext: Context  // 注入Application Context，不会造成内存泄漏
 ) : ViewModel() {
     
     private val _selectorInput = MutableStateFlow("")
     val selectorInput: StateFlow<String> = _selectorInput.asStateFlow()
     
-    // 用于存储Context，在UI层设置
-    private var context: Context? = null
-    
     /**
-     * 设置Context，由UI层在创建ViewModel后调用
+     * 初始化版本检查和加载设置
      */
-    fun setContext(context: Context) {
-        this.context = context
-        // 设置Context后初始化版本检查、加载设置和历史记录
+    fun initialize() {
         initializeVersionCheck()
         viewModelScope.launch {
             // 先从JSON文件加载配置
@@ -143,16 +141,14 @@ class TellrawViewModel @Inject constructor(
             true
         } else {
             // Android 10及以下需要检查存储权限
-            context?.let { ctx ->
-                ContextCompat.checkSelfPermission(
-                    ctx,
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(
-                    ctx,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            } ?: false
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
     }
     
@@ -522,7 +518,7 @@ class TellrawViewModel @Inject constructor(
         val detectedType = SelectorConverter.detectSelectorType(selector)
         
         // 将基岩版选择器转换为Java版（如果需要）
-        val javaSelectorConversion = SelectorConverter.convertBedrockToJava(selector, context ?: return TellrawCommand("", "", emptyList()))
+        val javaSelectorConversion = SelectorConverter.convertBedrockToJava(selector, applicationContext)
         val wasConverted = javaSelectorConversion.wasConverted
         val originalSelector = if (wasConverted) selector else null
         val convertedSelector = if (wasConverted) javaSelectorConversion.javaSelector else null
@@ -549,10 +545,10 @@ class TellrawViewModel @Inject constructor(
         }
 
         // 过滤Java版参数，移除基岩版特有的参数（完全不支持）
-        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorFinal, SelectorType.JAVA, context ?: return TellrawCommand("", "", emptyList()))
+        val (javaSelectorFiltered, javaRemovedParams) = SelectorConverter.filterSelectorParameters(javaSelectorFinal, SelectorType.JAVA, applicationContext)
 
         // 过滤基岩版参数，移除Java版特有的参数（完全不支持）
-        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(bedrockSelectorFinal, SelectorType.BEDROCK, context ?: return TellrawCommand("", "", emptyList()))
+        val (bedrockSelectorFiltered, bedrockRemovedParams) = SelectorConverter.filterSelectorParameters(bedrockSelectorFinal, SelectorType.BEDROCK, applicationContext)
         
         // 合并所有Java版提醒信息并去重
         val allJavaReminders = mutableListOf<String>()
@@ -569,7 +565,7 @@ class TellrawViewModel @Inject constructor(
         // 但在混合模式下不显示此警告
         val isMixedMode = mNHandling == "font" && !mnCFEnabled
         if (!isMixedMode && ("§m_f" in message || "§n_f" in message)) {
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.bedrock_font_to_color_warning))
             }
         }
@@ -603,35 +599,35 @@ class TellrawViewModel @Inject constructor(
 
         // 添加Java版参数剔除提醒
         if (javaNonReminders.isNotEmpty()) {
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_java_unsupported_params, javaNonReminders.joinToString(", ")))
             }
         }
 
         // 添加Java版特殊提醒
         javaSpecificReminders.forEach { reminder ->
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_java_specific, reminder))
             }
         }
 
         // 添加基岩版参数剔除提醒
         if (bedrockNonReminders.isNotEmpty()) {
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_bedrock_unsupported_params, bedrockNonReminders.joinToString(", ")))
             }
         }
 
         // 添加基岩版特殊提醒
         bedrockSpecificReminders.forEach { reminder ->
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_java_specific, reminder))
             }
         }
         
         // 添加选择器转换提醒
         if (wasConverted && originalSelector != null && convertedSelector != null) {
-            context?.let { ctx ->
+            applicationContext.let { ctx ->
                 allWarnings.add(ctx.getString(R.string.note_bedrock_selector_converted, originalSelector, convertedSelector))
             }
         }
@@ -668,19 +664,19 @@ class TellrawViewModel @Inject constructor(
                 // 检查是否启用了JAVA/基岩混合模式
                 val (javaSelector, bedrockSelector) = if (_javaBedrockMixedMode.value) {
                     val mixedReminders = mutableListOf<String>()
-                    val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(selector, context ?: return@launch, mixedReminders)
+                    val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(selector, applicationContext, mixedReminders)
                     javaOut to bedrockOut
                 } else {
                     selector to selector
                 }
                 
                 // 生成Java版命令
-                val (javaFilteredSelector, _) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, context ?: return@launch)
+                val (javaFilteredSelector, _) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
                 val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value)
                 val javaCommand = "tellraw $javaFilteredSelector $javaJson"
                 
                 // 生成基岩版命令
-                val (bedrockFilteredSelector, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, context ?: return@launch)
+                val (bedrockFilteredSelector, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
                 val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value)
                 val bedrockCommand = "tellraw $bedrockFilteredSelector $bedrockJson"
                 
@@ -691,12 +687,12 @@ class TellrawViewModel @Inject constructor(
                 // 处理未知§组合的异常
                 _javaCommand.value = ""
                 _bedrockCommand.value = ""
-                _warnings.value = listOf(e.message ?: context?.getString(R.string.command_generation_error) ?: "Command generation error")
+                _warnings.value = listOf(e.message ?: applicationContext.getString(R.string.command_generation_error))
             } catch (e: Exception) {
                 // 处理其他可能的异常，防止卡死
                 _javaCommand.value = ""
                 _bedrockCommand.value = ""
-                _warnings.value = listOf(context?.getString(R.string.command_generation_error_with_message, e.message ?: "") ?: "Command generation error: ${e.message}")
+                _warnings.value = listOf(applicationContext.getString(R.string.command_generation_error_with_message, e.message ?: ""))
             } finally {
                 _isLoading.value = false
             }
@@ -713,8 +709,8 @@ class TellrawViewModel @Inject constructor(
         mnCFEnabled: Boolean = false
     ): String {
         // 过滤Java版不支持的参数
-        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context ?: return "")
-        
+        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, applicationContext)
+
         // 转换文本为Java版JSON格式
         val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
         return "tellraw $filteredSelector $javaJson"
@@ -730,7 +726,7 @@ class TellrawViewModel @Inject constructor(
         mnCFEnabled: Boolean = false
     ): String {
         // 过滤基岩版不支持的参数
-        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, context ?: return "")
+        val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, applicationContext)
         
         // 转换文本为基岩版JSON格式
         val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
@@ -738,25 +734,21 @@ class TellrawViewModel @Inject constructor(
     }
     
     fun copyToClipboard(text: String) {
-        context?.let { ctx ->
-            val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Tellraw Command", text)
-            clipboard.setPrimaryClip(clip)
-        }
+        val clipboard = applicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Tellraw Command", text)
+        clipboard.setPrimaryClip(clip)
     }
-    
+
     fun shareCommand(command: String) {
-        context?.let { ctx ->
-            val shareIntent = Intent().apply {
-                action = Intent.ACTION_SEND
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, command)
-                putExtra(Intent.EXTRA_SUBJECT, ctx.getString(R.string.share_subject))
-            }
-            ctx.startActivity(Intent.createChooser(shareIntent, ctx.getString(R.string.share_tellraw_command)))
+        val shareIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, command)
+            putExtra(Intent.EXTRA_SUBJECT, applicationContext.getString(R.string.share_subject))
         }
+        applicationContext.startActivity(Intent.createChooser(shareIntent, applicationContext.getString(R.string.share_tellraw_command)))
     }
-    
+
     fun clearAll() {
         val selector = _selectorInput.value
         val message = _messageInput.value
@@ -862,7 +854,7 @@ class TellrawViewModel @Inject constructor(
      * 初始化版本检查
      */
     private fun initializeVersionCheck() {
-        context?.let { ctx ->
+        applicationContext.let { ctx ->
             // 保存当前版本（从BuildConfig获取）
             try {
                 val version = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
@@ -895,10 +887,8 @@ class TellrawViewModel @Inject constructor(
      * 打开下载链接
      */
     fun openDownloadUrl(url: String) {
-        context?.let { ctx ->
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            ctx.startActivity(intent)
-        }
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        applicationContext.startActivity(intent)
     }
     
     /**
@@ -1081,9 +1071,9 @@ class TellrawViewModel @Inject constructor(
      * 选择/创建文件
      * 检查文件是否存在：如果文件存在，提示"文件已存在"；如果文件不存在，创建文件并提示"成功使用该目录"
      */
-    fun writeHistoryToFile(context: Context, historyList: List<HistoryItem>) {
+    fun writeHistoryToFile(context: Context) {
         val activity = context as? MainActivity
-        
+
         // 主动申请权限
         activity?.requestAllFilesAccessIfNeeded(
             onGranted = {
