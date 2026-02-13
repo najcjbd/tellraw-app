@@ -124,8 +124,8 @@ class MergeLogicAndMixedModeTest {
         // 单边范围：只有上限或下限
         val selector = "@a[distance=5..,distance=..10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        // 5..的差是无限大，..10的差是10，应该选择5..
-        assertTrue("应包含distance=5..", conversion.javaSelector.contains("distance=5.."))
+        // 左单边合起来取最小值5，右单边合起来取最大值10，合并为5..10
+        assertTrue("应包含distance=5..10", conversion.javaSelector.contains("distance=5..10"))
     }
     
     @Test

@@ -2063,8 +2063,12 @@ object SelectorConverter {
                         for (value in values) {
                             val range = parseRange(value.first)
                             if (range != null) {
-                                allMinValues.add(range.first)
-                                allMaxValues.add(range.second)
+                                if (range.first != null) {
+                                    allMinValues.add(range.first)
+                                }
+                                if (range.second != null) {
+                                    allMaxValues.add(range.second)
+                                }
                             }
                         }
 
@@ -2085,39 +2089,35 @@ object SelectorConverter {
 
                         mergedParams.add("$paramName=$rangeValue")
                     } else {
-                        // 使用新的合并逻辑（选取差的绝对值最大的范围）
-                        var selectedRange: Pair<Double, Double>? = null
-                        var maxDiff = 0.0
+                        // 默认合并逻辑：先分别处理左单边和右单边，然后合成完整范围
+                        val allMinValues = mutableListOf<Double>()
+                        val allMaxValues = mutableListOf<Double>()
 
                         for (value in values) {
                             val range = parseRange(value.first)
                             if (range != null) {
-                                val diff = kotlin.math.abs(range.second - range.first)
-                                if (diff >= maxDiff) {
-                                    maxDiff = diff
-                                    selectedRange = range
+                                if (range.first != null) {
+                                    allMinValues.add(range.first)
+                                }
+                                if (range.second != null) {
+                                    allMaxValues.add(range.second)
                                 }
                             }
                         }
 
-                        if (selectedRange != null) {
-                            // 格式化输出，处理特殊情况
-                            val rangeValue = when {
-                                selectedRange.first == Double.POSITIVE_INFINITY -> {
-                                    // 只有上限，如 ..10
-                                    "..${formatSingleNumber(selectedRange.second.toString())}"
-                                }
-                                selectedRange.second == Double.MAX_VALUE -> {
-                                    // 只有下限，如 5..
-                                    "${formatSingleNumber(selectedRange.first.toString())}.."
-                                }
-                                else -> {
-                                    // 正常范围，如 5..10
-                                    "${formatSingleNumber(selectedRange.first.toString())}..${formatSingleNumber(selectedRange.second.toString())}"
-                                }
-                            }
-                            mergedParams.add("$paramName=$rangeValue")
+                        // 合并所有最小值取最小，所有最大值取最大
+                        val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
+                        val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
+
+                        // 格式化输出
+                        val rangeValue = when {
+                            finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
+                            finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
+                            finalMax != null -> "..${formatSingleNumber(finalMax.toString())}"
+                            else -> continue
                         }
+
+                        mergedParams.add("$paramName=$rangeValue")
                     }
                 }
                 else -> {
@@ -2208,7 +2208,7 @@ object SelectorConverter {
      * 解析范围值
      * 返回 Pair<最小值, 最大值>
      */
-    private fun parseRange(value: String): Pair<Double, Double>? {
+    private fun parseRange(value: String): Pair<Double?, Double?>? {
         if (".." in value) {
             val parts = value.split("..")
             val minVal = parts.getOrNull(0)?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
@@ -2218,10 +2218,10 @@ object SelectorConverter {
                 return Pair(minVal, maxVal)
             } else if (minVal != null) {
                 // 只有下限，如 5..，表示从5到正无穷
-                return Pair(minVal, Double.MAX_VALUE)
+                return Pair(minVal, null)
             } else if (maxVal != null) {
-                // 只有上限，如 ..10，返回特殊值表示只有上限
-                return Pair(Double.POSITIVE_INFINITY, maxVal)
+                // 只有上限，如 ..10，表示从负无穷到10（实际最小值为0或负无穷，具体由参数语义决定）
+                return Pair(null, maxVal)
             }
         }
 
