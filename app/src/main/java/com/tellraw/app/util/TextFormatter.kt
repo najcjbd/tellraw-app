@@ -283,7 +283,7 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码（不包含格式代码k、l、m、n、o、r）
-                if (code[1] in "0123456789abcdefgpqstuv") {
+                if (code[1] in "0123456789abcdefghijpqstuv") {
                     // 基岩版独属颜色代码列表
                     val bedrockExclusiveColors = setOf("§g", "§h", "§i", "§j", "§p", "§q", "§s", "§t", "§u", "§v")
                     
@@ -310,23 +310,6 @@ object TextFormatter {
                             "§t" -> currentFormat["color"] = "dark_blue"
                             "§u" -> currentFormat["color"] = "light_purple"
                             "§v" -> currentFormat["color"] = "gold"
-                            // 普通颜色代码
-                            "§0" -> currentFormat["color"] = "black"
-                            "§1" -> currentFormat["color"] = "dark_blue"
-                            "§2" -> currentFormat["color"] = "dark_green"
-                            "§3" -> currentFormat["color"] = "dark_aqua"
-                            "§4" -> currentFormat["color"] = "dark_red"
-                            "§5" -> currentFormat["color"] = "dark_purple"
-                            "§6" -> currentFormat["color"] = "gold"
-                            "§7" -> currentFormat["color"] = "gray"
-                            "§8" -> currentFormat["color"] = "dark_gray"
-                            "§9" -> currentFormat["color"] = "blue"
-                            "§a" -> currentFormat["color"] = "green"
-                            "§b" -> currentFormat["color"] = "aqua"
-                            "§c" -> currentFormat["color"] = "red"
-                            "§d" -> currentFormat["color"] = "light_purple"
-                            "§e" -> currentFormat["color"] = "yellow"
-                            "§f" -> currentFormat["color"] = "white"
                         }
                     } else {
                         // 普通颜色代码，正常处理
@@ -488,9 +471,9 @@ object TextFormatter {
         
         if (mnCFEnabled) {
             // 在§m/§n_c/f模式下，先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
-            // 只移除后面不是_f或_c的§m和§n
-            processedText = processedText.replace(Regex("§m(?![_fn])"), "")
-            processedText = processedText.replace(Regex("§n(?![_fn])"), "")
+            // 只移除后面不是下划线（即不是_f/_c）的§m和§n
+            processedText = processedText.replace(Regex("§m(?![a-z])"), "")
+            processedText = processedText.replace(Regex("§n(?![a-z])"), "")
             // 然后将§m_f/§m_c统一转换为§m（material_redstone）
             processedText = processedText.replace("§m_f", "§m")
             processedText = processedText.replace("§m_c", "§m")
@@ -515,30 +498,6 @@ object TextFormatter {
             // 在这个模式下，§m_c等不会被识别为特殊格式，而是理解为§m + _c
         }
         
-        // 基岩版独属颜色代码不应该被转换，直接保留
-        val bedrockExclusiveCodes = setOf("§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v")
-        
-        if (mnCFEnabled) {
-            // 在§m/§n_c/f模式下，先移除普通的§m/§n（使用正则表达式精确匹配独立的§m和§n）
-            // 只移除后面不是_f或_c的§m和§n
-            processedText = processedText.replace(Regex("§m(?![_fn])"), "")
-            processedText = processedText.replace(Regex("§n(?![_fn])"), "")
-            // 然后将§m_f/§m_c统一转换为§m（material_redstone）
-            processedText = processedText.replace("§m_f", "§m")
-            processedText = processedText.replace("§m_c", "§m")
-            // 将§n_f/§n_c统一转换为§n（material_copper）
-            processedText = processedText.replace("§n_f", "§n")
-            processedText = processedText.replace("§n_c", "§n")
-        } else if (isMixedMode) {
-            // 混合模式：将§m_f/§m_c/§n_f/§n_c统一转换为§m/§n（颜色代码）
-            // 不移除普通的§m/§n，因为基岩版中它们也是有效的颜色代码
-            // 只是将§m_f/§m_c统一转换为§m（material_redstone）
-            processedText = processedText.replace("§m_f", "§m")
-            processedText = processedText.replace("§m_c", "§m")
-            // 将§n_f/§n_c统一转换为§n（material_copper）
-            processedText = processedText.replace("§n_f", "§n")
-            processedText = processedText.replace("§n_c", "§n")
-        }
         // 注意：不转换基岩版独属颜色代码（§g、§h、§i、§j、§p、§q、§s、§t、§u、§v）
         // 基岩版独属颜色代码在基岩版输出中应该保持原样
         
