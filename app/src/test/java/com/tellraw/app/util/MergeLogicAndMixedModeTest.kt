@@ -1045,7 +1045,7 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testSingleSideRangeMerge_7() {
+    fun testSingleSideRangeMerge_WithFullRange_1() {
         // 左单边 + 完整范围
         val selector = "@a[distance=5..,distance=3..9]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
@@ -1053,7 +1053,7 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testSingleSideRangeMerge_8() {
+    fun testSingleSideRangeMerge_WithFullRange_2() {
         // 右单边 + 完整范围
         val selector = "@a[distance=..10,distance=5..15]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
@@ -1061,7 +1061,7 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testSingleSideRangeMerge_9() {
+    fun testSingleSideRangeMerge_WithFullRange_3() {
         // 左单边 + 左单边 + 右单边
         val selector = "@a[distance=5..,distance=3..,distance=..10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
