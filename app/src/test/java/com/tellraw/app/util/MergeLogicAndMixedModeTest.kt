@@ -110,10 +110,10 @@ class MergeLogicAndMixedModeTest {
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         // c=10 转换为 limit=10,sort=nearest
         // limit=3 与 limit=10 合并，取最大值 10
-        // l=5 转换为 level=5
+        // l=5 转换为 level=..5（l表示最大值）
         assertTrue("应包含limit=10", conversion.javaSelector.contains("limit=10"))
         assertTrue("应包含sort=nearest", conversion.javaSelector.contains("sort=nearest"))
-        assertTrue("应包含level=5", conversion.javaSelector.contains("level=5"))
+        assertTrue("应包含level=..5", conversion.javaSelector.contains("level=..5"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
