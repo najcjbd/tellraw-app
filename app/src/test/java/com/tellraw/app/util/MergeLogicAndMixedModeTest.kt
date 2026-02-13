@@ -699,8 +699,6 @@ class MergeLogicAndMixedModeTest {
         assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
         assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
     }
-        assertTrue("应包含distance=1..8", conversion.javaSelector.contains("distance=1..8"))
-    }
     
     /**
      * 测试组10：JAVA基岩混合模式下的各种合并情况
