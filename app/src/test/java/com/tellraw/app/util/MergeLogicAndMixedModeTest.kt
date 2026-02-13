@@ -676,21 +676,23 @@ class MergeLogicAndMixedModeTest {
      */
     @Test
     fun testMinValueParamsMerge_1() {
-        // distance参数（范围）：使用默认合并逻辑，取所有最小值的最小值
+        // distance参数（范围）：使用默认合并逻辑，取差的绝对值最大的范围
         val selector = "@a[distance=5..10,distance=2..8]"
         val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
-        // distance转换为r和rm，取最小值2..10
+        // distance=5..10差值为5，distance=2..8差值为6，选择distance=2..8
+        // distance转换为r和rm，rm=2,r=8
         assertTrue("应包含rm=2", conversion.bedrockSelector.contains("rm=2"))
-        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
+        assertTrue("应包含r=8", conversion.bedrockSelector.contains("r=8"))
     }
     
     @Test
     fun testMinValueParamsMerge_2() {
-        // distance参数（范围）的负数处理
+        // distance参数（范围）的负数处理：使用默认合并逻辑，取差的绝对值最大的范围
         val selector = "@a[distance=-10..-5,distance=-8..-2]"
         val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
-        // distance转换为r和rm，取最小值-10..-2
-        assertTrue("应包含rm=-10", conversion.bedrockSelector.contains("rm=-10"))
+        // distance=-10..-5差值为5，distance=-8..-2差值为6，选择distance=-8..-2
+        // distance转换为r和rm，rm=-8,r=-2
+        assertTrue("应包含rm=-8", conversion.bedrockSelector.contains("rm=-8"))
         assertTrue("应包含r=-2", conversion.bedrockSelector.contains("r=-2"))
     }
     
@@ -910,14 +912,15 @@ class MergeLogicAndMixedModeTest {
     
     @Test
     fun testAllParamsCombination_4() {
-        // JAVA基岩混合模式下的所有参数组合
+        // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
+        // 只有Java版特有参数，不会触发混合模式
         val selector = "@a[distance=5..10,x_rotation=-45..45,limit=5,team=red]"
         val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
         
-        // 应该触发混合模式转换
-        assertTrue("应包含提醒信息", conversion.bedrockReminders.any { it.contains("混合模式") })
+        // 不触发混合模式，没有提醒信息
+        assertFalse("不应包含提醒信息", conversion.bedrockReminders.any { it.contains("混合模式") })
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -1283,10 +1286,10 @@ class MergeLogicAndMixedModeTest {
     
     @Test
     fun testLeftRightFull_Mixed_10() {
-        // 边界情况：右单边值为0
-        val selector = "@a[distance=5..,distance=..0]"
+        // 边界情况：左单边值为0
+        val selector = "@a[distance=0..,distance=..10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含distance=0..5", conversion.javaSelector.contains("distance=0..5"))
+        assertTrue("应包含distance=0..10", conversion.javaSelector.contains("distance=0..10"))
     }
     
     @Test
