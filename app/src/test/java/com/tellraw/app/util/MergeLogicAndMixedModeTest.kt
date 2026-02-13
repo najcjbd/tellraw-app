@@ -554,91 +554,99 @@ class MergeLogicAndMixedModeTest {
     }
     
     /**
-     * 测试组7：最大值参数合并逻辑补充测试
+     * 测试组7：最大值参数合并逻辑补充测试（Java版输出）
      */
     @Test
     fun testMaxValueParamsMerge_1() {
-        // r参数：取最大值
-        val selector = "@a[r=5,r=10]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含r=10", conversion.javaSelector.contains("r=10"))
-        assertFalse("不应包含r=5", conversion.javaSelector.contains("r=5"))
+        // distance参数：取最大值（单值）
+        val selector = "@a[distance=5,distance=10]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // distance转换为r，取最大值
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
+        assertFalse("不应包含r=5", conversion.bedrockSelector.contains("r=5"))
     }
     
     @Test
     fun testMaxValueParamsMerge_2() {
-        // rx参数：取最大值
-        val selector = "@a[rx=10,rx=20]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含rx=20", conversion.javaSelector.contains("rx=20"))
-        assertFalse("不应包含rx=10", conversion.javaSelector.contains("rx=10"))
+        // x_rotation参数：取最大值（单值）
+        val selector = "@a[x_rotation=10,x_rotation=20]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // x_rotation转换为rx，取最大值
+        assertTrue("应包含rx=20", conversion.bedrockSelector.contains("rx=20"))
+        assertFalse("不应包含rx=10", conversion.bedrockSelector.contains("rx=10"))
     }
     
     @Test
     fun testMaxValueParamsMerge_3() {
-        // ry参数：取最大值
-        val selector = "@a[ry=15,ry=25]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含ry=25", conversion.javaSelector.contains("ry=25"))
-        assertFalse("不应包含ry=15", conversion.javaSelector.contains("ry=15"))
+        // y_rotation参数：取最大值（单值）
+        val selector = "@a[y_rotation=15,y_rotation=25]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // y_rotation转换为ry，取最大值
+        assertTrue("应包含ry=25", conversion.bedrockSelector.contains("ry=25"))
+        assertFalse("不应包含ry=15", conversion.bedrockSelector.contains("ry=15"))
     }
     
     @Test
     fun testMaxValueParamsMerge_4() {
-        // l参数：取最大值
-        val selector = "@a[l=3,l=8]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含l=8", conversion.javaSelector.contains("l=8"))
-        assertFalse("不应包含l=3", conversion.javaSelector.contains("l=3"))
+        // level参数：取最大值（单值）
+        val selector = "@a[level=3,level=8]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // level转换为l，取最大值
+        assertTrue("应包含l=8", conversion.bedrockSelector.contains("l=8"))
+        assertFalse("不应包含l=3", conversion.bedrockSelector.contains("l=3"))
     }
     
     @Test
     fun testMaxValueParamsMerge_5() {
-        // c参数：取最大值
-        val selector = "@a[c=2,c=7]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含c=7", conversion.javaSelector.contains("c=7"))
-        assertFalse("不应包含c=2", conversion.javaSelector.contains("c=2"))
+        // limit参数：取最大值
+        val selector = "@a[limit=3,limit=5]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // limit转换为c，取最大值
+        assertTrue("应包含c=5", conversion.bedrockSelector.contains("c=5"))
+        assertFalse("不应包含c=3", conversion.bedrockSelector.contains("c=3"))
     }
     
     @Test
     fun testMaxValueParamsMerge_6() {
-        // limit参数：取最大值
-        val selector = "@a[limit=3,limit=5]"
-        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
-        assertTrue("应包含limit=5", conversion.bedrockSelector.contains("limit=5"))
-        assertFalse("不应包含limit=3", conversion.bedrockSelector.contains("limit=3"))
+        // Java版通用参数的负数处理：x, y, z
+        val selector = "@a[x=-10,x=-5,y=-20,y=-15,z=-5,z=0]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x=-5", conversion.javaSelector.contains("x=-5"))
+        assertTrue("应包含y=-15", conversion.javaSelector.contains("y=-15"))
+        assertTrue("应包含z=0", conversion.javaSelector.contains("z=0"))
     }
     
     @Test
     fun testMaxValueParamsMerge_7() {
-        // 最大值参数的负数处理
-        val selector = "@a[r=-10,r=-5,rx=-20,rx=-10,ry=-15,ry=-5]"
+        // Java版通用参数的负数处理：dx, dy, dz
+        val selector = "@a[dx=-5,dx=-2,dy=-10,dy=-3,dz=-8,dz=-1]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含r=-5", conversion.javaSelector.contains("r=-5"))
-        assertTrue("应包含rx=-10", conversion.javaSelector.contains("rx=-10"))
-        assertTrue("应包含ry=-5", conversion.javaSelector.contains("ry=-5"))
+        assertTrue("应包含dx=-2", conversion.javaSelector.contains("dx=-2"))
+        assertTrue("应包含dy=-3", conversion.javaSelector.contains("dy=-3"))
+        assertTrue("应包含dz=-1", conversion.javaSelector.contains("dz=-1"))
     }
     
     /**
-     * 测试组8：最小值参数合并逻辑补充测试
+     * 测试组8：Java版范围参数合并逻辑补充测试
      */
     @Test
     fun testMinValueParamsMerge_1() {
-        // lm参数：取最小值
-        val selector = "@a[lm=5,lm=10]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含lm=5", conversion.javaSelector.contains("lm=5"))
-        assertFalse("不应包含lm=10", conversion.javaSelector.contains("lm=10"))
+        // distance参数（范围）：使用默认合并逻辑，取所有最小值的最小值
+        val selector = "@a[distance=5..10,distance=2..8]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // distance转换为r和rm，取最小值2..10
+        assertTrue("应包含rm=2", conversion.bedrockSelector.contains("rm=2"))
+        assertTrue("应包含r=10", conversion.bedrockSelector.contains("r=10"))
     }
     
     @Test
     fun testMinValueParamsMerge_2() {
-        // lm参数的负数处理
-        val selector = "@a[lm=-10,lm=-5]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含lm=-10", conversion.javaSelector.contains("lm=-10"))
-        assertFalse("不应包含lm=-5", conversion.javaSelector.contains("lm=-5"))
+        // distance参数（范围）的负数处理
+        val selector = "@a[distance=-10..-5,distance=-8..-2]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
+        // distance转换为r和rm，取最小值-10..-2
+        assertTrue("应包含rm=-10", conversion.bedrockSelector.contains("rm=-10"))
+        assertTrue("应包含r=-2", conversion.bedrockSelector.contains("r=-2"))
     }
     
     /**
@@ -646,28 +654,18 @@ class MergeLogicAndMixedModeTest {
      */
     @Test
     fun testMultipleParamsMerge_1() {
-        // 多个参数同时重复：最大值类型
-        val selector = "@a[x=8,y=5,dx=10,dx=5,r=3,r=7]"
+        // 多个参数同时重复：最大值类型（Java版通用参数）
+        val selector = "@a[x=8,y=5,dx=10,dx=5]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含x=8", conversion.javaSelector.contains("x=8"))
         assertTrue("应包含y=5", conversion.javaSelector.contains("y=5"))
         assertTrue("应包含dx=10", conversion.javaSelector.contains("dx=10"))
-        assertTrue("应包含r=7", conversion.javaSelector.contains("r=7"))
+        assertFalse("不应包含dx=5", conversion.javaSelector.contains("dx=5"))
     }
     
     @Test
     fun testMultipleParamsMerge_2() {
-        // 多个参数同时重复：最小值类型
-        val selector = "@a[rm=2,rm=5,rxm=-10,rxm=-5,lm=3,lm=8]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含rm=2", conversion.javaSelector.contains("rm=2"))
-        assertTrue("应包含rxm=-10", conversion.javaSelector.contains("rxm=-10"))
-        assertTrue("应包含lm=3", conversion.javaSelector.contains("lm=3"))
-    }
-    
-    @Test
-    fun testMultipleParamsMerge_3() {
-        // 多个参数同时重复：范围类型
+        // 多个参数同时重复：范围类型（Java版参数）
         val selector = "@a[distance=5..7,distance=3..9,x_rotation=-45..45,x_rotation=-30..30,y_rotation=-90..90,y_rotation=0..180,level=5..10,level=3..15]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
@@ -677,12 +675,30 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testMultipleParamsMerge_4() {
-        // 混合类型参数：最大值、最小值、范围类型同时重复
-        val selector = "@a[x=5,x=10,rm=2,rm=5,distance=3..5,distance=1..8]"
+    fun testMultipleParamsMerge_3() {
+        // 多个参数同时重复：混合类型（最大值、最小值、范围类型）
+        val selector = "@a[x=5,x=10,dx=3,dx=8,distance=3..5,distance=1..8]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含x=10", conversion.javaSelector.contains("x=10"))
-        assertTrue("应包含rm=2", conversion.javaSelector.contains("rm=2"))
+        assertTrue("应包含dx=8", conversion.javaSelector.contains("dx=8"))
+        assertTrue("应包含distance=1..8", conversion.javaSelector.contains("distance=1..8"))
+    }
+    
+    @Test
+    fun testMultipleParamsMerge_4() {
+        // 混合类型参数：所有类型同时重复
+        val selector = "@a[x=5,x=10,y=3,y=8,dx=2,dx=7,dy=1,dy=6,dz=4,dz=9,distance=5..7,distance=2..9,x_rotation=-45..45,x_rotation=-30..30,y_rotation=-90..90,y_rotation=0..180,level=5..10,level=3..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x=10", conversion.javaSelector.contains("x=10"))
+        assertTrue("应包含y=8", conversion.javaSelector.contains("y=8"))
+        assertTrue("应包含dx=7", conversion.javaSelector.contains("dx=7"))
+        assertTrue("应包含dy=6", conversion.javaSelector.contains("dy=6"))
+        assertTrue("应包含dz=9", conversion.javaSelector.contains("dz=9"))
+        assertTrue("应包含distance=2..9", conversion.javaSelector.contains("distance=2..9"))
+        assertTrue("应包含x_rotation=-45..45", conversion.javaSelector.contains("x_rotation=-45..45"))
+        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
+    }
         assertTrue("应包含distance=1..8", conversion.javaSelector.contains("distance=1..8"))
     }
     
@@ -694,12 +710,14 @@ class MergeLogicAndMixedModeTest {
         // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        // 同时包含r参数：一个来自原选择器，一个来自转换后的Java版参数
-        val selector = "@a[r=5,distance=10]"
+        // 同时包含distance参数（Java版）和r参数（基岩版）
+        val selector = "@a[distance=5,r=10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // r应该被转换为distance，并与原来的distance合并
+        assertTrue("应包含distance参数", conversion.javaSelector.contains("distance"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -710,12 +728,14 @@ class MergeLogicAndMixedModeTest {
         // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        // 同时包含rx参数和x_rotation参数（会相互转换）
-        val selector = "@a[rx=10,x_rotation=-45..45]"
+        // 同时包含x_rotation参数（Java版）和rx参数（基岩版）
+        val selector = "@a[x_rotation=-45..45,rx=10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // rx应该被转换为x_rotation，并与原来的x_rotation合并
+        assertTrue("应包含x_rotation参数", conversion.javaSelector.contains("x_rotation"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -726,12 +746,14 @@ class MergeLogicAndMixedModeTest {
         // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        // 同时包含l参数和level参数（会相互转换）
-        val selector = "@a[l=10,level=5..15]"
+        // 同时包含level参数（Java版）和l参数（基岩版）
+        val selector = "@a[level=5..15,l=10]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // l应该被转换为level，并与原来的level合并
+        assertTrue("应包含level参数", conversion.javaSelector.contains("level"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -742,12 +764,14 @@ class MergeLogicAndMixedModeTest {
         // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        // 同时包含c参数和limit参数（会相互转换）
-        val selector = "@a[c=5,limit=3]"
+        // 同时包含limit参数（Java版）和c参数（基岩版）
+        val selector = "@a[limit=3,c=5]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // c应该被转换为limit，并与原来的limit合并
+        assertTrue("应包含limit参数", conversion.javaSelector.contains("limit"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -758,12 +782,14 @@ class MergeLogicAndMixedModeTest {
         // 启用JAVA/基岩混合模式
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        // 同时包含ry参数和y_rotation参数（会相互转换）
-        val selector = "@a[ry=45,y_rotation=-90..90]"
+        // 同时包含y_rotation参数（Java版）和ry参数（基岩版）
+        val selector = "@a[y_rotation=-90..90,ry=45]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         
         // 应该触发混合模式转换
         assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        // ry应该被转换为y_rotation，并与原来的y_rotation合并
+        assertTrue("应包含y_rotation参数", conversion.javaSelector.contains("y_rotation"))
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
@@ -774,8 +800,8 @@ class MergeLogicAndMixedModeTest {
      */
     @Test
     fun testAllParamsCombination_1() {
-        // 所有最大值参数的组合
-        val selector = "@a[x=10,x=15,y=20,y=25,z=30,z=35,dx=5,dx=10,dy=8,dy=12,dz=3,dz=7,r=10,r=15,rx=20,rx=25,ry=30,ry=35,l=5,l=10,c=3,c=8,limit=7,limit=12]"
+        // 所有最大值参数的组合（Java版通用参数）
+        val selector = "@a[x=10,x=15,y=20,y=25,z=30,z=35,dx=5,dx=10,dy=8,dy=12,dz=3,dz=7,limit=7,limit=12]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含x=15", conversion.javaSelector.contains("x=15"))
         assertTrue("应包含y=25", conversion.javaSelector.contains("y=25"))
@@ -783,28 +809,12 @@ class MergeLogicAndMixedModeTest {
         assertTrue("应包含dx=10", conversion.javaSelector.contains("dx=10"))
         assertTrue("应包含dy=12", conversion.javaSelector.contains("dy=12"))
         assertTrue("应包含dz=7", conversion.javaSelector.contains("dz=7"))
-        assertTrue("应包含r=15", conversion.javaSelector.contains("r=15"))
-        assertTrue("应包含rx=25", conversion.javaSelector.contains("rx=25"))
-        assertTrue("应包含ry=35", conversion.javaSelector.contains("ry=35"))
-        assertTrue("应包含l=10", conversion.javaSelector.contains("l=10"))
-        assertTrue("应包含c=8", conversion.javaSelector.contains("c=8"))
         assertTrue("应包含limit=12", conversion.javaSelector.contains("limit=12"))
     }
     
     @Test
     fun testAllParamsCombination_2() {
-        // 所有最小值参数的组合
-        val selector = "@a[rm=5,rm=10,rxm=-20,rxm=-15,rym=-10,rym=-5,lm=8,lm=15]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        assertTrue("应包含rm=5", conversion.javaSelector.contains("rm=5"))
-        assertTrue("应包含rxm=-20", conversion.javaSelector.contains("rxm=-20"))
-        assertTrue("应包含rym=-10", conversion.javaSelector.contains("rym=-10"))
-        assertTrue("应包含lm=8", conversion.javaSelector.contains("lm=8"))
-    }
-    
-    @Test
-    fun testAllParamsCombination_3() {
-        // 所有范围参数的组合
+        // 所有范围参数的组合（Java版参数）
         val selector = "@a[distance=5..10,distance=3..12,x_rotation=-45..45,x_rotation=-30..60,y_rotation=-90..90,y_rotation=0..180,level=10..20,level=5..25]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
         assertTrue("应包含distance=3..12", conversion.javaSelector.contains("distance=3..12"))
@@ -814,7 +824,7 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testAllParamsCombination_4() {
+    fun testAllParamsCombination_3() {
         // 混合模式合并逻辑下的所有范围参数
         SelectorConverter.setMergeLogicMode(true)
         
@@ -830,17 +840,35 @@ class MergeLogicAndMixedModeTest {
     }
     
     @Test
-    fun testAllParamsCombination_5() {
+    fun testAllParamsCombination_4() {
         // JAVA基岩混合模式下的所有参数组合
         SelectorConverter.setJavaBedrockMixedModeEnabled(true)
         
-        val selector = "@a[r=10,distance=5..10,rx=20,x_rotation=-45..45,l=15,level=10..20,c=5,limit=3]"
-        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        val selector = "@a[distance=5..10,x_rotation=-45..45,limit=5,team=red]"
+        val conversion = SelectorConverter.convertJavaToBedrock(selector, context)
         
         // 应该触发混合模式转换
-        assertTrue("应包含提醒信息", conversion.javaReminders.any { it.contains("混合模式") })
+        assertTrue("应包含提醒信息", conversion.bedrockReminders.any { it.contains("混合模式") })
         
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
+    }
+    
+    @Test
+    fun testAllParamsCombination_5() {
+        // 完整组合：最大值、最小值、范围类型
+        val selector = "@a[x=5,x=10,y=3,y=8,z=1,z=6,dx=2,dx=7,dy=4,dy=9,dz=3,dz=8,distance=5..10,distance=2..15,x_rotation=-45..45,x_rotation=-30..60,y_rotation=-90..90,y_rotation=0..180,level=10..20,level=5..25,limit=3,limit=7]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x=10", conversion.javaSelector.contains("x=10"))
+        assertTrue("应包含y=8", conversion.javaSelector.contains("y=8"))
+        assertTrue("应包含z=6", conversion.javaSelector.contains("z=6"))
+        assertTrue("应包含dx=7", conversion.javaSelector.contains("dx=7"))
+        assertTrue("应包含dy=9", conversion.javaSelector.contains("dy=9"))
+        assertTrue("应包含dz=8", conversion.javaSelector.contains("dz=8"))
+        assertTrue("应包含distance=2..15", conversion.javaSelector.contains("distance=2..15"))
+        assertTrue("应包含x_rotation=-45..60", conversion.javaSelector.contains("x_rotation=-45..60"))
+        assertTrue("应包含y_rotation=-90..180", conversion.javaSelector.contains("y_rotation=-90..180"))
+        assertTrue("应包含level=5..25", conversion.javaSelector.contains("level=5..25"))
+        assertTrue("应包含limit=7", conversion.javaSelector.contains("limit=7"))
     }
 }
