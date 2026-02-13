@@ -2091,37 +2091,73 @@ object SelectorConverter {
 
                         mergedParams.add("$paramName=$rangeValue")
                     } else {
-                        // 默认合并逻辑：先分别处理左单边和右单边，然后合成完整范围
-                        val allMinValues = mutableListOf<Double>()
-                        val allMaxValues = mutableListOf<Double>()
+                        // 默认合并逻辑
+                        // 检查是否包含单边范围（只有最小值或只有最大值）
+                        val hasLeftOnly = values.any { parseRange(it.first)?.first != null && parseRange(it.first)?.second == null }
+                        val hasRightOnly = values.any { parseRange(it.first)?.first == null && parseRange(it.first)?.second != null }
+                        
+                        if (hasLeftOnly || hasRightOnly) {
+                            // 包含单边范围：先分别处理左单边和右单边，然后合成完整范围
+                            val allMinValues = mutableListOf<Double>()
+                            val allMaxValues = mutableListOf<Double>()
 
-                        for (value in values) {
-                            val range = parseRange(value.first)
-                            if (range != null) {
-                                val minVal = range.first
-                                val maxVal = range.second
-                                if (minVal != null) {
-                                    allMinValues.add(minVal)
-                                }
-                                if (maxVal != null) {
-                                    allMaxValues.add(maxVal)
+                            for (value in values) {
+                                val range = parseRange(value.first)
+                                if (range != null) {
+                                    val minVal = range.first
+                                    val maxVal = range.second
+                                    if (minVal != null) {
+                                        allMinValues.add(minVal)
+                                    }
+                                    if (maxVal != null) {
+                                        allMaxValues.add(maxVal)
+                                    }
                                 }
                             }
-                        }
 
-                        // 合并所有最小值取最小，所有最大值取最大
-                        val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
-                        val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
+                            // 合并所有最小值取最小，所有最大值取最大
+                            val finalMin = if (allMinValues.isNotEmpty()) allMinValues.minOrNull() else null
+                            val finalMax = if (allMaxValues.isNotEmpty()) allMaxValues.maxOrNull() else null
 
-                        // 格式化输出
-                        val rangeValue = when {
-                            finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
-                            finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
+                            // 格式化输出
+                            val rangeValue = when {
+                                finalMin != null && finalMax != null -> "${formatSingleNumber(finalMin.toString())}..${formatSingleNumber(finalMax.toString())}"
+                                finalMin != null -> "${formatSingleNumber(finalMin.toString())}.."
                             finalMax != null -> "..${formatSingleNumber(finalMax.toString())}"
                             else -> continue
                         }
 
-                        mergedParams.add("$paramName=$rangeValue")
+                            mergedParams.add("$paramName=$rangeValue")
+                        } else {
+                            // 完整范围：选取差的绝对值最大的范围，差值相等时选最后一个
+                            var selectedRange: Pair<Double?, Double?>? = null
+                            var maxDiff = 0.0
+
+                            for (value in values) {
+                                val range = parseRange(value.first)
+                                if (range != null && range.first != null && range.second != null) {
+                                    val diff = kotlin.math.abs(range.second!! - range.first!!)
+                                    if (diff >= maxDiff) {
+                                        maxDiff = diff
+                                        selectedRange = range
+                                    }
+                                }
+                            }
+
+                            if (selectedRange != null) {
+                                // 格式化输出
+                                val rangeValue = when {
+                                    selectedRange.first == null && selectedRange.second != null ->
+                                        "..${formatSingleNumber(selectedRange.second.toString())}"
+                                    selectedRange.first != null && selectedRange.second == null ->
+                                        "${formatSingleNumber(selectedRange.first.toString())}.."
+                                    selectedRange.first != null && selectedRange.second != null ->
+                                        "${formatSingleNumber(selectedRange.first.toString())}..${formatSingleNumber(selectedRange.second.toString())}"
+                                    else -> continue
+                                }
+                                mergedParams.add("$paramName=$rangeValue")
+                            }
+                        }
                     }
                 }
                 else -> {

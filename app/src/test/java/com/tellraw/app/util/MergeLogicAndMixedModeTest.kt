@@ -944,4 +944,394 @@ class MergeLogicAndMixedModeTest {
         // 重置
         SelectorConverter.setJavaBedrockMixedModeEnabled(false)
     }
+    
+    /**
+     * 测试组4：单边范围合并测试
+     */
+    @Test
+    fun testSingleSideRangeMerge_1() {
+        // 左单边 + 右单边：合并为完整范围
+        val selector = "@a[distance=5..,distance=..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=5..10", conversion.javaSelector.contains("distance=5..10"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_2() {
+        // 多个左单边：取最小值
+        val selector = "@a[distance=5..,distance=3..]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..", conversion.javaSelector.contains("distance=3.."))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_3() {
+        // 多个右单边：取最大值
+        val selector = "@a[distance=..10,distance=..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=..15", conversion.javaSelector.contains("distance=..15"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_4() {
+        // x_rotation 单边合并
+        val selector = "@a[x_rotation=45..,x_rotation=..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=45..90", conversion.javaSelector.contains("x_rotation=45..90"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_5() {
+        // y_rotation 单边合并
+        val selector = "@a[y_rotation=-45..,y_rotation=..60]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=-45..60", conversion.javaSelector.contains("y_rotation=-45..60"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_6() {
+        // level 单边合并
+        val selector = "@a[level=5..,level=..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=5..15", conversion.javaSelector.contains("level=5..15"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_7() {
+        // x_rotation 多个左单边
+        val selector = "@a[x_rotation=45..,x_rotation=-30..]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-30..", conversion.javaSelector.contains("x_rotation=-30.."))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_8() {
+        // x_rotation 多个右单边
+        val selector = "@a[x_rotation=..90,x_rotation=..135]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=..135", conversion.javaSelector.contains("x_rotation=..135"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_9() {
+        // y_rotation 多个左单边
+        val selector = "@a[y_rotation=-45..,y_rotation=-90..]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=-90..", conversion.javaSelector.contains("y_rotation=-90.."))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_10() {
+        // y_rotation 多个右单边
+        val selector = "@a[y_rotation=..60,y_rotation=..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=..90", conversion.javaSelector.contains("y_rotation=..90"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_11() {
+        // level 多个左单边
+        val selector = "@a[level=5..,level=3..]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=3..", conversion.javaSelector.contains("level=3.."))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_12() {
+        // level 多个右单边
+        val selector = "@a[level=..15,level=..20]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=..20", conversion.javaSelector.contains("level=..20"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_7() {
+        // 左单边 + 完整范围
+        val selector = "@a[distance=5..,distance=3..9]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_8() {
+        // 右单边 + 完整范围
+        val selector = "@a[distance=..10,distance=5..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=5..15", conversion.javaSelector.contains("distance=5..15"))
+    }
+    
+    @Test
+    fun testSingleSideRangeMerge_9() {
+        // 左单边 + 左单边 + 右单边
+        val selector = "@a[distance=5..,distance=3..,distance=..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..10", conversion.javaSelector.contains("distance=3..10"))
+    }
+    
+    /**
+     * 测试组5：完整范围合并测试（差值不同）
+     */
+    @Test
+    fun testFullRangeMerge_1() {
+        // 完整范围：差值不同，选差值大的
+        val selector = "@a[distance=5..7,distance=3..9]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..9", conversion.javaSelector.contains("distance=3..9"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_2() {
+        // x_rotation 完整范围：差值不同
+        val selector = "@a[x_rotation=-45..45,x_rotation=-30..60]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-30..60", conversion.javaSelector.contains("x_rotation=-30..60"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_3() {
+        // y_rotation 完整范围：差值不同
+        val selector = "@a[y_rotation=-90..0,y_rotation=45..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=-90..0", conversion.javaSelector.contains("y_rotation=-90..0"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_4() {
+        // level 完整范围：差值不同
+        val selector = "@a[level=5..10,level=3..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_5() {
+        // x_rotation 完整范围：差值不同
+        val selector = "@a[x_rotation=-45..45,x_rotation=-30..60]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-30..60", conversion.javaSelector.contains("x_rotation=-30..60"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_6() {
+        // x_rotation 完整范围：差值更大
+        val selector = "@a[x_rotation=-10..10,x_rotation=-90..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-90..90", conversion.javaSelector.contains("x_rotation=-90..90"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_7() {
+        // y_rotation 完整范围：差值更大
+        val selector = "@a[y_rotation=-30..30,y_rotation=-180..180]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=-180..180", conversion.javaSelector.contains("y_rotation=-180..180"))
+    }
+    
+    /**
+     * 测试组6：完整范围合并测试（差值相等）
+     */
+    @Test
+    fun testFullRangeMerge_EqualDiff_1() {
+        // 完整范围：差值相等，选最后一个
+        val selector = "@a[distance=5..10,distance=3..8]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..8", conversion.javaSelector.contains("distance=3..8"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_EqualDiff_2() {
+        // y_rotation 差值相等：选最后一个
+        val selector = "@a[y_rotation=-90..90,y_rotation=0..180]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=0..180", conversion.javaSelector.contains("y_rotation=0..180"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_EqualDiff_3() {
+        // 多个范围，差值相等：选最后一个
+        val selector = "@a[distance=5..10,distance=3..8,distance=1..6]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=1..6", conversion.javaSelector.contains("distance=1..6"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_EqualDiff_4() {
+        // x_rotation 差值相等：选最后一个
+        val selector = "@a[x_rotation=-45..45,x_rotation=45..135]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=45..135", conversion.javaSelector.contains("x_rotation=45..135"))
+    }
+    
+    @Test
+    fun testFullRangeMerge_EqualDiff_5() {
+        // level 差值相等：选最后一个
+        val selector = "@a[level=5..15,level=0..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=0..10", conversion.javaSelector.contains("level=0..10"))
+    }
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=1..6", conversion.javaSelector.contains("distance=1..6"))
+    }
+    
+    /**
+     * 测试组7：混合模式下的单边范围合并
+     */
+    @Test
+    fun testMixedMode_SingleSide_1() {
+        SelectorConverter.setMergeLogicMode(true)
+        
+        val selector = "@a[distance=5..,distance=..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=5..10", conversion.javaSelector.contains("distance=5..10"))
+        
+        SelectorConverter.setMergeLogicMode(false)
+    }
+    
+    @Test
+    fun testMixedMode_SingleSide_2() {
+        SelectorConverter.setMergeLogicMode(true)
+        
+        val selector = "@a[distance=5..,distance=1..8]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=1..8", conversion.javaSelector.contains("distance=1..8"))
+        
+        SelectorConverter.setMergeLogicMode(false)
+    }
+    
+    @Test
+    fun testMixedMode_SingleSide_3() {
+        SelectorConverter.setMergeLogicMode(true)
+        
+        val selector = "@a[distance=..10,distance=5..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=5..15", conversion.javaSelector.contains("distance=5..15"))
+        
+        SelectorConverter.setMergeLogicMode(false)
+    }
+    
+    /**
+     * 测试组8：左右单边加完整范围组合测试
+     */
+    @Test
+    fun testLeftRightFull_Mixed_1() {
+        // 左单边 + 完整范围 + 右单边
+        val selector = "@a[distance=5..,distance=3..12,distance=..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..15", conversion.javaSelector.contains("distance=3..15"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_2() {
+        // 左单边 + 左单边 + 完整范围
+        val selector = "@a[distance=5..,distance=3..,distance=2..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=2..10", conversion.javaSelector.contains("distance=2..10"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_3() {
+        // 右单边 + 右单边 + 完整范围
+        val selector = "@a[distance=..5,distance=..10,distance=3..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..15", conversion.javaSelector.contains("distance=3..15"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_4() {
+        // 左单边 + 右单边 + 完整范围 + 完整范围
+        val selector = "@a[distance=5..,distance=..20,distance=3..12,distance=8..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..20", conversion.javaSelector.contains("distance=3..20"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_5() {
+        // x_rotation: 左单边 + 完整范围 + 右单边
+        val selector = "@a[x_rotation=45..,x_rotation=-30..60,x_rotation=..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-30..90", conversion.javaSelector.contains("x_rotation=-30..90"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_6() {
+        // y_rotation: 左单边 + 完整范围 + 右单边
+        val selector = "@a[y_rotation=-45..,y_rotation=-90..0,y_rotation=..60]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含y_rotation=-90..60", conversion.javaSelector.contains("y_rotation=-90..60"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_7() {
+        // level: 左单边 + 完整范围 + 右单边
+        val selector = "@a[level=5..,level=3..12,level=..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含level=3..15", conversion.javaSelector.contains("level=3..15"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_8() {
+        // 多个左单边 + 多个右单边 + 多个完整范围
+        val selector = "@a[distance=8..,distance=5..,distance=..10,distance=..15,distance=3..12,distance=6..18]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..18", conversion.javaSelector.contains("distance=3..18"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_9() {
+        // 边界情况：左单边值为0
+        val selector = "@a[distance=0..,distance=..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=0..10", conversion.javaSelector.contains("distance=0..10"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_10() {
+        // 边界情况：右单边值为0
+        val selector = "@a[distance=5..,distance=..0]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=0..5", conversion.javaSelector.contains("distance=0..5"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_11() {
+        // 边界情况：负数值
+        val selector = "@a[x_rotation=-90..,x_rotation=..90]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-90..90", conversion.javaSelector.contains("x_rotation=-90..90"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_12() {
+        // 边界情况：完整范围包含负数
+        val selector = "@a[x_rotation=-60..,x_rotation=-90..-30,x_rotation=..45]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含x_rotation=-90..45", conversion.javaSelector.contains("x_rotation=-90..45"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_13() {
+        // 复杂组合：所有参数类型混合
+        val selector = "@a[distance=5..,distance=3..10,x_rotation=45..,x_rotation=-30..60,y_rotation=-90..,y_rotation=0..90,level=2..,level=1..8]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..10", conversion.javaSelector.contains("distance=3..10"))
+        assertTrue("应包含x_rotation=-30..60", conversion.javaSelector.contains("x_rotation=-30..60"))
+        assertTrue("应包含y_rotation=-90..90", conversion.javaSelector.contains("y_rotation=-90..90"))
+        assertTrue("应包含level=1..8", conversion.javaSelector.contains("level=1..8"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_14() {
+        // 左单边与完整范围重叠，右单边超出
+        val selector = "@a[distance=3..,distance=5..8,distance=..15]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=3..15", conversion.javaSelector.contains("distance=3..15"))
+    }
+    
+    @Test
+    fun testLeftRightFull_Mixed_15() {
+        // 完整范围差值相等，选择最后一个
+        val selector = "@a[distance=5..,distance=3..8,distance=1..6,distance=..10]"
+        val conversion = SelectorConverter.convertBedrockToJava(selector, context)
+        assertTrue("应包含distance=1..10", conversion.javaSelector.contains("distance=1..10"))
+    }
 }
