@@ -84,8 +84,8 @@ fun MainScreen(
     val showHistoryDialog = remember { mutableStateOf(false) }
     val showSettingsDialog = remember { mutableStateOf(false) }
 
-    // 初始化ViewModel
-    LaunchedEffect(context) {
+    // 初始化ViewModel（只在首次组合时调用一次，屏幕旋转时不会重复初始化）
+    LaunchedEffect(Unit) {
         viewModel.initialize()
     }
 

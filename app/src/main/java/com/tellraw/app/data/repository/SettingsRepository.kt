@@ -62,22 +62,60 @@ class SettingsRepository @Inject constructor(
     
     /**
      * 加载配置
+     * @return 加载后的设置值对象
      */
-    suspend fun loadConfig(): Boolean {
+    suspend fun loadConfig(): LoadedSettings {
         return withContext(Dispatchers.IO) {
             try {
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
                 if (!configFile.exists()) {
-                    return@withContext false
+                    return@withContext LoadedSettings(
+                        mnHandlingMode = _mnHandlingMode.value,
+                        mnMixedMode = _mnMixedMode.value,
+                        mnCFEnabled = _mnCFEnabled.value,
+                        javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                        historyStorageUri = _historyStorageUri.value,
+                        historyStorageFilename = _historyStorageFilename.value
+                    )
                 }
                 
                 val json = configFile.readText()
                 importSettingsFromJson(json)
+                
+                // 返回加载后的设置值
+                LoadedSettings(
+                    mnHandlingMode = _mnHandlingMode.value,
+                    mnMixedMode = _mnMixedMode.value,
+                    mnCFEnabled = _mnCFEnabled.value,
+                    javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                    historyStorageUri = _historyStorageUri.value,
+                    historyStorageFilename = _historyStorageFilename.value
+                )
             } catch (e: Exception) {
-                false
+                // 加载失败，返回当前值
+                LoadedSettings(
+                    mnHandlingMode = _mnHandlingMode.value,
+                    mnMixedMode = _mnMixedMode.value,
+                    mnCFEnabled = _mnCFEnabled.value,
+                    javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                    historyStorageUri = _historyStorageUri.value,
+                    historyStorageFilename = _historyStorageFilename.value
+                )
             }
         }
     }
+    
+    /**
+     * 加载后的设置值
+     */
+    data class LoadedSettings(
+        val mnHandlingMode: Boolean,
+        val mnMixedMode: Boolean,
+        val mnCFEnabled: Boolean,
+        val javaBedrockMixedMode: Boolean,
+        val historyStorageUri: String?,
+        val historyStorageFilename: String
+    )
     
     /**
      * 保存配置

@@ -46,10 +46,57 @@ class TellrawViewModel @Inject constructor(
     fun initialize() {
         initializeVersionCheck()
         viewModelScope.launch {
-            // 先从JSON文件加载配置
-            settingsRepository.loadConfig()
-            // 然后加载设置
-            loadSettings()
+            // 从JSON文件加载配置并获取设置值
+            val loadedSettings = settingsRepository.loadConfig()
+            
+            // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
+            val historyStorageUri = loadedSettings.historyStorageUri
+            if (historyStorageUri != null && !hasStoragePermission()) {
+                settingsRepository.setHistoryStorageUri("")
+                _historyStorageUri.value = null
+            } else {
+                _historyStorageUri.value = historyStorageUri
+            }
+            
+            // 处理配置文件中的互斥逻辑
+            // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
+            // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
+            val mnHandlingMode = loadedSettings.mnHandlingMode
+            val mixedMode = loadedSettings.mnMixedMode
+            val cfEnabled = loadedSettings.mnCFEnabled
+            val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
+            
+            if (enabledCount >= 2) {
+                // 两个及以上开启，只保留"选择§m/§n的处理"
+                settingsRepository.setMNMixedMode(false)
+                settingsRepository.setMNCFEnabled(false)
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = false
+                // 保留原有的mn_handling_mode
+                _useJavaFontStyle.value = mnHandlingMode
+            } else if (mixedMode) {
+                // 只开启混合模式
+                _mnMixedMode.value = true
+                _mnCFEnabled.value = false
+                _useJavaFontStyle.value = true // 默认值，但UI中不显示
+            } else if (cfEnabled) {
+                // 只开启§m/§n_c/f
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = true
+                _useJavaFontStyle.value = true // 默认值，但UI中不显示
+            } else {
+                // 都没开启时，使用原有的mn_handling_mode
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = false
+                _useJavaFontStyle.value = mnHandlingMode
+            }
+            
+            // 加载JAVA/基岩混合模式
+            _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
+            
+            // 加载历史记录文件名
+            _historyStorageFilename.value = loadedSettings.historyStorageFilename
+            
             // 加载历史记录
             historyRepository.init()
         }
@@ -85,53 +132,6 @@ class TellrawViewModel @Inject constructor(
     /**
      * 加载用户设置
      */
-    private suspend fun loadSettings() {
-        val mnHandlingMode = settingsRepository.getMNHandlingMode()
-        val mixedMode = settingsRepository.getMNMixedMode()
-        val cfEnabled = settingsRepository.getMNCFEnabled()
-        val javaBedrockMixedMode = settingsRepository.getJavaBedrockMixedMode()
-        
-        // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
-        val historyStorageUri = settingsRepository.getHistoryStorageUri()
-        if (historyStorageUri != null && !hasStoragePermission()) {
-            settingsRepository.setHistoryStorageUri("")
-            _historyStorageUri.value = null
-        }
-        
-        // 处理配置文件中的互斥逻辑
-        // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
-        // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
-        val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
-        
-        if (enabledCount >= 2) {
-            // 两个及以上开启，只保留"选择§m/§n的处理"
-            settingsRepository.setMNMixedMode(false)
-            settingsRepository.setMNCFEnabled(false)
-            _mnMixedMode.value = false
-            _mnCFEnabled.value = false
-            // 保留原有的mn_handling_mode
-            _useJavaFontStyle.value = mnHandlingMode
-        } else if (mixedMode) {
-            // 只开启混合模式
-            _mnMixedMode.value = true
-            _mnCFEnabled.value = false
-            _useJavaFontStyle.value = true // 默认值，但UI中不显示
-        } else if (cfEnabled) {
-            // 只开启§m/§n_c/f
-            _mnMixedMode.value = false
-            _mnCFEnabled.value = true
-            _useJavaFontStyle.value = true // 默认值，但UI中不显示
-        } else {
-            // 都没开启时，使用原有的mn_handling_mode
-            _mnMixedMode.value = false
-            _mnCFEnabled.value = false
-            _useJavaFontStyle.value = mnHandlingMode
-        }
-        
-        // 加载JAVA/基岩混合模式
-        _javaBedrockMixedMode.value = javaBedrockMixedMode
-    }
-    
     /**
      * 检查是否有存储权限
      */
