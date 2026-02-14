@@ -227,88 +227,230 @@ fun MNCodeDialog(
     }
     
     var rememberChoice by remember { mutableStateOf(false) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
-    AlertDialog(
-        onDismissRequest = {
-            // 点击空白区域取消时，默认使用方式一
-            if (mnMixedMode) {
-                onMixedModeChoice(codeType ?: "§m", "font")
-            } else {
-                onUseJavaFontStyle(true)
-            }
-            onDismiss()
-        },
-        title = {
-            Text(stringResource(R.string.detected_code, codeName))
-        },
-        text = {
-            Column {
-                if (mnMixedMode) {
-                    // 混合模式：显示方式一和方式二
-                    Text(
-                        text = stringResource(R.string.code_dialog_message_mixed, codeName)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.code_option_1_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.code_option_2_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.code_dialog_message_full, codeName)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(350.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
                 ) {
-                    Checkbox(
-                        checked = rememberChoice,
-                        onCheckedChange = { rememberChoice = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.remember_choice))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    if (mnMixedMode) {
-                        // 方式一：Java版用字体模式，基岩版用颜色模式
-                        onMixedModeChoice(codeType ?: "§m", "font")
-                    } else {
-                        onUseJavaFontStyle(true)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.detected_code, codeName),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        IconButton(
+                            onClick = {
+                                if (mnMixedMode) {
+                                    onMixedModeChoice(codeType ?: "§m", "font")
+                                } else {
+                                    onUseJavaFontStyle(true)
+                                }
+                                onDismiss()
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
-            ) {
-                Text(stringResource(R.string.code_option_1))
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
+                
+                // 内容区域
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     if (mnMixedMode) {
-                        // 方式二：两版都用颜色模式
-                        onMixedModeChoice(codeType ?: "§m", "color")
+                        // 混合模式：显示方式一和方式二
+                        Text(
+                            text = stringResource(R.string.code_dialog_message_mixed, codeName),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.code_option_1_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.code_option_2_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
                     } else {
-                        onUseJavaFontStyle(false)
+                        Text(
+                            text = stringResource(R.string.code_dialog_message_full, codeName),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = rememberChoice,
+                            onCheckedChange = { rememberChoice = it }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.remember_choice))
                     }
                 }
-            ) {
-                Text(stringResource(R.string.code_option_2))
+                
+                // 底部按钮
+                Surface(
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (mnMixedMode) {
+                                    onMixedModeChoice(codeType ?: "§m", "font")
+                                } else {
+                                    onUseJavaFontStyle(true)
+                                }
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.code_option_1), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(
+                            onClick = {
+                                if (mnMixedMode) {
+                                    onMixedModeChoice(codeType ?: "§m", "color")
+                                } else {
+                                    onUseJavaFontStyle(false)
+                                }
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.code_option_2), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         }
-    )
+    } else {
+        // 竖屏：AlertDialog
+        AlertDialog(
+            onDismissRequest = {
+                if (mnMixedMode) {
+                    onMixedModeChoice(codeType ?: "§m", "font")
+                } else {
+                    onUseJavaFontStyle(true)
+                }
+                onDismiss()
+            },
+            title = {
+                Text(stringResource(R.string.detected_code, codeName))
+            },
+            text = {
+                Column {
+                    if (mnMixedMode) {
+                        Text(
+                            text = stringResource(R.string.code_dialog_message_mixed, codeName)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.code_option_1_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.code_option_2_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.code_dialog_message_full, codeName)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = rememberChoice,
+                            onCheckedChange = { rememberChoice = it }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.remember_choice))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        if (mnMixedMode) {
+                            onMixedModeChoice(codeType ?: "§m", "font")
+                        } else {
+                            onUseJavaFontStyle(true)
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.code_option_1))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (mnMixedMode) {
+                            onMixedModeChoice(codeType ?: "§m", "color")
+                        } else {
+                            onUseJavaFontStyle(false)
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.code_option_2))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1501,49 +1643,155 @@ fun FilenameInputDialog(
     onConfirm: (String) -> Unit
 ) {
     var filename by remember { mutableStateOf(currentFilename) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(R.string.set_filename))
-        },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.enter_filename),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = filename,
-                    onValueChange = { filename = it },
-                    label = { Text(stringResource(R.string.storage_filename)) },
-                    placeholder = { Text(stringResource(R.string.filename_placeholder)) },
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val finalFilename = if (filename.isBlank()) {
-                        "TellrawCommand.txt"
-                    } else {
-                        // 清理文件名：移除引号和其他非法字符
-                        filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
-                    }
-                    onConfirm(finalFilename)
-                }
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(300.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text(stringResource(R.string.ok))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.set_filename),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+                
+                // 内容区域
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.enter_filename),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = filename,
+                        onValueChange = { filename = it },
+                        label = { Text(stringResource(R.string.storage_filename)) },
+                        placeholder = { Text(stringResource(R.string.filename_placeholder)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                // 底部按钮
+                Surface(
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.cancel), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(
+                            onClick = {
+                                val finalFilename = if (filename.isBlank()) {
+                                    "TellrawCommand.txt"
+                                } else {
+                                    filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+                                }
+                                onConfirm(finalFilename)
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.ok), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         }
-    )
+    } else {
+        // 竖屏：AlertDialog
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(stringResource(R.string.set_filename))
+            },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.enter_filename),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = filename,
+                        onValueChange = { filename = it },
+                        label = { Text(stringResource(R.string.storage_filename)) },
+                        placeholder = { Text(stringResource(R.string.filename_placeholder)) },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val finalFilename = if (filename.isBlank()) {
+                            "TellrawCommand.txt"
+                        } else {
+                            filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+                        }
+                        onConfirm(finalFilename)
+                    }
+                ) {
+                    Text(stringResource(R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1553,28 +1801,127 @@ fun FileExistsDialog(
     onAppendToExisting: () -> Unit,
     onCustomize: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(R.string.file_exists))
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.file_exists_message, filename),
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onAppendToExisting) {
-                Text(stringResource(R.string.append_to_file))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCustomize) {
-                Text(stringResource(R.string.customize_filename))
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    if (isLandscape) {
+        // 横屏：侧边栏布局
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(320.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 顶部栏
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.file_exists),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+                
+                // 内容区域
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.file_exists_message, filename),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                // 底部按钮
+                Surface(
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                onCustomize()
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.customize_filename), style = MaterialTheme.typography.bodySmall)
+                        }
+                        Button(
+                            onClick = {
+                                onAppendToExisting()
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(stringResource(R.string.append_to_file), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         }
-    )
+    } else {
+        // 竖屏：AlertDialog
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(stringResource(R.string.file_exists))
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.file_exists_message, filename),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onAppendToExisting) {
+                    Text(stringResource(R.string.append_to_file))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCustomize) {
+                    Text(stringResource(R.string.customize_filename))
+                }
+            }
+        )
+    }
 }
 
 /**
