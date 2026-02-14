@@ -70,16 +70,21 @@ class TellrawViewModel @Inject constructor(
     // 初始化标志，防止在屏幕旋转时重复初始化
     private var isInitialized = false
     
+    // 在构造函数中初始化配置
+    init {
+        android.util.Log.d("TellrawViewModel", "ViewModel constructor called")
+        loadConfiguration()
+    }
+    
     /**
-     * 初始化版本检查和加载设置
+     * 加载配置（从JSON文件）
      */
-    fun initialize() {
+    private fun loadConfiguration() {
         if (isInitialized) {
-            android.util.Log.d("TellrawViewModel", "initialize() already called, skipping")
-            // 已经初始化过，直接返回
+            android.util.Log.d("TellrawViewModel", "loadConfiguration() already called, skipping")
             return
         }
-        android.util.Log.d("TellrawViewModel", "initialize() called for the first time")
+        android.util.Log.d("TellrawViewModel", "loadConfiguration() called for the first time")
         isInitialized = true
         
         initializeVersionCheck()
@@ -147,6 +152,14 @@ class TellrawViewModel @Inject constructor(
             // 加载历史记录
             historyRepository.init()
         }
+    }
+    
+    /**
+     * 初始化版本检查和加载设置（保留向后兼容）
+     */
+    fun initialize() {
+        android.util.Log.d("TellrawViewModel", "initialize() called, delegating to loadConfiguration()")
+        loadConfiguration()
     }
     
     /**
