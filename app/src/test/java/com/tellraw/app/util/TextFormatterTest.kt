@@ -175,20 +175,19 @@ class TextFormatterTest {
      */
     @Test
     fun testColorMapping_1() {
-        // 验证基岩版颜色代码映射到Java版
+        // 验证基岩版颜色代码映射到Java版（基于RGB值对比）
         val mapping = mapOf(
-            "§g" to "§6",  // minecoin_gold -> gold
+            "§g" to "§e",  // minecoin_gold -> yellow
             "§h" to "§f",  // material_quartz -> white
-            "§i" to "§7",  // material_iron -> gray
+            "§i" to "§f",  // material_iron -> white
             "§j" to "§8",  // material_netherite -> dark_gray
-            "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
-            "§n" to "§c",  // material_copper -> red (特殊处理)
+            // §m 和 §n 保持独特处理逻辑，不在此映射
             "§p" to "§6",  // material_gold -> gold
             "§q" to "§a",  // material_emerald -> green
             "§s" to "§b",  // material_diamond -> aqua
             "§t" to "§1",  // material_lapis -> dark_blue
             "§u" to "§d",  // material_amethyst -> light_purple
-            "§v" to "§6"   // material_resin -> gold
+            "§v" to "§c"   // material_resin -> red
         )
 
         mapping.forEach { (bedrock, java) ->
@@ -461,23 +460,22 @@ class TextFormatterTest {
     @Test
     fun testColorCodeConversion_1() {
         // 基岩版颜色代码到Java版转换
-        val bedrockText = "§g金色"
         val javaCode = TextFormatter.convertColorCodes("§g", com.tellraw.app.model.MinecraftVersion.JAVA)
-        assertEquals("§6", javaCode)
+        assertEquals("§e", javaCode)  // minecoin_gold -> yellow
     }
 
     @Test
     fun testColorCodeConversion_2() {
-        // 基岩版material_redstone到Java版dark_red
+        // §m保持独特的处理逻辑，不在此转换
         val javaCode = TextFormatter.convertColorCodes("§m", com.tellraw.app.model.MinecraftVersion.JAVA)
-        assertEquals("§4", javaCode)
+        assertEquals("§m", javaCode)  // 保持原值，由convertToJavaJson处理
     }
 
     @Test
     fun testColorCodeConversion_3() {
-        // 基岩版material_copper到Java版red
+        // §n保持独特的处理逻辑，不在此转换
         val javaCode = TextFormatter.convertColorCodes("§n", com.tellraw.app.model.MinecraftVersion.JAVA)
-        assertEquals("§c", javaCode)
+        assertEquals("§n", javaCode)  // 保持原值，由convertToJavaJson处理
     }
 
     @Test
@@ -515,12 +513,12 @@ class TextFormatterTest {
 
     @Test
     fun testColorCodeConversion_8() {
-        // 特殊情况：§m和§n在Java版中是格式代码
+        // 特殊情况：§m和§n保持独特的处理逻辑，不在此转换
         val javaM = TextFormatter.convertColorCodes("§m", com.tellraw.app.model.MinecraftVersion.JAVA)
-        assertEquals("基岩版§m应转换为Java版dark_red", "§4", javaM)
+        assertEquals("§m应保持原值，由convertToJavaJson处理", "§m", javaM)
 
         val javaN = TextFormatter.convertColorCodes("§n", com.tellraw.app.model.MinecraftVersion.JAVA)
-        assertEquals("基岩版§n应转换为Java版red", "§c", javaN)
+        assertEquals("§n应保持原值，由convertToJavaJson处理", "§n", javaN)
     }
     
     /**
@@ -1146,7 +1144,7 @@ class TextFormatterTest {
     fun testConvertToJavaJson_15() {
         // 基岩版颜色代码转换（基岩版颜色代码应按颜色代码处理，不受mNHandling影响）
         val json = TextFormatter.convertToJavaJson("§g金色§h白色")
-        assertTrue("应包含gold颜色", json.contains("\"gold\""))
+        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
         assertTrue("应包含white颜色", json.contains("\"white\""))
         assertTrue("应包含金色文本", json.contains("金色"))
         assertTrue("应包含白色文本", json.contains("白色"))
@@ -1586,12 +1584,12 @@ class TextFormatterTest {
         val bedrockText = "§g金色§h白色§i灰色"
         val javaJson = TextFormatter.convertToJavaJson(bedrockText)
         val bedrockJson = TextFormatter.convertToBedrockJson(bedrockText)
-        
-        // Java版应该转换基岩版颜色代码
-        assertTrue("Java版应包含gold", javaJson.contains("\"gold\""))
+
+        // Java版应该转换基岩版颜色代码（基于RGB值对比）
+        assertTrue("Java版应包含yellow", javaJson.contains("\"yellow\""))
         assertTrue("Java版应包含white", javaJson.contains("\"white\""))
-        assertTrue("Java版应包含gray", javaJson.contains("\"gray\""))
-        
+        assertTrue("Java版应包含white", javaJson.contains("\"white\""))  // §i也转换为white
+
         // 基岩版保留颜色代码
         assertTrue("基岩版应包含金色", bedrockJson.contains("金色"))
         assertTrue("基岩版应包含白色", bedrockJson.contains("白色"))
@@ -1942,10 +1940,11 @@ class TextFormatterTest {
         val text = "§g金色§h白色§i灰色§m删除线§n下划线§a绿色§b青色§c红色"
         val javaJson = TextFormatter.convertToJavaJson(text)
         val bedrockJson = TextFormatter.convertToBedrockJson(text)
-        
-        assertTrue("Java版应包含gold", javaJson.contains("\"gold\""))
+
+        // Java版应该转换基岩版颜色代码（基于RGB值对比）
+        assertTrue("Java版应包含yellow", javaJson.contains("\"yellow\""))
         assertTrue("Java版应包含white", javaJson.contains("\"white\""))
-        assertTrue("Java版应包含gray", javaJson.contains("\"gray\""))
+        assertTrue("Java版应包含white", javaJson.contains("\"white\""))  // §i也转换为white
         assertTrue("Java版应包含dark_red或red", javaJson.contains("\"dark_red\"") || javaJson.contains("\"red\""))
         assertTrue("Java版应包含green", javaJson.contains("\"green\""))
         assertTrue("Java版应包含aqua", javaJson.contains("\"aqua\""))

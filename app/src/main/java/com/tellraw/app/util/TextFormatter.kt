@@ -66,19 +66,18 @@ object TextFormatter {
     
     // 从文本中直接提取的颜色代码
     private val TEXT_COLOR_CODES = mapOf(
-        // 基岩版特有颜色代码（映射到标准代码）
-        "§g" to "§6",  // 基岩版minecoin_gold -> 金色
+        // 基岩版特有颜色代码（映射到标准代码，根据RGB值对比）
+        "§g" to "§e",  // 基岩版minecoin_gold -> 黄色
         "§h" to "§f",  // 基岩版material_quartz -> 白色
-        "§i" to "§7",  // 基岩版material_iron -> 灰色
+        "§i" to "§f",  // 基岩版material_iron -> 白色
         "§j" to "§8",  // 基岩版material_netherite -> 深灰色
-        "§m" to "§4",  // 基岩版material_redstone -> 深红色 (特殊处理)
-        "§n" to "§c",  // 基岩版material_copper -> 红色 (特殊处理)
+        // §m 和 §n 不在此映射，保持其独特的处理逻辑
         "§p" to "§6",  // 基岩版material_gold -> 金色
         "§q" to "§a",  // 基岩版material_emerald -> 绿色
         "§s" to "§b",  // 基岩版material_diamond -> 青色
         "§t" to "§1",  // 基岩版material_lapis -> 深蓝色
         "§u" to "§d",  // 基岩版material_amethyst -> 粉色
-        "§v" to "§6",  // 基岩版material_resin -> 金色
+        "§v" to "§c",  // 基岩版material_resin -> 红色
         // 标准单字符颜色代码
         "§a" to "§a",  // 绿色
         "§b" to "§b",  // 青色
@@ -100,18 +99,17 @@ object TextFormatter {
     
     // 基岩版特有颜色代码 (为了保持向后兼容性)
     private val BEDROCK_COLORS = mapOf(
-        "§g" to "§6",  // minecoin_gold -> gold
+        "§g" to "§e",  // minecoin_gold -> yellow
         "§h" to "§f",  // material_quartz -> white
-        "§i" to "§7",  // material_iron -> gray
+        "§i" to "§f",  // material_iron -> white
         "§j" to "§8",  // material_netherite -> dark_gray
-        "§m" to "§4",  // material_redstone -> dark_red (特殊处理)
-        "§n" to "§c",  // material_copper -> red (特殊处理)
+        // §m 和 §n 不在此映射，保持其独特的处理逻辑
         "§p" to "§6",  // material_gold -> gold
         "§q" to "§a",  // material_emerald -> green
         "§s" to "§b",  // material_diamond -> aqua
         "§t" to "§1",  // material_lapis -> dark_blue
         "§u" to "§d",  // material_amethyst -> light_purple
-        "§v" to "§6",  // material_resin -> gold
+        "§v" to "§c",  // material_resin -> red
     )
     
     // 格式代码映射
@@ -203,11 +201,35 @@ object TextFormatter {
         var jsonText = text
         var currentFormat = mutableMapOf<String, Any>()
 
+        // 预处理：将除§m/§n以外的基岩独占颜色代码转换为JAVA版的颜色代码
+        // 根据tellraw/§.txt，使用RGB欧氏距离、色相、饱和度、亮度等多维度综合分析：
+        // §g minecoin_gold (221,214,5) -> §e yellow [黄绿色调，高亮度，最接近黄色]
+        // §h material_quartz (227,212,209) -> §f white [极浅灰白色，RGB值接近白色]
+        // §i material_iron (206,202,202) -> §f white [浅灰色，最接近白色而非灰色]
+        // §j material_netherite (68,58,59) -> §8 dark_gray [深灰色，RGB值最接近深灰]
+        // §p material_gold (222,177,45) -> §6 gold [金色，RGB值接近金色]
+        // §q material_emerald (17,160,54) -> §a green [绿色，RGB值接近绿色]
+        // §s material_diamond (44,186,168) -> §b aqua [青蓝色，RGB值接近水青色]
+        // §t material_lapis (33,73,123) -> §1 dark_blue [深蓝色，RGB值接近深蓝]
+        // §u material_amethyst (154,92,198) -> §d light_purple [紫色，RGB值接近亮紫色]
+        // §v material_resin (235,114,20) -> §c red [橙红色，RGB值接近红色]
+        // 注意：§m/§n不在此处转换，保持其独特的处理逻辑
+        jsonText = jsonText.replace("§g", "§e")
+        jsonText = jsonText.replace("§h", "§f")
+        jsonText = jsonText.replace("§i", "§f")
+        jsonText = jsonText.replace("§j", "§8")
+        jsonText = jsonText.replace("§p", "§6")
+        jsonText = jsonText.replace("§q", "§a")
+        jsonText = jsonText.replace("§s", "§b")
+        jsonText = jsonText.replace("§t", "§1")
+        jsonText = jsonText.replace("§u", "§d")
+        jsonText = jsonText.replace("§v", "§c")
+
         // 已知的§组合
         val knownCodes = setOf(
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9",
             "§a", "§b", "§c", "§d", "§e", "§f",
-            "§g", "§h", "§i", "§j", "§m", "§n", "§p", "§q", "§s", "§t", "§u", "§v",
+            "§m", "§n",
             "§k", "§l", "§o", "§r",
             "§m_f", "§m_c", "§n_f", "§n_c"
         )
@@ -283,54 +305,27 @@ object TextFormatter {
             if (tokenType == "format_code") {
                 val code = tokenValue
                 // 颜色代码（不包含格式代码k、l、m、n、o、r）
-                if (code[1] in "0123456789abcdefghijpqstuv") {
-                    // 基岩版独属颜色代码列表
-                    val bedrockExclusiveColors = setOf("§g", "§h", "§i", "§j", "§p", "§q", "§s", "§t", "§u", "§v")
-                    
-                    // 如果是基岩版独属颜色代码，需要强制创建新的文本部分
-                    if (code in bedrockExclusiveColors) {
-                        // 先将当前格式保存（如果有文本）
-                        val mainText = result["text"] as? String ?: ""
-                        if (mainText.isNotEmpty()) {
-                            val newPart = mutableMapOf<String, Any>("text" to mainText)
-                            newPart.putAll(currentFormat)
-                            extraParts.add(newPart)
-                            result["text"] = ""
-                        }
-                        
-                        // 更新颜色
-                        when (code) {
-                            "§g" -> currentFormat["color"] = "gold"
-                            "§h" -> currentFormat["color"] = "white"
-                            "§i" -> currentFormat["color"] = "gray"
-                            "§j" -> currentFormat["color"] = "dark_gray"
-                            "§p" -> currentFormat["color"] = "gold"
-                            "§q" -> currentFormat["color"] = "green"
-                            "§s" -> currentFormat["color"] = "aqua"
-                            "§t" -> currentFormat["color"] = "dark_blue"
-                            "§u" -> currentFormat["color"] = "light_purple"
-                            "§v" -> currentFormat["color"] = "gold"
-                        }
-                    } else {
-                        // 普通颜色代码，正常处理
-                        when (code) {
-                            "§0" -> currentFormat["color"] = "black"
-                            "§1" -> currentFormat["color"] = "dark_blue"
-                            "§2" -> currentFormat["color"] = "dark_green"
-                            "§3" -> currentFormat["color"] = "dark_aqua"
-                            "§4" -> currentFormat["color"] = "dark_red"
-                            "§5" -> currentFormat["color"] = "dark_purple"
-                            "§6" -> currentFormat["color"] = "gold"
-                            "§7" -> currentFormat["color"] = "gray"
-                            "§8" -> currentFormat["color"] = "dark_gray"
-                            "§9" -> currentFormat["color"] = "blue"
-                            "§a" -> currentFormat["color"] = "green"
-                            "§b" -> currentFormat["color"] = "aqua"
-                            "§c" -> currentFormat["color"] = "red"
-                            "§d" -> currentFormat["color"] = "light_purple"
-                            "§e" -> currentFormat["color"] = "yellow"
-                            "§f" -> currentFormat["color"] = "white"
-                        }
+                if (code[1] in "0123456789abcdef") {
+                    // 普通颜色代码，正常处理
+                    // 注意：基岩版独占颜色代码（§g, §h, §i, §j, §p, §q, §s, §t, §u, §v）
+                    // 已经在预处理步骤转换为普通颜色代码，这里不需要特殊处理
+                    when (code) {
+                        "§0" -> currentFormat["color"] = "black"
+                        "§1" -> currentFormat["color"] = "dark_blue"
+                        "§2" -> currentFormat["color"] = "dark_green"
+                        "§3" -> currentFormat["color"] = "dark_aqua"
+                        "§4" -> currentFormat["color"] = "dark_red"
+                        "§5" -> currentFormat["color"] = "dark_purple"
+                        "§6" -> currentFormat["color"] = "gold"
+                        "§7" -> currentFormat["color"] = "gray"
+                        "§8" -> currentFormat["color"] = "dark_gray"
+                        "§9" -> currentFormat["color"] = "blue"
+                        "§a" -> currentFormat["color"] = "green"
+                        "§b" -> currentFormat["color"] = "aqua"
+                        "§c" -> currentFormat["color"] = "red"
+                        "§d" -> currentFormat["color"] = "light_purple"
+                        "§e" -> currentFormat["color"] = "yellow"
+                        "§f" -> currentFormat["color"] = "white"
                     }
                 }
                 // §m_f/§m_c/§n_f/§n_c格式（优先处理，因为它们是4字符代码）
