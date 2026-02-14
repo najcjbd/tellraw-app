@@ -397,7 +397,7 @@ object TextFormatter {
                         
                     if (formatsMatch) {
                         // 格式相同，合并文本
-                        extraParts[extraParts.size - 1] = lastPart + ("text" to ((lastPart["text"] as? String) ?: "" + textContent))
+                        extraParts[extraParts.size - 1] = lastPart + ("text" to (((lastPart["text"] as? String) ?: "") + textContent))
                     } else {
                         // 格式不同，添加新部分
                         val newPart = mutableMapOf<String, Any>("text" to textContent)
