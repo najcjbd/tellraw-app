@@ -1,6 +1,7 @@
 package com.tellraw.app.data.repository
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -33,15 +34,16 @@ class HistoryRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
+        private const val TAG = "HistoryRepository"
         private const val DEFAULT_FILENAME = "TellrawCommand.txt"
         private const val CONFIG_FILENAME = "tellraw_config.json"
         private const val DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
         
         // 特殊符号：用于标记历史记录的开始和结束
-        // \u200B = 零宽度空格（Zero Width Space）
-        // \u200C = 零宽度非连接符（Zero Width Non-Joiner）
-        private const val START_MARKER = " \u200B"
-        private const val END_MARKER = " \u200C"
+        // \u200B = 零宽度空格（Zero Width Space）- 不可见
+        // \u200C = 零宽度非连接符（Zero Width Non-Joiner）- 不可见
+        private const val START_MARKER = "\u200B"
+        private const val END_MARKER = "\u200C"
     }
     
     private val dateFormat = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
@@ -58,6 +60,9 @@ class HistoryRepository @Inject constructor(
     private val _historyList = MutableStateFlow<List<HistoryItem>>(emptyList())
     val historyList: Flow<List<HistoryItem>> = _historyList.asStateFlow()
     
+    // 配置文件最后修改时间缓存
+    private var _configFileLastModified = 0L
+    
     /**
      * 初始化配置
      */
@@ -68,19 +73,24 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 加载配置
-     * 每次调用都会从配置文件重新读取，确保与 SettingsRepository 同步
+     * 只有当配置文件被修改时才重新读取，避免不必要的文件 I/O
      */
     suspend fun loadConfig() {
         withContext(Dispatchers.IO) {
             try {
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
                 if (configFile.exists()) {
-                    val json = configFile.readText()
-                    val storageUri = extractJsonValue(json, "history_storage_uri")
-                    val storageFilename = extractJsonValue(json, "history_storage_filename")
+                    val lastModified = configFile.lastModified()
+                    // 只有当配置文件被修改时才重新加载
+                    if (lastModified > _configFileLastModified) {
+                        val json = configFile.readText()
+                        val storageUri = extractJsonValue(json, "history_storage_uri")
+                        val storageFilename = extractJsonValue(json, "history_storage_filename")
 
-                    _storageUri.value = storageUri?.takeIf { it.isNotEmpty() }
-                    _storageFilename.value = storageFilename?.takeIf { it.isNotEmpty() } ?: DEFAULT_FILENAME
+                        _storageUri.value = storageUri?.takeIf { it.isNotEmpty() }
+                        _storageFilename.value = storageFilename?.takeIf { it.isNotEmpty() } ?: DEFAULT_FILENAME
+                        _configFileLastModified = lastModified
+                    }
                 }
             } catch (e: Exception) {
                 // 加载失败，使用默认值
@@ -214,10 +224,10 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 解析历史记录内容（新格式）
-     * 格式：时间:年:月:日 时:分:秒 \u200B
-     * 输入文本:输入的文本
-     * JAVA版输出:JAVA版的指令
-     * 基岩版输出:基岩版的指令 \u200C
+     * 格式：\u200B时间:年:月:日 时:分:秒
+     *  输入文本:输入的文本
+     *  JAVA版输出:JAVA版的指令
+     *  基岩版输出:基岩版的指令\u200C
      */
     private fun parseHistoryContent(content: String): List<HistoryItem> {
         val history = mutableListOf<HistoryItem>()
@@ -389,10 +399,10 @@ class HistoryRepository @Inject constructor(
         
         for (item in sortedList) {
             val timeText = dateFormat.format(Date(item.timestamp))
-            content.append("时间:$timeText$START_MARKER\n")
-            content.append("输入文本:").append(item.message).append("\n")
-            content.append("JAVA版输出:").append(item.javaCommand).append("\n")
-            content.append("基岩版输出:").append(item.bedrockCommand).append(END_MARKER).append("\n\n")
+            content.append("${START_MARKER}时间:$timeText\n")
+            content.append(" 输入文本:").append(item.message).append("\n")
+            content.append(" JAVA版输出:").append(item.javaCommand).append("\n")
+            content.append(" 基岩版输出:").append(item.bedrockCommand).append(END_MARKER).append("\n\n")
         }
         
         return content.toString()
@@ -421,14 +431,14 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 构建单个历史记录项的内容
-     * 新格式：时间:年:月:日 时:分:秒 \u200B
-     * 输入文本:输入的文本
-     * JAVA版输出:JAVA版的指令
-     * 基岩版输出:基岩版的指令 \u200C
+     * 新格式：\u200B时间:年:月:日 时:分:秒
+     *  输入文本:输入的文本
+     *  JAVA版输出:JAVA版的指令
+     *  基岩版输出:基岩版的指令\u200C
      */
     fun buildSingleHistoryItem(item: HistoryItem): String {
         val timeText = dateFormat.format(Date(item.timestamp))
-        return "时间:$timeText$START_MARKER\n输入文本:${item.message}\nJAVA版输出:${item.javaCommand}\n基岩版输出:${item.bedrockCommand}$END_MARKER\n\n"
+        return "${START_MARKER}时间:$timeText\n 输入文本:${item.message}\n JAVA版输出:${item.javaCommand}\n 基岩版输出:${item.bedrockCommand}$END_MARKER\n\n"
     }
     
     /**
@@ -440,19 +450,59 @@ class HistoryRepository @Inject constructor(
                 val file = getHistoryFile() ?: return@withContext
                 if (!file.exists()) return@withContext
                 
+                val timeText = dateFormat.format(Date(item.timestamp))
+                Log.d(TAG, "开始删除历史记录: 时间=$timeText, 选择器=${item.selector}")
+                
                 var content = file.readText()
                 val itemContent = buildSingleHistoryItem(item)
+                val originalLength = content.length
                 
-                // 删除匹配的内容
+                // 使用正则表达式匹配并删除记录
+                // 首先尝试精确匹配
                 if (itemContent in content) {
+                    Log.d(TAG, "精确匹配成功")
                     content = content.replace(itemContent, "")
+                    // 清理多余的空行
+                    content = content.replace(Regex("\n{3,}"), "\n\n")
                     file.writeText(content)
+                    Log.d(TAG, "删除成功: 文件大小从 $originalLength 减少到 ${content.length}")
+                } else {
+                    // 如果精确匹配失败，尝试使用更精确的正则表达式匹配
+                    // 包含时间戳、选择器和消息哈希，确保唯一性
+                    val selectorHash = item.selector.hashCode()
+                    val messageHash = item.message.hashCode()
+                    
+                    Log.d(TAG, "精确匹配失败，尝试正则表达式匹配: selectorHash=$selectorHash, messageHash=$messageHash")
+                    
+                    // 构建更精确的正则表达式：匹配 START_MARKER + 时间 + 选择器特征 + 任意内容 + END_MARKER
+                    val pattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?selector:[\\s\\S]*?$END_MARKER")
+                    val newContent = pattern.replace(content, "")
+                    
+                    if (newContent != content) {
+                        // 匹配成功
+                        Log.d(TAG, "正则表达式匹配成功")
+                        content = newContent
+                        // 清理多余的空行
+                        content = content.replace(Regex("\n{3,}"), "\n\n")
+                        file.writeText(content)
+                        Log.d(TAG, "删除成功: 文件大小从 $originalLength 减少到 ${content.length}")
+                    } else {
+                        // 如果还是匹配失败，尝试只使用时间戳匹配（最后手段）
+                        Log.d(TAG, "正则表达式匹配失败，尝试时间戳匹配")
+                        val fallbackPattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?$END_MARKER")
+                        content = fallbackPattern.replace(content, "")
+                        // 清理多余的空行
+                        content = content.replace(Regex("\n{3,}"), "\n\n")
+                        file.writeText(content)
+                        Log.d(TAG, "时间戳匹配完成: 文件大小从 $originalLength 减少到 ${content.length}")
+                    }
                 }
                 
                 // 重新加载历史记录
                 loadHistory()
+                Log.d(TAG, "重新加载历史记录完成")
             } catch (e: Exception) {
-                // 删除失败
+                Log.e(TAG, "删除历史记录失败", e)
             }
         }
     }

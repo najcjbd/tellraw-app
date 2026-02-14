@@ -723,6 +723,7 @@ fun SettingsDialog(
 @Composable
 fun HistoryDialog(
     historyList: List<com.tellraw.app.data.repository.HistoryItem>,
+    searchResults: List<com.tellraw.app.data.repository.HistoryItem> = emptyList(),
     onDismiss: () -> Unit,
     onLoadHistory: (com.tellraw.app.data.repository.HistoryItem) -> Unit,
     onDeleteHistory: (com.tellraw.app.data.repository.HistoryItem) -> Unit,
@@ -733,6 +734,9 @@ fun HistoryDialog(
     var searchQuery by remember { mutableStateOf("") }
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    // 根据搜索查询决定显示哪个列表
+    val displayedList = if (searchQuery.isEmpty()) historyList else searchResults
     
     if (isLandscape) {
         // 横屏：侧边栏布局
@@ -815,7 +819,7 @@ fun HistoryDialog(
                 )
                 
                 // 历史记录列表 - 增大宽度
-                if (historyList.isEmpty()) {
+                if (displayedList.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -847,7 +851,10 @@ fun HistoryDialog(
                             .padding(horizontal = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        items(historyList) { history ->
+                        items(
+                            items = displayedList,
+                            key = { it.timestamp.toString() + it.selector + it.message.hashCode() }
+                        ) { history ->
                             HistoryItem(
                                 history = history,
                                 onLoad = { onLoadHistory(history) },
@@ -869,7 +876,7 @@ fun HistoryDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (historyList.isNotEmpty()) {
+                        if (displayedList.isNotEmpty()) {
                             OutlinedButton(
                                 onClick = {
                                     onClearAll()
@@ -938,7 +945,7 @@ fun HistoryDialog(
                         }
                     )
                     
-                    if (historyList.isEmpty()) {
+                    if (displayedList.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -967,7 +974,10 @@ fun HistoryDialog(
                             modifier = Modifier.heightIn(max = 400.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(historyList) { history ->
+                            items(
+                                items = displayedList,
+                                key = { it.timestamp.toString() + it.selector + it.message.hashCode() }
+                            ) { history ->
                                 HistoryItem(
                                     history = history,
                                     onLoad = { onLoadHistory(history) },
@@ -982,7 +992,7 @@ fun HistoryDialog(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (historyList.isNotEmpty()) {
+                    if (displayedList.isNotEmpty()) {
                         TextButton(
                             onClick = {
                                 onClearAll()

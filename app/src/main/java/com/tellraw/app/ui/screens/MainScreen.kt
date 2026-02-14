@@ -80,6 +80,7 @@ fun MainScreen(
     
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
+    val searchResults by viewModel.searchResults.collectAsState(initial = emptyList())
     val showHistoryDialog = remember { mutableStateOf(false) }
     val showSettingsDialog = remember { mutableStateOf(false) }
 
@@ -123,6 +124,7 @@ fun MainScreen(
     if (showHistoryDialog.value) {
         HistoryDialog(
             historyList = commandHistory,
+            searchResults = searchResults,
             onDismiss = { showHistoryDialog.value = false },
             onLoadHistory = { history ->
                 viewModel.loadFromHistory(history)
