@@ -1151,6 +1151,45 @@ class TextFormatterTest {
     }
 
     @Test
+    fun testConvertToJavaJson_15a() {
+        // 第三个基岩颜色代码 - 验证文本合并逻辑
+        val json = TextFormatter.convertToJavaJson("§gh§hi§ig")
+        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
+        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("g"))
+        assertTrue("应包含合并的文本ig", json.contains("\"ig\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_15b() {
+        // 多个基岩颜色代码 - 验证连续相同颜色合并
+        val json = TextFormatter.convertToJavaJson("§gh§hi§ik§qp")
+        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
+        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("k") && json.contains("p"))
+        assertTrue("应包含合并的文本ik", json.contains("\"ik\""))
+    }
+
+    @Test
+    fun testConvertToJavaJson_15c() {
+        // 连续基岩颜色代码 - 验证多段相同颜色合并
+        val json = TextFormatter.convertToJavaJson("§g§h§i§j§p§q")
+        assertTrue("应包含多个extra部分", json.contains("\"extra\""))
+        assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("j") && json.contains("p") && json.contains("q"))
+    }
+
+    @Test
+    fun testConvertToJavaJson_15d() {
+        // 混合通用颜色和基岩颜色代码
+        val json = TextFormatter.convertToJavaJson("§a绿色§g金色§b青色")
+        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
+        assertTrue("应包含aqua颜色", json.contains("\"aqua\""))
+        assertTrue("应包含所有文本字符", json.contains("绿色") && json.contains("金色") && json.contains("青色"))
+    }
+
+    @Test
     fun testConvertToJavaJson_16() {
         // 所有格式代码
         val json = TextFormatter.convertToJavaJson("§l粗体§m删除线§n下划线§o斜体§k混乱")
