@@ -1173,10 +1173,12 @@ class TextFormatterTest {
 
     @Test
     fun testConvertToJavaJson_15c() {
-        // 连续基岩颜色代码 - 验证多段相同颜色合并
-        val json = TextFormatter.convertToJavaJson("§g§h§i§j§p§q")
+        // 连续基岩颜色代码带文本 - 验证多段相同颜色合并
+        val json = TextFormatter.convertToJavaJson("§g金§h白§i浅§j深§p橙§q绿")
         assertTrue("应包含多个extra部分", json.contains("\"extra\""))
-        assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("j") && json.contains("p") && json.contains("q"))
+        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
+        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含所有文本字符", json.contains("金") && json.contains("白") && json.contains("浅") && json.contains("深") && json.contains("橙") && json.contains("绿"))
     }
 
     @Test
