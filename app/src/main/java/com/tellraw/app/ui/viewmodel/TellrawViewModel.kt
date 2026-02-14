@@ -40,68 +40,6 @@ class TellrawViewModel @Inject constructor(
     private val _selectorInput = MutableStateFlow("")
     val selectorInput: StateFlow<String> = _selectorInput.asStateFlow()
     
-    /**
-     * 初始化版本检查和加载设置
-     */
-    fun initialize() {
-        initializeVersionCheck()
-        viewModelScope.launch {
-            // 从JSON文件加载配置并获取设置值
-            val loadedSettings = settingsRepository.loadConfig()
-            
-            // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
-            val historyStorageUri = loadedSettings.historyStorageUri
-            if (historyStorageUri != null && !hasStoragePermission()) {
-                settingsRepository.setHistoryStorageUri("")
-                _historyStorageUri.value = null
-            } else {
-                _historyStorageUri.value = historyStorageUri
-            }
-            
-            // 处理配置文件中的互斥逻辑
-            // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
-            // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
-            val mnHandlingMode = loadedSettings.mnHandlingMode
-            val mixedMode = loadedSettings.mnMixedMode
-            val cfEnabled = loadedSettings.mnCFEnabled
-            val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
-            
-            if (enabledCount >= 2) {
-                // 两个及以上开启，只保留"选择§m/§n的处理"
-                settingsRepository.setMNMixedMode(false)
-                settingsRepository.setMNCFEnabled(false)
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = false
-                // 保留原有的mn_handling_mode
-                _useJavaFontStyle.value = mnHandlingMode
-            } else if (mixedMode) {
-                // 只开启混合模式
-                _mnMixedMode.value = true
-                _mnCFEnabled.value = false
-                _useJavaFontStyle.value = true // 默认值，但UI中不显示
-            } else if (cfEnabled) {
-                // 只开启§m/§n_c/f
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = true
-                _useJavaFontStyle.value = true // 默认值，但UI中不显示
-            } else {
-                // 都没开启时，使用原有的mn_handling_mode
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = false
-                _useJavaFontStyle.value = mnHandlingMode
-            }
-            
-            // 加载JAVA/基岩混合模式
-            _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
-            
-            // 加载历史记录文件名
-            _historyStorageFilename.value = loadedSettings.historyStorageFilename
-            
-            // 加载历史记录
-            historyRepository.init()
-        }
-    }
-    
     private val _messageInput = MutableStateFlow("")
     val messageInput: StateFlow<String> = _messageInput.asStateFlow()
     
@@ -129,9 +67,88 @@ class TellrawViewModel @Inject constructor(
     private val _javaBedrockMixedMode = MutableStateFlow(false)
     val javaBedrockMixedMode: StateFlow<Boolean> = _javaBedrockMixedMode.asStateFlow()
     
+    // 初始化标志，防止在屏幕旋转时重复初始化
+    private var isInitialized = false
+    
     /**
-     * 加载用户设置
+     * 初始化版本检查和加载设置
      */
+    fun initialize() {
+        if (isInitialized) {
+            android.util.Log.d("TellrawViewModel", "initialize() already called, skipping")
+            // 已经初始化过，直接返回
+            return
+        }
+        android.util.Log.d("TellrawViewModel", "initialize() called for the first time")
+        isInitialized = true
+        
+        initializeVersionCheck()
+        viewModelScope.launch {
+            android.util.Log.d("TellrawViewModel", "Starting to load config")
+            // 从JSON文件加载配置并获取设置值
+            val loadedSettings = settingsRepository.loadConfig()
+            
+            android.util.Log.d("TellrawViewModel", "Loaded settings: mixedMode=${loadedSettings.mnMixedMode}, cfEnabled=${loadedSettings.mnCFEnabled}, mnHandlingMode=${loadedSettings.mnHandlingMode}")
+            
+            // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
+            val historyStorageUri = loadedSettings.historyStorageUri
+            if (historyStorageUri != null && !hasStoragePermission()) {
+                settingsRepository.setHistoryStorageUri("")
+                _historyStorageUri.value = null
+            } else {
+                _historyStorageUri.value = historyStorageUri
+            }
+            
+            // 处理配置文件中的互斥逻辑
+            // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
+            // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
+            val mnHandlingMode = loadedSettings.mnHandlingMode
+            val mixedMode = loadedSettings.mnMixedMode
+            val cfEnabled = loadedSettings.mnCFEnabled
+            val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
+            
+            android.util.Log.d("TellrawViewModel", "enabledCount=$enabledCount, mixedMode=$mixedMode, cfEnabled=$cfEnabled")
+            
+            if (enabledCount >= 2) {
+                // 两个及以上开启，只保留"选择§m/§n的处理"
+                settingsRepository.setMNMixedMode(false)
+                settingsRepository.setMNCFEnabled(false)
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = false
+                // 保留原有的mn_handling_mode
+                _useJavaFontStyle.value = mnHandlingMode
+                android.util.Log.d("TellrawViewModel", "Mode: enabledCount>=2, mnMixedMode=false, mnCFEnabled=false, useJavaFontStyle=$mnHandlingMode")
+            } else if (mixedMode) {
+                // 只开启混合模式
+                _mnMixedMode.value = true
+                _mnCFEnabled.value = false
+                _useJavaFontStyle.value = true // 默认值，但UI中不显示
+                android.util.Log.d("TellrawViewModel", "Mode: mixedMode only, mnMixedMode=true, mnCFEnabled=false, useJavaFontStyle=true")
+            } else if (cfEnabled) {
+                // 只开启§m/§n_c/f
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = true
+                _useJavaFontStyle.value = true // 默认值，但UI中不显示
+                android.util.Log.d("TellrawViewModel", "Mode: cfEnabled only, mnMixedMode=false, mnCFEnabled=true, useJavaFontStyle=true")
+            } else {
+                // 都没开启时，使用原有的mn_handling_mode
+                _mnMixedMode.value = false
+                _mnCFEnabled.value = false
+                _useJavaFontStyle.value = mnHandlingMode
+                android.util.Log.d("TellrawViewModel", "Mode: none enabled, mnMixedMode=false, mnCFEnabled=false, useJavaFontStyle=$mnHandlingMode")
+            }
+            
+            // 加载JAVA/基岩混合模式
+            _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
+            
+            // 加载历史记录文件名
+            _historyStorageFilename.value = loadedSettings.historyStorageFilename
+            
+            // 加载历史记录
+            historyRepository.init()
+        }
+    }
+    
     /**
      * 检查是否有存储权限
      */
