@@ -68,8 +68,9 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 加载配置
+     * 每次调用都会从配置文件重新读取，确保与 SettingsRepository 同步
      */
-    private suspend fun loadConfig() {
+    suspend fun loadConfig() {
         withContext(Dispatchers.IO) {
             try {
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
@@ -77,7 +78,7 @@ class HistoryRepository @Inject constructor(
                     val json = configFile.readText()
                     val storageUri = extractJsonValue(json, "history_storage_uri")
                     val storageFilename = extractJsonValue(json, "history_storage_filename")
-                    
+
                     _storageUri.value = storageUri?.takeIf { it.isNotEmpty() }
                     _storageFilename.value = storageFilename?.takeIf { it.isNotEmpty() } ?: DEFAULT_FILENAME
                 }
@@ -127,10 +128,13 @@ class HistoryRepository @Inject constructor(
     
     /**
      * 获取历史记录文件
+     * 每次调用都会从配置文件重新加载存储路径，确保与 SettingsRepository 同步
      * 优先使用用户选择的目录，如果文件不存在则创建它
      * 如果用户没有选择目录或没有权限，返回沙盒目录的文件
      */
-    private fun getHistoryFile(): File? {
+    private suspend fun getHistoryFile(): File? {
+        // 每次获取文件时都重新加载配置，确保存储路径是最新的
+        loadConfig()
         val uri = _storageUri.value
         val filename = _storageFilename.value
         
@@ -156,11 +160,10 @@ class HistoryRepository @Inject constructor(
                     sandboxFile
                 }
             } else {
-                // 检查是否有写权限
-                try {
-                    externalFile.writeText("")
+                // 文件已存在，检查是否有写权限
+                if (externalFile.canWrite()) {
                     externalFile
-                } catch (e: Exception) {
+                } else {
                     // 没有写权限，返回沙盒文件
                     val sandboxFile = File(context.filesDir, filename)
                     if (!sandboxFile.exists()) {
@@ -463,22 +466,21 @@ class HistoryRepository @Inject constructor(
             try {
                 val file = getHistoryFile()
                 if (file != null && file.exists()) {
-                    val content = file.readText()
+                    var content = file.readText()
                     
-                    // 按段落分割：从 \u200B 开始到 \u200C 结束
-                    val sections = content.split(START_MARKER)
-                    val newContent = StringBuilder()
+                    // 使用正则表达式删除所有从 START_MARKER 到 END_MARKER 的完整记录
+                    // 匹配模式：START_MARKER + 任意内容 + END_MARKER
+                    val pattern = Regex("$START_MARKER[\\s\\S]*?$END_MARKER")
+                    content = content.replace(pattern, "")
                     
-                    for (section in sections) {
-                        // 跳过包含结束标记的段落（应用生成的记录）
-                        if (END_MARKER !in section) {
-                            // 保留不包含特殊符号的原始内容
-                            newContent.append(section)
-                        }
-                    }
+                    // 清理多余的空行（连续的2个或更多空行替换为单个空行）
+                    content = content.replace(Regex("\n{3,}"), "\n\n")
+                    
+                    // 清理开头的空行
+                    content = content.trimStart('\n')
                     
                     // 写入清理后的内容
-                    file.writeText(newContent.toString())
+                    file.writeText(content)
                     
                     // 更新内存中的历史记录列表
                     _historyList.value = emptyList()
@@ -489,21 +491,20 @@ class HistoryRepository @Inject constructor(
                     // 没有配置存储目录，检查是否需要清空沙盒文件
                     val sandboxFile = File(context.filesDir, DEFAULT_FILENAME)
                     if (sandboxFile.exists()) {
-                        val content = sandboxFile.readText()
+                        var content = sandboxFile.readText()
                         
-                        // 按段落分割
-                        val sections = content.split(START_MARKER)
-                        val newContent = StringBuilder()
+                        // 使用正则表达式删除所有从 START_MARKER 到 END_MARKER 的完整记录
+                        val pattern = Regex("$START_MARKER[\\s\\S]*?$END_MARKER")
+                        content = content.replace(pattern, "")
                         
-                        for (section in sections) {
-                            // 跳过包含结束标记的段落
-                            if (END_MARKER !in section) {
-                                newContent.append(section)
-                            }
-                        }
+                        // 清理多余的空行
+                        content = content.replace(Regex("\n{3,}"), "\n\n")
+                        
+                        // 清理开头的空行
+                        content = content.trimStart('\n')
                         
                         // 写入清理后的内容
-                        sandboxFile.writeText(newContent.toString())
+                        sandboxFile.writeText(content)
                         
                         // 更新内存中的历史记录列表
                         _historyList.value = emptyList()

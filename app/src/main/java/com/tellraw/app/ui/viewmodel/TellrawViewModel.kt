@@ -966,33 +966,21 @@ class TellrawViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setHistoryStorageUri(uri)
             _historyStorageUri.value = uri
-            
+
+            // 检查文件状态
             val filename = _historyStorageFilename.value
             val file = java.io.File(uri, filename)
             
             if (file.exists()) {
-                // 文件已存在，在文件开头添加空行（如果是空的则添加）
-                try {
-                    val currentContent = file.readText()
-                    if (currentContent.isNotEmpty() && !currentContent.startsWith("\n")) {
-                        file.writeText("\n" + currentContent)
-                    }
-                    _writeFileMessage.value = "文件已存在，将使用该文件存储历史记录"
-                } catch (e: Exception) {
-                    _writeFileMessage.value = "文件已存在，但无法读取内容，将直接使用该文件存储历史记录"
-                }
+                _writeFileMessage.value = "存储目录已设置，目录下已存在同名文件：$filename"
             } else {
-                // 文件不存在，创建它
-                try {
-                    file.createNewFile()
-                    _writeFileMessage.value = "成功使用该目录，文件已创建"
-                } catch (e: Exception) {
-                    _writeFileMessage.value = "创建文件失败：${e.message}，将使用应用沙盒存储"
+                val dir = java.io.File(uri)
+                if (dir.exists() && dir.isDirectory && dir.canWrite()) {
+                    _writeFileMessage.value = "存储目录已设置：$uri，可写入。点击「选择/创建此文件」按钮创建文件"
+                } else {
+                    _writeFileMessage.value = "存储目录已设置，但可能没有写权限或目录不存在。点击「选择/创建此文件」按钮尝试创建文件"
                 }
             }
-            
-            // 重新加载历史记录
-            loadHistoryStorageSettings()
         }
     }
     
@@ -1020,23 +1008,19 @@ class TellrawViewModel @Inject constructor(
             val cleanFilename = filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
             settingsRepository.setHistoryStorageFilename(cleanFilename)
             _historyStorageFilename.value = cleanFilename
-            
+
+            // 检查文件状态
             val storagePath = _historyStorageUri.value
             if (storagePath != null) {
                 val file = java.io.File(storagePath, cleanFilename)
                 
                 if (file.exists()) {
-                    // 文件已存在
-                    _writeFileMessage.value = "文件已存在，将使用该文件存储历史记录"
+                    _writeFileMessage.value = "文件名已设置为：$cleanFilename，该文件已存在"
                 } else {
-                    // 文件不存在，创建它
-                    try {
-                        file.createNewFile()
-                        _writeFileMessage.value = "成功使用该目录，文件已创建"
-                    } catch (e: Exception) {
-                        _writeFileMessage.value = "创建文件失败：${e.message}，将使用应用沙盒存储"
-                    }
+                    _writeFileMessage.value = "文件名已设置为：$cleanFilename，文件尚未创建。点击「选择/创建此文件」按钮创建文件"
                 }
+            } else {
+                _writeFileMessage.value = "文件名已设置为：$cleanFilename，但未设置存储目录。请先选择存储目录"
             }
         }
     }
