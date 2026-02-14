@@ -1,14 +1,12 @@
 package com.tellraw.app.util
 
 import android.content.Context
-import android.util.Log
 import com.tellraw.app.R
 import com.tellraw.app.model.*
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
 object SelectorConverter {
-    private const val TAG = "SelectorConverter"
     
     // 控制是否使用JAVA/基岩混合模式
     // true: 当同时存在Java版和基岩版特有参数时，调用convertForMixedMode

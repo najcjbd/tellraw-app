@@ -1,7 +1,6 @@
 package com.tellraw.app.data.repository
 
 import android.content.Context
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -451,7 +450,6 @@ class HistoryRepository @Inject constructor(
                 if (!file.exists()) return@withContext
                 
                 val timeText = dateFormat.format(Date(item.timestamp))
-                Log.d(TAG, "开始删除历史记录: 时间=$timeText, 选择器=${item.selector}")
                 
                 var content = file.readText()
                 val itemContent = buildSingleHistoryItem(item)
@@ -460,19 +458,15 @@ class HistoryRepository @Inject constructor(
                 // 使用正则表达式匹配并删除记录
                 // 首先尝试精确匹配
                 if (itemContent in content) {
-                    Log.d(TAG, "精确匹配成功")
                     content = content.replace(itemContent, "")
                     // 清理多余的空行
                     content = content.replace(Regex("\n{3,}"), "\n\n")
                     file.writeText(content)
-                    Log.d(TAG, "删除成功: 文件大小从 $originalLength 减少到 ${content.length}")
                 } else {
                     // 如果精确匹配失败，尝试使用更精确的正则表达式匹配
                     // 包含时间戳、选择器和消息哈希，确保唯一性
                     val selectorHash = item.selector.hashCode()
                     val messageHash = item.message.hashCode()
-                    
-                    Log.d(TAG, "精确匹配失败，尝试正则表达式匹配: selectorHash=$selectorHash, messageHash=$messageHash")
                     
                     // 构建更精确的正则表达式：匹配 START_MARKER + 时间 + 选择器特征 + 任意内容 + END_MARKER
                     val pattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?selector:[\\s\\S]*?$END_MARKER")
@@ -480,29 +474,24 @@ class HistoryRepository @Inject constructor(
                     
                     if (newContent != content) {
                         // 匹配成功
-                        Log.d(TAG, "正则表达式匹配成功")
                         content = newContent
                         // 清理多余的空行
                         content = content.replace(Regex("\n{3,}"), "\n\n")
                         file.writeText(content)
-                        Log.d(TAG, "删除成功: 文件大小从 $originalLength 减少到 ${content.length}")
                     } else {
                         // 如果还是匹配失败，尝试只使用时间戳匹配（最后手段）
-                        Log.d(TAG, "正则表达式匹配失败，尝试时间戳匹配")
                         val fallbackPattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?$END_MARKER")
                         content = fallbackPattern.replace(content, "")
                         // 清理多余的空行
                         content = content.replace(Regex("\n{3,}"), "\n\n")
                         file.writeText(content)
-                        Log.d(TAG, "时间戳匹配完成: 文件大小从 $originalLength 减少到 ${content.length}")
                     }
                 }
                 
                 // 重新加载历史记录
                 loadHistory()
-                Log.d(TAG, "重新加载历史记录完成")
             } catch (e: Exception) {
-                Log.e(TAG, "删除历史记录失败", e)
+                // 删除历史记录失败
             }
         }
     }

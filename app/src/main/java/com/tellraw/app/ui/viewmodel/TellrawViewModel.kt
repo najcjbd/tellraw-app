@@ -72,7 +72,6 @@ class TellrawViewModel @Inject constructor(
     
     // 在构造函数中初始化配置
     init {
-        android.util.Log.d("TellrawViewModel", "ViewModel constructor called")
         loadConfiguration()
     }
     
@@ -81,19 +80,14 @@ class TellrawViewModel @Inject constructor(
      */
     private fun loadConfiguration() {
         if (isInitialized) {
-            android.util.Log.d("TellrawViewModel", "loadConfiguration() already called, skipping")
             return
         }
-        android.util.Log.d("TellrawViewModel", "loadConfiguration() called for the first time")
         isInitialized = true
         
         initializeVersionCheck()
         viewModelScope.launch {
-            android.util.Log.d("TellrawViewModel", "Starting to load config")
             // 从JSON文件加载配置并获取设置值
             val loadedSettings = settingsRepository.loadConfig()
-            
-            android.util.Log.d("TellrawViewModel", "Loaded settings: mixedMode=${loadedSettings.mnMixedMode}, cfEnabled=${loadedSettings.mnCFEnabled}, mnHandlingMode=${loadedSettings.mnHandlingMode}")
             
             // 检查历史记录存储设置，如果配置了存储位置但没有权限，则清空设置
             val historyStorageUri = loadedSettings.historyStorageUri
@@ -112,8 +106,6 @@ class TellrawViewModel @Inject constructor(
             val cfEnabled = loadedSettings.mnCFEnabled
             val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
             
-            android.util.Log.d("TellrawViewModel", "enabledCount=$enabledCount, mixedMode=$mixedMode, cfEnabled=$cfEnabled")
-            
             if (enabledCount >= 2) {
                 // 两个及以上开启，只保留"选择§m/§n的处理"
                 settingsRepository.setMNMixedMode(false)
@@ -122,25 +114,21 @@ class TellrawViewModel @Inject constructor(
                 _mnCFEnabled.value = false
                 // 保留原有的mn_handling_mode
                 _useJavaFontStyle.value = mnHandlingMode
-                android.util.Log.d("TellrawViewModel", "Mode: enabledCount>=2, mnMixedMode=false, mnCFEnabled=false, useJavaFontStyle=$mnHandlingMode")
             } else if (mixedMode) {
                 // 只开启混合模式
                 _mnMixedMode.value = true
                 _mnCFEnabled.value = false
                 _useJavaFontStyle.value = true // 默认值，但UI中不显示
-                android.util.Log.d("TellrawViewModel", "Mode: mixedMode only, mnMixedMode=true, mnCFEnabled=false, useJavaFontStyle=true")
             } else if (cfEnabled) {
                 // 只开启§m/§n_c/f
                 _mnMixedMode.value = false
                 _mnCFEnabled.value = true
                 _useJavaFontStyle.value = true // 默认值，但UI中不显示
-                android.util.Log.d("TellrawViewModel", "Mode: cfEnabled only, mnMixedMode=false, mnCFEnabled=true, useJavaFontStyle=true")
             } else {
                 // 都没开启时，使用原有的mn_handling_mode
                 _mnMixedMode.value = false
                 _mnCFEnabled.value = false
                 _useJavaFontStyle.value = mnHandlingMode
-                android.util.Log.d("TellrawViewModel", "Mode: none enabled, mnMixedMode=false, mnCFEnabled=false, useJavaFontStyle=$mnHandlingMode")
             }
             
             // 加载JAVA/基岩混合模式
@@ -158,7 +146,6 @@ class TellrawViewModel @Inject constructor(
      * 初始化版本检查和加载设置（保留向后兼容）
      */
     fun initialize() {
-        android.util.Log.d("TellrawViewModel", "initialize() called, delegating to loadConfiguration()")
         loadConfiguration()
     }
     
