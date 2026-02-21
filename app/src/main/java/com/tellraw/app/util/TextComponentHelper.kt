@@ -122,20 +122,45 @@ object TextComponentHelper {
         val typeKey = parts[0]
         val type = ComponentType.values().find { it.key == typeKey } ?: return null
         
-        // 主内容
-        val mainContent = if (parts.size >= 2) parts[1] else ""
+        // 查找主内容（到第一个副组件开始标记为止）
+        val mainContentEndIndex = content.indexOf(MARKER_START.toString() + MARKER_END.toString())
+        val mainContent = if (mainContentEndIndex == -1) {
+            // 没有副组件，整个content都是mainContent
+            if (parts.size >= 2) parts[1] else ""
+        } else {
+            // 有副组件，mainContent是第一个副组件之前的部分
+            parts[1]
+        }
         
-        // 解析副组件（每两个元素是一对：类型+内容）
+        // 解析副组件
         val subComponents = mutableListOf<SubComponent>()
-        var i = 2
-        while (i + 1 < parts.size) {
-            val subTypeKey = parts[i]
-            val subContent = parts[i + 1]
+        var searchStart = mainContentEndIndex
+        while (searchStart != -1) {
+            // 查找副组件开始标记：MARKER_START + MARKER_END + subTypeKey + MARKER_END
+            val subComponentStart = content.indexOf(MARKER_START.toString() + MARKER_END.toString(), searchStart)
+            if (subComponentStart == -1) break
+            
+            // 查找副组件类型
+            val typeStart = subComponentStart + 2  // MARKER_START + MARKER_END
+            val typeEnd = content.indexOf(MARKER_END.toString(), typeStart)
+            if (typeEnd == -1) break
+            
+            val subTypeKey = content.substring(typeStart, typeEnd)
             val subType = SubComponentType.values().find { it.key == subTypeKey }
-            if (subType != null) {
-                subComponents.add(SubComponent(subType, subContent))
+            if (subType == null) {
+                searchStart = typeEnd + 1
+                continue
             }
-            i += 2
+            
+            // 查找副组件内容
+            val contentStart = typeEnd + 1
+            val contentEnd = content.indexOf(MARKER_END.toString() + MARKER_END.toString(), contentStart)
+            if (contentEnd == -1) break
+            
+            val subContent = content.substring(contentStart, contentEnd)
+            subComponents.add(SubComponent(subType, subContent))
+            
+            searchStart = contentEnd + 2
         }
         
         return TextComponent(type, mainContent, subComponents)
@@ -143,12 +168,14 @@ object TextComponentHelper {
     
     /**
      * 将组件列表转换为标记文本
-     * 简化格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
+     * 格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
+     * 副组件格式：MARKER_START + MARKER_END + sub.type.key + MARKER_END + sub.content + MARKER_END + MARKER_END
+     * 这样findMatchingEndMarker就不会被副组件的开始标记误导
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
-                "$MARKER_END${sub.type.key}$MARKER_END${sub.content}$MARKER_END"
+                "$MARKER_START$MARKER_END${sub.type.key}$MARKER_END${sub.content}$MARKER_END$MARKER_END"
             }
             "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END"
         }
