@@ -320,8 +320,7 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 更新文本组件标记符（改进版，更接近updateBackendMessage的实现）
-     * 使用逐个字符处理的方式，保留旧映射中的组件类型
+     * 更新文本组件标记符（简化版，支持新的标记符格式）
      */
     private fun updateComponentMarkers(frontendMessage: String) {
         // 如果前台文本为空，清空后台文本和映射
@@ -331,13 +330,6 @@ class TellrawViewModel @Inject constructor(
             lastMessageInput = ""
             return
         }
-        
-        // 构建新的带标记符的文本
-        val newBackend = StringBuilder()
-        val newMappings = mutableListOf<ComponentMapping>()
-        
-        var frontendIndex = 0
-        var backendIndex = 0
         
         // 解析当前的带标记符文本，获取旧组件列表
         val oldComponents = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
@@ -350,65 +342,54 @@ class TellrawViewModel @Inject constructor(
             return
         }
         
-        // 遍历前台消息，逐个字符处理
-        while (frontendIndex < frontendMessage.length) {
-            // 检查当前字符是否在旧的映射范围内
-            val oldMapping = componentMappings.find { 
-                frontendIndex in it.frontendStart until it.frontendEnd 
-            }
+        // 计算前台文本和旧纯文本的长度
+        val oldPlainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
+        val oldLength = oldPlainText.length
+        val newLength = frontendMessage.length
+        
+        if (oldLength == newLength && oldPlainText == frontendMessage) {
+            // 内容相同，不更新
+            return
+        }
+        
+        // 内容不同，重新构建带标记符的文本
+        // 简化处理：将前台文本作为纯文本，并保留旧组件的类型
+        val newComponents = mutableListOf<TextComponentHelper.TextComponent>()
+        var currentPos = 0
+        
+        for (oldComponent in oldComponents) {
+            val componentLength = oldComponent.content.length + oldComponent.subComponents.sumOf { it.content.length }
             
-            if (oldMapping != null) {
-                // 在旧映射范围内，保留原有的标记符
-                val oldBackend = _messageInputWithMarkers.value
+            if (currentPos + componentLength <= newLength) {
+                // 提取新的内容
+                val newContent = frontendMessage.substring(currentPos, currentPos + oldComponent.content.length)
                 
-                // 提取旧的组件标记符（不包括内容）
-                val componentMarkerStart = oldBackend.substring(
-                    oldMapping.backendStart,
-                    oldMapping.backendStart + 1 + oldMapping.componentType.key.length + 1
-                )
-                val componentMarkerEnd = oldBackend.substring(
-                    oldMapping.backendEnd - 1 - oldMapping.componentType.key.length,
-                    oldMapping.backendEnd
-                )
+                // 提取新的副组件内容
+                val newSubComponents = oldComponent.subComponents.map { oldSub ->
+                    val subContent = frontendMessage.substring(
+                        currentPos + oldComponent.content.length,
+                        currentPos + oldComponent.content.length + oldSub.content.length
+                    )
+                    TextComponentHelper.SubComponent(oldSub.type, subContent)
+                }.toMutableList()
                 
-                // 如果是第一个字符，添加开始标记符
-                if (frontendIndex == oldMapping.frontendStart) {
-                    newBackend.append(componentMarkerStart)
-                    backendIndex += componentMarkerStart.length
-                }
-                
-                // 添加字符
-                newBackend.append(frontendMessage[frontendIndex])
-                frontendIndex++
-                backendIndex++
-                
-                // 如果是最后一个字符，添加结束标记符
-                if (frontendIndex == oldMapping.frontendEnd) {
-                    newBackend.append(componentMarkerEnd)
-                    newMappings.add(ComponentMapping(
-                        frontendStart = oldMapping.frontendStart,
-                        frontendEnd = oldMapping.frontendEnd,
-                        backendStart = oldMapping.backendStart,
-                        backendEnd = backendIndex,
-                        componentType = oldMapping.componentType
-                    ))
-                    backendIndex += componentMarkerEnd.length
-                }
-            } else {
-                // 不在旧映射范围内，作为普通文本处理
-                newBackend.append(frontendMessage[frontendIndex])
-                frontendIndex++
-                backendIndex++
+                newComponents.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
+                currentPos += componentLength
             }
         }
         
-        _messageInputWithMarkers.value = newBackend.toString()
-        componentMappings = newMappings
+        // 添加剩余的纯文本
+        if (currentPos < newLength) {
+            newComponents.add(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage.substring(currentPos)))
+        }
+        
+        _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
+        buildComponentMappings(newComponents)
         lastMessageInput = frontendMessage
     }
     
     /**
-     * 根据组件列表构建位置映射（修复索引计算错误）
+     * 根据组件列表构建位置映射（支持新的标记符格式）
      */
     private fun buildComponentMappings(components: List<TextComponentHelper.TextComponent>) {
         componentMappings.clear()
@@ -417,22 +398,26 @@ class TellrawViewModel @Inject constructor(
         var backendPos = 0
         
         for (component in components) {
-            val contentLength = component.content.length + component.subComponents.sumOf { it.content.length }
+            // 前台文本长度：主内容 + 副组件内容
+            val frontendContentLength = component.content.length + component.subComponents.sumOf { it.content.length }
             
-            // 计算标记符长度：MARKER_START(1) + type.key.length + MARKER_END(1) + MARKER_END(1) + type.key.length + MARKER_END(1)
-            val markerLength = 1 + component.type.key.length + 1 + 1 + component.type.key.length + 1
+            // 后台文本长度：MARKER_START(1) + type.key.length + MARKER_END(1) + content长度 + 副组件长度 + MARKER_END(1)
+            // 注意：副组件使用__type.key__content格式，所以副组件长度 = 2 + type.key.length + content.length
+            val subComponentBackendLength = component.subComponents.sumOf { 2 + it.type.key.length + it.content.length }
+            val backendContentLength = component.content.length + subComponentBackendLength
+            val markerLength = 1 + component.type.key.length + 1 + backendContentLength + 1
             
             // 记录映射
             componentMappings.add(ComponentMapping(
                 frontendStart = frontendPos,
-                frontendEnd = frontendPos + contentLength,
+                frontendEnd = frontendPos + frontendContentLength,
                 backendStart = backendPos,
-                backendEnd = backendPos + contentLength + markerLength,
+                backendEnd = backendPos + markerLength,
                 componentType = component.type
             ))
             
-            frontendPos += contentLength
-            backendPos += contentLength + markerLength
+            frontendPos += frontendContentLength
+            backendPos += markerLength
         }
     }
     

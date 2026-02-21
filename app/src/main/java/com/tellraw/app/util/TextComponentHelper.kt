@@ -47,6 +47,7 @@ object TextComponentHelper {
     
     /**
      * 将原始文本（带组件标记）解析为组件列表
+     * 使用字符串搜索而不是深度计数，避免副组件的MARKER_START干扰
      */
     fun parseTextComponents(text: String): List<TextComponent> {
         val components = mutableListOf<TextComponent>()
@@ -54,22 +55,61 @@ object TextComponentHelper {
         
         while (i < text.length) {
             // 查找组件开始标记
-            if (i + 1 < text.length && text[i] == MARKER_START) {
-                // 查找对应的结束标记
-                val endPos = findMatchingEndMarker(text, i)
-                if (endPos != -1) {
-                    // 提取组件内容
-                    val componentContent = text.substring(i + 1, endPos)
-                    val component = parseSingleComponent(componentContent)
-                    if (component != null) {
-                        components.add(component)
-                    }
-                    i = endPos + 1
-                } else {
-                    // 没有找到结束标记，将标记作为普通文本处理
+            if (text[i] == MARKER_START) {
+                // 查找组件类型
+                val typeEnd = text.indexOf(MARKER_END, i + 1)
+                if (typeEnd == -1) {
+                    // 没有找到类型结束标记，将标记作为普通文本处理
                     components.add(TextComponent(ComponentType.TEXT, text[i].toString()))
                     i++
+                    continue
                 }
+                
+                val typeKey = text.substring(i + 1, typeEnd)
+                val type = ComponentType.values().find { it.key == typeKey }
+                
+                if (type == null) {
+                    // 未知的组件类型，将标记作为普通文本处理
+                    components.add(TextComponent(ComponentType.TEXT, text.substring(i, typeEnd + 1)))
+                    i = typeEnd + 1
+                    continue
+                }
+                
+                // 查找组件结束标记（从typeEnd + 1开始搜索，避免误判副组件的MARKER_START）
+                // 查找格式：MARKER_END（这是组件的结束标记）
+                // 但需要确保不是副组件中的MARKER_END
+                var componentEnd = -1
+                var searchStart = typeEnd + 1
+                var depth = 0
+                
+                while (searchStart < text.length) {
+                    if (text[searchStart] == MARKER_START) {
+                        depth++
+                    } else if (text[searchStart] == MARKER_END) {
+                        if (depth == 0) {
+                            componentEnd = searchStart
+                            break
+                        } else {
+                            depth--
+                        }
+                    }
+                    searchStart++
+                }
+                
+                if (componentEnd == -1) {
+                    // 没有找到结束标记，将标记作为普通文本处理
+                    components.add(TextComponent(ComponentType.TEXT, text.substring(i)))
+                    break
+                }
+                
+                // 提取组件内容（不包括标记）
+                val componentContent = text.substring(typeEnd + 1, componentEnd)
+                val component = parseSingleComponentWithContent(type, componentContent)
+                if (component != null) {
+                    components.add(component)
+                }
+                
+                i = componentEnd + 1
             } else {
                 // 普通文本，寻找下一个组件开始标记
                 val nextStart = text.indexOf(MARKER_START, i)
@@ -93,68 +133,34 @@ object TextComponentHelper {
     }
     
     /**
-     * 查找匹配的结束标记
+     * 解析单个组件（已知组件类型）
+     * 使用简单的副组件格式：__type.key__content
      */
-    private fun findMatchingEndMarker(text: String, startPos: Int): Int {
-        var depth = 1
-        var i = startPos + 1
-        
-        while (i < text.length && depth > 0) {
-            if (text[i] == MARKER_START) {
-                depth++
-            } else if (text[i] == MARKER_END) {
-                depth--
-            }
-            i++
-        }
-        
-        return if (depth == 0) i - 1 else -1
-    }
-    
-    /**
-     * 解析单个组件
-     */
-    private fun parseSingleComponent(content: String): TextComponent? {
-        // 查找组件类型和内容
-        val parts = content.split(MARKER_END.toString()).toMutableList()
-        if (parts.size < 2) return null
-        
-        val typeKey = parts[0]
-        val type = ComponentType.values().find { it.key == typeKey } ?: return null
-        
-        // 查找主内容（到第一个副组件开始标记为止）
-        val mainContentEndIndex = content.indexOf(MARKER_START.toString() + MARKER_END.toString())
-        val mainContent = if (mainContentEndIndex == -1) {
-            // 没有副组件，整个content都是mainContent
-            if (parts.size >= 2) parts[1] else ""
-        } else {
-            // 有副组件，mainContent是第一个副组件之前的部分
-            parts[1]
-        }
-        
-        // 解析副组件
+    private fun parseSingleComponentWithContent(type: ComponentType, content: String): TextComponent? {
+        // 查找副组件
         val subComponents = mutableListOf<SubComponent>()
-        var searchStart = mainContentEndIndex
-        while (searchStart != -1) {
-            // 查找副组件开始标记：MARKER_START + MARKER_END + subTypeKey + MARKER_END
-            val subComponentStart = content.indexOf(MARKER_START.toString() + MARKER_END.toString(), searchStart)
+        var searchStart = 0
+        
+        while (searchStart < content.length) {
+            // 查找副组件开始标记：__type.key__
+            val subComponentStart = content.indexOf("__", searchStart)
             if (subComponentStart == -1) break
             
             // 查找副组件类型
-            val typeStart = subComponentStart + 2  // MARKER_START + MARKER_END
-            val typeEnd = content.indexOf(MARKER_END.toString(), typeStart)
+            val typeStart = subComponentStart + 2  // 跳过__
+            val typeEnd = content.indexOf("__", typeStart)
             if (typeEnd == -1) break
             
             val subTypeKey = content.substring(typeStart, typeEnd)
             val subType = SubComponentType.values().find { it.key == subTypeKey }
             if (subType == null) {
-                searchStart = typeEnd + 1
+                searchStart = typeEnd + 2
                 continue
             }
             
-            // 查找副组件内容
-            val contentStart = typeEnd + 1
-            val contentEnd = content.indexOf(MARKER_END.toString() + MARKER_END.toString(), contentStart)
+            // 查找副组件内容（从typeEnd + 2开始，到下一个__）
+            val contentStart = typeEnd + 2
+            val contentEnd = content.indexOf("__", contentStart)
             if (contentEnd == -1) break
             
             val subContent = content.substring(contentStart, contentEnd)
@@ -163,19 +169,31 @@ object TextComponentHelper {
             searchStart = contentEnd + 2
         }
         
+        // 提取主内容（到第一个副组件或字符串末尾）
+        val mainContent = if (subComponents.isEmpty()) {
+            content
+        } else {
+            val firstSubComponent = content.indexOf("__")
+            if (firstSubComponent == -1) {
+                content
+            } else {
+                content.substring(0, firstSubComponent)
+            }
+        }
+        
         return TextComponent(type, mainContent, subComponents)
     }
     
     /**
      * 将组件列表转换为标记文本
      * 格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
-     * 副组件格式：MARKER_START + MARKER_END + sub.type.key + MARKER_END + sub.content + MARKER_END + MARKER_END
-     * 这样findMatchingEndMarker就不会被副组件的开始标记误导
+     * 副组件格式：__type.key__content
+     * 这样parseTextComponents可以直接使用字符串搜索，而不是深度计数
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
-                "$MARKER_START$MARKER_END${sub.type.key}$MARKER_END${sub.content}$MARKER_END$MARKER_END"
+                "__${sub.type.key}__${sub.content}"
             }
             "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END"
         }
@@ -1072,11 +1090,11 @@ ComponentType.SELECTOR -> {
         // 解析组件列表
         val components = parseTextComponents(text)
         
-        // 提取纯文本内容
+        // 提取纯文本内容（包括副组件内容）
         return components.joinToString("") { component ->
             // 主内容
             val mainContent = component.content
-            // 副组件内容
+            // 副组件内容（跳过__type.key__标记，只提取内容）
             val subContent = component.subComponents.joinToString("") { it.content }
             mainContent + subContent
         }
