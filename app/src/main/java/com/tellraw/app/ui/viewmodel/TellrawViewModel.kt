@@ -226,6 +226,19 @@ class TellrawViewModel @Inject constructor(
     )
     private var mnMappings = mutableListOf<MNMapping>()
     
+    /**
+     * 文本组件位置映射（类似于MNMapping）
+     * 记录前台纯文本位置和后台带标记符文本位置的对应关系
+     */
+    private data class ComponentMapping(
+        val frontendStart: Int,        // 前台文本开始位置
+        val frontendEnd: Int,          // 前台文本结束位置
+        val backendStart: Int,         // 后台文本开始位置（包括标记符）
+        val backendEnd: Int,           // 后台文本结束位置（包括标记符）
+        val componentType: TextComponentHelper.ComponentType
+    )
+    private var componentMappings = mutableListOf<ComponentMapping>()
+    
     // 版本检查相关状态
     private val _showUpdateDialog = MutableStateFlow<GithubRelease?>(null)
     val showUpdateDialog: StateFlow<GithubRelease?> = _showUpdateDialog.asStateFlow()
@@ -282,22 +295,14 @@ class TellrawViewModel @Inject constructor(
     fun updateMessage(message: String) {
         _messageInput.value = message
         
-        // 检测是否为删除操作
-        val oldTextWithMarkers = _messageInputWithMarkers.value
-        
         // 如果关闭了"默认使用text"，需要在后台同步处理带标记符的文本
         if (!_defaultUseText.value) {
-            // 解析旧的带标记符文本
-            val oldComponents = TextComponentHelper.parseTextComponents(oldTextWithMarkers)
-            
-            // 根据新的纯文本更新组件内容，删除空组件
-            val updatedComponents = updateComponentsWithNewText(oldComponents, message)
-            
-            // 转换回带标记符的文本
-            _messageInputWithMarkers.value = TextComponentHelper.componentsToText(updatedComponents)
+            // 使用位置映射更新带标记符的文本（类似于updateBackendMessage）
+            updateComponentMarkers(message)
         } else {
             // 默认使用text模式，直接同步
             _messageInputWithMarkers.value = message
+            componentMappings.clear()
         }
         
         // 检测新增的§m和§n代码
@@ -311,42 +316,91 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 根据新的纯文本更新组件内容，删除空组件
-     * 类似于updateBackendMessage的逻辑，根据前台纯文本重建后台带标记符的文本
+     * 更新文本组件标记符（借鉴updateBackendMessage的做法）
+     * 使用位置映射来同步前台纯文本和后台带标记符文本
      */
-    private fun updateComponentsWithNewText(
-        oldComponents: List<TextComponentHelper.TextComponent>,
-        newPlainText: String
-    ): List<TextComponentHelper.TextComponent> {
-        // 如果纯文本为空，返回空列表
-        if (newPlainText.isEmpty()) {
-            return emptyList()
+    private fun updateComponentMarkers(frontendMessage: String) {
+        // 如果前台文本为空，清空后台文本和映射
+        if (frontendMessage.isEmpty()) {
+            _messageInputWithMarkers.value = ""
+            componentMappings.clear()
+            return
         }
         
-        // 简单实现：根据纯文本长度和组件内容长度，删除空组件
-        // TODO: 更精确的实现需要追踪每个字符属于哪个组件
-        // 当前实现：保留所有有内容的组件，删除空组件
-        val result = mutableListOf<TextComponentHelper.TextComponent>()
+        // 构建新的带标记符的文本
+        val newBackend = StringBuilder()
         
-        for (component in oldComponents) {
-            // 检查组件是否有内容
-            val hasMainContent = component.content.isNotEmpty()
-            val hasSubContent = component.subComponents.any { it.content.isNotEmpty() }
+        var frontendIndex = 0
+        var backendIndex = 0
+        
+        // 遍历前台消息，逐个字符处理
+        while (frontendIndex < frontendMessage.length) {
+            // 检查当前字符是否在旧的映射范围内
+            val oldMapping = componentMappings.find { 
+                frontendIndex in it.frontendStart until it.frontendEnd 
+            }
             
-            if (hasMainContent || hasSubContent) {
-                result.add(component)
+            if (oldMapping != null) {
+                // 在旧映射范围内，保留原有的标记符
+                val oldBackend = _messageInputWithMarkers.value
+                
+                // 提取旧的组件内容（不包括标记符）
+                val componentStart = oldMapping.backendStart + 2  // 跳过开始标记符
+                val componentEnd = oldMapping.backendEnd - 2      // 跳过结束标记符
+                val componentContent = oldBackend.substring(componentStart, componentEnd)
+                
+                // 计算在组件内容中的相对位置
+                val relativePos = frontendIndex - oldMapping.frontendStart
+                
+                // 只取到当前位置的字符
+                if (relativePos < componentContent.length) {
+                    val char = componentContent[relativePos]
+                    newBackend.append(char)
+                    frontendIndex++
+                    backendIndex++
+                } else {
+                    // 超出组件内容长度，停止保留此组件
+                    frontendIndex++
+                }
+            } else {
+                // 不在旧映射范围内，作为普通文本处理
+                newBackend.append(frontendMessage[frontendIndex])
+                frontendIndex++
+                backendIndex++
             }
         }
         
-        // 如果纯文本不为空但没有匹配的组件，创建text组件
-        if (result.isEmpty() && newPlainText.isNotEmpty()) {
-            result.add(TextComponentHelper.TextComponent(
-                TextComponentHelper.ComponentType.TEXT,
-                newPlainText
-            ))
-        }
+        _messageInputWithMarkers.value = newBackend.toString()
         
-        return result
+        // 重新解析并构建新的映射（简化版）
+        val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
+        buildComponentMappings(components)
+    }
+    
+    /**
+     * 根据组件列表构建位置映射
+     */
+    private fun buildComponentMappings(components: List<TextComponentHelper.TextComponent>) {
+        componentMappings.clear()
+        
+        var frontendPos = 0
+        var backendPos = 0
+        
+        for (component in components) {
+            val contentLength = component.content.length
+            
+            // 记录映射
+            componentMappings.add(ComponentMapping(
+                frontendStart = frontendPos,
+                frontendEnd = frontendPos + contentLength,
+                backendStart = backendPos,
+                backendEnd = backendPos + contentLength + 4,  // 加上2个开始标记符和2个结束标记符
+                componentType = component.type
+            ))
+            
+            frontendPos += contentLength
+            backendPos += contentLength + 4
+        }
     }
     
     /**
@@ -1461,6 +1515,7 @@ class TellrawViewModel @Inject constructor(
     
     /**
      * 删除文本，同时删除对应的组件标记
+     * 使用位置映射来精确删除（借鉴deleteBackendCharacters的做法）
      */
     fun deleteTextWithComponent(deletePosition: Int, deletedLength: Int, newText: String) {
         // 更新前台显示的纯文本
@@ -1468,24 +1523,12 @@ class TellrawViewModel @Inject constructor(
         
         // 在后台处理带标记符的文本
         if (!_defaultUseText.value) {
-            val oldTextWithMarkers = _messageInputWithMarkers.value
-            
-            // 如果纯文本为空，清空带标记符的文本
-            if (newText.isEmpty()) {
-                _messageInputWithMarkers.value = ""
-            } else {
-                // 解析旧的带标记符文本
-                val oldComponents = TextComponentHelper.parseTextComponents(oldTextWithMarkers)
-                
-                // 更新组件内容，删除空组件
-                val updatedComponents = updateComponentsAfterDelete(oldComponents, deletePosition, deletedLength, newText)
-                
-                // 转换回带标记符的文本
-                _messageInputWithMarkers.value = TextComponentHelper.componentsToText(updatedComponents)
-            }
+            // 使用位置映射删除文本（类似于updateBackendMessage）
+            deleteComponentMarkers(deletePosition, deletedLength, newText)
         } else {
             // 默认使用text模式，直接同步
             _messageInputWithMarkers.value = newText
+            componentMappings.clear()
         }
         
         // 更新悬停组件类型
@@ -1498,46 +1541,60 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 删除文本后更新组件，删除空组件
+     * 删除文本组件标记符（借鉴deleteBackendCharacters的做法）
+     * 使用位置映射来精确删除前台和后台的文本
      */
-    private fun updateComponentsAfterDelete(
-        oldComponents: List<TextComponentHelper.TextComponent>,
-        deletePosition: Int,
-        deletedLength: Int,
-        newText: String
-    ): List<TextComponentHelper.TextComponent> {
-        // 如果纯文本为空，返回空列表
+    private fun deleteComponentMarkers(deletePosition: Int, deletedLength: Int, newText: String) {
+        // 如果新文本为空，清空后台文本和映射
         if (newText.isEmpty()) {
-            return emptyList()
+            _messageInputWithMarkers.value = ""
+            componentMappings.clear()
+            return
         }
         
-        // 简单实现：保留所有有内容的组件，删除空组件
-        // TODO: 更精确的实现需要追踪删除的位置和对应的组件
-        val result = mutableListOf<TextComponentHelper.TextComponent>()
+        // 找到删除位置所在的组件
+        val affectedMapping = componentMappings.find { 
+            deletePosition in it.frontendStart until it.frontendEnd 
+        }
         
-        for (component in oldComponents) {
-            // 检查组件是否有内容
-            val hasMainContent = component.content.isNotEmpty()
-            val hasSubContent = component.subComponents.any { it.content.isNotEmpty() }
+        if (affectedMapping != null) {
+            // 在组件内删除，需要更新带标记符的文本
+            val oldBackend = _messageInputWithMarkers.value
             
-            if (hasMainContent || hasSubContent) {
-                result.add(component)
+            // 计算删除位置在后台的对应位置
+            val relativePos = deletePosition - affectedMapping.frontendStart
+            val backendDeletePos = affectedMapping.backendStart + 2 + relativePos  // 加上2个开始标记符
+            
+            // 删除后台的对应文本
+            val newBackend = oldBackend.substring(0, backendDeletePos) + 
+                            oldBackend.substring(backendDeletePos + deletedLength)
+            
+            _messageInputWithMarkers.value = newBackend
+            
+            // 检查组件是否为空，如果为空则删除整个组件标记符
+            val componentStart = affectedMapping.backendStart + 2
+            val componentEnd = affectedMapping.backendEnd - 2
+            val componentContent = newBackend.substring(componentStart, componentEnd)
+            
+            if (componentContent.isEmpty()) {
+                // 删除整个组件标记符
+                val finalBackend = newBackend.substring(0, affectedMapping.backendStart) + 
+                                  newBackend.substring(affectedMapping.backendEnd)
+                _messageInputWithMarkers.value = finalBackend
             }
+            
+            // 重新构建映射
+            val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
+            buildComponentMappings(components)
+        } else {
+            // 不在任何组件内，直接使用updateComponentMarkers重建
+            updateComponentMarkers(newText)
         }
-        
-        // 如果纯文本不为空但没有匹配的组件，创建text组件
-        if (result.isEmpty() && newText.isNotEmpty()) {
-            result.add(TextComponentHelper.TextComponent(
-                TextComponentHelper.ComponentType.TEXT,
-                newText
-            ))
-        }
-        
-        return result
     }
     
     /**
      * 带组件标记的文本插入
+     * 使用位置映射来精确插入（类似于updateBackendMessage）
      */
     fun insertTextWithComponent(insertPosition: Int, textToInsert: String) {
         val currentComponent = _selectedTextComponent.value
@@ -1568,6 +1625,10 @@ class TellrawViewModel @Inject constructor(
         // 更新前台显示的纯文本（去除标记符）
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         _messageInput.value = plainText
+        
+        // 重新构建位置映射
+        val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
+        buildComponentMappings(components)
         
         generateCommands()
     }
