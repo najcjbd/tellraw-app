@@ -282,8 +282,23 @@ class TellrawViewModel @Inject constructor(
     fun updateMessage(message: String) {
         _messageInput.value = message
         
-        // 同步更新带标记符的文本
-        _messageInputWithMarkers.value = message
+        // 检测是否为删除操作
+        val oldTextWithMarkers = _messageInputWithMarkers.value
+        
+        // 如果关闭了"默认使用text"，需要在后台同步处理带标记符的文本
+        if (!_defaultUseText.value) {
+            // 解析旧的带标记符文本
+            val oldComponents = TextComponentHelper.parseTextComponents(oldTextWithMarkers)
+            
+            // 根据新的纯文本更新组件内容，删除空组件
+            val updatedComponents = updateComponentsWithNewText(oldComponents, message)
+            
+            // 转换回带标记符的文本
+            _messageInputWithMarkers.value = TextComponentHelper.componentsToText(updatedComponents)
+        } else {
+            // 默认使用text模式，直接同步
+            _messageInputWithMarkers.value = message
+        }
         
         // 检测新增的§m和§n代码
         detectAndCountMNCodes(message)
@@ -293,6 +308,45 @@ class TellrawViewModel @Inject constructor(
         
         // 始终生成命令，不等待对话框关闭
         generateCommands()
+    }
+    
+    /**
+     * 根据新的纯文本更新组件内容，删除空组件
+     * 类似于updateBackendMessage的逻辑，根据前台纯文本重建后台带标记符的文本
+     */
+    private fun updateComponentsWithNewText(
+        oldComponents: List<TextComponentHelper.TextComponent>,
+        newPlainText: String
+    ): List<TextComponentHelper.TextComponent> {
+        // 如果纯文本为空，返回空列表
+        if (newPlainText.isEmpty()) {
+            return emptyList()
+        }
+        
+        // 简单实现：根据纯文本长度和组件内容长度，删除空组件
+        // TODO: 更精确的实现需要追踪每个字符属于哪个组件
+        // 当前实现：保留所有有内容的组件，删除空组件
+        val result = mutableListOf<TextComponentHelper.TextComponent>()
+        
+        for (component in oldComponents) {
+            // 检查组件是否有内容
+            val hasMainContent = component.content.isNotEmpty()
+            val hasSubContent = component.subComponents.any { it.content.isNotEmpty() }
+            
+            if (hasMainContent || hasSubContent) {
+                result.add(component)
+            }
+        }
+        
+        // 如果纯文本不为空但没有匹配的组件，创建text组件
+        if (result.isEmpty() && newPlainText.isNotEmpty()) {
+            result.add(TextComponentHelper.TextComponent(
+                TextComponentHelper.ComponentType.TEXT,
+                newPlainText
+            ))
+        }
+        
+        return result
     }
     
     /**
@@ -1392,7 +1446,7 @@ class TellrawViewModel @Inject constructor(
         _selectedSubComponent.value = subComponent
     }
     
-    /**
+/**
      * 更新光标悬停位置的组件类型
      */
     fun updateHoveredComponentType(position: Int) {
@@ -1406,9 +1460,84 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
+     * 删除文本，同时删除对应的组件标记
+     */
+    fun deleteTextWithComponent(deletePosition: Int, deletedLength: Int, newText: String) {
+        // 更新前台显示的纯文本
+        _messageInput.value = newText
+        
+        // 在后台处理带标记符的文本
+        if (!_defaultUseText.value) {
+            val oldTextWithMarkers = _messageInputWithMarkers.value
+            
+            // 如果纯文本为空，清空带标记符的文本
+            if (newText.isEmpty()) {
+                _messageInputWithMarkers.value = ""
+            } else {
+                // 解析旧的带标记符文本
+                val oldComponents = TextComponentHelper.parseTextComponents(oldTextWithMarkers)
+                
+                // 更新组件内容，删除空组件
+                val updatedComponents = updateComponentsAfterDelete(oldComponents, deletePosition, deletedLength, newText)
+                
+                // 转换回带标记符的文本
+                _messageInputWithMarkers.value = TextComponentHelper.componentsToText(updatedComponents)
+            }
+        } else {
+            // 默认使用text模式，直接同步
+            _messageInputWithMarkers.value = newText
+        }
+        
+        // 更新悬停组件类型
+        if (deletePosition > 0) {
+            updateHoveredComponentType(deletePosition - 1)
+        }
+        
+        // 生成命令
+        generateCommands()
+    }
+    
+    /**
+     * 删除文本后更新组件，删除空组件
+     */
+    private fun updateComponentsAfterDelete(
+        oldComponents: List<TextComponentHelper.TextComponent>,
+        deletePosition: Int,
+        deletedLength: Int,
+        newText: String
+    ): List<TextComponentHelper.TextComponent> {
+        // 如果纯文本为空，返回空列表
+        if (newText.isEmpty()) {
+            return emptyList()
+        }
+        
+        // 简单实现：保留所有有内容的组件，删除空组件
+        // TODO: 更精确的实现需要追踪删除的位置和对应的组件
+        val result = mutableListOf<TextComponentHelper.TextComponent>()
+        
+        for (component in oldComponents) {
+            // 检查组件是否有内容
+            val hasMainContent = component.content.isNotEmpty()
+            val hasSubContent = component.subComponents.any { it.content.isNotEmpty() }
+            
+            if (hasMainContent || hasSubContent) {
+                result.add(component)
+            }
+        }
+        
+        // 如果纯文本不为空但没有匹配的组件，创建text组件
+        if (result.isEmpty() && newText.isNotEmpty()) {
+            result.add(TextComponentHelper.TextComponent(
+                TextComponentHelper.ComponentType.TEXT,
+                newText
+            ))
+        }
+        
+        return result
+    }
+    
+    /**
      * 带组件标记的文本插入
-     * @param insertPosition 插入位置
-     * @param textToInsert 要插入的文本
      */
     fun insertTextWithComponent(insertPosition: Int, textToInsert: String) {
         val currentComponent = _selectedTextComponent.value

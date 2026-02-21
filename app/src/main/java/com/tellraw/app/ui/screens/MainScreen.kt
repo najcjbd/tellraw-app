@@ -429,7 +429,9 @@ private fun PortraitLayout(
                                 }
                             } else if (newText.length < oldText.length) {
                                 // 文本减少：删除文本
-                                viewModel.updateMessage(newText)
+                                val deletedLength = oldText.length - newText.length
+                                val deletePosition = cursorPosition  // 删除后的光标位置就是删除位置
+                                viewModel.deleteTextWithComponent(deletePosition, deletedLength, newText)
                             } else {
                                 // 文本长度相同，可能是替换或光标移动
                                 viewModel.updateMessage(newText)
