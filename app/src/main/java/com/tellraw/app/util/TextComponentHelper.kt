@@ -125,10 +125,10 @@ object TextComponentHelper {
         // 主内容
         val mainContent = if (parts.size >= 2) parts[1] else ""
         
-        // 解析副组件（跳过最后一个验证元素）
+        // 解析副组件（每两个元素是一对：类型+内容）
         val subComponents = mutableListOf<SubComponent>()
         var i = 2
-        while (i + 1 < parts.size - 1) {  // 减1是因为最后一个元素是验证类型
+        while (i + 1 < parts.size) {
             val subTypeKey = parts[i]
             val subContent = parts[i + 1]
             val subType = SubComponentType.values().find { it.key == subTypeKey }
@@ -138,23 +138,19 @@ object TextComponentHelper {
             i += 2
         }
         
-        // 验证最后一个元素是否等于类型（可选，用于验证）
-        // if (parts.size > 2 && parts.last() != typeKey) {
-        //     // 验证失败，但仍然返回解析结果
-        // }
-        
         return TextComponent(type, mainContent, subComponents)
     }
     
     /**
      * 将组件列表转换为标记文本
+     * 简化格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
-                "$MARKER_END${sub.type.key}$MARKER_END${sub.content}$MARKER_END${sub.type.key}"
+                "$MARKER_END${sub.type.key}$MARKER_END${sub.content}$MARKER_END"
             }
-            "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END${component.type.key}"
+            "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END"
         }
     }
     
