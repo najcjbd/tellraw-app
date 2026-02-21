@@ -297,6 +297,19 @@
     <string name="action_copy">複製</string>
     <string name="action_share">分享</string>
     <string name="action_load">載入</string>
+    
+    <!-- 文本組件相關 -->
+    <string name="text_component_title">文本組件</string>
+    <string name="current_component">當前組件:</string>
+    <string name="component_text">純文本</string>
+    <string name="component_translate">翻譯文本</string>
+    <string name="component_score">記分板分數</string>
+    <string name="component_selector">實體名稱</string>
+    <string name="component_with">參數</string>
+    <string name="component_expand">展開</string>
+    <string name="component_collapse">收起</string>
+    <string name="component_arrow">  → </string>
+    <string name="bedrock_separator_not_supported">基岩版不支援separator參數，已忽略所有sep:定義</string>
     <string name="action_delete">刪除</string>
     
     <!-- 歷史紀錄項 -->

@@ -321,6 +321,19 @@
     <string name="action_copy">Copy</string>
     <string name="action_share">Share</string>
     <string name="action_load">Load</string>
+    
+    <!-- Text Components -->
+    <string name="text_component_title">Text Components</string>
+    <string name="current_component">Current component:</string>
+    <string name="component_text">Plain Text</string>
+    <string name="component_translate">Translation</string>
+    <string name="component_score">Score</string>
+    <string name="component_selector">Selector</string>
+    <string name="component_with">With</string>
+    <string name="component_expand">Expand</string>
+    <string name="component_collapse">Collapse</string>
+    <string name="component_arrow">  → </string>
+    <string name="bedrock_separator_not_supported">Bedrock does not support separator parameter, all sep: definitions have been ignored</string>
     <string name="action_delete">Delete</string>
     
     <!-- History Items -->

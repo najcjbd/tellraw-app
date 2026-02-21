@@ -309,6 +309,8 @@
     <string name="component_with">参数</string>
     <string name="component_expand">展开</string>
     <string name="component_collapse">收起</string>
+    <string name="component_arrow">  → </string>
+    <string name="bedrock_separator_not_supported">基岩版不支持separator参数，已忽略所有sep:定义</string>
     <string name="action_delete">删除</string>
     
     <!-- 历史记录项 -->
