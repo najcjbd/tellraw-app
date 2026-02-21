@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder
 import com.tellraw.app.R
 import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.model.MinecraftVersion
+import com.tellraw.app.util.TextComponentHelper
 
 object TextFormatter {
     
@@ -197,7 +198,15 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null): String {
+        // 检查是否包含文本组件标记
+        if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
+            // 使用新的文本组件转换逻辑
+            val components = TextComponentHelper.parseTextComponents(text)
+            return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context)
+        }
+        
+        // 原有的转换逻辑（向后兼容）
         var jsonText = text
         var currentFormat = mutableMapOf<String, Any>()
 
@@ -454,7 +463,15 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null): String {
+        // 检查是否包含文本组件标记
+        if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
+            // 使用新的文本组件转换逻辑
+            val components = TextComponentHelper.parseTextComponents(text)
+            return TextComponentHelper.convertToBedrockJson(components, mNHandling, mnCFEnabled, context, warnings)
+        }
+        
+        // 原有的转换逻辑（向后兼容）
         var processedText = text
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）

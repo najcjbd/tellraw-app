@@ -19,6 +19,7 @@ import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.TellrawCommand
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
+import com.tellraw.app.util.TextComponentHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -66,6 +67,27 @@ class TellrawViewModel @Inject constructor(
     
     private val _javaBedrockMixedMode = MutableStateFlow(false)
     val javaBedrockMixedMode: StateFlow<Boolean> = _javaBedrockMixedMode.asStateFlow()
+    
+    private val _defaultUseText = MutableStateFlow(true)
+    val defaultUseText: StateFlow<Boolean> = _defaultUseText.asStateFlow()
+    
+    // 文本组件选择相关状态
+    private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
+    val selectedTextComponent: StateFlow<TextComponentHelper.ComponentType?> = _selectedTextComponent.asStateFlow()
+    
+    private val _expandedSubComponents = MutableStateFlow<Set<String>>(emptySet())
+    val expandedSubComponents: StateFlow<Set<String>> = _expandedSubComponents.asStateFlow()
+    
+    private val _selectedSubComponent = MutableStateFlow<TextComponentHelper.SubComponentType?>(null)
+    val selectedSubComponent: StateFlow<TextComponentHelper.SubComponentType?> = _selectedSubComponent.asStateFlow()
+    
+    // 当前光标位置的组件类型（用于悬停显示）
+    private val _hoveredComponentType = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
+    val hoveredComponentType: StateFlow<TextComponentHelper.ComponentType?> = _hoveredComponentType.asStateFlow()
+    
+    // 当前光标位置的组件内容（用于悬停显示）
+    private val _hoveredComponentContent = MutableStateFlow<String?>(null)
+    val hoveredComponentContent: StateFlow<String?> = _hoveredComponentContent.asStateFlow()
     
     // 初始化标志，防止在屏幕旋转时重复初始化
     private var isInitialized = false
@@ -133,6 +155,9 @@ class TellrawViewModel @Inject constructor(
             
             // 加载JAVA/基岩混合模式
             _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
+            
+            // 加载默认使用text文本组件设置
+            _defaultUseText.value = loadedSettings.defaultUseText
             
             // 加载历史记录文件名
             _historyStorageFilename.value = loadedSettings.historyStorageFilename
@@ -256,6 +281,9 @@ class TellrawViewModel @Inject constructor(
         
         // 检测新增的§m和§n代码
         detectAndCountMNCodes(message)
+        
+        // 更新悬停组件类型（光标在末尾）
+        updateHoveredComponentType(message.length - 1)
         
         // 始终生成命令，不等待对话框关闭
         generateCommands()
@@ -508,6 +536,15 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
     
+    fun setDefaultUseText(enabled: Boolean) {
+        _defaultUseText.value = enabled
+        viewModelScope.launch {
+            settingsRepository.setDefaultUseText(enabled)
+            settingsRepository.saveConfig()
+        }
+        generateCommands()
+    }
+    
     fun dismissMNDialog() {
         _showMNDialog.value = null
         generateCommands()
@@ -588,12 +625,20 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 生成Java版命令
-        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
+        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled, applicationContext)
         val javaCommand = "tellraw $javaSelectorFiltered $javaJson"
         
         // 生成基岩版命令
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
+        val bedrockWarnings = mutableListOf<String>()
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled, applicationContext, bedrockWarnings)
         val bedrockCommand = "tellraw $bedrockSelectorFiltered $bedrockJson"
+        
+        // 如果有警告，显示给用户
+        if (bedrockWarnings.isNotEmpty()) {
+            _warnings.value = bedrockWarnings
+        } else {
+            _warnings.value = emptyList()
+        }
         
         // 处理提醒信息显示
         // 分类并去重处理Java版提醒
@@ -689,17 +734,24 @@ class TellrawViewModel @Inject constructor(
                 
                 // 生成Java版命令
                 val (javaFilteredSelector, _) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
-                val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value)
+                val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext)
                 val javaCommand = "tellraw $javaFilteredSelector $javaJson"
                 
                 // 生成基岩版命令
                 val (bedrockFilteredSelector, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
-                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value)
+                val bedrockWarnings = mutableListOf<String>()
+                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings)
                 val bedrockCommand = "tellraw $bedrockFilteredSelector $bedrockJson"
                 
                 _javaCommand.value = javaCommand
                 _bedrockCommand.value = bedrockCommand
-                _warnings.value = emptyList()  // TODO: 可以在这里添加警告信息
+                
+                // 如果有警告，显示给用户
+                if (bedrockWarnings.isNotEmpty()) {
+                    _warnings.value = bedrockWarnings
+                } else {
+                    _warnings.value = emptyList()
+                }
             } catch (e: IllegalArgumentException) {
                 // 处理未知§组合的异常
                 _javaCommand.value = ""
@@ -729,7 +781,7 @@ class TellrawViewModel @Inject constructor(
         val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, applicationContext)
 
         // 转换文本为Java版JSON格式
-        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled)
+        val javaJson = TextFormatter.convertToJavaJson(message, mNHandling, mnCFEnabled, applicationContext)
         return "tellraw $filteredSelector $javaJson"
     }
     
@@ -746,7 +798,14 @@ class TellrawViewModel @Inject constructor(
         val (filteredSelector, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, applicationContext)
         
         // 转换文本为基岩版JSON格式
-        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled)
+        val bedrockWarnings = mutableListOf<String>()
+        val bedrockJson = TextFormatter.convertToBedrockJson(message, mNHandling, mnCFEnabled, applicationContext, bedrockWarnings)
+        
+        // 如果有警告，显示给用户
+        if (bedrockWarnings.isNotEmpty()) {
+            _warnings.value = bedrockWarnings
+        }
+        
         return "tellraw $filteredSelector $bedrockJson"
     }
     
@@ -1267,6 +1326,165 @@ class TellrawViewModel @Inject constructor(
             _writeFileMessage.value = context.getString(R.string.append_file_failed) + ": ${e.message}"
         } finally {
             _isWritingToFile.value = false
+        }
+    }
+    
+    // ==================== 文本组件相关方法 ====================
+    
+    /**
+     * 选择文本组件
+     * 如果再次点击相同的组件，则取消选择
+     */
+    fun selectTextComponent(component: TextComponentHelper.ComponentType) {
+        if (_selectedTextComponent.value == component) {
+            // 再次点击相同的组件，切换选中/取消选中
+            if (_selectedSubComponent.value == null) {
+                // 当前选中的是主组件，取消选择
+                _selectedTextComponent.value = null
+                _selectedSubComponent.value = null
+                _expandedSubComponents.value = emptySet()
+            } else {
+                // 当前选中的是副组件，切换回主组件
+                _selectedSubComponent.value = null
+            }
+        } else {
+            // 选择新组件，清空之前的状态
+            _selectedTextComponent.value = component
+            _selectedSubComponent.value = null
+            _expandedSubComponents.value = emptySet()
+        }
+    }
+    
+    /**
+     * 展开/收起副组件
+     */
+    fun toggleSubComponents(component: TextComponentHelper.ComponentType) {
+        val currentExpanded = _expandedSubComponents.value.toMutableSet()
+        if (currentExpanded.contains(component.key)) {
+            currentExpanded.remove(component.key)
+            _selectedSubComponent.value = null
+        } else {
+            currentExpanded.add(component.key)
+        }
+        _expandedSubComponents.value = currentExpanded
+    }
+    
+    /**
+     * 选择副组件
+     */
+    fun selectSubComponent(subComponent: TextComponentHelper.SubComponentType) {
+        _selectedSubComponent.value = subComponent
+    }
+    
+    /**
+     * 更新光标悬停位置的组件类型
+     */
+    fun updateHoveredComponentType(position: Int) {
+        val componentType = TextComponentHelper.getComponentTypeAtPosition(_messageInput.value, position)
+        _hoveredComponentType.value = componentType
+        
+        // 同时更新组件内容
+        val componentContent = TextComponentHelper.getComponentContentAtPosition(_messageInput.value, position)
+        _hoveredComponentContent.value = componentContent
+    }
+    
+    /**
+     * 带组件标记的文本插入
+     * @param insertPosition 插入位置
+     * @param textToInsert 要插入的文本
+     */
+    fun insertTextWithComponent(insertPosition: Int, textToInsert: String) {
+        val currentComponent = _selectedTextComponent.value
+        val currentSubComponent = _selectedSubComponent.value
+        
+        // 处理副组件逻辑
+        if (currentSubComponent != null && currentComponent != null && currentComponent.hasSubComponent) {
+            // 副组件：如果选中了副组件（如translate的with），输入的内容作为副组件内容
+            val components = TextComponentHelper.parseTextComponents(_messageInput.value)
+            val updatedComponents = processSubComponentInsertion(components, insertPosition, textToInsert, currentComponent, currentSubComponent)
+            val newText = TextComponentHelper.componentsToText(updatedComponents)
+            _messageInput.value = newText
+        } else if (currentComponent != null && currentComponent != TextComponentHelper.ComponentType.TEXT) {
+            // 主组件：选中了主组件，输入的内容作为主组件内容
+            // 检查是否需要创建新组件还是汇入现有组件
+            val newText = TextComponentHelper.insertTextWithComponent(
+                _messageInput.value,
+                insertPosition,
+                textToInsert,
+                currentComponent
+            )
+            _messageInput.value = newText
+        } else {
+            // 未选中组件，直接插入（默认text组件）
+            _messageInput.value = _messageInput.value.substring(0, insertPosition) + textToInsert + _messageInput.value.substring(insertPosition)
+        }
+        
+        generateCommands()
+    }
+    
+    /**
+     * 处理副组件的插入逻辑
+     */
+    private fun processSubComponentInsertion(
+        components: List<TextComponentHelper.TextComponent>,
+        insertPosition: Int,
+        textToInsert: String,
+        targetComponent: TextComponentHelper.ComponentType,
+        targetSubComponent: TextComponentHelper.SubComponentType
+    ): List<TextComponentHelper.TextComponent> {
+        val result = mutableListOf<TextComponentHelper.TextComponent>()
+        var currentPos = 0
+        var inserted = false
+        
+        for (component in components) {
+            val componentLength = component.content.length + component.subComponents.sumOf { it.content.length }
+            
+            if (!inserted && insertPosition >= currentPos && insertPosition < currentPos + componentLength) {
+                // 在当前组件内插入
+                if (component.type == targetComponent) {
+                    // 主组件匹配，更新副组件
+                    val updatedSubComponents = component.subComponents.toMutableList()
+                    val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
+                    if (subComponent != null) {
+                        // 更新现有副组件
+                        val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
+                        updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
+                    } else {
+                        // 添加新副组件
+                        updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+                    }
+                    result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
+                } else {
+                    // 主组件不匹配，保持原样
+                    result.add(component)
+                }
+                inserted = true
+            } else {
+                result.add(component)
+            }
+            
+            currentPos += componentLength
+        }
+        
+        // 如果在所有组件之后插入
+        if (!inserted && insertPosition >= currentPos) {
+            val newSubComponents = mutableListOf<TextComponentHelper.SubComponent>(
+                TextComponentHelper.SubComponent(targetSubComponent, textToInsert)
+            )
+            result.add(TextComponentHelper.TextComponent(targetComponent, "", newSubComponents))
+        }
+        
+        return result
+    }
+    
+    /**
+     * 清除组件标记（当关闭"默认使用text文本组件"选项时）
+     */
+    fun clearComponentMarkers() {
+        val plainText = TextComponentHelper.stripComponentMarkers(_messageInput.value)
+        if (plainText != _messageInput.value) {
+            _messageInput.value = plainText
+            generateCommands()
         }
     }
 }

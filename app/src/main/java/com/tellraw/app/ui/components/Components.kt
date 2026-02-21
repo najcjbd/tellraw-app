@@ -459,11 +459,13 @@ fun SettingsDialog(
     mnMixedMode: Boolean,
     mnCFEnabled: Boolean,
     javaBedrockMixedMode: Boolean,
+    defaultUseText: Boolean,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
     onMNMixedModeChanged: (Boolean) -> Unit,
     onMNCFEnabledChanged: (Boolean) -> Unit,
-    onJavaBedrockMixedModeChanged: (Boolean) -> Unit
+    onJavaBedrockMixedModeChanged: (Boolean) -> Unit,
+    onDefaultUseTextChanged: (Boolean) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -670,6 +672,33 @@ fun SettingsDialog(
                             )
                         }
                     }
+                    
+                    // 分隔线
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    
+                    // 默认使用text文本组件开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = defaultUseText,
+                            onCheckedChange = onDefaultUseTextChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.default_use_text),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.default_use_text_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
                 
                 // 底部操作栏
@@ -846,6 +875,31 @@ fun SettingsDialog(
                             )
                             Text(
                                 text = stringResource(R.string.java_bedrock_mixed_mode_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // 分隔线
+                    HorizontalDivider()
+                    
+                    // 默认使用text文本组件开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = defaultUseText,
+                            onCheckedChange = onDefaultUseTextChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.default_use_text),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.default_use_text_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

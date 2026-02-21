@@ -56,6 +56,8 @@
     <string name="java_bedrock_mixed_mode">JAVA/基岩混合</string>
     <string name="java_bedrock_mixed_mode_description">输入有两版特有参数时，保留各自的参数并改其他参数</string>
     <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式开启：找到两版特有参数，自动转换</string>
+    <string name="default_use_text">默认使用text文本组件</string>
+    <string name="default_use_text_description">生成命令时使用text文本组件</string>
     
     <!-- 颜色代码 -->
     <string name="color_black">黑色</string>
@@ -296,6 +298,17 @@
     <string name="action_copy">复制</string>
     <string name="action_share">分享</string>
     <string name="action_load">加载</string>
+    
+    <!-- 文本组件相关 -->
+    <string name="text_component_title">文本组件</string>
+    <string name="current_component">当前组件:</string>
+    <string name="component_text">纯文本</string>
+    <string name="component_translate">翻译文本</string>
+    <string name="component_score">记分板分数</string>
+    <string name="component_selector">实体名称</string>
+    <string name="component_with">参数</string>
+    <string name="component_expand">展开</string>
+    <string name="component_collapse">收起</string>
     <string name="action_delete">删除</string>
     
     <!-- 历史记录项 -->

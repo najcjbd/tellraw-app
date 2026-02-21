@@ -22,6 +22,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_MN_MIXED_MODE = "mn_mixed_mode"
         private const val KEY_MN_CF_ENABLED = "mn_cf_enabled"
         private const val KEY_JAVA_BEDROCK_MIXED_MODE = "java_bedrock_mixed_mode"
+        private const val KEY_DEFAULT_USE_TEXT = "default_use_text"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
@@ -44,6 +45,10 @@ class SettingsRepository @Inject constructor(
     // JAVA/基岩混合模式开关
     private val _javaBedrockMixedMode = MutableStateFlow(false)
     val javaBedrockMixedMode: Flow<Boolean> = _javaBedrockMixedMode.asStateFlow()
+    
+    // 默认使用text文本组件开关
+    private val _defaultUseText = MutableStateFlow(true)
+    val defaultUseText: Flow<Boolean> = _defaultUseText.asStateFlow()
     
     // 历史记录存储目录URI
     private val _historyStorageUri = MutableStateFlow<String?>(null)
@@ -74,6 +79,7 @@ class SettingsRepository @Inject constructor(
                         mnMixedMode = _mnMixedMode.value,
                         mnCFEnabled = _mnCFEnabled.value,
                         javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                        defaultUseText = _defaultUseText.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
                     )
@@ -88,6 +94,7 @@ class SettingsRepository @Inject constructor(
                     mnMixedMode = _mnMixedMode.value,
                     mnCFEnabled = _mnCFEnabled.value,
                     javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                    defaultUseText = _defaultUseText.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -98,6 +105,7 @@ class SettingsRepository @Inject constructor(
                     mnMixedMode = _mnMixedMode.value,
                     mnCFEnabled = _mnCFEnabled.value,
                     javaBedrockMixedMode = _javaBedrockMixedMode.value,
+                    defaultUseText = _defaultUseText.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -113,6 +121,7 @@ class SettingsRepository @Inject constructor(
         val mnMixedMode: Boolean,
         val mnCFEnabled: Boolean,
         val javaBedrockMixedMode: Boolean,
+        val defaultUseText: Boolean,
         val historyStorageUri: String?,
         val historyStorageFilename: String
     )
@@ -143,6 +152,7 @@ class SettingsRepository @Inject constructor(
                 val mnMixedMode = extractJsonValue(jsonString, KEY_MN_MIXED_MODE) == "true"
                 val mnCfEnabled = extractJsonValue(jsonString, KEY_MN_CF_ENABLED) == "true"
                 val javaBedrockMixedMode = extractJsonValue(jsonString, KEY_JAVA_BEDROCK_MIXED_MODE) == "true"
+                val defaultUseText = extractJsonValue(jsonString, KEY_DEFAULT_USE_TEXT) != "false"
                 val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
@@ -151,6 +161,7 @@ class SettingsRepository @Inject constructor(
                 _mnMixedMode.value = mnMixedMode
                 _mnCFEnabled.value = mnCfEnabled
                 _javaBedrockMixedMode.value = javaBedrockMixedMode
+                _defaultUseText.value = defaultUseText
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
                 
@@ -169,6 +180,7 @@ class SettingsRepository @Inject constructor(
         val mnMixedMode = _mnMixedMode.value
         val mnCfEnabled = _mnCFEnabled.value
         val javaBedrockMixedMode = _javaBedrockMixedMode.value
+        val defaultUseText = _defaultUseText.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
         
@@ -178,6 +190,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_MN_MIXED_MODE": $mnMixedMode,
               "$KEY_MN_CF_ENABLED": $mnCfEnabled,
               "$KEY_JAVA_BEDROCK_MIXED_MODE": $javaBedrockMixedMode,
+              "$KEY_DEFAULT_USE_TEXT": $defaultUseText,
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
             }
@@ -260,6 +273,23 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun setJavaBedrockMixedMode(enabled: Boolean) {
         _javaBedrockMixedMode.value = enabled
+        saveConfig()
+    }
+    
+    /**
+     * 获取默认使用text文本组件开关
+     * @return true表示默认使用text文本组件，false表示不使用
+     */
+    suspend fun getDefaultUseText(): Boolean {
+        return _defaultUseText.value
+    }
+    
+    /**
+     * 设置默认使用text文本组件开关
+     * @param enabled true表示默认使用text文本组件，false表示不使用
+     */
+    suspend fun setDefaultUseText(enabled: Boolean) {
+        _defaultUseText.value = enabled
         saveConfig()
     }
     

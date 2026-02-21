@@ -27,6 +27,7 @@ import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.tellraw.app.util.TextComponentHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,11 +51,19 @@ fun MainScreen(
     val mnMixedMode by viewModel.mnMixedMode.collectAsState()
     val mnCFEnabled by viewModel.mnCFEnabled.collectAsState()
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
+    val defaultUseText by viewModel.defaultUseText.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     val showJavaBedrockMixedModeWarningDialog by viewModel.showJavaBedrockMixedModeWarningDialog.collectAsState()
+    
+    // 文本组件相关状态
+    val selectedTextComponent by viewModel.selectedTextComponent.collectAsState()
+    val expandedSubComponents by viewModel.expandedSubComponents.collectAsState()
+    val selectedSubComponent by viewModel.selectedSubComponent.collectAsState()
+    val hoveredComponentType by viewModel.hoveredComponentType.collectAsState()
+    val hoveredComponentContent by viewModel.hoveredComponentContent.collectAsState()
     
     // 历史记录存储相关状态
     val showStorageSettingsDialog by viewModel.showStorageSettingsDialog.collectAsState()
@@ -102,6 +111,12 @@ fun MainScreen(
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
             showSettingsDialog = showSettingsDialog,
+            defaultUseText = defaultUseText,
+            selectedTextComponent = selectedTextComponent,
+            expandedSubComponents = expandedSubComponents,
+            selectedSubComponent = selectedSubComponent,
+            hoveredComponentType = hoveredComponentType,
+            hoveredComponentContent = hoveredComponentContent,
             viewModel = viewModel
         )
     } else {
@@ -116,6 +131,12 @@ fun MainScreen(
             isLoading = isLoading,
             showHistoryDialog = showHistoryDialog,
             showSettingsDialog = showSettingsDialog,
+            defaultUseText = defaultUseText,
+            selectedTextComponent = selectedTextComponent,
+            expandedSubComponents = expandedSubComponents,
+            selectedSubComponent = selectedSubComponent,
+            hoveredComponentType = hoveredComponentType,
+            hoveredComponentContent = hoveredComponentContent,
             viewModel = viewModel
         )
     }
@@ -166,6 +187,7 @@ fun MainScreen(
             mnMixedMode = mnMixedMode,
             mnCFEnabled = mnCFEnabled,
             javaBedrockMixedMode = javaBedrockMixedMode,
+            defaultUseText = defaultUseText,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -178,6 +200,9 @@ fun MainScreen(
             },
             onJavaBedrockMixedModeChanged = { enabled ->
                 viewModel.setJavaBedrockMixedMode(enabled)
+            },
+            onDefaultUseTextChanged = { enabled ->
+                viewModel.setDefaultUseText(enabled)
             }
         )
     }
@@ -290,6 +315,12 @@ private fun PortraitLayout(
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
     showSettingsDialog: MutableState<Boolean>,
+    defaultUseText: Boolean,
+    selectedTextComponent: TextComponentHelper.ComponentType?,
+    expandedSubComponents: Set<String>,
+    selectedSubComponent: TextComponentHelper.SubComponentType?,
+    hoveredComponentType: TextComponentHelper.ComponentType?,
+    hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
     Column(
@@ -368,14 +399,66 @@ private fun PortraitLayout(
                 OutlinedTextField(
                     value = messageTextFieldValue.value,
                     onValueChange = { 
+                        val oldText = messageTextFieldValue.value.text
+                        val newText = it.text
+                        val cursorPosition = it.selection.start
+                        
                         messageTextFieldValue.value = it
-                        viewModel.updateMessage(it.text)
+                        
+                        // 如果关闭了"默认使用text"，需要处理组件标记
+                        if (!defaultUseText) {
+                            val selectedComponent = selectedTextComponent
+                            val selectedSubComponent = selectedSubComponent
+                            
+                            // 检测文本变化类型
+                            if (newText.length > oldText.length) {
+                                // 文本增加：插入新文本
+                                val insertedText = newText.substring(cursorPosition - (newText.length - oldText.length), cursorPosition)
+                                val insertPosition = cursorPosition - insertedText.length
+                                
+                                // 调用ViewModel的插入方法
+                                if (selectedSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
+                                    // 副组件
+                                    viewModel.insertTextWithComponent(insertPosition, insertedText)
+                                } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
+                                    // 主组件
+                                    viewModel.insertTextWithComponent(insertPosition, insertedText)
+                                } else {
+                                    // 默认text组件
+                                    viewModel.updateMessage(newText)
+                                }
+                            } else if (newText.length < oldText.length) {
+                                // 文本减少：删除文本
+                                viewModel.updateMessage(newText)
+                            } else {
+                                // 文本长度相同，可能是替换或光标移动
+                                viewModel.updateMessage(newText)
+                            }
+                            
+                            // 更新悬停组件类型
+                            if (cursorPosition > 0) {
+                                viewModel.updateHoveredComponentType(cursorPosition - 1)
+                            }
+                        } else {
+                            // 直接更新
+                            viewModel.updateMessage(newText)
+                        }
                     },
                     label = { Text(stringResource(R.string.input_text)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
                 )
+                
+                // 监听光标位置变化（自动更新悬停组件类型）
+                if (!defaultUseText) {
+                    LaunchedEffect(messageTextFieldValue.value.selection) {
+                        val cursorPosition = messageTextFieldValue.value.selection.start
+                        if (cursorPosition > 0) {
+                            viewModel.updateHoveredComponentType(cursorPosition - 1)
+                        }
+                    }
+                }
                 
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
@@ -396,7 +479,33 @@ private fun PortraitLayout(
                         viewModel.updateMessage(newText)
                     }
                 )
+                
+                // 文本组件选择器（当关闭"默认使用text文本组件"时显示）
+                if (!defaultUseText) {
+                    TextComponentSelector(
+                        selectedComponent = selectedTextComponent,
+                        selectedSubComponent = selectedSubComponent,
+                        expandedSubComponents = expandedSubComponents,
+                        onComponentSelected = { component ->
+                            viewModel.selectTextComponent(component)
+                        },
+                        onSubComponentToggle = { component ->
+                            viewModel.toggleSubComponents(component)
+                        },
+                        onSubComponentSelected = { subComponent ->
+                            viewModel.selectSubComponent(subComponent)
+                        }
+                    )
+                }
             }
+        }
+        
+        // 悬停显示的组件类型
+        if (hoveredComponentType != null && !defaultUseText) {
+            CurrentComponentIndicator(
+                component = hoveredComponentType,
+                componentContent = hoveredComponentContent
+            )
         }
 
         // 警告信息
@@ -463,6 +572,12 @@ private fun LandscapeLayout(
     isLoading: Boolean,
     showHistoryDialog: MutableState<Boolean>,
     showSettingsDialog: MutableState<Boolean>,
+    defaultUseText: Boolean,
+    selectedTextComponent: TextComponentHelper.ComponentType?,
+    expandedSubComponents: Set<String>,
+    selectedSubComponent: TextComponentHelper.SubComponentType?,
+    hoveredComponentType: TextComponentHelper.ComponentType?,
+    hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
     Column(
@@ -586,14 +701,66 @@ private fun LandscapeLayout(
                         OutlinedTextField(
                             value = messageTextFieldValue.value,
                             onValueChange = { 
+                                val oldText = messageTextFieldValue.value.text
+                                val newText = it.text
+                                val cursorPosition = it.selection.start
+                                
                                 messageTextFieldValue.value = it
-                                viewModel.updateMessage(it.text)
+                                
+                                // 如果关闭了"默认使用text"，需要处理组件标记
+                                if (!defaultUseText) {
+                                    val selectedComponent = selectedTextComponent
+                                    val selectedSubComponent = selectedSubComponent
+                                    
+                                    // 检测文本变化类型
+                                    if (newText.length > oldText.length) {
+                                        // 文本增加：插入新文本
+                                        val insertedText = newText.substring(cursorPosition - (newText.length - oldText.length), cursorPosition)
+                                        val insertPosition = cursorPosition - insertedText.length
+                                        
+                                        // 调用ViewModel的插入方法
+                                        if (selectedSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
+                                            // 副组件
+                                            viewModel.insertTextWithComponent(insertPosition, insertedText)
+                                        } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
+                                            // 主组件
+                                            viewModel.insertTextWithComponent(insertPosition, insertedText)
+                                        } else {
+                                            // 默认text组件
+                                            viewModel.updateMessage(newText)
+                                        }
+                                    } else if (newText.length < oldText.length) {
+                                        // 文本减少：删除文本
+                                        viewModel.updateMessage(newText)
+                                    } else {
+                                        // 文本长度相同，可能是替换或光标移动
+                                        viewModel.updateMessage(newText)
+                                    }
+                                    
+                                    // 更新悬停组件类型
+                                    if (cursorPosition > 0) {
+                                        viewModel.updateHoveredComponentType(cursorPosition - 1)
+                                    }
+                                } else {
+                                    // 直接更新
+                                    viewModel.updateMessage(newText)
+                                }
                             },
                             label = { Text(stringResource(R.string.input_text)) },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             maxLines = 5
                         )
+                        
+                        // 监听光标位置变化（自动更新悬停组件类型）
+                        if (!defaultUseText) {
+                            LaunchedEffect(messageTextFieldValue.value.selection) {
+                                val cursorPosition = messageTextFieldValue.value.selection.start
+                                if (cursorPosition > 0) {
+                                    viewModel.updateHoveredComponentType(cursorPosition - 1)
+                                }
+                            }
+                        }
                         
                         // 颜色代码快速输入
                         ColorCodeQuickInput(
@@ -614,7 +781,33 @@ private fun LandscapeLayout(
                                 viewModel.updateMessage(newText)
                             }
                         )
+                        
+                        // 文本组件选择器（当关闭"默认使用text文本组件"时显示）
+                        if (!defaultUseText) {
+                            TextComponentSelector(
+                                selectedComponent = selectedTextComponent,
+                                selectedSubComponent = selectedSubComponent,
+                                expandedSubComponents = expandedSubComponents,
+                                onComponentSelected = { component ->
+                                    viewModel.selectTextComponent(component)
+                                },
+                                onSubComponentToggle = { component ->
+                                    viewModel.toggleSubComponents(component)
+                                },
+                                onSubComponentSelected = { subComponent ->
+                                    viewModel.selectSubComponent(subComponent)
+                                }
+                            )
+                        }
                     }
+                }
+                
+                // 悬停显示的组件类型
+                if (hoveredComponentType != null && !defaultUseText) {
+                    CurrentComponentIndicator(
+                        component = hoveredComponentType,
+                        componentContent = hoveredComponentContent
+                    )
                 }
 
                 // 操作按钮
