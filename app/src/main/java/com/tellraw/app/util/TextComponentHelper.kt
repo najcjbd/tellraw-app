@@ -125,29 +125,29 @@ object TextComponentHelper {
         // 主内容
         val mainContent = if (parts.size >= 2) parts[1] else ""
         
-        // 解析副组件
+        // 解析副组件（跳过最后一个验证元素）
         val subComponents = mutableListOf<SubComponent>()
         var i = 2
-        while (i < parts.size) {
-            if (i + 1 < parts.size) {
-                val subTypeKey = parts[i]
-                val subType = SubComponentType.values().find { it.key == subTypeKey }
-                if (subType != null) {
-                    subComponents.add(SubComponent(subType, parts[i + 1]))
-                    i += 2
-                } else {
-                    i++
-                }
-            } else {
-                i++
+        while (i + 1 < parts.size - 1) {  // 减1是因为最后一个元素是验证类型
+            val subTypeKey = parts[i]
+            val subContent = parts[i + 1]
+            val subType = SubComponentType.values().find { it.key == subTypeKey }
+            if (subType != null) {
+                subComponents.add(SubComponent(subType, subContent))
             }
+            i += 2
         }
+        
+        // 验证最后一个元素是否等于类型（可选，用于验证）
+        // if (parts.size > 2 && parts.last() != typeKey) {
+        //     // 验证失败，但仍然返回解析结果
+        // }
         
         return TextComponent(type, mainContent, subComponents)
     }
     
     /**
-     将组件列表转换为标记文本
+     * 将组件列表转换为标记文本
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
