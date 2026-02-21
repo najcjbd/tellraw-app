@@ -41,8 +41,11 @@ class TellrawViewModel @Inject constructor(
     private val _selectorInput = MutableStateFlow("")
     val selectorInput: StateFlow<String> = _selectorInput.asStateFlow()
     
-    private val _messageInput = MutableStateFlow("")
+    private val _messageInput = MutableStateFlow("")  // 前台显示的纯文本（不包含标记符）
     val messageInput: StateFlow<String> = _messageInput.asStateFlow()
+    
+    private val _messageInputWithMarkers = MutableStateFlow("")  // 后台存储的带标记符文本
+    val messageInputWithMarkers: StateFlow<String> = _messageInputWithMarkers.asStateFlow()
     
     private val _javaCommand = MutableStateFlow("")
     val javaCommand: StateFlow<String> = _javaCommand.asStateFlow()
@@ -278,6 +281,9 @@ class TellrawViewModel @Inject constructor(
     
     fun updateMessage(message: String) {
         _messageInput.value = message
+        
+        // 同步更新带标记符的文本
+        _messageInputWithMarkers.value = message
         
         // 检测新增的§m和§n代码
         detectAndCountMNCodes(message)
@@ -703,8 +709,12 @@ class TellrawViewModel @Inject constructor(
             
             val selector = _selectorInput.value
             val message = _messageInput.value
+            val messageWithMarkers = _messageInputWithMarkers.value
             
-            if (selector.isEmpty() || message.isEmpty()) {
+            // 检查消息是否为空（使用带标记符的文本检查，因为纯文本可能为空但带标记符不为空）
+            val actualMessage = if (_defaultUseText.value) message else messageWithMarkers
+            
+            if (selector.isEmpty() || actualMessage.isEmpty()) {
                 _javaCommand.value = ""
                 _bedrockCommand.value = ""
                 _warnings.value = emptyList()
@@ -713,8 +723,12 @@ class TellrawViewModel @Inject constructor(
             }
             
             try {
-                // 确定要使用的消息（混合模式下使用后台存储）
-                val messageToUse = if (_mnMixedMode.value) backendMessageContent else message
+                // 确定要使用的消息
+                val messageToUse = when {
+                    _mnMixedMode.value -> backendMessageContent  // 混合模式下使用后台存储
+                    _defaultUseText.value -> message  // 默认使用text模式，使用纯文本
+                    else -> messageWithMarkers  // 使用带标记符的文本
+                }
                 
                 // 确定m_n_handling参数
                 val mNHandling = when {
@@ -848,6 +862,7 @@ class TellrawViewModel @Inject constructor(
         
         _selectorInput.value = ""
         _messageInput.value = ""
+        _messageInputWithMarkers.value = ""
         _javaCommand.value = ""
         _bedrockCommand.value = ""
         _warnings.value = emptyList()
@@ -893,6 +908,7 @@ class TellrawViewModel @Inject constructor(
     fun loadFromHistory(history: HistoryItem) {
         _selectorInput.value = history.selector
         _messageInput.value = history.message
+        _messageInputWithMarkers.value = history.message
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
         detectSelectorType()
@@ -1380,11 +1396,12 @@ class TellrawViewModel @Inject constructor(
      * 更新光标悬停位置的组件类型
      */
     fun updateHoveredComponentType(position: Int) {
-        val componentType = TextComponentHelper.getComponentTypeAtPosition(_messageInput.value, position)
+        // 使用带标记符的文本获取组件类型和内容
+        val componentType = TextComponentHelper.getComponentTypeAtPosition(_messageInputWithMarkers.value, position)
         _hoveredComponentType.value = componentType
         
         // 同时更新组件内容
-        val componentContent = TextComponentHelper.getComponentContentAtPosition(_messageInput.value, position)
+        val componentContent = TextComponentHelper.getComponentContentAtPosition(_messageInputWithMarkers.value, position)
         _hoveredComponentContent.value = componentContent
     }
     
@@ -1400,24 +1417,28 @@ class TellrawViewModel @Inject constructor(
         // 处理副组件逻辑
         if (currentSubComponent != null && currentComponent != null && currentComponent.hasSubComponent) {
             // 副组件：如果选中了副组件（如translate的with），输入的内容作为副组件内容
-            val components = TextComponentHelper.parseTextComponents(_messageInput.value)
+            val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
             val updatedComponents = processSubComponentInsertion(components, insertPosition, textToInsert, currentComponent, currentSubComponent)
             val newText = TextComponentHelper.componentsToText(updatedComponents)
-            _messageInput.value = newText
+            _messageInputWithMarkers.value = newText
         } else if (currentComponent != null && currentComponent != TextComponentHelper.ComponentType.TEXT) {
             // 主组件：选中了主组件，输入的内容作为主组件内容
             // 检查是否需要创建新组件还是汇入现有组件
             val newText = TextComponentHelper.insertTextWithComponent(
-                _messageInput.value,
+                _messageInputWithMarkers.value,
                 insertPosition,
                 textToInsert,
                 currentComponent
             )
-            _messageInput.value = newText
+            _messageInputWithMarkers.value = newText
         } else {
             // 未选中组件，直接插入（默认text组件）
-            _messageInput.value = _messageInput.value.substring(0, insertPosition) + textToInsert + _messageInput.value.substring(insertPosition)
+            _messageInputWithMarkers.value = _messageInputWithMarkers.value.substring(0, insertPosition) + textToInsert + _messageInputWithMarkers.value.substring(insertPosition)
         }
+        
+        // 更新前台显示的纯文本（去除标记符）
+        val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
+        _messageInput.value = plainText
         
         generateCommands()
     }
@@ -1481,8 +1502,9 @@ class TellrawViewModel @Inject constructor(
      * 清除组件标记（当关闭"默认使用text文本组件"选项时）
      */
     fun clearComponentMarkers() {
-        val plainText = TextComponentHelper.stripComponentMarkers(_messageInput.value)
-        if (plainText != _messageInput.value) {
+        val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
+        if (plainText != _messageInputWithMarkers.value) {
+            _messageInputWithMarkers.value = plainText
             _messageInput.value = plainText
             generateCommands()
         }
