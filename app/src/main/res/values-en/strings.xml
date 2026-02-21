@@ -53,6 +53,8 @@
     <string name="java_bedrock_mixed_mode">Java/Bedrock Mixed</string>
     <string name="java_bedrock_mixed_mode_description">When input has version params, keep each version\'s params and convert the rest</string>
     <string name="java_bedrock_mixed_mode_active">Java/Bedrock mixed mode on: found version params, auto-converted</string>
+    <string name="default_use_text">Default use text component</string>
+    <string name="default_use_text_description">Use text component when generating commands</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>

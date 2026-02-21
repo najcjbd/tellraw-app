@@ -56,6 +56,8 @@
     <string name="java_bedrock_mixed_mode">JAVA/基岩混合</string>
     <string name="java_bedrock_mixed_mode_description">輸入有兩版特有參數時，保留各自的參數並改其他參數</string>
     <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式開啟：找到兩版特有參數，自動轉換</string>
+    <string name="default_use_text">預設使用text文本組件</string>
+    <string name="default_use_text_description">生成命令時使用text文本組件</string>
     
     <!-- 顏色代碼 -->
     <string name="color_black">黑色</string>
