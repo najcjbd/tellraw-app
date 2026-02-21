@@ -1041,7 +1041,21 @@ ComponentType.SELECTOR -> {
      * 移除所有组件标记，返回纯文本
      */
     fun stripComponentMarkers(text: String): String {
-        return text.replace(MARKER_START.toString(), "")
-                  .replace(MARKER_END.toString(), "")
+        // 如果没有标记符，直接返回
+        if (!text.contains(MARKER_START) || !text.contains(MARKER_END)) {
+            return text
+        }
+        
+        // 解析组件列表
+        val components = parseTextComponents(text)
+        
+        // 提取纯文本内容
+        return components.joinToString("") { component ->
+            // 主内容
+            val mainContent = component.content
+            // 副组件内容
+            val subContent = component.subComponents.joinToString("") { it.content }
+            mainContent + subContent
+        }
     }
 }
