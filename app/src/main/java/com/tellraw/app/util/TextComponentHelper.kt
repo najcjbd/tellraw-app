@@ -134,7 +134,8 @@ object TextComponentHelper {
     
     /**
      * 解析单个组件（已知组件类型）
-     * 使用简单的副组件格式：__type.key__content
+     * 使用简单的副组件格式：__type.key__content__
+     * 注意：只有以__结束的才是有效的副组件，避免将用户输入的__with__误认为是副组件标记
      */
     private fun parseSingleComponentWithContent(type: ComponentType, content: String): TextComponent? {
         // 查找副组件
@@ -154,6 +155,7 @@ object TextComponentHelper {
             val subTypeKey = content.substring(typeStart, typeEnd)
             val subType = SubComponentType.values().find { it.key == subTypeKey }
             if (subType == null) {
+                // 不是有效的副组件类型，跳过
                 searchStart = typeEnd + 2
                 continue
             }
@@ -161,12 +163,15 @@ object TextComponentHelper {
             // 查找副组件内容（从typeEnd + 2开始，到下一个__）
             val contentStart = typeEnd + 2
             val contentEnd = content.indexOf("__", contentStart)
-            if (contentEnd == -1) break
+            if (contentEnd == -1) {
+                // 没有找到结束标记，这不是有效的副组件
+                break
+            }
             
             val subContent = content.substring(contentStart, contentEnd)
             subComponents.add(SubComponent(subType, subContent))
             
-            searchStart = contentEnd + 2
+            searchStart = contentEnd + 2  // 跳过结束标记__
         }
         
         // 提取主内容（到第一个副组件或字符串末尾）
@@ -187,13 +192,13 @@ object TextComponentHelper {
     /**
      * 将组件列表转换为标记文本
      * 格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
-     * 副组件格式：__type.key__content
+     * 副组件格式：__type.key__content__
      * 这样parseTextComponents可以直接使用字符串搜索，而不是深度计数
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
-                "__${sub.type.key}__${sub.content}"
+                "__${sub.type.key}__${sub.content}__"
             }
             "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END"
         }
@@ -458,16 +463,50 @@ object TextComponentHelper {
             currentPos += componentTextLength
         }
         
-        // 如果光标在所有组件之后，创建新组件
+        // 如果光标在所有组件之后，检查是否可以与最后一个组件合并
         if (targetComponentIndex == -1) {
-            val result = StringBuilder()
-            components.forEach { result.append(componentToText(it)) }
-            result.append(componentToText(TextComponent(currentComponent, textToInsert)))
-            return result.toString()
+            val lastComponent = components.lastOrNull()
+            if (lastComponent != null && lastComponent.type == currentComponent && lastComponent.subComponents.isEmpty()) {
+                // 与最后一个组件合并
+                val mergedContent = lastComponent.content + textToInsert
+                val mergedComponent = TextComponent(currentComponent, mergedContent, lastComponent.subComponents)
+                val result = StringBuilder()
+                for (i in 0 until components.size - 1) {
+                    result.append(componentToText(components[i]))
+                }
+                result.append(componentToText(mergedComponent))
+                return result.toString()
+            } else {
+                // 创建新组件
+                val result = StringBuilder()
+                components.forEach { result.append(componentToText(it)) }
+                result.append(componentToText(TextComponent(currentComponent, textToInsert)))
+                return result.toString()
+            }
         }
         
         // 光标在某个组件内
         val targetComponent = components[targetComponentIndex]
+        
+        // 如果目标组件类型与当前选中组件类型相同，直接合并内容
+        if (targetComponent.type == currentComponent && targetComponent.subComponents.isEmpty()) {
+            val newContent = targetComponent.content.substring(0, offsetInTargetComponent) + 
+                           textToInsert + 
+                           targetComponent.content.substring(offsetInTargetComponent)
+            val mergedComponent = TextComponent(currentComponent, newContent, targetComponent.subComponents)
+            
+            val result = StringBuilder()
+            for (i in 0 until targetComponentIndex) {
+                result.append(componentToText(components[i]))
+            }
+            result.append(componentToText(mergedComponent))
+            for (i in targetComponentIndex + 1 until components.size) {
+                result.append(componentToText(components[i]))
+            }
+            return result.toString()
+        }
+        
+        // 类型不同或有副组件，使用原有逻辑
         val result = StringBuilder()
         
         // 添加前面的组件
@@ -525,16 +564,19 @@ object TextComponentHelper {
      * 转换为Java版JSON
      */
     fun convertToJavaJson(
-    components: List<TextComponent>, 
-    mNHandling: String = "font", 
+    components: List<TextComponent>,
+    mNHandling: String = "font",
     mnCFEnabled: Boolean = false,
     context: Context? = null
 ): String {
         if (components.isEmpty()) return "{}"
-        
-        if (components.size == 1 && components[0].type == ComponentType.TEXT && components[0].subComponents.isEmpty()) {
+
+        // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
+        val expandedComponents = expandComponents(components)
+
+        if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
             // 单个纯文本组件
-            val plainText = components[0].content
+            val plainText = expandedComponents[0].content
             val formatMap = processSectionCodesToJson(plainText, mNHandling, mnCFEnabled)
             if (formatMap.isEmpty()) {
                 return """{"text":"$plainText"}"""
@@ -544,10 +586,10 @@ object TextComponentHelper {
                 return mapToJson(result)
             }
         }
-        
-        val mainComponent = components[0]
+
+        val mainComponent = expandedComponents[0]
         val result = mutableMapOf<String, Any>()
-        
+
         when (mainComponent.type) {
             ComponentType.TEXT -> {
                 result["text"] = mainComponent.content
@@ -558,30 +600,32 @@ object TextComponentHelper {
             ComponentType.TRANSLATE -> {
                 result["translate"] = mainComponent.content
                 if (mainComponent.subComponents.isNotEmpty()) {
-                    val withComponents = mainComponent.subComponents
-                        .filter { it.type == SubComponentType.WITH }
-                        .map { sub ->
-                            // 处理副组件内容中的§代码
-                            val subFormatMap = processSectionCodesToJson(sub.content, mNHandling, mnCFEnabled)
+                    val withSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.WITH }
+                    if (withSubComponent != null) {
+                        // 解析with参数（用逗号分隔，支持\,转义）
+                        val withParams = parseTranslateWithContent(withSubComponent.content)
+                        // 过滤空参数并处理§代码
+                        val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
+                            val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled)
                             if (subFormatMap.isEmpty()) {
-                                sub.content
+                                param
                             } else {
                                 val mutableMap = subFormatMap.toMutableMap()
-                                mutableMap["text"] = sub.content
+                                mutableMap["text"] = param
                                 mutableMap
                             }
                         }
-                    if (withComponents.isNotEmpty()) {
-                        result["with"] = withComponents
+                        if (withComponents.isNotEmpty()) {
+                            result["with"] = withComponents
+                        }
                     }
                 }
             }
             ComponentType.SCORE -> {
                 // 记分板分数格式：{"score":{"name":"...","objective":"..."}}
-                // 内容格式：name:objective，支持用逗号分隔多个
-                // 转义规则：如果name或objective包含逗号，用'\,'表示
+                // 内容格式：name:objective（已展开，每个组件只包含一个条目）
                 val scoreEntries = parseScoreContent(mainComponent.content)
-                
+
                 if (scoreEntries.isEmpty()) {
                     // 空内容，作为纯文本处理
                     result["text"] = mainComponent.content
@@ -591,71 +635,41 @@ object TextComponentHelper {
                         "name" to firstName,
                         "objective" to firstObjective
                     )
-                    
-                    // 添加剩余的score组件到extra
-                    if (scoreEntries.size > 1) {
-                        val extraScores = scoreEntries.drop(1).map { (name, objective) ->
-                            mapOf<String, Any>("score" to mapOf("name" to name, "objective" to objective))
-                        }
-                        
-                        // 如果已有extra，合并
-                        val existingExtra = result["extra"] as? List<Map<String, Any>> ?: emptyList()
-                        result["extra"] = existingExtra + extraScores
-                    }
                 }
             }
-ComponentType.SELECTOR -> {
-                // 选择器：完整调用选择器转换逻辑
+            ComponentType.SELECTOR -> {
+                // 选择器：完整调用选择器转换逻辑（已展开，每个组件只包含一个条目）
                 val selectorString = mainComponent.content
                 val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
-                
+
                 if (selectorEntries.isEmpty()) {
                     // 空内容，作为纯文本处理
                     result["text"] = mainComponent.content
                 } else {
-                    // 对每个selector调用完整的转换逻辑
-                    val convertedSelectors = selectorEntries.mapIndexed { index, selector ->
-                        if (context != null) {
-                            // 使用convertForMixedMode获取Java版和基岩版结果
-                            val reminders = mutableListOf<String>()
-                            val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selector, context, reminders)
-                            javaSelector  // Java版使用Java版结果
-                        } else {
-                            // 没有Context，保持原样
-                            selector
-                        }
+                    // 对selector调用完整的转换逻辑
+                    val convertedSelector = if (context != null) {
+                        // 使用convertForMixedMode获取Java版和基岩版结果
+                        val reminders = mutableListOf<String>()
+                        val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                        javaSelector  // Java版使用Java版结果
+                    } else {
+                        // 没有Context，保持原样
+                        selectorEntries[0]
                     }
-                    
-                    result["selector"] = convertedSelectors[0]
-                    
+
+                    result["selector"] = convertedSelector
+
                     // 如果有separator，添加到主selector
                     if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         result["separator"] = mapOf("text" to separatorEntries[0]!!)
                     }
-                    
-                    // 添加剩余的selector组件到extra
-                    if (convertedSelectors.size > 1) {
-                        val extraSelectors = mutableListOf<Map<String, Any>>()
-                        for (i in 1 until convertedSelectors.size) {
-                            val selectorMap = mutableMapOf<String, Any>("selector" to convertedSelectors[i])
-                            // 如果有separator，添加到该selector
-                            if (separatorEntries.size > i && separatorEntries[i] != null) {
-                                selectorMap["separator"] = mapOf("text" to separatorEntries[i]!!)
-                            }
-                            extraSelectors.add(selectorMap)
-                        }
-                        
-                        // 如果已有extra，合并
-                        val existingExtra = result["extra"] as? List<Map<String, Any>> ?: emptyList()
-                        result["extra"] = existingExtra + extraSelectors
-                    }
                 }
             }
         }
-        
+
         // 添加extra（如果有子组件）
-        if (components.size > 1) {
-            val extra = components.subList(1, components.size).map { sub ->
+        if (expandedComponents.size > 1) {
+            val extra = expandedComponents.subList(1, expandedComponents.size).map { sub ->
                 val subMap = mutableMapOf<String, Any>()
                 when (sub.type) {
                     ComponentType.TEXT -> {
@@ -666,26 +680,31 @@ ComponentType.SELECTOR -> {
                     ComponentType.TRANSLATE -> {
                         subMap["translate"] = sub.content
                         if (sub.subComponents.isNotEmpty()) {
-                            val withComponents = sub.subComponents
-                                .filter { it.type == SubComponentType.WITH }
-                                .map { with ->
-                                    val subFormatMap = processSectionCodesToJson(with.content, mNHandling, mnCFEnabled)
+                            val withSubComponent = sub.subComponents.find { it.type == SubComponentType.WITH }
+                            if (withSubComponent != null) {
+                                // 解析with参数（用逗号分隔，支持\,转义）
+                                val withParams = parseTranslateWithContent(withSubComponent.content)
+                                // 过滤空参数并处理§代码
+                                val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
+                                    val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled)
                                     if (subFormatMap.isEmpty()) {
-                                        with.content
+                                        param
                                     } else {
                                         val mutableMap = subFormatMap.toMutableMap()
-                                        mutableMap["text"] = with.content
+                                        mutableMap["text"] = param
                                         mutableMap
                                     }
                                 }
-                            if (withComponents.isNotEmpty()) {
-                                subMap["with"] = withComponents
+                                if (withComponents.isNotEmpty()) {
+                                    subMap["with"] = withComponents
+                                }
                             }
                         }
                     }
                     ComponentType.SCORE -> {
+                        // SCORE组件已展开，每个组件只包含一个条目
                         val scoreEntries = parseScoreContent(sub.content)
-                        
+
                         if (scoreEntries.isEmpty()) {
                             subMap["text"] = sub.content
                         } else {
@@ -694,60 +713,32 @@ ComponentType.SELECTOR -> {
                                 "name" to firstName,
                                 "objective" to firstObjective
                             )
-                            
-                            // 多个score组件，使用extra
-                            if (scoreEntries.size > 1) {
-                                val extraScores = scoreEntries.drop(1).map { (name, objective) ->
-                                    mapOf<String, Any>("score" to mapOf("name" to name, "objective" to objective))
-                                }
-                                
-                                // 将extraScores添加到extra列表中（稍后合并）
-                                subMap["__extra_scores__"] = extraScores
-                            }
                         }
                     }
                     ComponentType.SELECTOR -> {
-                        // SELECTOR组件支持多个选择器（用逗号分隔），完整调用选择器转换逻辑
+                        // SELECTOR组件已展开，每个组件只包含一个条目
                         val selectorString = sub.content
                         val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
-                        
+
                         if (selectorEntries.isEmpty()) {
                             subMap["text"] = sub.content
                         } else {
-                            // 对每个selector调用完整的转换逻辑
-                            val convertedSelectors = selectorEntries.mapIndexed { index, selector ->
-                                if (context != null) {
-                                    // 使用convertForMixedMode获取Java版和基岩版结果
-                                    val reminders = mutableListOf<String>()
-                                    val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selector, context, reminders)
-                                    javaSelector  // Java版使用Java版结果
-                                } else {
-                                    // 没有Context，保持原样
-                                    selector
-                                }
+                            // 对selector调用完整的转换逻辑
+                            val convertedSelector = if (context != null) {
+                                // 使用convertForMixedMode获取Java版和基岩版结果
+                                val reminders = mutableListOf<String>()
+                                val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                                javaSelector  // Java版使用Java版结果
+                            } else {
+                                // 没有Context，保持原样
+                                selectorEntries[0]
                             }
-                            
-                            subMap["selector"] = convertedSelectors[0]
-                            
+
+                            subMap["selector"] = convertedSelector
+
                             // 如果有separator，添加到主selector
                             if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
-                            }
-                            
-                            // 多个selector组件，使用extra
-                            if (convertedSelectors.size > 1) {
-                                val extraSelectors = mutableListOf<Map<String, Any>>()
-                                for (i in 1 until convertedSelectors.size) {
-                                    val selectorMap = mutableMapOf<String, Any>("selector" to convertedSelectors[i])
-                                    // 如果有separator，添加到该selector
-                                    if (separatorEntries.size > i && separatorEntries[i] != null) {
-                                        selectorMap["separator"] = mapOf("text" to separatorEntries[i]!!)
-                                    }
-                                    extraSelectors.add(selectorMap)
-                                }
-                                
-                                // 将extraSelectors添加到extra列表中（稍后合并）
-                                subMap["__extra_selectors__"] = extraSelectors
                             }
                         }
                     }
@@ -756,39 +747,7 @@ ComponentType.SELECTOR -> {
             }
             result["extra"] = extra
         }
-        
-        // 处理__extra_scores__，展开到extra中
-        val extraList = result["extra"] as? MutableList<Map<String, Any>> ?: mutableListOf()
-        val itemsToRemove = mutableListOf<Int>()
-        
-        for (i in extraList.indices) {
-            val item = extraList[i].toMutableMap()
-            val extraScores = item.remove("__extra_scores__") as? List<Map<String, Any>>
-            if (extraScores != null) {
-                extraList[i] = item  // 更新item，移除__extra_scores__
-                itemsToRemove.add(i)
-                // 在当前位置插入额外的score组件
-                extraList.addAll(i + 1, extraScores)
-            }
-            
-            val extraSelectors = item.remove("__extra_selectors__") as? List<Map<String, Any>>
-            if (extraSelectors != null) {
-                extraList[i] = item  // 更新item，移除__extra_selectors__
-                itemsToRemove.add(i)
-                // 在当前位置插入额外的selector组件
-                extraList.addAll(i + 1, extraSelectors)
-            }
-        }
-        
-        // 删除已处理的项
-        itemsToRemove.sortedDescending().forEach { extraList.removeAt(it) }
-        
-        if (extraList.isNotEmpty()) {
-            result["extra"] = extraList
-        } else {
-            result.remove("extra")
-        }
-        
+
         return mapToJson(result)
     }
     
@@ -803,10 +762,13 @@ ComponentType.SELECTOR -> {
     warnings: MutableList<String>? = null
 ): String {
         if (components.isEmpty()) return """{"rawtext":[]}"""
-        
-        val rawtext = components.map { component ->
+
+        // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
+        val expandedComponents = expandComponents(components)
+
+        val rawtext = expandedComponents.map { component ->
             val item = mutableMapOf<String, Any>()
-            
+
             when (component.type) {
                 ComponentType.TEXT -> {
                     // 处理§代码
@@ -815,21 +777,24 @@ ComponentType.SELECTOR -> {
                 ComponentType.TRANSLATE -> {
                     item["translate"] = component.content
                     if (component.subComponents.isNotEmpty()) {
-                        val withRawtext = component.subComponents
-                            .filter { it.type == SubComponentType.WITH }
-                            .map { with ->
-                                mapOf<String, Any>("text" to processSectionCodesToBedrock(with.content, mNHandling, mnCFEnabled))
+                        val withSubComponent = component.subComponents.find { it.type == SubComponentType.WITH }
+                        if (withSubComponent != null) {
+                            // 解析with参数（用逗号分隔，支持\,转义）
+                            val withParams = parseTranslateWithContent(withSubComponent.content)
+                            // 过滤空参数并处理§代码
+                            val withRawtext = withParams.filter { it.isNotEmpty() }.map { param ->
+                                mapOf<String, Any>("text" to processSectionCodesToBedrock(param, mNHandling, mnCFEnabled))
                             }
-                        if (withRawtext.isNotEmpty()) {
-                            item["with"] = mapOf("rawtext" to withRawtext)
+                            if (withRawtext.isNotEmpty()) {
+                                item["with"] = mapOf("rawtext" to withRawtext)
+                            }
                         }
                     }
                 }
                 ComponentType.SCORE -> {
-                    // 记分板分数格式：{"score":{"name":"...","objective":"..."}}
-                    // 支持多个name:objective，用逗号分隔
+                    // SCORE组件已展开，每个组件只包含一个条目
                     val scoreEntries = parseScoreContent(component.content)
-                    
+
                     if (scoreEntries.isEmpty()) {
                         // 空内容，作为纯文本处理
                         item["text"] = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
@@ -839,23 +804,13 @@ ComponentType.SELECTOR -> {
                             "name" to firstName,
                             "objective" to firstObjective
                         )
-                        
-                        // 添加剩余的score组件
-                        if (scoreEntries.size > 1) {
-                            val extraScores = scoreEntries.drop(1).map { (name, objective) ->
-                                mapOf<String, Any>("score" to mapOf("name" to name, "objective" to objective))
-                            }
-                            
-                            // 将extraScores添加到rawtext中（在函数返回前处理）
-                            item["__extra_scores__"] = extraScores
-                        }
                     }
                 }
-ComponentType.SELECTOR -> {
-                    // 选择器：完整调用选择器转换逻辑（基岩版不支持separator）
+                ComponentType.SELECTOR -> {
+                    // SELECTOR组件已展开，每个组件只包含一个条目
                     val selectorString = component.content
                     val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
-                    
+
                     if (selectorEntries.isEmpty()) {
                         // 空内容，作为纯文本处理
                         item["text"] = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
@@ -864,61 +819,35 @@ ComponentType.SELECTOR -> {
                         if (separatorEntries.any { it != null }) {
                             warnings?.add(context?.getString(R.string.bedrock_separator_not_supported) ?: "基岩版不支持separator参数，已忽略所有sep:定义")
                         }
-                        
-                        // 对每个selector调用完整的转换逻辑
-                        val convertedSelectors = selectorEntries.map { selector ->
-                            if (context != null) {
-                                // 使用convertForMixedMode获取Java版和基岩版结果
-                                val reminders = mutableListOf<String>()
-                                val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selector, context, reminders)
-                                bedrockSelector  // 基岩版使用基岩版结果
-                            } else {
-                                // 没有Context，保持原样
-                                selector
-                            }
+
+                        // 对selector调用完整的转换逻辑
+                        val convertedSelector = if (context != null) {
+                            // 使用convertForMixedMode获取Java版和基岩版结果
+                            val reminders = mutableListOf<String>()
+                            val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                            bedrockSelector  // 基岩版使用基岩版结果
+                        } else {
+                            // 没有Context，保持原样
+                            selectorEntries[0]
                         }
-                        
-                        item["selector"] = convertedSelectors[0]
-                        
-                        // 添加剩余的selector组件
-                        if (convertedSelectors.size > 1) {
-                            val extraSelectors = convertedSelectors.drop(1).map { selector ->
-                                mapOf<String, Any>("selector" to selector)
-                            }
-                            
-                            // 将extraSelectors添加到rawtext中（在函数返回前处理）
-                            item["__extra_selectors__"] = extraSelectors
-                        }
-                        
+
+                        item["selector"] = convertedSelector
+
                         // 基岩版不支持separator参数，忽略所有sep:定义
                     }
                 }
             }
-            
+
             item
         }
-        
-        // 处理__extra_scores__和__extra_selectors__，展开成多个rawtext项
-        val expandedRawtext = mutableListOf<Map<String, Any>>()
-        for (item in rawtext) {
-            expandedRawtext.add(item)
-            val extraScores = item.remove("__extra_scores__") as? List<Map<String, Any>>
-            if (extraScores != null) {
-                expandedRawtext.addAll(extraScores)
-            }
-            val extraSelectors = item.remove("__extra_selectors__") as? List<Map<String, Any>>
-            if (extraSelectors != null) {
-                expandedRawtext.addAll(extraSelectors)
-            }
-        }
-        
-        return """{"rawtext":${listToJson(expandedRawtext)}}"""
+
+        return """{"rawtext":${listToJson(rawtext)}}"""
     }
-    
+
     /**
      * 解析score组件内容
      * 格式：name:objective（支持用逗号分隔多个）
-     * 转义规则：如果name或objective包含逗号，用'\,'表示
+     * 转义规则：如果name或objective包含逗号，用\,表示
      */
     private fun parseScoreContent(content: String): List<Pair<String, String>> {
         val result = mutableListOf<Pair<String, String>>()
@@ -926,7 +855,7 @@ ComponentType.SELECTOR -> {
         var i = 0
         
         while (i < content.length) {
-            if (content[i] == ',' && i + 1 < content.length && content[i + 1] == ',') {
+            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
                 // 转义的逗号，添加单个逗号
                 currentEntry.append(',')
                 i += 2
@@ -955,7 +884,7 @@ ComponentType.SELECTOR -> {
      * 解析selector组件内容
      * 格式：selector（支持用逗号分隔多个）
      * 特殊语法：sep:分隔符（用于指定前面一个selector的分隔符，必须完整匹配sep:）
-     * 转义规则：如果selector包含逗号，用'\,'表示
+     * 转义规则：如果selector包含逗号，用\,表示
      * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
      */
     private fun parseSelectorContent(content: String): Pair<List<String>, List<String?>> {
@@ -965,7 +894,7 @@ ComponentType.SELECTOR -> {
         var i = 0
         
         while (i < content.length) {
-            if (content[i] == ',' && i + 1 < content.length && content[i + 1] == ',') {
+            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
                 // 转义的逗号，添加单个逗号
                 currentEntry.append(',')
                 i += 2
@@ -1049,6 +978,82 @@ ComponentType.SELECTOR -> {
         }
         return Pair(name, objective)
     }
+
+    /**
+     * 解析translate组件的with参数
+     * 格式：参数1,参数2,参数3（用逗号分隔多个参数）
+     * 转义规则：如果参数包含逗号，用\,表示
+     * @return 参数列表
+     */
+    private fun parseTranslateWithContent(content: String): List<String> {
+        val result = mutableListOf<String>()
+        var currentEntry = StringBuilder()
+        var i = 0
+
+        while (i < content.length) {
+            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
+                // 转义的逗号，添加单个逗号
+                currentEntry.append(',')
+                i += 2
+            } else if (content[i] == ',') {
+                // 分隔符，处理当前条目
+                result.add(currentEntry.toString())
+                currentEntry.clear()
+                i++
+            } else {
+                currentEntry.append(content[i])
+                i++
+            }
+        }
+
+        // 处理最后一个条目
+        result.add(currentEntry.toString())
+
+        return result
+    }
+
+    /**
+     * 展开组件列表，将score和selector组件中的多个条目分割成独立的文本组件
+     * 这样每个score或selector条目都会成为独立的文本组件，而不是放在同一个组件的extra中
+     */
+    private fun expandComponents(components: List<TextComponent>): List<TextComponent> {
+        val expanded = mutableListOf<TextComponent>()
+        
+        for (component in components) {
+            when (component.type) {
+                ComponentType.SCORE -> {
+                    val scoreEntries = parseScoreContent(component.content)
+                    if (scoreEntries.isEmpty()) {
+                        // 空内容，作为纯文本处理
+                        expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                    } else {
+                        // 每个score条目都作为独立的score组件
+                        for ((name, objective) in scoreEntries) {
+                            expanded.add(TextComponent(ComponentType.SCORE, "$name:$objective"))
+                        }
+                    }
+                }
+                ComponentType.SELECTOR -> {
+                    val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
+                    if (selectorEntries.isEmpty()) {
+                        // 空内容，作为纯文本处理
+                        expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                    } else {
+                        // 每个selector条目都作为独立的selector组件
+                        for ((index, selector) in selectorEntries.withIndex()) {
+                            expanded.add(TextComponent(ComponentType.SELECTOR, selector))
+                        }
+                    }
+                }
+                else -> {
+                    // 其他组件类型保持不变
+                    expanded.add(component)
+                }
+            }
+        }
+        
+        return expanded
+    }
     private fun mapToJson(map: Map<String, Any>): String {
         val entries = map.entries.joinToString(",") { (key, value) ->
             "\"$key\":${valueToJson(value)}"
@@ -1094,7 +1099,7 @@ ComponentType.SELECTOR -> {
         return components.joinToString("") { component ->
             // 主内容
             val mainContent = component.content
-            // 副组件内容（跳过__type.key__标记，只提取内容）
+            // 副组件内容（跳过__type.key__content__标记，只提取内容）
             val subContent = component.subComponents.joinToString("") { it.content }
             mainContent + subContent
         }
