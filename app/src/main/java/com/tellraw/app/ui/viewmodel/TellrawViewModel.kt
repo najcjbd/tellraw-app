@@ -353,34 +353,43 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 内容不同，重新构建带标记符的文本
-        // 简化处理：将前台文本作为纯文本，并保留旧组件的类型
-        val newComponents = mutableListOf<TextComponentHelper.TextComponent>()
-        var currentPos = 0
-        
-        for (oldComponent in oldComponents) {
-            val componentLength = oldComponent.content.length + oldComponent.subComponents.sumOf { it.content.length }
-            
-            if (currentPos + componentLength <= newLength) {
-                // 提取新的内容
-                val newContent = frontendMessage.substring(currentPos, currentPos + oldComponent.content.length)
-                
-                // 提取新的副组件内容
-                val newSubComponents = oldComponent.subComponents.map { oldSub ->
-                    val subContent = frontendMessage.substring(
-                        currentPos + oldComponent.content.length,
-                        currentPos + oldComponent.content.length + oldSub.content.length
-                    )
-                    TextComponentHelper.SubComponent(oldSub.type, subContent)
-                }.toMutableList()
-                
-                newComponents.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
-                currentPos += componentLength
+        // 检查是否所有组件都是TEXT组件
+        val allTextComponents = oldComponents.all { it.type == TextComponentHelper.ComponentType.TEXT && it.subComponents.isEmpty() }
+        val newComponents = if (allTextComponents) {
+            // 所有组件都是TEXT组件，将整个输入内容作为一个TEXT组件处理
+            mutableListOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage))
+        } else {
+            // 有非TEXT组件，需要保留原有的组件结构
+            val result = mutableListOf<TextComponentHelper.TextComponent>()
+            var currentPos = 0
+
+            for (oldComponent in oldComponents) {
+                val componentLength = oldComponent.content.length + oldComponent.subComponents.sumOf { it.content.length }
+
+                if (currentPos + componentLength <= newLength) {
+                    // 提取新的主组件内容
+                    val newContent = frontendMessage.substring(currentPos, currentPos + oldComponent.content.length)
+
+                    // 提取新的副组件内容
+                    val newSubComponents = oldComponent.subComponents.mapIndexed { index, oldSub ->
+                        // 计算副组件的起始位置（使用新主组件内容长度）
+                        val offset = newContent.length + oldComponent.subComponents.take(index).sumOf { it.content.length }
+                        val subContent = frontendMessage.substring(currentPos + offset, currentPos + offset + oldSub.content.length)
+                        TextComponentHelper.SubComponent(oldSub.type, subContent)
+                    }.toMutableList()
+
+                    result.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
+                    // 使用新组件的实际长度更新currentPos，而不是旧长度
+                    currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
+                }
             }
-        }
-        
-        // 添加剩余的纯文本
-        if (currentPos < newLength) {
-            newComponents.add(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage.substring(currentPos)))
+
+            // 添加剩余的纯文本
+            if (currentPos < newLength) {
+                result.add(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage.substring(currentPos)))
+            }
+
+            result
         }
         
         _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
@@ -1710,47 +1719,27 @@ class TellrawViewModel @Inject constructor(
         targetSubComponent: TextComponentHelper.SubComponentType
     ): List<TextComponentHelper.TextComponent> {
         val result = mutableListOf<TextComponentHelper.TextComponent>()
-        var currentPos = 0
-        var inserted = false
-        
+
         for (component in components) {
-            val componentLength = component.content.length + component.subComponents.sumOf { it.content.length }
-            
-            if (!inserted && insertPosition >= currentPos && insertPosition < currentPos + componentLength) {
-                // 在当前组件内插入
-                if (component.type == targetComponent) {
-                    // 主组件匹配，更新副组件
-                    val updatedSubComponents = component.subComponents.toMutableList()
-                    val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
-                    if (subComponent != null) {
-                        // 更新现有副组件
-                        val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
-                        updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
-                    } else {
-                        // 添加新副组件
-                        updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
-                    }
-                    result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
+            if (component.type == targetComponent) {
+                // 主组件匹配，更新副组件
+                val updatedSubComponents = component.subComponents.toMutableList()
+                val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
+                if (subComponent != null) {
+                    // 更新现有副组件：将textToInsert追加到content末尾
+                    val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
+                    updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
                 } else {
-                    // 主组件不匹配，保持原样
-                    result.add(component)
+                    // 添加新副组件
+                    updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
                 }
-                inserted = true
+                result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
             } else {
+                // 主组件不匹配，保持原样
                 result.add(component)
             }
-            
-            currentPos += componentLength
         }
-        
-        // 如果在所有组件之后插入
-        if (!inserted && insertPosition >= currentPos) {
-            val newSubComponents = mutableListOf<TextComponentHelper.SubComponent>(
-                TextComponentHelper.SubComponent(targetSubComponent, textToInsert)
-            )
-            result.add(TextComponentHelper.TextComponent(targetComponent, "", newSubComponents))
-        }
-        
+
         return result
     }
     

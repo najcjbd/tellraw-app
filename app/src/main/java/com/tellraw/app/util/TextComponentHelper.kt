@@ -574,8 +574,16 @@ object TextComponentHelper {
         // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
         val expandedComponents = expandComponents(components)
 
+        // 检查是否所有组件都是TEXT组件
+        val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
+        if (allTextComponents) {
+            // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
+            val combinedText = expandedComponents.joinToString("") { it.content }
+            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context)
+        }
+
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
-            // 单个纯文本组件
+            // 单个纯文本组件（这个分支现在不会被触发，因为上面已经处理了所有TEXT组件的情况）
             val plainText = expandedComponents[0].content
             val formatMap = processSectionCodesToJson(plainText, mNHandling, mnCFEnabled)
             if (formatMap.isEmpty()) {
@@ -766,6 +774,14 @@ object TextComponentHelper {
         // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
         val expandedComponents = expandComponents(components)
 
+        // 检查是否所有组件都是TEXT组件
+        val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
+        if (allTextComponents) {
+            // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
+            val combinedText = expandedComponents.joinToString("") { it.content }
+            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled)
+        }
+
         val rawtext = expandedComponents.map { component ->
             val item = mutableMapOf<String, Any>()
 
@@ -890,71 +906,35 @@ object TextComponentHelper {
     private fun parseSelectorContent(content: String): Pair<List<String>, List<String?>> {
         val selectors = mutableListOf<String>()
         val separators = mutableListOf<String?>()
-        var currentEntry = StringBuilder()
+        
+        // 使用@符号来分割selector条目
+        // 规则：第一个@为起点，后面一个@的前面一个文本为终点
+        // 如果@后面没有@了，那么就从那个@开始一直算到selector文本组件的末尾
+        var startIndex = -1
         var i = 0
         
         while (i < content.length) {
-            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
-                // 转义的逗号，添加单个逗号
-                currentEntry.append(',')
-                i += 2
-            } else if (content[i] == ',') {
-                // 分隔符，处理当前条目
-                val entry = currentEntry.toString().trim()
-                if (entry.isNotEmpty()) {
-                    if (entry == "sep:" || entry.startsWith("sep:")) {
-                        // 这是分隔符定义（必须以sep:开头）
-                        val separatorValue = entry.substring(4).trim()
-                        // 将分隔符应用到前一个selector
-                        if (selectors.isNotEmpty()) {
-                            // 更新最后一个selector的分隔符
-                            if (separators.size < selectors.size) {
-                                // 补齐分隔符列表
-                                while (separators.size < selectors.size - 1) {
-                                    separators.add(null)
-                                }
-                                separators.add(separatorValue.ifEmpty { "," })
-                            } else {
-                                // 替换最后一个分隔符（多个sep:时以最后一个为准）
-                                separators[separators.size - 1] = separatorValue.ifEmpty { "," }
-                            }
-                        }
-                    } else {
-                        // 这是普通selector
-                        selectors.add(entry)
-                        separators.add(null)  // 默认无分隔符
-                    }
-                }
-                currentEntry.clear()
+            if (content[i] == '@' && startIndex == -1) {
+                // 找到@，记录起点
+                startIndex = i
+                i++
+            } else if (content[i] == '@' && startIndex != -1) {
+                // 找到下一个@，提取从startIndex到i-1的selector
+                val selector = content.substring(startIndex, i)
+                selectors.add(selector)
+                separators.add(null)  // 默认无分隔符
+                startIndex = i  // 新的起点
                 i++
             } else {
-                currentEntry.append(content[i])
                 i++
             }
         }
         
-        // 处理最后一个条目
-        val lastEntry = currentEntry.toString().trim()
-        if (lastEntry.isNotEmpty()) {
-            if (lastEntry == "sep:" || lastEntry.startsWith("sep:")) {
-                // 这是分隔符定义
-                val separatorValue = lastEntry.substring(4).trim()
-                // 将分隔符应用到前一个selector
-                if (selectors.isNotEmpty()) {
-                    if (separators.size < selectors.size) {
-                        while (separators.size < selectors.size - 1) {
-                            separators.add(null)
-                        }
-                        separators.add(separatorValue.ifEmpty { "," })
-                    } else {
-                        separators[separators.size - 1] = separatorValue.ifEmpty { "," }
-                    }
-                }
-            } else {
-                // 这是普通selector
-                selectors.add(lastEntry)
-                separators.add(null)
-            }
+        // 处理最后一个@到末尾的selector
+        if (startIndex != -1) {
+            val selector = content.substring(startIndex)
+            selectors.add(selector)
+            separators.add(null)
         }
         
         return Pair(selectors, separators)
@@ -1018,9 +998,14 @@ object TextComponentHelper {
      */
     private fun expandComponents(components: List<TextComponent>): List<TextComponent> {
         val expanded = mutableListOf<TextComponent>()
-        
+
         for (component in components) {
             when (component.type) {
+                ComponentType.TEXT -> {
+                    // TEXT组件直接使用原有的text文本处理逻辑
+                    // 将TEXT组件的内容提取出来，作为纯文本处理
+                    expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                }
                 ComponentType.SCORE -> {
                     val scoreEntries = parseScoreContent(component.content)
                     if (scoreEntries.isEmpty()) {
@@ -1051,7 +1036,7 @@ object TextComponentHelper {
                 }
             }
         }
-        
+
         return expanded
     }
     private fun mapToJson(map: Map<String, Any>): String {
