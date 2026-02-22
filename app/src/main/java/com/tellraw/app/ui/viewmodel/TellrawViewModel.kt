@@ -78,6 +78,10 @@ class TellrawViewModel @Inject constructor(
     private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
     val selectedTextComponent: StateFlow<TextComponentHelper.ComponentType?> = _selectedTextComponent.asStateFlow()
     
+    // 光标位置状态（用于保持用户的光标位置）
+    private val _cursorPosition = MutableStateFlow(0)
+    val cursorPosition: StateFlow<Int> = _cursorPosition.asStateFlow()
+    
     private val _expandedSubComponents = MutableStateFlow<Set<String>>(emptySet())
     val expandedSubComponents: StateFlow<Set<String>> = _expandedSubComponents.asStateFlow()
     
@@ -1640,10 +1644,38 @@ class TellrawViewModel @Inject constructor(
                 )
             } else {
                 // 在副组件内删除
-                // TODO: 需要更复杂的逻辑来处理副组件删除
-                // 简化处理：直接使用updateComponentMarkers重建
-                updateComponentMarkers(newText)
-                return
+                // 找到要删除的副组件
+                val subComponentOffset = offsetInTargetComponent - targetComponent.content.length
+                var subCurrentPos = 0
+                var targetSubComponentIndex = -1
+                
+                for (subIndex in targetComponent.subComponents.indices) {
+                    val subLength = targetComponent.subComponents[subIndex].content.length
+                    if (subComponentOffset >= subCurrentPos && subComponentOffset < subCurrentPos + subLength) {
+                        targetSubComponentIndex = subIndex
+                        break
+                    }
+                    subCurrentPos += subLength
+                }
+                
+                if (targetSubComponentIndex != -1) {
+                    // 找到了副组件，更新副组件内容
+                    val targetSubComponent = targetComponent.subComponents[targetSubComponentIndex]
+                    val offsetInSubComponent = subComponentOffset - subCurrentPos
+                    val deleteEndInSubComponent = Math.min(offsetInSubComponent + deletedLength, targetSubComponent.content.length)
+                    
+                    val newSubContent = targetSubComponent.content.substring(0, offsetInSubComponent) +
+                                        targetSubComponent.content.substring(deleteEndInSubComponent)
+                    
+                    val updatedSubComponents = targetComponent.subComponents.toMutableList()
+                    updatedSubComponents[targetSubComponentIndex] = TextComponentHelper.SubComponent(targetSubComponent.type, newSubContent)
+                    
+                    newComponents[targetComponentIndex] = TextComponentHelper.TextComponent(
+                        targetComponent.type,
+                        targetComponent.content,
+                        updatedSubComponents
+                    )
+                }
             }
         } else {
             // 删除范围跨越多个组件
@@ -1719,10 +1751,15 @@ class TellrawViewModel @Inject constructor(
         targetSubComponent: TextComponentHelper.SubComponentType
     ): List<TextComponentHelper.TextComponent> {
         val result = mutableListOf<TextComponentHelper.TextComponent>()
-
+        var currentPos = 0
+        var processed = false
+        
         for (component in components) {
-            if (component.type == targetComponent) {
-                // 主组件匹配，更新副组件
+            val componentLength = component.content.length + component.subComponents.sumOf { it.content.length }
+            
+            if (!processed && component.type == targetComponent && 
+                insertPosition >= currentPos && insertPosition < currentPos + componentLength) {
+                // 找到了光标位置所在的组件，更新副组件
                 val updatedSubComponents = component.subComponents.toMutableList()
                 val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
                 if (subComponent != null) {
@@ -1734,10 +1771,13 @@ class TellrawViewModel @Inject constructor(
                     updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
                 }
                 result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
+                processed = true
             } else {
                 // 主组件不匹配，保持原样
                 result.add(component)
             }
+            
+            currentPos += componentLength
         }
 
         return result
@@ -1751,6 +1791,9 @@ class TellrawViewModel @Inject constructor(
         if (plainText != _messageInputWithMarkers.value) {
             _messageInputWithMarkers.value = plainText
             _messageInput.value = plainText
+            // 清空悬停组件类型和内容
+            _hoveredComponentType.value = null
+            _hoveredComponentContent.value = null
             generateCommands()
         }
     }

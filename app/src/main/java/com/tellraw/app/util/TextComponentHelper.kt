@@ -651,15 +651,29 @@ object TextComponentHelper {
                 val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
 
                 if (selectorEntries.isEmpty()) {
-                    // 空内容，作为纯文本处理
-                    result["text"] = mainComponent.content
+                    // 空内容，作为空selector处理
+                    result["selector"] = ""
                 } else {
                     // 对selector调用完整的转换逻辑
                     val convertedSelector = if (context != null) {
                         // 使用convertForMixedMode获取Java版和基岩版结果
                         val reminders = mutableListOf<String>()
                         val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
-                        javaSelector  // Java版使用Java版结果
+                        
+                        // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
+                        // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
+                        if (javaSelector == selectorEntries[0]) {
+                            // 没有进行任何转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
+                            val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
+                                selectorEntries[0],
+                                SelectorConverter.SelectorType.JAVA,
+                                context
+                            )
+                            filteredSelector
+                        } else {
+                            // 已经进行了转换，使用convertForMixedMode的结果
+                            javaSelector
+                        }
                     } else {
                         // 没有Context，保持原样
                         selectorEntries[0]
@@ -828,8 +842,8 @@ object TextComponentHelper {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
 
                     if (selectorEntries.isEmpty()) {
-                        // 空内容，作为纯文本处理
-                        item["text"] = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
+                        // 空内容，作为空selector处理
+                        item["selector"] = ""
                     } else {
                         // 检测是否有separator参数
                         if (separatorEntries.any { it != null }) {
@@ -841,7 +855,21 @@ object TextComponentHelper {
                             // 使用convertForMixedMode获取Java版和基岩版结果
                             val reminders = mutableListOf<String>()
                             val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
-                            bedrockSelector  // 基岩版使用基岩版结果
+                            
+                            // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
+                            // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
+                            if (bedrockSelector == selectorEntries[0]) {
+                                // 没有进行任何转换，调用filterSelectorParameters来处理Java版到基岩版的参数转换
+                                val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
+                                    selectorEntries[0],
+                                    SelectorConverter.SelectorType.BEDROCK,
+                                    context
+                                )
+                                filteredSelector
+                            } else {
+                                // 已经进行了转换，使用convertForMixedMode的结果
+                                bedrockSelector
+                            }
                         } else {
                             // 没有Context，保持原样
                             selectorEntries[0]
@@ -907,23 +935,44 @@ object TextComponentHelper {
         val selectors = mutableListOf<String>()
         val separators = mutableListOf<String?>()
         
-        // 使用@符号来分割selector条目
+        // 第一步：使用@符号来分割selector条目
         // 规则：第一个@为起点，后面一个@的前面一个文本为终点
         // 如果@后面没有@了，那么就从那个@开始一直算到selector文本组件的末尾
+        // 注意：非@开头的文本也应该被当作selector（例如玩家名字、uuid）
         var startIndex = -1
+        var lastAtPos = -1
         var i = 0
         
         while (i < content.length) {
-            if (content[i] == '@' && startIndex == -1) {
-                // 找到@，记录起点
-                startIndex = i
-                i++
-            } else if (content[i] == '@' && startIndex != -1) {
-                // 找到下一个@，提取从startIndex到i-1的selector
-                val selector = content.substring(startIndex, i)
-                selectors.add(selector)
-                separators.add(null)  // 默认无分隔符
-                startIndex = i  // 新的起点
+            if (content[i] == '@') {
+                if (startIndex == -1) {
+                    // 第一个@，记录起点
+                    // 检查前面是否有非@文本
+                    if (i > 0) {
+                        // 前面有非@文本，添加为selector
+                        val precedingText = content.substring(0, i)
+                        if (precedingText.isNotEmpty()) {
+                            selectors.add(precedingText)
+                            separators.add(null)
+                        }
+                    }
+                    startIndex = i
+                } else {
+                    // 找到下一个@，提取从startIndex到i-1的selector
+                    var selector = content.substring(startIndex, i)
+                    
+                    // 检查selector是否以逗号结尾，如果是，可能是sep:定义的一部分
+                    // 如果selector以逗号结尾，并且前面有sep:定义，则保留逗号
+                    // 否则，去掉末尾的逗号
+                    if (selector.endsWith(",") && !selector.contains(",'sep':")) {
+                        selector = selector.substring(0, selector.length - 1)
+                    }
+                    
+                    selectors.add(selector)
+                    separators.add(null)  // 默认无分隔符
+                    startIndex = i
+                }
+                lastAtPos = i
                 i++
             } else {
                 i++
@@ -935,9 +984,84 @@ object TextComponentHelper {
             val selector = content.substring(startIndex)
             selectors.add(selector)
             separators.add(null)
+        } else if (lastAtPos == -1 && content.isNotEmpty()) {
+            // 没有@，将整个内容作为selector
+            selectors.add(content)
+            separators.add(null)
         }
         
-        return Pair(selectors, separators)
+        // 后处理：如果一个条目不包含@符号，并且以,'sep':开头，那么它应该合并到前一个条目中
+        val mergedSelectors = mutableListOf<String>()
+        val mergedSeparators = mutableListOf<String?>()
+        for (i in selectors.indices) {
+            val selector = selectors[i]
+            if (!selector.contains("@") && selector.startsWith(",'sep':") && i > 0) {
+                // 合并到前一个条目
+                val lastSelector = mergedSelectors.last()
+                mergedSelectors[mergedSelectors.size - 1] = lastSelector + selector
+                // 合并时，前一个条目的separator保持不变
+            } else {
+                mergedSelectors.add(selector)
+                mergedSeparators.add(separators[i])
+            }
+        }
+        
+        // 更新selectors和separators
+        selectors.clear()
+        selectors.addAll(mergedSelectors)
+        separators.clear()
+        separators.addAll(mergedSeparators)
+        
+        // 第二步：处理sep:分隔符定义
+        // 规则：,'sep':分隔符 表示使用分隔符，作用范围是从它前面开始到结束或上一个sep:
+        // 注意：sep:定义应该应用到前面的条目，而不是后面的条目
+        // 处理方法：
+        // 1. 首先提取所有sep:定义及其位置
+        val sepDefinitions = mutableListOf<Pair<Int, String>>()  // (条目索引, 分隔符)
+        for (i in selectors.indices) {
+            val selector = selectors[i]
+            // 检查selector中是否包含sep:定义
+            if (",'sep':" in selector) {
+                // 提取sep:分隔符
+                val parts = selector.split(",'sep':")
+                if (parts.size >= 2) {
+                    val separatorValue = parts[1].trim()
+                    sepDefinitions.add(Pair(i, separatorValue.ifEmpty { "," }))
+                }
+            }
+        }
+        
+        // 2. 应用sep:定义到条目
+        // 规则：sep:定义从它所在的条目开始生效，直到下一个sep:定义
+        // 处理方法：
+        // 1. 清空separators列表
+        separators.clear()
+        // 2. 从每个条目中提取selector和separator
+        val cleanedSelectors = mutableListOf<String>()
+        var currentSeparator: String? = null
+        
+        for (i in selectors.indices) {
+            val selector = selectors[i]
+            var actualSelector = selector
+            
+            // 检查selector中是否包含sep:定义
+            if (",'sep':" in selector) {
+                // 提取sep:分隔符
+                val parts = selector.split(",'sep':")
+                if (parts.size >= 2) {
+                    val separatorValue = parts[1].trim()
+                    currentSeparator = separatorValue.ifEmpty { "," }
+                    // 移除sep:定义，得到实际的selector
+                    actualSelector = parts[0]
+                }
+            }
+            
+            cleanedSelectors.add(actualSelector)
+            // 将当前separator应用到这个条目
+            separators.add(currentSeparator)
+        }
+        
+        return Pair(cleanedSelectors, separators)
     }
     
     /**
@@ -1021,8 +1145,8 @@ object TextComponentHelper {
                 ComponentType.SELECTOR -> {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
                     if (selectorEntries.isEmpty()) {
-                        // 空内容，作为纯文本处理
-                        expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                        // 空内容，保留为selector组件（内容为空字符串）
+                        expanded.add(TextComponent(ComponentType.SELECTOR, ""))
                     } else {
                         // 每个selector条目都作为独立的selector组件
                         for ((index, selector) in selectorEntries.withIndex()) {

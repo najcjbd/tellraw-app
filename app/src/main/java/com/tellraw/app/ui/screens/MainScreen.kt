@@ -83,7 +83,14 @@ fun MainScreen(
     // 当messageInput变化时，同步更新messageTextFieldValue
     LaunchedEffect(messageInput) {
         if (messageTextFieldValue.value.text != messageInput) {
-            messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(messageInput)
+            // 保持当前的光标位置（如果可能的话）
+            val currentCursorPosition = messageTextFieldValue.value.selection.start
+            val newCursorPosition = minOf(currentCursorPosition, messageInput.length)
+            
+            messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+                text = messageInput,
+                selection = androidx.compose.ui.text.TextRange(newCursorPosition)
+            )
         }
     }
     
