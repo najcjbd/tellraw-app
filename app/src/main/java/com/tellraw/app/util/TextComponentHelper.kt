@@ -1187,16 +1187,8 @@ object TextComponentHelper {
             is String -> "\"${value.replace("\"", "\\\"")}\""
             is Number -> value.toString()
             is Boolean -> value.toString()
-            is Map<*, *> -> {
-                // 类型检查：确保Map的键是String，值是Any
-                @Suppress("UNCHECKED_CAST")
-                mapToJson(value as Map<String, Any>)
-            }
-            is List<*> -> {
-                // 类型检查：确保List的元素是Any
-                @Suppress("UNCHECKED_CAST")
-                listToJson(value as List<Any>)
-            }
+            is Map<*, *> -> mapToJson(value as Map<String, Any>)
+            is List<*> -> listToJson(value as List<Any>)
             else -> "\"$value\""
         }
     }
