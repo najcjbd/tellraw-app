@@ -994,16 +994,16 @@ object TextComponentHelper {
         // 后处理：如果一个条目不包含@符号，并且以,'sep':开头，那么它应该合并到前一个条目中
         val mergedSelectors = mutableListOf<String>()
         val mergedSeparators = mutableListOf<String?>()
-        for (i in selectors.indices) {
-            val selector = selectors[i]
-            if (!selector.contains("@") && selector.startsWith(",'sep':") && i > 0) {
+        for (idx in selectors.indices) {
+            val selector = selectors[idx]
+            if (!selector.contains("@") && selector.startsWith(",'sep':") && idx > 0) {
                 // 合并到前一个条目
                 val lastSelector = mergedSelectors.last()
                 mergedSelectors[mergedSelectors.size - 1] = lastSelector + selector
                 // 合并时，前一个条目的separator保持不变
             } else {
                 mergedSelectors.add(selector)
-                mergedSeparators.add(separators[i])
+                mergedSeparators.add(separators[idx])
             }
         }
         
@@ -1019,15 +1019,15 @@ object TextComponentHelper {
         // 处理方法：
         // 1. 首先提取所有sep:定义及其位置
         val sepDefinitions = mutableListOf<Pair<Int, String>>()  // (条目索引, 分隔符)
-        for (i in selectors.indices) {
-            val selector = selectors[i]
+        for (idx in selectors.indices) {
+            val selector = selectors[idx]
             // 检查selector中是否包含sep:定义
             if (",'sep':" in selector) {
                 // 提取sep:分隔符
                 val parts = selector.split(",'sep':")
                 if (parts.size >= 2) {
                     val separatorValue = parts[1].trim()
-                    sepDefinitions.add(Pair(i, separatorValue.ifEmpty { "," }))
+                    sepDefinitions.add(Pair(idx, separatorValue.ifEmpty { "," }))
                 }
             }
         }
@@ -1041,8 +1041,8 @@ object TextComponentHelper {
         val cleanedSelectors = mutableListOf<String>()
         var currentSeparator: String? = null
         
-        for (i in selectors.indices) {
-            val selector = selectors[i]
+        for (idx in selectors.indices) {
+            val selector = selectors[idx]
             var actualSelector = selector
             
             // 检查selector中是否包含sep:定义
@@ -1187,8 +1187,16 @@ object TextComponentHelper {
             is String -> "\"${value.replace("\"", "\\\"")}\""
             is Number -> value.toString()
             is Boolean -> value.toString()
-            is Map<*, *> -> mapToJson(value as Map<String, Any>)
-            is List<*> -> listToJson(value as List<Any>)
+            is Map<*, *> -> {
+                // 类型检查：确保Map的键是String，值是Any
+                @Suppress("UNCHECKED_CAST")
+                mapToJson(value as Map<String, Any>)
+            }
+            is List<*> -> {
+                // 类型检查：确保List的元素是Any
+                @Suppress("UNCHECKED_CAST")
+                listToJson(value as List<Any>)
+            }
             else -> "\"$value\""
         }
     }

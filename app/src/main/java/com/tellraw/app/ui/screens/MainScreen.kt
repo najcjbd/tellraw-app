@@ -415,7 +415,7 @@ private fun PortraitLayout(
                         // 如果关闭了"默认使用text"，需要处理组件标记
                         if (!defaultUseText) {
                             val selectedComponent = selectedTextComponent
-                            val selectedSubComponent = selectedSubComponent
+                            val currentSubComponent = selectedSubComponent
                             
                             // 检测文本变化类型
                             if (newText.length > oldText.length) {
@@ -424,7 +424,7 @@ private fun PortraitLayout(
                                 val insertPosition = cursorPosition - insertedText.length
                                 
                                 // 调用ViewModel的插入方法
-                                if (selectedSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
+                                if (currentSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
                                     // 副组件
                                     viewModel.insertTextWithComponent(insertPosition, insertedText)
                                 } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
@@ -719,7 +719,7 @@ private fun LandscapeLayout(
                                 // 如果关闭了"默认使用text"，需要处理组件标记
                                 if (!defaultUseText) {
                                     val selectedComponent = selectedTextComponent
-                                    val selectedSubComponent = selectedSubComponent
+                                    val currentSubComponent = selectedSubComponent
                                     
                                     // 检测文本变化类型
                                     if (newText.length > oldText.length) {
@@ -728,7 +728,7 @@ private fun LandscapeLayout(
                                         val insertPosition = cursorPosition - insertedText.length
                                         
                                         // 调用ViewModel的插入方法
-                                        if (selectedSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
+                                        if (currentSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
                                             // 副组件
                                             viewModel.insertTextWithComponent(insertPosition, insertedText)
                                         } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
