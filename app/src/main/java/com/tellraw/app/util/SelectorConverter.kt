@@ -833,14 +833,14 @@ object SelectorConverter {
         // 例如：转换过程可能产生新的重复参数，需要再次合并
         if ('[' in finalSelector && ']' in finalSelector) {
             val selectorVarPart = finalSelector.split('[')[0]
-            val paramsPart = finalSelector.substringAfter('[').substringBeforeLast(']')
+            val finalParamsPart = finalSelector.substringAfter('[').substringBeforeLast(']')
 
             // 合并重复参数
-            val mergedParamsPart = mergeDuplicateParameters(paramsPart)
+            val finalMergedParamsPart = mergeDuplicateParameters(finalParamsPart)
 
             // 重构选择器
-            finalSelector = if (mergedParamsPart.isNotEmpty()) {
-                "$selectorVarPart[$mergedParamsPart]"
+            finalSelector = if (finalMergedParamsPart.isNotEmpty()) {
+                "$selectorVarPart[$finalMergedParamsPart]"
             } else {
                 selectorVarPart
             }

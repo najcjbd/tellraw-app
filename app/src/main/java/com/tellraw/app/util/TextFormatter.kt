@@ -671,8 +671,6 @@ object TextFormatter {
         var bracketCount = 0
         var inString = false
         var escapeNext = false
-        var expectingKey = true  // 期望键（在对象开始时或逗号后）
-        var expectingValue = false  // 期望值（在冒号后）
         
         for (char in json) {
             when {
@@ -688,18 +686,9 @@ object TextFormatter {
                 !inString -> {
                     when (char) {
                         '{' -> braceCount++
-                        '}' -> {
-                            braceCount--
-                            expectingKey = false  // 对象结束
-                        }
+                        '}' -> braceCount--
                         '[' -> bracketCount++
                         ']' -> bracketCount--
-                        ':' -> {
-                            expectingValue = true  // 冒号后期望值
-                        }
-                        ',' -> {
-                            expectingKey = true  // 逗号后期望键
-                        }
                     }
                 }
             }

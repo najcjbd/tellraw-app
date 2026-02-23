@@ -1239,8 +1239,14 @@ object TextComponentHelper {
             is String -> "\"${value.replace("\"", "\\\"")}\""
             is Number -> value.toString()
             is Boolean -> value.toString()
-            is Map<*, *> -> mapToJson(value as Map<String, Any>)
-            is List<*> -> listToJson(value as List<Any>)
+            is Map<*, *> -> {
+                @Suppress("UNCHECKED_CAST")
+                mapToJson(value as Map<String, Any>)
+            }
+            is List<*> -> {
+                @Suppress("UNCHECKED_CAST")
+                listToJson(value as List<Any>)
+            }
             else -> "\"$value\""
         }
     }
