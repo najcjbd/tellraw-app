@@ -441,7 +441,10 @@ private fun PortraitLayout(
                                 viewModel.deleteTextWithComponent(deletePosition, deletedLength, newText)
                             } else {
                                 // 文本长度相同，可能是替换或光标移动
-                                viewModel.updateMessage(newText)
+                                // 检查是否真的需要更新（内容不同才更新）
+                                if (newText != oldText) {
+                                    viewModel.updateMessage(newText)
+                                }
                             }
                             
                             // 更新悬停组件类型
