@@ -751,7 +751,21 @@ object TextComponentHelper {
                                 // 使用convertForMixedMode获取Java版和基岩版结果
                                 val reminders = mutableListOf<String>()
                                 val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
-                                javaSelector  // Java版使用Java版结果
+                                
+                                // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
+                                // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
+                                if (javaSelector == selectorEntries[0]) {
+                                    // 没有进行任何转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
+                                    val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
+                                        selectorEntries[0],
+                                        SelectorType.JAVA,
+                                        context
+                                    )
+                                    filteredSelector
+                                } else {
+                                    // 已经进行了转换，使用convertForMixedMode的结果
+                                    javaSelector
+                                }
                             } else {
                                 // 没有Context，保持原样
                                 selectorEntries[0]

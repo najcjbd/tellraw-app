@@ -376,7 +376,7 @@ class TellrawViewModel @Inject constructor(
 
                     // 提取新的副组件内容
                     val newSubComponents = oldComponent.subComponents.mapIndexed { index, oldSub ->
-                        // 计算副组件的起始位置（使用新主组件内容长度）
+                        // 计算副组件的起始位置（使用新主组件内容长度 + 前面副组件的总长度）
                         val offset = newContent.length + oldComponent.subComponents.take(index).sumOf { it.content.length }
                         val subContent = frontendMessage.substring(currentPos + offset, currentPos + offset + oldSub.content.length)
                         TextComponentHelper.SubComponent(oldSub.type, subContent)
@@ -385,6 +385,29 @@ class TellrawViewModel @Inject constructor(
                     result.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
                     // 使用新组件的实际长度更新currentPos，而不是旧长度
                     currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
+                } else {
+                    // 组件长度超过了新文本长度，只保留部分内容
+                    val remainingLength = newLength - currentPos
+                    if (remainingLength > 0) {
+                        // 提取新的主组件内容（截断）
+                        val newContent = frontendMessage.substring(currentPos, currentPos + minOf(oldComponent.content.length, remainingLength))
+                        
+                        // 提取新的副组件内容（截断）
+                        val newSubComponents = mutableListOf<TextComponentHelper.SubComponent>()
+                        var subOffset = newContent.length
+                        
+                        for (oldSub in oldComponent.subComponents) {
+                            if (subOffset < newLength) {
+                                val remainingSubLength = newLength - subOffset
+                                val subContent = frontendMessage.substring(subOffset, subOffset + minOf(oldSub.content.length, remainingSubLength))
+                                newSubComponents.add(TextComponentHelper.SubComponent(oldSub.type, subContent))
+                                subOffset += oldSub.content.length
+                            }
+                        }
+                        
+                        result.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
+                        currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
+                    }
                 }
             }
 
@@ -1019,6 +1042,10 @@ class TellrawViewModel @Inject constructor(
         
         // 重置对话框状态
         _showMNDialog.value = null
+        
+        // 清空悬停组件类型和内容
+        _hoveredComponentType.value = null
+        _hoveredComponentContent.value = null
     }
     
     // 历史记录管理函数
