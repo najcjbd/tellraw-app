@@ -985,16 +985,40 @@ object TextComponentHelper {
                     // 找到下一个@，提取从startIndex到i-1的selector
                     var selector = content.substring(startIndex, i)
                     
-                    // 检查selector是否以逗号结尾，如果是，可能是sep:定义的一部分
-                    // 如果selector以逗号结尾，并且前面有sep:定义，则保留逗号
-                    // 否则，去掉末尾的逗号
-                    if (selector.endsWith(",") && !selector.contains(",'sep':")) {
-                        selector = selector.substring(0, selector.length - 1)
+                    // 检查两个@之间是否有文本（是否有第二个@）
+                    val atPos = selector.indexOf('@', 1)  // 从第2个字符开始查找@
+                    if (atPos != -1) {
+                        // 找到第二个@，说明两个@之间有文本
+                        // 将第一个@提取为selector
+                        val actualSelector = selector.substring(0, atPos)
+                        val remainingText = selector.substring(atPos)
+                        
+                        // 检查actualSelector是否以逗号结尾，如果是，并且前面没有sep:定义，则去掉末尾的逗号
+                        if (actualSelector.endsWith(",") && !actualSelector.contains(",'sep':")) {
+                            val cleanedSelector = actualSelector.substring(0, actualSelector.length - 1)
+                            selectors.add(cleanedSelector)
+                            separators.add(null)
+                        } else {
+                            selectors.add(actualSelector)
+                            separators.add(null)
+                        }
+                        
+                        // 将剩余文本（以@开头）作为下一个待处理的selector
+                        // 重新设置startIndex，让它指向剩余文本中的第一个@
+                        startIndex = i - remainingText.length
+                        lastAtPos = i - remainingText.length
+                        continue  // 不更新i，让循环继续处理剩余文本
+                    } else {
+                        // 没有找到第二个@，直接添加selector
+                        // 检查selector是否以逗号结尾，如果是，并且前面没有sep:定义，则去掉末尾的逗号
+                        if (selector.endsWith(",") && !selector.contains(",'sep':")) {
+                            selector = selector.substring(0, selector.length - 1)
+                        }
+                        
+                        selectors.add(selector)
+                        separators.add(null)
+                        startIndex = i
                     }
-                    
-                    selectors.add(selector)
-                    separators.add(null)  // 默认无分隔符
-                    startIndex = i
                 }
                 lastAtPos = i
                 i++

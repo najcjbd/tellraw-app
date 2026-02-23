@@ -376,8 +376,9 @@ class TellrawViewModel @Inject constructor(
 
                     // 提取新的副组件内容
                     val newSubComponents = oldComponent.subComponents.mapIndexed { index, oldSub ->
-                        // 计算副组件的起始位置（使用新主组件内容长度 + 前面副组件的总长度）
-                        val offset = newContent.length + oldComponent.subComponents.take(index).sumOf { it.content.length }
+                        // 计算副组件的起始位置（使用旧主组件内容长度 + 前面副组件的总长度）
+                        // 注意：必须使用oldComponent.content.length，因为副组件位置是基于旧组件结构的
+                        val offset = oldComponent.content.length + oldComponent.subComponents.take(index).sumOf { it.content.length }
                         val subContent = frontendMessage.substring(currentPos + offset, currentPos + offset + oldSub.content.length)
                         TextComponentHelper.SubComponent(oldSub.type, subContent)
                     }.toMutableList()
@@ -394,7 +395,7 @@ class TellrawViewModel @Inject constructor(
                         
                         // 提取新的副组件内容（截断）
                         val newSubComponents = mutableListOf<TextComponentHelper.SubComponent>()
-                        var subOffset = newContent.length
+                        var subOffset = oldComponent.content.length
                         
                         for (oldSub in oldComponent.subComponents) {
                             if (subOffset < newLength) {
