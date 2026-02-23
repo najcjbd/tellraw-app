@@ -491,7 +491,7 @@ object TextComponentHelper {
         val targetComponent = components[targetComponentIndex]
         
         // 如果目标组件类型与当前选中组件类型相同，直接合并内容
-        if (targetComponent.type == currentComponent && targetComponent.subComponents.isEmpty()) {
+        if (targetComponent.type == currentComponent) {
             val newContent = targetComponent.content.substring(0, offsetInTargetComponent) + 
                            textToInsert + 
                            targetComponent.content.substring(offsetInTargetComponent)
