@@ -317,7 +317,13 @@ class TellrawViewModel @Inject constructor(
         detectAndCountMNCodes(message)
         
         // 更新悬停组件类型（光标在末尾）
-        updateHoveredComponentType(message.length - 1)
+        // 如果message为空，清除hoveredComponentType
+        if (message.isEmpty()) {
+            _hoveredComponentType.value = null
+            _hoveredComponentContent.value = null
+        } else {
+            updateHoveredComponentType(message.length - 1)
+        }
         
         // 始终生成命令，不等待对话框关闭
         generateCommands()
@@ -1749,6 +1755,15 @@ class TellrawViewModel @Inject constructor(
                 currentComponent
             )
             _messageInputWithMarkers.value = newText
+        } else if (currentComponent == TextComponentHelper.ComponentType.TEXT) {
+            // 选中了TEXT组件，调用insertTextWithComponent创建text组件标记
+            val newText = TextComponentHelper.insertTextWithComponent(
+                _messageInputWithMarkers.value,
+                insertPosition,
+                textToInsert,
+                currentComponent
+            )
+            _messageInputWithMarkers.value = newText
         } else {
             // 未选中组件，直接插入（默认text组件）
             _messageInputWithMarkers.value = _messageInputWithMarkers.value.substring(0, insertPosition) + textToInsert + _messageInputWithMarkers.value.substring(insertPosition)
@@ -1786,19 +1801,31 @@ class TellrawViewModel @Inject constructor(
             val componentLength = component.content.length + component.subComponents.sumOf { it.content.length }
             
             if (!processed && component.type == targetComponent && 
-                insertPosition >= currentPos && insertPosition < currentPos + componentLength) {
-                // 找到了光标位置所在的组件，更新副组件
-                val updatedSubComponents = component.subComponents.toMutableList()
-                val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
-                if (subComponent != null) {
-                    // 更新现有副组件：将textToInsert追加到content末尾
-                    val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
-                    updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
+                insertPosition >= currentPos && insertPosition <= currentPos + componentLength) {
+                // 找到了光标位置所在的组件（包括末尾）
+                
+                // 检查光标位置是否在主组件内（不包括末尾）
+                if (insertPosition < currentPos + component.content.length) {
+                    // 光标在主组件内（不包括末尾），更新主组件内容
+                    val offsetInMainContent = insertPosition - currentPos
+                    val newContent = component.content.substring(0, offsetInMainContent) + 
+                                   textToInsert + 
+                                   component.content.substring(offsetInMainContent)
+                    result.add(TextComponentHelper.TextComponent(component.type, newContent, component.subComponents))
                 } else {
-                    // 添加新副组件
-                    updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+                    // 光标在副组件内或副组件后（包括主组件末尾），更新副组件
+                    val updatedSubComponents = component.subComponents.toMutableList()
+                    val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
+                    if (subComponent != null) {
+                        // 更新现有副组件：将textToInsert追加到content末尾
+                        val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
+                        updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
+                    } else {
+                        // 添加新副组件
+                        updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+                    }
+                    result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
                 }
-                result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
                 processed = true
             } else {
                 // 主组件不匹配，保持原样

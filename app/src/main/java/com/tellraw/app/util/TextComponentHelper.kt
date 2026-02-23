@@ -434,8 +434,13 @@ object TextComponentHelper {
         if (textToInsert.isEmpty()) return originalText
         
         // 如果没有选中组件，直接插入（默认text组件）
-        if (currentComponent == null || currentComponent == ComponentType.TEXT) {
+        if (currentComponent == null) {
             return originalText.substring(0, insertPosition) + textToInsert + originalText.substring(insertPosition)
+        }
+        
+        // 如果选中了TEXT组件，创建新的text组件标记
+        if (currentComponent == ComponentType.TEXT) {
+            return originalText.substring(0, insertPosition) + componentToText(TextComponent(ComponentType.TEXT, textToInsert)) + originalText.substring(insertPosition)
         }
         
         // 解析原始文本
@@ -946,38 +951,134 @@ object TextComponentHelper {
         }
         
         return result
-    }
-    
-    /**
-     * 解析selector组件内容
+        
+            }
+        
+            
+        
+            /**
+        
+             * 解析单个score条目
+        
+             * 格式：name:objective
+        
+             */
+        
+            private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
+        
+                val parts = entry.split(":", limit = 2)
+        
+                val name = when {
+        
+                    parts[0].isEmpty() && parts.size == 2 -> "*"  // 只有:objective
+        
+                    parts[0].isEmpty() -> "*"  // 只有:
+        
+                    else -> parts[0]
+        
+                }
+        
+                val objective = when {
+        
+                    parts.size == 2 && parts[1].isEmpty() -> "*"  // 只有name:
+        
+                    parts.size == 2 -> parts[1]  // 正常格式
+        
+                    else -> "*"  // 只有name或格式错误
+        
+                }
+        
+                return Pair(name, objective)
+        
+            }
+        
+        
+        
+            /**
+        
+             * 解析selector组件内容
      * 格式：selector（支持用逗号分隔多个）
      * 特殊语法：sep:分隔符（用于指定前面一个selector的分隔符，必须完整匹配sep:）
      * 转义规则：如果selector包含逗号，用\,表示
      * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
      */
+    /**
+     * 解析selector组件内容
+     * 格式：selector（支持用逗号分隔多个）
+     * 特殊语法：,'sep':分隔符（用于指定前面所有@选择器的分隔符）
+     * 转义规则：如果selector包含逗号，用\,表示
+     * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
+     */
     private fun parseSelectorContent(content: String): Pair<List<String>, List<String?>> {
-        val selectors = mutableListOf<String>()
-        val separators = mutableListOf<String?>()
-        
-        // 第一步：使用@符号来分割selector条目
-        // 规则：第一个@为起点，后面一个@的前面一个文本为终点
-        // 如果@后面没有@了，那么就从那个@开始一直算到selector文本组件的末尾
-        // 注意：非@开头的文本也应该被当作selector（例如玩家名字、uuid）
-        var startIndex = -1
-        var lastAtPos = -1
+        // 第一步：提取所有sep:定义和它们的位置
+        // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级
+        // ,'sep':后面的文本一直到下一个,(不包含,)为一个整体，或者是如果后面没有,时，那么就是一直到结束的文本的separator
+        val sepDefinitions = mutableListOf<Triple<Int, String, Int>>()  // (原始位置索引, 分隔符, selector索引)
         var i = 0
         
         while (i < content.length) {
+            if (content.substring(i).startsWith(",'sep':")) {
+                // 找到sep:定义
+                val sepStart = i
+                var sepEnd = i + 7  // ,'sep':的长度
+                
+                // 提取separator值
+                // 规则：,'sep':后面的文本一直到下一个,(不包含,)为一个整体，或者是如果后面没有,时，那么就是一直到结束的文本
+                val remainingText = content.substring(sepEnd)
+                val nextCommaIndex = remainingText.indexOf(',')
+                val separatorValue = if (nextCommaIndex != -1) {
+                    remainingText.substring(0, nextCommaIndex).trim()
+                } else {
+                    remainingText.trim()
+                }
+                
+                sepDefinitions.add(Triple(sepStart, separatorValue.ifEmpty { "," }, -1))  // selector索引暂时设为-1
+                
+                // 跳过sep:定义和separator值
+                if (nextCommaIndex != -1) {
+                    i = sepEnd + nextCommaIndex
+                } else {
+                    i = content.length
+                }
+            } else {
+                i++
+            }
+        }
+        
+        // 第二步：提取selector条目（不包括sep:定义），同时记录每个selector的原始位置
+        // 规则：选择器的读取是从@一直到后面一个@(不包含后面一个@)，或者是如果后面没有@了那就表明一直到这个文本组件的结束或者一直到后面的,(不包含,)
+        // 规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数(第一个@前面的'sep':直接被忽略)
+        val selectors = mutableListOf<String>()
+        val selectorPositions = mutableListOf<Int>()  // 每个selector的原始位置
+        var startIndex = -1
+        var lastAtPos = -1
+        i = 0
+        
+        while (i < content.length) {
+            // 跳过sep:定义
+            if (content.substring(i).startsWith(",'sep':")) {
+                // 跳过整个sep:定义
+                val sepEnd = i + 7
+                val remainingText = content.substring(sepEnd)
+                val nextCommaIndex = remainingText.indexOf(',')
+                if (nextCommaIndex != -1) {
+                    i = sepEnd + nextCommaIndex + 1
+                } else {
+                    i = content.length
+                }
+                continue
+            }
+            
             if (content[i] == '@') {
                 if (startIndex == -1) {
                     // 第一个@，记录起点
                     // 检查前面是否有非@文本
-                    if (i > 0) {
+                    if (i > 0 && lastAtPos == -1) {
                         // 前面有非@文本，添加为selector
                         val precedingText = content.substring(0, i)
                         if (precedingText.isNotEmpty()) {
                             selectors.add(precedingText)
-                            separators.add(null)
+                            selectorPositions.add(0)  // 第一个selector的位置是0
                         }
                     }
                     startIndex = i
@@ -985,42 +1086,31 @@ object TextComponentHelper {
                     // 找到下一个@，提取从startIndex到i-1的selector
                     var selector = content.substring(startIndex, i)
                     
-                    // 检查两个@之间是否有文本（是否有第二个@）
-                    val atPos = selector.indexOf('@', 1)  // 从第2个字符开始查找@
-                    if (atPos != -1) {
-                        // 找到第二个@，说明两个@之间有文本
-                        // 将第一个@提取为selector
-                        val actualSelector = selector.substring(0, atPos)
-                        val remainingText = selector.substring(atPos)
-                        
-                        // 检查actualSelector是否以逗号结尾，如果是，并且前面没有sep:定义，则去掉末尾的逗号
-                        if (actualSelector.endsWith(",") && !actualSelector.contains(",'sep':")) {
-                            val cleanedSelector = actualSelector.substring(0, actualSelector.length - 1)
-                            selectors.add(cleanedSelector)
-                            separators.add(null)
-                        } else {
-                            selectors.add(actualSelector)
-                            separators.add(null)
-                        }
-                        
-                        // 将剩余文本（以@开头）作为下一个待处理的selector
-                        // 重新设置startIndex，让它指向剩余文本中的第一个@
-                        startIndex = i - remainingText.length
-                        lastAtPos = i - remainingText.length
-                        continue  // 不更新i，让循环继续处理剩余文本
-                    } else {
-                        // 没有找到第二个@，直接添加selector
-                        // 检查selector是否以逗号结尾，如果是，并且前面没有sep:定义，则去掉末尾的逗号
-                        if (selector.endsWith(",") && !selector.contains(",'sep':")) {
-                            selector = selector.substring(0, selector.length - 1)
-                        }
-                        
-                        selectors.add(selector)
-                        separators.add(null)
-                        startIndex = i
+                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+                    if (selector.endsWith(",")) {
+                        selector = selector.substring(0, selector.length - 1)
                     }
+                    
+                    selectors.add(selector)
+                    selectorPositions.add(startIndex)
+                    startIndex = i
                 }
                 lastAtPos = i
+                i++
+            } else if (content[i] == ',') {
+                // 逗号，处理当前条目
+                if (startIndex != -1) {
+                    var selector = content.substring(startIndex, i)
+                    
+                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+                    if (selector.endsWith(",")) {
+                        selector = selector.substring(0, selector.length - 1)
+                    }
+                    
+                    selectors.add(selector)
+                    selectorPositions.add(startIndex)
+                    startIndex = -1
+                }
                 i++
             } else {
                 i++
@@ -1029,112 +1119,107 @@ object TextComponentHelper {
         
         // 处理最后一个@到末尾的selector
         if (startIndex != -1) {
-            val selector = content.substring(startIndex)
+            var selector = content.substring(startIndex)
+            
+            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+            if (selector.endsWith(",")) {
+                selector = selector.substring(0, selector.length - 1)
+            }
+            
             selectors.add(selector)
-            separators.add(null)
+            selectorPositions.add(startIndex)
         } else if (lastAtPos == -1 && content.isNotEmpty()) {
             // 没有@，将整个内容作为selector
             selectors.add(content)
+            selectorPositions.add(0)
+        }
+        
+        // 第三步：为每个sep:定义找到对应的selector索引
+        // 规则：sep:定义修饰它前面的所有@选择器，直到遇到没有被separator修饰的@选择器
+        // 限制：
+        // 1. separator只能修饰@选择器（mknbt、uuid等非@选择器忽略separator）
+        // 2. 第一个@前面的sep:定义直接被忽略
+        // 3. 'sep':'air'的特殊情况优先级最高：前面的第一个@选择器会自动忽略所有separator参数
+        
+        // 为每个sep:定义找到对应的selector索引
+        // sep:定义应该放在它前面的第一个selector之后
+        for (sepIdx in sepDefinitions.indices) {
+            val sepPos = sepDefinitions[sepIdx].first
+            // 找到sepPos前面最近的selector
+            var bestSelectorIndex = -1
+            for (selectorIdx in selectorPositions.indices) {
+                if (selectorPositions[selectorIdx] < sepPos) {
+                    bestSelectorIndex = selectorIdx
+                } else {
+                    break
+                }
+            }
+            sepDefinitions[sepIdx] = Triple(sepPos, sepDefinitions[sepIdx].second, bestSelectorIndex)
+        }
+        
+        // 初始化separators列表，全部为null
+        val separators = mutableListOf<String?>()
+        for (idx in selectors.indices) {
             separators.add(null)
         }
         
-        // 后处理：如果一个条目不包含@符号，并且以,'sep':开头，那么它应该合并到前一个条目中
-        val mergedSelectors = mutableListOf<String>()
-        val mergedSeparators = mutableListOf<String?>()
+        // 找到第一个@选择器的位置
+        var firstAtSelectorIndex = -1
         for (idx in selectors.indices) {
-            val selector = selectors[idx]
-            if (!selector.contains("@") && selector.startsWith(",'sep':") && idx > 0) {
-                // 合并到前一个条目
-                val lastSelector = mergedSelectors.last()
-                mergedSelectors[mergedSelectors.size - 1] = lastSelector + selector
-                // 合并时，前一个条目的separator保持不变
-            } else {
-                mergedSelectors.add(selector)
-                mergedSeparators.add(separators[idx])
+            if (selectors[idx].startsWith("@")) {
+                firstAtSelectorIndex = idx
+                break
             }
         }
         
-        // 更新selectors和separators
-        selectors.clear()
-        selectors.addAll(mergedSelectors)
-        separators.clear()
-        separators.addAll(mergedSeparators)
-        
-        // 第二步：处理sep:分隔符定义
-        // 规则：,'sep':分隔符 表示使用分隔符，作用范围是从它前面开始到结束或上一个sep:
-        // 注意：sep:定义应该应用到前面的条目，而不是后面的条目
-        // 处理方法：
-        // 1. 首先提取所有sep:定义及其位置
-        val sepDefinitions = mutableListOf<Pair<Int, String>>()  // (条目索引, 分隔符)
-        for (idx in selectors.indices) {
-            val selector = selectors[idx]
-            // 检查selector中是否包含sep:定义
-            if (",'sep':" in selector) {
-                // 提取sep:分隔符
-                val parts = selector.split(",'sep':")
-                if (parts.size >= 2) {
-                    val separatorValue = parts[1].trim()
-                    sepDefinitions.add(Pair(idx, separatorValue.ifEmpty { "," }))
+        // 处理sep:定义
+        for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
+            if (sepIndex == -1) continue
+            
+            // 检查sep:定义是否在第一个@选择器之前
+            if (firstAtSelectorIndex != -1 && sepIndex < firstAtSelectorIndex) {
+                // 第一个@前面的sep:定义直接被忽略
+                continue
+            }
+            
+            // 检查是否是,'sep':'air'（特殊情况）
+            if (separatorValue == "air") {
+                // 找到sep:定义前面的第一个@选择器
+                var targetIndex = -1
+                for (index in sepIndex - 1 downTo 0) {
+                    if (selectors[index].startsWith("@")) {
+                        targetIndex = index
+                        break
+                    }
+                }
+                if (targetIndex != -1) {
+                    // 第一个@选择器忽略所有separator参数（设置为null）
+                    separators[targetIndex] = null
+                }
+                continue
+            }
+            
+            // 从sepIndex开始往前查找，修饰所有@选择器
+            // 规则：separator修饰它前面所有@选择器，直到遇到没有被separator修饰的@选择器
+            for (index in sepIndex - 1 downTo 0) {
+                if (selectors[index].startsWith("@")) {
+                    // 这是一个@选择器
+                    if (separators[index] == null) {
+                        // 这个@选择器还没有被修饰，应用separator
+                        separators[index] = separatorValue
+                    } else {
+                        // 这个@选择器已经被修饰了，停止
+                        break
+                    }
                 }
             }
         }
         
-        // 2. 应用sep:定义到条目
-        // 规则：sep:定义从它所在的条目开始生效，直到下一个sep:定义
-        // 处理方法：
-        // 1. 清空separators列表
-        separators.clear()
-        // 2. 从每个条目中提取selector和separator
-        val cleanedSelectors = mutableListOf<String>()
-        var currentSeparator: String? = null
-        
-        for (idx in selectors.indices) {
-            val selector = selectors[idx]
-            var actualSelector = selector
-            
-            // 检查selector中是否包含sep:定义
-            if (",'sep':" in selector) {
-                // 提取sep:分隔符
-                val parts = selector.split(",'sep':")
-                if (parts.size >= 2) {
-                    val separatorValue = parts[1].trim()
-                    currentSeparator = separatorValue.ifEmpty { "," }
-                    // 移除sep:定义，得到实际的selector
-                    actualSelector = parts[0]
-                }
-            }
-            
-            cleanedSelectors.add(actualSelector)
-            // 将当前separator应用到这个条目
-            separators.add(currentSeparator)
-        }
-        
-        return Pair(cleanedSelectors, separators)
+        return Pair(selectors, separators)
     }
     
     /**
-     * 解析单个score条目
-     * 格式：name:objective
-     */
-    private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
-        val parts = entry.split(":", limit = 2)
-        val name = when {
-            parts[0].isEmpty() && parts.size == 2 -> "*"  // 只有:objective
-            parts[0].isEmpty() -> "*"  // 只有:
-            else -> parts[0]
-        }
-        val objective = when {
-            parts.size == 2 && parts[1].isEmpty() -> "*"  // 只有name:
-            parts.size == 2 -> parts[1]  // 正常格式
-            else -> "*"  // 只有name或格式错误
-        }
-        return Pair(name, objective)
-    }
-
-    /**
      * 解析translate组件的with参数
-     * 格式：参数1,参数2,参数3（用逗号分隔多个参数）
-     * 转义规则：如果参数包含逗号，用\,表示
      * @return 参数列表
      */
     private fun parseTranslateWithContent(content: String): List<String> {
