@@ -1210,6 +1210,10 @@ object TextComponentHelper {
         // 标记哪些@选择器被'sep':'air'影响（忽略所有separator参数）
         val airIgnoredSelectors = mutableSetOf<Int>()
         
+        // 先处理所有sep:定义，记录哪些selector被哪些separator修饰
+        val sepToSelectors = mutableMapOf<Int, MutableList<Int>>()  // sep索引 -> 修饰的selector索引列表
+        val selectorToSep = mutableMapOf<Int, Int>()  // selector索引 -> 修饰它的sep索引
+        
         // 处理sep:定义
         for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
             if (sepIndex == -1) continue
@@ -1220,41 +1224,43 @@ object TextComponentHelper {
                 continue
             }
             
-            // 检查是否是,'sep':'air'（特殊情况）
-            if (separatorValue == "air") {
-                // 找到sep:定义前面的第一个@选择器
-                var targetIndex = -1
-                for (index in sepIndex - 1 downTo 0) {
-                    if (selectors[index].startsWith("@")) {
-                        targetIndex = index
-                        break
-                    }
-                }
-                if (targetIndex != -1) {
-                    // 标记这个@选择器为被'sep':'air'影响（忽略所有separator参数）
-                    airIgnoredSelectors.add(targetIndex)
-                }
-                continue
-            }
-            
             // 从sepIndex开始往前查找，修饰所有@选择器
-            // 规则：separator修饰它前面所有@选择器，直到遇到没有被separator修饰的@选择器
             for (index in sepIndex - 1 downTo 0) {
-                // 跳过被'sep':'air'影响的@选择器
-                if (airIgnoredSelectors.contains(index)) {
-                    continue
-                }
-                
                 if (selectors[index].startsWith("@")) {
                     // 这是一个@选择器
-                    if (separators[index] == null) {
+                    if (!selectorToSep.containsKey(index)) {
                         // 这个@选择器还没有被修饰，应用separator
                         separators[index] = separatorValue
+                        selectorToSep[index] = sepIndex
+                        sepToSelectors.getOrPut(sepIndex) { mutableListOf() }.add(index)
                     } else {
                         // 这个@选择器已经被修饰了，停止
                         break
                     }
                 }
+            }
+        }
+        
+        // 处理'sep':'air'的特殊情况
+        for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
+            if (sepIndex == -1) continue
+            if (separatorValue != "air") continue
+            
+            // 找到sep:定义前面的第一个@选择器
+            var targetIndex = -1
+            for (index in sepIndex - 1 downTo 0) {
+                if (selectors[index].startsWith("@")) {
+                    targetIndex = index
+                    break
+                }
+            }
+            if (targetIndex != -1) {
+                // 清除这个@选择器的separator
+                separators[targetIndex] = null
+                // 移除selector到sep的映射
+                selectorToSep.remove(targetIndex)
+                // 从sep到selectors的映射中移除
+                sepToSelectors[sepIndex]?.remove(targetIndex)
             }
         }
         
