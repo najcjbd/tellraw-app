@@ -692,10 +692,10 @@ object TextComponentHelper {
                     // 从副组件中提取separator
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
-                        result["separator"] = mapOf("text" to separatorSubComponent.content)
+                        result["separator"] = separatorSubComponent.content
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                        result["separator"] = mapOf("text" to separatorEntries[0]!!)
+                        result["separator"] = separatorEntries[0]!!
                     }
                 }
             }
