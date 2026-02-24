@@ -438,9 +438,10 @@ object TextComponentHelper {
             return originalText.substring(0, insertPosition) + textToInsert + originalText.substring(insertPosition)
         }
         
-        // 如果选中了TEXT组件，创建新的text组件标记
+        // 如果选中了TEXT组件，直接插入文本（不创建新的text组件标记）
+        // 这样连续输入的字符会被合并到一个TEXT组件中
         if (currentComponent == ComponentType.TEXT) {
-            return originalText.substring(0, insertPosition) + componentToText(TextComponent(ComponentType.TEXT, textToInsert)) + originalText.substring(insertPosition)
+            return originalText.substring(0, insertPosition) + textToInsert + originalText.substring(insertPosition)
         }
         
         // 解析原始文本
