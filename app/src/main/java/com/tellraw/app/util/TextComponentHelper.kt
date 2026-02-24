@@ -1046,9 +1046,10 @@ object TextComponentHelper {
             }
         }
         
-        // 第二步：提取selector条目（保留sep:定义，因为sep:定义应该保留在selector字符串中）
+        // 第二步：提取selector条目（不包括sep:定义），同时记录每个selector的原始位置
         // 规则：选择器的读取是从@一直到后面一个@(不包含后面一个@)，或者是如果后面没有@了那就表明一直到这个文本组件的结束或者一直到后面的,(不包含,)
         // 规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数(第一个@前面的'sep':直接被忽略)
+        // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级，读取selector时必须跳过sep:定义
         val selectors = mutableListOf<String>()
         val selectorPositions = mutableListOf<Int>()  // 每个selector的原始位置
         var startIndex = -1
@@ -1056,7 +1057,19 @@ object TextComponentHelper {
         i = 0
         
         while (i < content.length) {
-            // 注意：不再跳过sep:定义，因为sep:定义应该保留在selector字符串中
+            // 跳过sep:定义（最高优先级）
+            if (content.substring(i).startsWith(",'sep':")) {
+                // 跳过整个sep:定义
+                val sepEnd = i + 7
+                val remainingText = content.substring(sepEnd)
+                val nextCommaIndex = remainingText.indexOf(',')
+                if (nextCommaIndex != -1) {
+                    i = sepEnd + nextCommaIndex + 1
+                } else {
+                    i = content.length
+                }
+                continue
+            }
             
             if (content[i] == '@') {
                 if (startIndex == -1) {
