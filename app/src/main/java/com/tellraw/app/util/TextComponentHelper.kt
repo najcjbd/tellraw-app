@@ -786,10 +786,10 @@ object TextComponentHelper {
                             // 从副组件中提取separator
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
-                                subMap["separator"] = mapOf("text" to separatorSubComponent.content)
+                                subMap["separator"] = separatorSubComponent.content
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                                subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
+                                subMap["separator"] = separatorEntries[0]!!
                             }
                         }
                     }
@@ -1110,6 +1110,52 @@ object TextComponentHelper {
                     selectors.add(selector)
                     selectorPositions.add(startIndex)
                     startIndex = -1
+                } else {
+                    // 规则：如果有,相隔并且无@，就作为一个无@文本组件参数
+                    // 检查逗号后面是否有非@文本
+                    var nextIndex = i + 1
+                    var foundAt = false
+                    var foundComma = false
+                    var textEndIndex = i + 1
+                    
+                    while (nextIndex < content.length) {
+                        // 跳过sep:定义
+                        if (content.substring(nextIndex).startsWith(",'sep':")) {
+                            val sepEnd = nextIndex + 7
+                            val remainingText = content.substring(sepEnd)
+                            val nextCommaIndex = remainingText.indexOf(',')
+                            if (nextCommaIndex != -1) {
+                                nextIndex = sepEnd + nextCommaIndex + 1
+                            } else {
+                                nextIndex = content.length
+                            }
+                            continue
+                        }
+                        
+                        if (content[nextIndex] == '@') {
+                            // 后面有@，停止
+                            foundAt = true
+                            break
+                        } else if (content[nextIndex] == ',') {
+                            // 后面有逗号，将逗号之间的文本作为无@文本组件参数
+                            foundComma = true
+                            textEndIndex = nextIndex
+                            break
+                        } else {
+                            nextIndex++
+                        }
+                    }
+                    
+                    // 如果找到了逗号，将逗号之间的文本作为无@文本组件参数
+                    if (foundComma && !foundAt) {
+                        val textBetweenCommas = content.substring(i + 1, textEndIndex).trim()
+                        if (textBetweenCommas.isNotEmpty()) {
+                            selectors.add(textBetweenCommas)
+                            selectorPositions.add(i + 1)
+                        }
+                        i = textEndIndex
+                        continue
+                    }
                 }
                 i++
             } else {
