@@ -1074,12 +1074,25 @@ object TextComponentHelper {
             if (content[i] == '@') {
                 if (startIndex == -1) {
                     // 第一个@，记录起点
-                    // 检查前面是否有非@文本
+                    // 检查前面是否有非@文本（第一个@前面的'sep':直接被忽略）
                     if (i > 0 && lastAtPos == -1) {
                         // 前面有非@文本，添加为selector
-                        val precedingText = content.substring(0, i)
-                        if (precedingText.isNotEmpty()) {
-                            selectors.add(precedingText)
+                        // 但是需要跳过sep:定义
+                        var textBeforeAt = content.substring(0, i)
+                        // 移除sep:定义
+                        while (textBeforeAt.contains(",'sep':")) {
+                            val sepStart = textBeforeAt.indexOf(",'sep':")
+                            val sepEnd = sepStart + 7
+                            val remainingText = textBeforeAt.substring(sepEnd)
+                            val nextCommaIndex = remainingText.indexOf(',')
+                            if (nextCommaIndex != -1) {
+                                textBeforeAt = textBeforeAt.substring(0, sepStart) + textBeforeAt.substring(sepEnd + nextCommaIndex + 1)
+                            } else {
+                                textBeforeAt = textBeforeAt.substring(0, sepStart)
+                            }
+                        }
+                        if (textBeforeAt.isNotEmpty()) {
+                            selectors.add(textBeforeAt)
                             selectorPositions.add(0)  // 第一个selector的位置是0
                         }
                     }
