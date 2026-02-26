@@ -91,24 +91,6 @@ object TextComponentHelper {
                     i = typeEnd + 1
                     continue
                 }
-                // 查找组件类型
-                val typeEnd = text.indexOf(MARKER_END, i + 1)
-                if (typeEnd == -1) {
-                    // 没有找到类型结束标记，将标记作为普通文本处理
-                    components.add(TextComponent(ComponentType.TEXT, text[i].toString()))
-                    i++
-                    continue
-                }
-                
-                val typeKey = text.substring(i + 1, typeEnd)
-                val type = ComponentType.values().find { it.key == typeKey }
-                
-                if (type == null) {
-                    // 未知的组件类型，将标记作为普通文本处理
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(i, typeEnd + 1)))
-                    i = typeEnd + 1
-                    continue
-                }
                 
                 // 查找组件结束标记（从typeEnd + 1开始搜索，避免误判副组件的MARKER_START）
                 // 查找格式：MARKER_END（这是组件的结束标记）
