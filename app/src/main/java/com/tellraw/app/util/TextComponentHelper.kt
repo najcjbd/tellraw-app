@@ -98,6 +98,12 @@ object TextComponentHelper {
                     searchStart++
                 }
                 
+                // 如果searchStart == typeEnd + 1且searchStart == text.length，
+                // 说明组件内容为空，但组件结束标记应该在typeEnd位置
+                if (componentEnd == -1 && searchStart == typeEnd + 1 && typeEnd < text.length && text[typeEnd] == MARKER_END) {
+                    componentEnd = typeEnd
+                }
+                
                 if (componentEnd == -1) {
                     // 没有找到结束标记，将标记作为普通文本处理
                     components.add(TextComponent(ComponentType.TEXT, text.substring(i)))
