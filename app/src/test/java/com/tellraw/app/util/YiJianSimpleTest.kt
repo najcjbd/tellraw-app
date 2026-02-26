@@ -39,6 +39,18 @@ class YiJianSimpleTest {
     fun testTextComponent() {
         val message = "hello\u0FC8text\u0FC9"
         val components = TextComponentHelper.parseTextComponents(message)
+        
+        // 调试输出
+        println("========================================")
+        println("testTextComponent 调试输出:")
+        println("输入消息: '$message'")
+        println("消息长度: ${message.length}")
+        println("解析得到的组件数量: ${components.size}")
+        for ((index, component) in components.withIndex()) {
+            println("组件 $index: type=${component.type}, content='${component.content}', content.length=${component.content.length}")
+        }
+        println("========================================")
+        
         assertEquals("应该有1个text组件", 1, components.size)
         assertEquals("text内容应该是'hello'", "hello", components[0].content)
     }
