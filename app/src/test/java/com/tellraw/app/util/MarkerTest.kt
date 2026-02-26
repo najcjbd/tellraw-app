@@ -12,7 +12,7 @@ class MarkerTest {
     fun testMarkerCharacters() {
         val markerStart = '\u0FC8'
         val markerEnd = '\u0F34'
-        val testString = "hello\u0FC8text\u0FC9"
+        val testString = "hello\u0FC8text\u0F34"
 
         println("========================================")
         println("测试字符标记:")
@@ -47,7 +47,7 @@ class MarkerTest {
 
     @Test
     fun testParseTextComponents() {
-        val message = "hello\u0FC8text\u0FC9"
+        val message = "hello\u0FC8text\u0F34"
 
         println("========================================")
         println("测试parseTextComponents:")

@@ -37,7 +37,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testTextComponent() {
-        val message = "hello\u0FC8text\u0FC9"
+        val message = "hello\u0FC8text\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         
         // 调试输出
@@ -75,7 +75,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testTranslateComponent() {
-        val message = "test\u0FC8translate\u0FC9"
+        val message = "test\u0FC8translate\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个translate组件", 1, components.size)
         assertEquals("translate内容应该是'test'", "test", components[0].content)
@@ -86,7 +86,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testScoreComponent() {
-        val message = "test:123\u0FC8score\u0FC9"
+        val message = "test:123\u0FC8score\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个score组件", 1, components.size)
         assertEquals("score内容应该是'test:123'", "test:123", components[0].content)
@@ -97,7 +97,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSelectorComponent() {
-        val message = "@a\u0FC8selector\u0FC9"
+        val message = "@a\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         assertEquals("selector内容应该是'@a'", "@a", components[0].content)
@@ -108,7 +108,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSelectorWithMultipleEntries() {
-        val message = "@a@p@e\u0FC8selector\u0FC9"
+        val message = "@a@p@e\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         assertEquals("selector内容应该是'@a@p@e'", "@a@p@e", components[0].content)
@@ -119,7 +119,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSelectorWithTextBeforeAt() {
-        val message = "text@a@p\u0FC8selector\u0FC9"
+        val message = "text@a@p\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         assertEquals("selector内容应该是'text@a@p'", "text@a@p", components[0].content)
@@ -130,7 +130,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSelectorWithSepDefinition() {
-        val message = "@a@p,'sep':kk,@e@r,'sep':66666\u0FC8selector\u0FC9"
+        val message = "@a@p,'sep':kk,@e@r,'sep':66666\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
     }
@@ -140,7 +140,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testTranslateWithTextJsonOutput() {
-        val message = "lll\u0FC8translate\u0FC9bbb\u0FC8text\u0FC9"
+        val message = "lll\u0FC8translate\u0F34bbb\u0FC8text\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有2个组件", 2, components.size)
         
@@ -156,7 +156,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testScoreWithTextJsonOutput() {
-        val message = "lll:999\u0FC8score\u0FC9lll\u0FC8text\u0FC9"
+        val message = "lll:999\u0FC8score\u0F34lll\u0FC8text\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有2个组件", 2, components.size)
         
@@ -172,7 +172,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testBedrockShouldIgnoreSeparator() {
-        val message = "@a@p,'sep':kk,@e@r,'sep':66666\u0FC8selector\u0FC9"
+        val message = "@a@p,'sep':kk,@e@r,'sep':66666\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         
@@ -193,7 +193,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSeparatorModifiesAtSelectors() {
-        val message = "@a@p,'sep':kk,@e@r\u0FC8selector\u0FC9"
+        val message = "@a@p,'sep':kk,@e@r\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         
@@ -214,7 +214,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSepAirSpecialCase() {
-        val message = "@a,'sep':'air',@p,'sep':666\u0FC8selector\u0FC9"
+        val message = "@a,'sep':'air',@p,'sep':666\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         
@@ -231,7 +231,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSepBeforeFirstAtShouldBeIgnored() {
-        val message = "text,'sep':ignore,@a@p\u0FC8selector\u0FC9"
+        val message = "text,'sep':ignore,@a@p\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         
@@ -248,7 +248,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testSelectorWithoutAtSymbol() {
-        val message = "mknbt\u0FC8selector\u0FC9"
+        val message = "mknbt\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有1个selector组件", 1, components.size)
         assertEquals("selector内容应该是'mknbt'", "mknbt", components[0].content)
@@ -262,7 +262,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testMultipleDifferentComponents() {
-        val message = "a\u0FC8text\u0FC9b\u0FC8translate\u0FC9c\u0FC8score\u0FC9d\u0FC8selector\u0FC9"
+        val message = "a\u0FC8text\u0F34b\u0FC8translate\u0F34c\u0FC8score\u0F34d\u0FC8selector\u0F34"
         val components = TextComponentHelper.parseTextComponents(message)
         assertEquals("应该有4个组件", 4, components.size)
         
@@ -277,7 +277,7 @@ class YiJianSimpleTest {
      */
     @Test
     fun testInsertTextWithComponent() {
-        val message = "test\u0FC8text\u0FC9"
+        val message = "test\u0FC8text\u0F34"
         val newMessage = TextComponentHelper.insertTextWithComponent(message, 0, "prefix", TextComponentHelper.ComponentType.TEXT)
         assertTrue("新消息应该以'prefix'开头", newMessage.startsWith("prefix"))
     }
