@@ -92,33 +92,40 @@ object TextComponentHelper {
                     continue
                 }
                 
-                // 查找组件结束标记（从typeEnd + 1开始搜索，避免误判副组件的MARKER_START）
-                // 查找格式：MARKER_END（这是组件的结束标记）
-                // 但需要确保不是副组件中的MARKER_END
+                // 检查typeEnd处的字符是否是MARKER_END
+                // 如果是，说明组件内容为空，直接将componentEnd设置为typeEnd
                 var componentEnd = -1
-                var searchStart = typeEnd + 1
-                var depth = 0
-                
-                println("  -> 开始查找组件结束标记，从位置 $searchStart 开始")
-                
-                while (searchStart < text.length) {
-                    if (text[searchStart] == MARKER_START) {
-                        depth++
-                        println("  -> 位置 $searchStart: 找到MARKER_START，depth=$depth")
-                    } else if (text[searchStart] == MARKER_END) {
-                        if (depth == 0) {
-                            componentEnd = searchStart
-                            println("  -> 位置 $searchStart: 找到组件结束标记 (depth=0)")
-                            break
-                        } else {
-                            depth--
-                            println("  -> 位置 $searchStart: 找到MARKER_END，depth减到$depth")
+                if (typeEnd < text.length && text[typeEnd] == MARKER_END) {
+                    componentEnd = typeEnd
+                    println("  -> typeEnd处的字符是MARKER_END，组件内容为空，componentEnd=$typeEnd")
+                } else {
+                    // 查找组件结束标记（从typeEnd + 1开始搜索，避免误判副组件的MARKER_START）
+                    // 查找格式：MARKER_END（这是组件的结束标记）
+                    // 但需要确保不是副组件中的MARKER_END
+                    var searchStart = typeEnd + 1
+                    var depth = 0
+                    
+                    println("  -> 开始查找组件结束标记，从位置 $searchStart 开始")
+                    
+                    while (searchStart < text.length) {
+                        if (text[searchStart] == MARKER_START) {
+                            depth++
+                            println("  -> 位置 $searchStart: 找到MARKER_START，depth=$depth")
+                        } else if (text[searchStart] == MARKER_END) {
+                            if (depth == 0) {
+                                componentEnd = searchStart
+                                println("  -> 位置 $searchStart: 找到组件结束标记 (depth=0)")
+                                break
+                            } else {
+                                depth--
+                                println("  -> 位置 $searchStart: 找到MARKER_END，depth减到$depth")
+                            }
                         }
+                        searchStart++
                     }
-                    searchStart++
+                    
+                    println("  -> componentEnd位置: $componentEnd, searchStart: $searchStart")
                 }
-                
-                println("  -> componentEnd位置: $componentEnd, searchStart: $searchStart")
                 
                 if (componentEnd == -1) {
                     // 没有找到结束标记，将标记作为普通文本处理
