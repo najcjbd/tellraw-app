@@ -1376,7 +1376,7 @@ object TextComponentHelper {
      * 展开组件列表，将score和selector组件中的多个条目分割成独立的文本组件
      * 这样每个score或selector条目都会成为独立的文本组件，而不是放在同一个组件的extra中
      */
-    private fun expandComponents(components: List<TextComponent>): List<TextComponent> {
+    fun expandComponents(components: List<TextComponent>): List<TextComponent> {
         val expanded = mutableListOf<TextComponent>()
 
         for (component in components) {
