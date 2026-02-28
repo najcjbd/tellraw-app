@@ -1243,6 +1243,7 @@ object TextComponentHelper {
             }
             
             // 从sepIndex开始往前查找，修饰所有@选择器
+            // 规则：separator会修饰他前面所有@选择器直到遇到没有被separator修饰的@选择器
             for (index in sepIndex - 1 downTo 0) {
                 if (selectors[index].startsWith("@")) {
                     // 这是一个@选择器
@@ -1252,8 +1253,8 @@ object TextComponentHelper {
                         selectorToSep[index] = sepIndex
                         sepToSelectors.getOrPut(sepIndex) { mutableListOf() }.add(index)
                     } else {
-                        // 这个@选择器已经被修饰了，停止
-                        break
+                        // 这个@选择器已经被修饰了，但继续往前查找
+                        // 因为separator应该修饰前面所有@选择器，直到遇到没有被separator修饰的@选择器
                     }
                 }
             }
