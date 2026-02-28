@@ -666,6 +666,7 @@ object TextComponentHelper {
                 // 选择器：完整调用选择器转换逻辑（已展开，每个组件只包含一个条目）
                 val selectorString = mainComponent.content
                 val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
+                println("mainComponent处理SELECTOR: selectorString='$selectorString', selectorEntries=$selectorEntries, separatorEntries=$separatorEntries, subComponents=${mainComponent.subComponents.map { "${it.type}:${it.content}" }}")
 
                 if (selectorEntries.isEmpty()) {
                     // 空内容，作为空selector处理
@@ -680,7 +681,7 @@ object TextComponentHelper {
                         // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                         // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
                         if (javaSelector == selectorEntries[0]) {
-                            // 没有进行任何转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
+                            // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
                             val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
                                 selectorEntries[0],
                                 SelectorType.JAVA,
@@ -702,9 +703,13 @@ object TextComponentHelper {
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
                         result["separator"] = mapOf("text" to separatorSubComponent.content)
+                        println("  mainComponent从副组件提取separator: ${separatorSubComponent.content}")
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
                         result["separator"] = mapOf("text" to separatorEntries[0]!!)
+                        println("  mainComponent从separatorEntries提取separator: ${separatorEntries[0]}")
+                    } else {
+                        println("  mainComponent没有找到separator")
                     }
                 }
             }
