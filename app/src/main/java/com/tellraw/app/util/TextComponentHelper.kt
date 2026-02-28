@@ -135,7 +135,12 @@ object TextComponentHelper {
                 }
                 
                 // 提取组件内容（不包括标记）
-                val componentContent = text.substring(typeEnd + 1, componentEnd)
+                val componentContent = if (typeEnd == componentEnd) {
+                    // 组件内容为空
+                    ""
+                } else {
+                    text.substring(typeEnd + 1, componentEnd)
+                }
                 println("  -> componentContent: '$componentContent' (从 ${typeEnd + 1} 到 $componentEnd)")
                 
                 val component = parseSingleComponentWithContent(type, componentContent)
