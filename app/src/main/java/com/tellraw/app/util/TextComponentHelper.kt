@@ -1223,7 +1223,9 @@ object TextComponentHelper {
                             selectorPositions.add(startIndex)
         
                             startIndex = -1
-        
+                            
+                            // 跳过sep:定义
+                            i = skipSepDefinitions(i + 1) - 1  // -1 因为循环末尾会i++
                         } else {
                     // 规则：如果有,相隔并且无@，就作为一个无@文本组件参数
                     // 检查逗号后面是否有非@文本
