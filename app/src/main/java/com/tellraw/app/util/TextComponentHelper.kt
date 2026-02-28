@@ -79,16 +79,71 @@ object TextComponentHelper {
                     continue
                 }
                 
-                // 提取组件内容（从componentStart到i的文本）
-                val componentContent = text.substring(componentStart, i)
+                // 查找组件结束标记（最后一个MARKER_END）
+                val componentEnd = text.indexOf(MARKER_END, typeEnd + 1)
+                if (componentEnd == -1) {
+                    // 没有找到组件结束标记，将标记作为普通文本处理
+                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
+                    break
+                }
+                
+                // 提取组件内容（从typeEnd + 1到componentEnd）
+                val fullContent = text.substring(typeEnd + 1, componentEnd)
+                
+                // 解析副组件
+                val subComponents = mutableListOf<SubComponent>()
+                var searchStart = 0
+                while (searchStart < fullContent.length) {
+                    // 查找副组件开始标记：__type.key__
+                    val subComponentStart = fullContent.indexOf("__", searchStart)
+                    if (subComponentStart == -1) break
+                    
+                    // 查找副组件类型
+                    val subTypeStart = subComponentStart + 2  // 跳过__
+                    val subTypeEnd = fullContent.indexOf("__", subTypeStart)
+                    if (subTypeEnd == -1) break
+                    
+                    val subTypeKey = fullContent.substring(subTypeStart, subTypeEnd)
+                    val subType = SubComponentType.values().find { it.key == subTypeKey }
+                    if (subType == null) {
+                        // 不是有效的副组件类型，跳过
+                        searchStart = subTypeEnd + 2
+                        continue
+                    }
+                    
+                    // 查找副组件内容（从subTypeEnd + 2开始，到下一个__）
+                    val contentStart = subTypeEnd + 2
+                    val contentEnd = fullContent.indexOf("__", contentStart)
+                    if (contentEnd == -1) {
+                        // 没有找到结束标记，这不是有效的副组件
+                        break
+                    }
+                    
+                    val subContent = fullContent.substring(contentStart, contentEnd)
+                    subComponents.add(SubComponent(subType, subContent))
+                    
+                    searchStart = contentEnd + 2  // 跳过结束标记__
+                }
+                
+                // 提取主内容（到第一个副组件或字符串末尾）
+                val mainContent = if (subComponents.isEmpty()) {
+                    fullContent
+                } else {
+                    val firstSubComponent = fullContent.indexOf("__")
+                    if (firstSubComponent == -1) {
+                        fullContent
+                    } else {
+                        fullContent.substring(0, firstSubComponent)
+                    }
+                }
                 
                 // 创建组件
-                val component = TextComponent(type, componentContent)
+                val component = TextComponent(type, mainContent, subComponents)
                 components.add(component)
                 
                 // 更新位置
-                componentStart = typeEnd + 1
-                i = typeEnd + 1
+                componentStart = componentEnd + 1
+                i = componentEnd + 1
             } else {
                 i++
             }
@@ -101,63 +156,6 @@ object TextComponentHelper {
         }
         
         return components
-    }
-    
-    /**
-     * 解析单个组件（已知组件类型）
-     * 使用简单的副组件格式：__type.key__content__
-     * 注意：只有以__结束的才是有效的副组件，避免将用户输入的__with__误认为是副组件标记
-     */
-    private fun parseSingleComponentWithContent(type: ComponentType, content: String): TextComponent? {
-        // 查找副组件
-        val subComponents = mutableListOf<SubComponent>()
-        var searchStart = 0
-        
-        while (searchStart < content.length) {
-            // 查找副组件开始标记：__type.key__
-            val subComponentStart = content.indexOf("__", searchStart)
-            if (subComponentStart == -1) break
-            
-            // 查找副组件类型
-            val typeStart = subComponentStart + 2  // 跳过__
-            val typeEnd = content.indexOf("__", typeStart)
-            if (typeEnd == -1) break
-            
-            val subTypeKey = content.substring(typeStart, typeEnd)
-            val subType = SubComponentType.values().find { it.key == subTypeKey }
-            if (subType == null) {
-                // 不是有效的副组件类型，跳过
-                searchStart = typeEnd + 2
-                continue
-            }
-            
-            // 查找副组件内容（从typeEnd + 2开始，到下一个__）
-            val contentStart = typeEnd + 2
-            val contentEnd = content.indexOf("__", contentStart)
-            if (contentEnd == -1) {
-                // 没有找到结束标记，这不是有效的副组件
-                break
-            }
-            
-            val subContent = content.substring(contentStart, contentEnd)
-            subComponents.add(SubComponent(subType, subContent))
-            
-            searchStart = contentEnd + 2  // 跳过结束标记__
-        }
-        
-        // 提取主内容（到第一个副组件或字符串末尾）
-        val mainContent = if (subComponents.isEmpty()) {
-            content
-        } else {
-            val firstSubComponent = content.indexOf("__")
-            if (firstSubComponent == -1) {
-                content
-            } else {
-                content.substring(0, firstSubComponent)
-            }
-        }
-        
-        return TextComponent(type, mainContent, subComponents)
     }
     
     /**
