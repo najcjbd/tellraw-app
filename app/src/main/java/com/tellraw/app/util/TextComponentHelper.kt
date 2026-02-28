@@ -1168,21 +1168,18 @@ object TextComponentHelper {
         
                             var selector = content.substring(startIndex, i)
         
-                            
-        
-                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
-        
-                            if (selector.endsWith(",")) {
-        
-                                selector = selector.substring(0, selector.length - 1)
-        
+                            // 检查selector是否包含sep:定义，如果包含，只取sep:定义之前的部分
+                            val sepStart = selector.indexOf(",'sep':")
+                            if (sepStart != -1) {
+                                selector = selector.substring(0, sepStart)
                             }
         
-                            
+                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+                            if (selector.endsWith(",")) {
+                                selector = selector.substring(0, selector.length - 1)
+                            }
         
                             println("  提取selector: '$selector' (从 $startIndex 到 $i)")
-        
-                            
         
                             selectors.add(selector)
         
@@ -1204,28 +1201,23 @@ object TextComponentHelper {
         
                             var selector = content.substring(startIndex, i)
         
-                            
-        
-                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
-        
-                            if (selector.endsWith(",")) {
-        
-                                selector = selector.substring(0, selector.length - 1)
-        
+                            // 检查selector是否包含sep:定义，如果包含，只取sep:定义之前的部分
+                            val sepStart = selector.indexOf(",'sep':")
+                            if (sepStart != -1) {
+                                selector = selector.substring(0, sepStart)
                             }
-        
                             
+                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+                            if (selector.endsWith(",")) {
+                                selector = selector.substring(0, selector.length - 1)
+                            }
         
                             println("  提取selector (逗号): '$selector' (从 $startIndex 到 $i)")
         
-                            
-        
                             selectors.add(selector)
-        
                             selectorPositions.add(startIndex)
-        
                             startIndex = -1
-                            
+        
                             // 跳过sep:定义
                             i = skipSepDefinitions(i + 1) - 1  // -1 因为循环末尾会i++
                         } else {
@@ -1284,6 +1276,12 @@ object TextComponentHelper {
         // 处理最后一个@到末尾的selector
         if (startIndex != -1) {
             var selector = content.substring(startIndex)
+            
+            // 检查selector是否包含sep:定义，如果包含，只取sep:定义之前的部分
+            val sepStart = selector.indexOf(",'sep':")
+            if (sepStart != -1) {
+                selector = selector.substring(0, sepStart)
+            }
             
             // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
             if (selector.endsWith(",")) {
