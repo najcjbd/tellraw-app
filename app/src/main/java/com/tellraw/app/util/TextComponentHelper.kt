@@ -1108,6 +1108,29 @@ object TextComponentHelper {
                 i++
             } else if (content[i] == ',') {
                 // 逗号，处理当前条目
+                // 先检查逗号后面是否是sep:定义，如果是，跳过sep:定义
+                var commaIndex = i
+                var nextCharIndex = commaIndex + 1
+                while (nextCharIndex < content.length) {
+                    if (content.substring(nextCharIndex).startsWith(",'sep':")) {
+                        // 逗号后面是sep:定义，跳过整个sep:定义
+                        val sepEnd = nextCharIndex + 7
+                        val remainingText = content.substring(sepEnd)
+                        val nextCommaIndex = remainingText.indexOf(',')
+                        if (nextCommaIndex != -1) {
+                            // 跳过sep:定义和后面的逗号
+                            i = sepEnd + nextCommaIndex
+                            continue
+                        } else {
+                            // 跳过sep:定义，到达文本末尾
+                            i = content.length
+                            break
+                        }
+                    } else {
+                        break
+                    }
+                }
+                
                 if (startIndex != -1) {
                     var selector = content.substring(startIndex, i)
                     
