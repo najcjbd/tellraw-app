@@ -1090,18 +1090,20 @@ object TextComponentHelper {
                     }
                     startIndex = i
                 } else {
-                    // 找到下一个@，提取从startIndex到i-1的selector
-                    var selector = content.substring(startIndex, i)
-                    
-                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
-                    if (selector.endsWith(",")) {
-                        selector = selector.substring(0, selector.length - 1)
-                    }
-                    
-                    selectors.add(selector)
-                    selectorPositions.add(startIndex)
-                    startIndex = i
-                }
+                            // 找到下一个@，提取从startIndex到i-1的selector
+                            var selector = content.substring(startIndex, i)
+                                    
+                                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+                                    if (selector.endsWith(",")) {
+                                        selector = selector.substring(0, selector.length - 1)
+                                    }
+                                    
+                                    println("  提取selector: '$selector' (从 $startIndex 到 $i)")
+                                    
+                                    selectors.add(selector)
+                                    selectorPositions.add(startIndex)
+                                    startIndex = i
+                                }
                 lastAtPos = i
                 i++
             } else if (content[i] == ',') {
@@ -1113,6 +1115,8 @@ object TextComponentHelper {
                     if (selector.endsWith(",")) {
                         selector = selector.substring(0, selector.length - 1)
                     }
+                    
+                    println("  提取selector (逗号): '$selector' (从 $startIndex 到 $i)")
                     
                     selectors.add(selector)
                     selectorPositions.add(startIndex)
