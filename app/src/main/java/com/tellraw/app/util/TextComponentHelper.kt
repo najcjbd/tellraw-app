@@ -684,10 +684,10 @@ object TextComponentHelper {
                     // 从副组件中提取separator
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
-                        result["separator"] = separatorSubComponent.content
+                        result["separator"] = mapOf("text" to separatorSubComponent.content)
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                        result["separator"] = separatorEntries[0]!!
+                        result["separator"] = mapOf("text" to separatorEntries[0]!!)
                     }
                 }
             }
@@ -779,10 +779,10 @@ object TextComponentHelper {
                             // 从副组件中提取separator
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
-                                subMap["separator"] = separatorSubComponent.content
+                                subMap["separator"] = mapOf("text" to separatorSubComponent.content)
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                                subMap["separator"] = separatorEntries[0]!!
+                                subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
                             }
                         }
                     }
