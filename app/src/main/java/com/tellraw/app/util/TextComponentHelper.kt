@@ -54,13 +54,14 @@ object TextComponentHelper {
     fun parseTextComponents(text: String): List<TextComponent> {
         val components = mutableListOf<TextComponent>()
         var i = 0
+        var componentStart = 0  // 追踪当前组件内容的开始位置
         
         println("========== parseTextComponents 调试开始 ==========")
         println("输入文本: '$text'")
         println("文本长度: ${text.length}")
         
         while (i < text.length) {
-            println("当前索引 i=$i, 字符='${text[i]}' (\\u${text[i].code.toString(16).padStart(4, '0')})")
+            println("当前索引 i=$i, 字符='${text[i]}' (\\u${text[i].code.toString(16).padStart(4, '0')}), componentStart=$componentStart")
             
             // 查找组件开始标记
             if (text[i] == MARKER_START) {
@@ -73,9 +74,8 @@ object TextComponentHelper {
                 if (typeEnd == -1) {
                     // 没有找到类型结束标记，将标记作为普通文本处理
                     println("  -> 没有找到类型结束标记，将标记作为普通文本")
-                    components.add(TextComponent(ComponentType.TEXT, text[i].toString()))
-                    i++
-                    continue
+                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
+                    break
                 }
                 
                 val typeKey = text.substring(i + 1, typeEnd)
@@ -87,103 +87,36 @@ object TextComponentHelper {
                 if (type == null) {
                     // 未知的组件类型，将标记作为普通文本处理
                     println("  -> 未知的组件类型，将标记作为普通文本")
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(i, typeEnd + 1)))
+                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart, typeEnd + 1)))
+                    componentStart = typeEnd + 1
                     i = typeEnd + 1
                     continue
                 }
                 
-                // 检查typeEnd处的字符是否是MARKER_END
-                // 如果是，说明组件内容为空，直接将componentEnd设置为typeEnd
-                var componentEnd = -1
-                if (typeEnd < text.length && text[typeEnd] == MARKER_END) {
-                    componentEnd = typeEnd
-                    println("  -> typeEnd处的字符是MARKER_END，组件内容为空，componentEnd=$typeEnd")
-                } else {
-                    // 查找组件结束标记（从typeEnd + 1开始搜索，避免误判副组件的MARKER_START）
-                    // 查找格式：MARKER_END（这是组件的结束标记）
-                    // 但需要确保不是副组件中的MARKER_END
-                    var searchStart = typeEnd + 1
-                    var depth = 0
-                    
-                    println("  -> 开始查找组件结束标记，从位置 $searchStart 开始")
-                    
-                    while (searchStart < text.length) {
-                        if (text[searchStart] == MARKER_START) {
-                            depth++
-                            println("  -> 位置 $searchStart: 找到MARKER_START，depth=$depth")
-                        } else if (text[searchStart] == MARKER_END) {
-                            if (depth == 0) {
-                                componentEnd = searchStart
-                                println("  -> 位置 $searchStart: 找到组件结束标记 (depth=0)")
-                                break
-                            } else {
-                                depth--
-                                println("  -> 位置 $searchStart: 找到MARKER_END，depth减到$depth")
-                            }
-                        }
-                        searchStart++
-                    }
-                    
-                    println("  -> componentEnd位置: $componentEnd, searchStart: $searchStart")
-                }
+                // 提取组件内容（从componentStart到i的文本）
+                val componentContent = text.substring(componentStart, i)
+                println("  -> componentContent: '$componentContent' (从$componentStart到$i)")
                 
-                if (componentEnd == -1) {
-                    // 没有找到结束标记，将标记作为普通文本处理
-                    println("  -> 没有找到结束标记，将标记作为普通文本")
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(i)))
-                    break
-                }
+                // 创建组件
+                val component = TextComponent(type, componentContent)
+                println("  -> 创建组件: type=$type, content='$componentContent'")
+                components.add(component)
+                println("  -> 已添加组件到列表")
                 
-                // 检查组件内容是否为空（typeEnd == componentEnd表示组件内容为空）
-                if (typeEnd == componentEnd) {
-                    // 组件内容为空，创建对应类型的空组件
-                    println("  -> 组件内容为空，创建${type.name}类型的空组件")
-                    val emptyComponent = TextComponent(type, "")
-                    components.add(emptyComponent)
-                    println("  -> 已添加空组件到列表")
-                    i = componentEnd + 1
-                    continue
-                }
-                
-                // 提取组件内容（不包括标记）
-                val componentContent = text.substring(typeEnd + 1, componentEnd)
-                println("  -> componentContent: '$componentContent' (从 ${typeEnd + 1} 到 $componentEnd)")
-                
-                val component = parseSingleComponentWithContent(type, componentContent)
-                println("  -> 解析得到的组件: type=${component?.type}, content='${component?.content}'")
-                
-                if (component != null) {
-                    components.add(component)
-                    println("  -> 已添加组件到列表")
-                }
-                
-                i = componentEnd + 1
-                println("  -> i更新为 $i")
+                // 更新位置
+                componentStart = typeEnd + 1
+                i = typeEnd + 1
+                println("  -> i和componentStart更新为 $i")
             } else {
-                // 普通文本，寻找下一个组件开始标记
-                val nextStart = text.indexOf(MARKER_START, i)
-                println("  -> 普通文本，下一个MARKER_START位置: $nextStart")
-                
-                if (nextStart == -1) {
-                    // 没有找到组件标记，剩余全是普通文本
-                    println("  -> 没有找到组件标记，剩余全是普通文本")
-                    if (i < text.length) {
-                        val textContent = text.substring(i)
-                        println("  -> 添加普通文本: '$textContent'")
-                        components.add(TextComponent(ComponentType.TEXT, textContent))
-                    }
-                    break
-                } else {
-                    // 添加普通文本
-                    if (nextStart > i) {
-                        val textContent = text.substring(i, nextStart)
-                        println("  -> 添加普通文本: '$textContent'")
-                        components.add(TextComponent(ComponentType.TEXT, textContent))
-                    }
-                    i = nextStart
-                    println("  -> i更新为 $i")
-                }
+                i++
             }
+        }
+        
+        // 处理剩余的普通文本
+        if (componentStart < text.length) {
+            val remainingText = text.substring(componentStart)
+            println("  -> 剩余普通文本: '$remainingText'")
+            components.add(TextComponent(ComponentType.TEXT, remainingText))
         }
         
         println("========== parseTextComponents 调试结束 ==========")
