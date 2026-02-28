@@ -1329,19 +1329,20 @@ object TextComponentHelper {
         // 3. 'sep':'air'的特殊情况优先级最高：前面的第一个@选择器会自动忽略所有separator参数
         
         // 为每个sep:定义找到对应的selector索引
-        // sep:定义应该放在它前面的第一个selector之后
+        // sep:定义应该放在它前面的最后一个selector之后
+        // 这样separator才能从sepIndex开始往前修饰所有未修饰的@选择器
         for (sepIdx in sepDefinitions.indices) {
             val sepPos = sepDefinitions[sepIdx].first
-            // 找到sepPos前面最近的selector
-            var bestSelectorIndex = -1
+            // 找到sepPos前面的最后一个selector
+            var lastSelectorBeforeSep = -1
             for (selectorIdx in selectorPositions.indices) {
                 if (selectorPositions[selectorIdx] < sepPos) {
-                    bestSelectorIndex = selectorIdx
+                    lastSelectorBeforeSep = selectorIdx
                 } else {
                     break
                 }
             }
-            sepDefinitions[sepIdx] = Triple(sepPos, sepDefinitions[sepIdx].second, bestSelectorIndex)
+            sepDefinitions[sepIdx] = Triple(sepPos, sepDefinitions[sepIdx].second, lastSelectorBeforeSep)
         }
         
         // 初始化separators列表，全部为null
@@ -1399,7 +1400,7 @@ object TextComponentHelper {
             // 规则：separator会修饰他前面所有@选择器，直到遇到没有被separator修饰的@选择器
             // 注意：被'sep':'air'影响的选择器会被跳过，但不影响其他separator的修饰逻辑
             // 注意：遇到非@选择器（如mknbt、uuid等）时停止查找
-            for (index in sepIndex - 1 downTo 0) {
+            for (index in sepIndex downTo 0) {
                 if (!selectors[index].startsWith("@")) {
                     // 遇到非@选择器，停止查找
                     break
