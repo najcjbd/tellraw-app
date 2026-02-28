@@ -1228,39 +1228,10 @@ object TextComponentHelper {
         // 标记哪些@选择器被'sep':'air'影响（忽略所有separator参数）
         val airIgnoredSelectors = mutableSetOf<Int>()
         
-        // 先处理所有sep:定义，记录哪些selector被哪些separator修饰
-        val sepToSelectors = mutableMapOf<Int, MutableList<Int>>()  // sep索引 -> 修饰的selector索引列表
+        // 用于记录哪些selector被哪些separator修饰
         val selectorToSep = mutableMapOf<Int, Int>()  // selector索引 -> 修饰它的sep索引
         
-        // 处理sep:定义
-        for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
-            if (sepIndex == -1) continue
-            
-            // 检查sep:定义是否在第一个@选择器之前
-            if (firstAtSelectorIndex != -1 && sepIndex < firstAtSelectorIndex) {
-                // 第一个@前面的sep:定义直接被忽略
-                continue
-            }
-            
-            // 从sepIndex开始往前查找，修饰所有@选择器
-            // 规则：separator会修饰他前面所有@选择器直到遇到没有被separator修饰的@选择器
-            for (index in sepIndex - 1 downTo 0) {
-                if (selectors[index].startsWith("@")) {
-                    // 这是一个@选择器
-                    if (!selectorToSep.containsKey(index)) {
-                        // 这个@选择器还没有被修饰，应用separator
-                        separators[index] = separatorValue
-                        selectorToSep[index] = sepIndex
-                        sepToSelectors.getOrPut(sepIndex) { mutableListOf() }.add(index)
-                    } else {
-                        // 这个@选择器已经被修饰了，但继续往前查找
-                        // 因为separator应该修饰前面所有@选择器，直到遇到没有被separator修饰的@选择器
-                    }
-                }
-            }
-        }
-        
-        // 处理'sep':'air'的特殊情况
+        // 先处理'sep':'air'，标记被影响的选择器
         for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
             if (sepIndex == -1) continue
             if (separatorValue != "air") continue
@@ -1274,12 +1245,38 @@ object TextComponentHelper {
                 }
             }
             if (targetIndex != -1) {
-                // 清除这个@选择器的separator
-                separators[targetIndex] = null
-                // 移除selector到sep的映射
-                selectorToSep.remove(targetIndex)
-                // 从sep到selectors的映射中移除
-                sepToSelectors[sepIndex]?.remove(targetIndex)
+                // 标记这个@选择器为忽略所有separator
+                airIgnoredSelectors.add(targetIndex)
+            }
+        }
+        
+        // 处理sep:定义（跳过'sep':'air'和被'sep':'air'影响的选择器）
+        for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
+            if (sepIndex == -1) continue
+            if (separatorValue == "air") continue  // 跳过'sep':'air'，因为已经处理过了
+            
+            // 检查sep:定义是否在第一个@选择器之前
+            if (firstAtSelectorIndex != -1 && sepIndex < firstAtSelectorIndex) {
+                // 第一个@前面的sep:定义直接被忽略
+                continue
+            }
+            
+            // 从sepIndex开始往前查找，修饰所有@选择器
+            // 规则：separator会修饰他前面所有@选择器直到遇到没有被separator修饰的@选择器
+            for (index in sepIndex - 1 downTo 0) {
+                if (selectors[index].startsWith("@")) {
+                    // 这是一个@选择器
+                    // 跳过被'sep':'air'影响的选择器
+                    if (airIgnoredSelectors.contains(index)) continue
+                    
+                    if (!selectorToSep.containsKey(index)) {
+                        // 这个@选择器还没有被修饰，应用separator
+                        separators[index] = separatorValue
+                        selectorToSep[index] = sepIndex
+                    }
+                    // separator应该修饰前面所有@选择器，直到遇到没有被separator修饰的@选择器
+                    // 所以继续往前查找
+                }
             }
         }
         
