@@ -56,37 +56,23 @@ object TextComponentHelper {
         var i = 0
         var componentStart = 0  // 追踪当前组件内容的开始位置
         
-        println("========== parseTextComponents 调试开始 ==========")
-        println("输入文本: '$text'")
-        println("文本长度: ${text.length}")
-        
         while (i < text.length) {
-            println("当前索引 i=$i, 字符='${text[i]}' (\\u${text[i].code.toString(16).padStart(4, '0')}), componentStart=$componentStart")
-            
             // 查找组件开始标记
             if (text[i] == MARKER_START) {
-                println("  -> 找到MARKER_START")
-                
                 // 查找组件类型
                 val typeEnd = text.indexOf(MARKER_END, i + 1)
-                println("  -> typeEnd位置: $typeEnd")
                 
                 if (typeEnd == -1) {
                     // 没有找到类型结束标记，将标记作为普通文本处理
-                    println("  -> 没有找到类型结束标记，将标记作为普通文本")
                     components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
                     break
                 }
                 
                 val typeKey = text.substring(i + 1, typeEnd)
-                println("  -> typeKey: '$typeKey'")
-                
                 val type = ComponentType.values().find { it.key == typeKey }
-                println("  -> 找到的type: $type")
                 
                 if (type == null) {
                     // 未知的组件类型，将标记作为普通文本处理
-                    println("  -> 未知的组件类型，将标记作为普通文本")
                     components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart, typeEnd + 1)))
                     componentStart = typeEnd + 1
                     i = typeEnd + 1
@@ -95,18 +81,14 @@ object TextComponentHelper {
                 
                 // 提取组件内容（从componentStart到i的文本）
                 val componentContent = text.substring(componentStart, i)
-                println("  -> componentContent: '$componentContent' (从 $componentStart 到 $i)")
                 
                 // 创建组件
                 val component = TextComponent(type, componentContent)
-                println("  -> 创建组件: type=$type, content='$componentContent'")
                 components.add(component)
-                println("  -> 已添加组件到列表")
                 
                 // 更新位置
                 componentStart = typeEnd + 1
                 i = typeEnd + 1
-                println("  -> i和componentStart更新为 $i")
             } else {
                 i++
             }
@@ -115,13 +97,8 @@ object TextComponentHelper {
         // 处理剩余的普通文本
         if (componentStart < text.length) {
             val remainingText = text.substring(componentStart)
-            println("  -> 剩余普通文本: '$remainingText'")
             components.add(TextComponent(ComponentType.TEXT, remainingText))
         }
-        
-        println("========== parseTextComponents 调试结束 ==========")
-        println("返回的组件数量: ${components.size}")
-        println()
         
         return components
     }
@@ -666,7 +643,6 @@ object TextComponentHelper {
                 // 选择器：完整调用选择器转换逻辑（已展开，每个组件只包含一个条目）
                 val selectorString = mainComponent.content
                 val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
-                println("mainComponent处理SELECTOR: selectorString='$selectorString', selectorEntries=$selectorEntries, separatorEntries=$separatorEntries, subComponents=${mainComponent.subComponents.map { "${it.type}:${it.content}" }}")
 
                 if (selectorEntries.isEmpty()) {
                     // 空内容，作为空selector处理
@@ -703,13 +679,9 @@ object TextComponentHelper {
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
                         result["separator"] = mapOf("text" to separatorSubComponent.content)
-                        println("  mainComponent从副组件提取separator: ${separatorSubComponent.content}")
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
                         result["separator"] = mapOf("text" to separatorEntries[0]!!)
-                        println("  mainComponent从separatorEntries提取separator: ${separatorEntries[0]}")
-                    } else {
-                        println("  mainComponent没有找到separator")
                     }
                 }
             }
@@ -767,7 +739,6 @@ object TextComponentHelper {
                         // SELECTOR组件已展开，每个组件只包含一个条目
                         val selectorString = sub.content
                         val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
-                        println("  extra处理SELECTOR: selectorString='$selectorString', selectorEntries=$selectorEntries, separatorEntries=$separatorEntries, subComponents=${sub.subComponents.map { "${it.type}:${it.content}" }}")
 
                         if (selectorEntries.isEmpty()) {
                             subMap["text"] = sub.content
@@ -803,11 +774,9 @@ object TextComponentHelper {
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
                                 subMap["separator"] = mapOf("text" to separatorSubComponent.content)
-                                println("  从副组件提取separator: ${separatorSubComponent.content}")
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
                                 subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
-                                println("  从separatorEntries提取separator: ${separatorEntries[0]}")
                             }
                         }
                     }
@@ -817,9 +786,7 @@ object TextComponentHelper {
             result["extra"] = extra
         }
 
-        val finalJson = mapToJson(result)
-        println("  最终JSON输出: $finalJson")
-        return finalJson
+        return mapToJson(result)
     }
     
     /**
@@ -1206,8 +1173,6 @@ object TextComponentHelper {
                                 selector = selector.substring(0, selector.length - 1)
                             }
         
-                            println("  提取selector: '$selector' (从 $startIndex 到 $i)")
-        
                             selectors.add(selector)
         
                             selectorPositions.add(startIndex)
@@ -1238,8 +1203,6 @@ object TextComponentHelper {
                             if (selector.endsWith(",")) {
                                 selector = selector.substring(0, selector.length - 1)
                             }
-        
-                            println("  提取selector (逗号): '$selector' (从 $startIndex 到 $i)")
         
                             selectors.add(selector)
                             selectorPositions.add(startIndex)
@@ -1489,9 +1452,6 @@ object TextComponentHelper {
                 }
                 ComponentType.SELECTOR -> {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
-                    println("expandComponents: component.content='${component.content}'")
-                    println("  selectorEntries=$selectorEntries")
-                    println("  separatorEntries=$separatorEntries")
                     if (selectorEntries.isEmpty()) {
                         // 空内容，保留为selector组件（内容为空字符串）
                         expanded.add(TextComponent(ComponentType.SELECTOR, ""))
@@ -1501,13 +1461,10 @@ object TextComponentHelper {
                             // 添加separator作为副组件
                             val subComponents = mutableListOf<SubComponent>()
                             val sep = if (index < separatorEntries.size) separatorEntries[index] else null
-                            println("  扩展selector[$index]='$selector', separator=$sep")
                             if (sep != null) {
                                 subComponents.add(SubComponent(SubComponentType.SEPARATOR, sep))
-                                println("  添加subComponents: ${subComponents.map { "${it.type}:${it.content}" }}")
                             }
                             val newComponent = TextComponent(ComponentType.SELECTOR, selector, subComponents)
-                            println("  创建的TextComponent: type=${newComponent.type}, content='${newComponent.content}', subComponents=${newComponent.subComponents.map { "${it.type}:${it.content}" }}")
                             expanded.add(newComponent)
                         }
                     }
