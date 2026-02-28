@@ -1072,12 +1072,14 @@ object TextComponentHelper {
         
                             idx += 7  // ,'sep':的长度
         
-                            // 跳到下一个逗号或文本末尾
-        
-                            if (idx < content.length && content[idx] == ',') {
-        
-                                idx++  // 跳过sep:定义后面的逗号
-        
+                            // 找到sep:定义后面的下一个逗号（跳过sep:定义的值）
+                            val nextCommaIndex = content.indexOf(',', idx)
+                            if (nextCommaIndex != -1) {
+                                // 找到下一个逗号，跳过它（因为这个逗号是sep:定义的一部分）
+                                idx = nextCommaIndex + 1
+                            } else {
+                                // 没有找到逗号，到达文本末尾
+                                idx = content.length
                             }
         
                         } else {
