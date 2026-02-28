@@ -1263,19 +1263,23 @@ object TextComponentHelper {
             
             // 从sepIndex开始往前查找，修饰所有@选择器
             // 规则：separator会修饰他前面所有@选择器，直到遇到没有被separator修饰的@选择器
+            // 注意：被'sep':'air'影响的选择器会被跳过，但不影响其他separator的修饰逻辑
             for (index in sepIndex - 1 downTo 0) {
                 if (selectors[index].startsWith("@")) {
                     // 这是一个@选择器
-                    // 跳过被'sep':'air'影响的选择器
-                    if (airIgnoredSelectors.contains(index)) continue
+                    
+                    // 如果被'sep':'air'影响，跳过这个选择器，但不停止查找
+                    if (airIgnoredSelectors.contains(index)) {
+                        continue
+                    }
                     
                     if (!selectorToSep.containsKey(index)) {
                         // 这个@选择器还没有被修饰，应用separator
                         separators[index] = separatorValue
                         selectorToSep[index] = sepIndex
                     } else {
-                        // 这个@选择器已经被修饰了，遇到第一个没有被separator修饰的@选择器
-                        // 所以停止查找
+                        // 这个@选择器已经被其他separator修饰了，停止查找
+                        // （被'sep':'air'影响的选择器不会在这里停止，因为上面已经continue了）
                         break
                     }
                 }
