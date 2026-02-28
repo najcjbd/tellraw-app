@@ -1329,23 +1329,20 @@ object TextComponentHelper {
         // 3. 'sep':'air'的特殊情况优先级最高：前面的第一个@选择器会自动忽略所有separator参数
         
         // 为每个sep:定义找到对应的selector索引
-        // sepIndex应该是sepPos后面的第一个selector的索引
-        // 这样循环从sepIndex-1开始，修饰sepPos前面的所有@选择器
+        // sepIndex应该是sepPos前面的最后一个selector的索引
+        // 这样循环从sepIndex开始，修饰sepPos前面的所有@选择器
         for (sepIdx in sepDefinitions.indices) {
             val sepPos = sepDefinitions[sepIdx].first
-            // 找到sepPos后面的第一个selector
-            var firstSelectorAfterSep = -1
+            // 找到sepPos前面的最后一个selector
+            var lastSelectorBeforeSep = -1
             for (selectorIdx in selectorPositions.indices) {
-                if (selectorPositions[selectorIdx] > sepPos) {
-                    firstSelectorAfterSep = selectorIdx
+                if (selectorPositions[selectorIdx] < sepPos) {
+                    lastSelectorBeforeSep = selectorIdx
+                } else {
                     break
                 }
             }
-            // 如果sepPos后面没有selector，则使用最后一个selector
-            if (firstSelectorAfterSep == -1 && !selectorPositions.isEmpty()) {
-                firstSelectorAfterSep = selectorPositions.size - 1
-            }
-            sepDefinitions[sepIdx] = Triple(sepPos, sepDefinitions[sepIdx].second, firstSelectorAfterSep)
+            sepDefinitions[sepIdx] = Triple(sepPos, sepDefinitions[sepIdx].second, lastSelectorBeforeSep)
         }
         
         // 初始化separators列表，全部为null
@@ -1399,11 +1396,11 @@ object TextComponentHelper {
                 continue
             }
             
-            // 从sepIndex-1开始往前查找，修饰所有@选择器
+            // 从sepIndex开始往前查找，修饰所有@选择器
             // 规则：separator会修饰他前面所有@选择器，直到遇到没有被separator修饰的@选择器
             // 注意：被'sep':'air'影响的选择器会被跳过，但不影响其他separator的修饰逻辑
             // 注意：遇到非@选择器（如mknbt、uuid等）时停止查找
-            for (index in (sepIndex - 1) downTo 0) {
+            for (index in sepIndex downTo 0) {
                 if (!selectors[index].startsWith("@")) {
                     // 遇到非@选择器，停止查找
                     break
@@ -1424,16 +1421,6 @@ object TextComponentHelper {
                     // 这个@选择器已经被其他separator修饰了，停止查找
                     // （被'sep':'air'影响的选择器不会在这里停止，因为上面已经continue了）
                     break
-                }
-            }
-            
-            // 修饰sepIndex对应的selector（sepPos后面的第一个selector）
-            if (sepIndex < selectors.size && selectors[sepIndex].startsWith("@")) {
-                // 检查是否被'sep':'air'影响
-                if (!airIgnoredSelectors.contains(sepIndex) && !selectorToSep.containsKey(sepIndex)) {
-                    // 应用separator
-                    separators[sepIndex] = separatorValue
-                    selectorToSep[sepIndex] = sepIndex
                 }
             }
         }
