@@ -136,8 +136,11 @@ object TextComponentHelper {
                 
                 // 检查组件内容是否为空（typeEnd == componentEnd表示组件内容为空）
                 if (typeEnd == componentEnd) {
-                    // 组件内容为空，跳过这个组件标记
-                    println("  -> 组件内容为空，跳过组件标记")
+                    // 组件内容为空，创建对应类型的空组件
+                    println("  -> 组件内容为空，创建$type类型的空组件")
+                    val emptyComponent = TextComponent(type, "")
+                    components.add(emptyComponent)
+                    println("  -> 已添加空组件到列表")
                     i = componentEnd + 1
                     continue
                 }
