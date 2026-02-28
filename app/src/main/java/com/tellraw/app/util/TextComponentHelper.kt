@@ -629,8 +629,11 @@ object TextComponentHelper {
                 val scoreEntries = parseScoreContent(mainComponent.content)
 
                 if (scoreEntries.isEmpty()) {
-                    // 空内容，作为纯文本处理
-                    result["text"] = mainComponent.content
+                    // 空内容，保持为score字段（与SELECTOR一致）
+                    result["score"] = mapOf(
+                        "name" to "",
+                        "objective" to ""
+                    )
                 } else {
                     val (firstName, firstObjective) = scoreEntries[0]
                     result["score"] = mapOf(
@@ -726,7 +729,11 @@ object TextComponentHelper {
                         val scoreEntries = parseScoreContent(sub.content)
 
                         if (scoreEntries.isEmpty()) {
-                            subMap["text"] = sub.content
+                            // 空内容，保持为score字段（与mainComponent一致）
+                            subMap["score"] = mapOf(
+                                "name" to "",
+                                "objective" to ""
+                            )
                         } else {
                             val (firstName, firstObjective) = scoreEntries[0]
                             subMap["score"] = mapOf(
@@ -741,14 +748,15 @@ object TextComponentHelper {
                         val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
 
                         if (selectorEntries.isEmpty()) {
-                            subMap["text"] = sub.content
+                            // 空内容，保持为selector字段（与mainComponent一致）
+                            subMap["selector"] = ""
                         } else {
                             // 对selector调用完整的转换逻辑
                             val convertedSelector = if (context != null) {
                                 // 使用convertForMixedMode获取Java版和基岩版结果
                                 val reminders = mutableListOf<String>()
                                 val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
-                                
+
                                 // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                                 // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
                                 if (javaSelector == selectorEntries[0]) {
@@ -842,8 +850,11 @@ object TextComponentHelper {
                     val scoreEntries = parseScoreContent(component.content)
 
                     if (scoreEntries.isEmpty()) {
-                        // 空内容，作为纯文本处理
-                        item["text"] = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
+                        // 空内容，保持为score字段（与SELECTOR一致）
+                        item["score"] = mapOf(
+                            "name" to "",
+                            "objective" to ""
+                        )
                     } else {
                         val (firstName, firstObjective) = scoreEntries[0]
                         item["score"] = mapOf(
@@ -1441,8 +1452,8 @@ object TextComponentHelper {
                 ComponentType.SCORE -> {
                     val scoreEntries = parseScoreContent(component.content)
                     if (scoreEntries.isEmpty()) {
-                        // 空内容，作为纯文本处理
-                        expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                        // 空内容，保持为score组件（与SELECTOR一致）
+                        expanded.add(TextComponent(ComponentType.SCORE, ":"))
                     } else {
                         // 每个score条目都作为独立的score组件
                         for ((name, objective) in scoreEntries) {
