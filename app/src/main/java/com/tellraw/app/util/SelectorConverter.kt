@@ -330,20 +330,13 @@ object SelectorConverter {
         }
         
         // 检测是否需要使用JAVA/基岩混合模式
-        println("DEBUG: javaBedrockMixedModeEnabled=$javaBedrockMixedModeEnabled")
-        println("DEBUG: selector=$selector")
-        println("DEBUG: hasBothJavaAndBedrockParams=${hasBothJavaAndBedrockParams(selector)}")
         var bedrockSelector = selector  // 初始化bedrockSelector为原始选择器
         if (javaBedrockMixedModeEnabled && hasBothJavaAndBedrockParams(selector)) {
-            println("DEBUG: 调用convertForMixedMode")
             // 使用混合模式转换
             val (javaMixedOutput, bedrockMixedOutput) = convertForMixedMode(selector, context, reminders)
             javaSelector = javaMixedOutput
             bedrockSelector = bedrockMixedOutput  // 更新bedrockSelector
             wasConverted = true
-            println("DEBUG: javaMixedOutput=$javaMixedOutput")
-            println("DEBUG: bedrockMixedOutput=$bedrockMixedOutput")
-            println("DEBUG: reminders=$reminders")
         }
 
         return SelectorConversionResult(
