@@ -125,8 +125,10 @@ class YiJianSimpleTest {
         assertEquals("selector内容应该是'text@a@p'", "text@a@p", components[0].content)
         
         // 验证完整的JSON输出
+        // 根据意见.txt规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数
+        // 所以text@a@p应该被展开为：{"selector":"text","extra":[{"selector":"@a"},{"selector":"@p"}]}
         val json = TextComponentHelper.convertToJavaJson(components)
-        val expectedJson = """{"selector":"text@a@p"}"""
+        val expectedJson = """{"selector":"text","extra":[{"selector":"@a"},{"selector":"@p"}]}"""
         assertTrue("JSON输出应该包含'$expectedJson'", json.contains(expectedJson))
     }
     

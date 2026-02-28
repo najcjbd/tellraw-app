@@ -817,7 +817,9 @@ object TextComponentHelper {
             result["extra"] = extra
         }
 
-        return mapToJson(result)
+        val finalJson = mapToJson(result)
+        println("  最终JSON输出: $finalJson")
+        return finalJson
     }
     
     /**
