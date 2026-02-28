@@ -1262,7 +1262,7 @@ object TextComponentHelper {
             }
             
             // 从sepIndex开始往前查找，修饰所有@选择器
-            // 规则：separator会修饰他前面所有@选择器直到遇到没有被separator修饰的@选择器
+            // 规则：separator会修饰他前面所有@选择器，直到遇到没有被separator修饰的@选择器
             for (index in sepIndex - 1 downTo 0) {
                 if (selectors[index].startsWith("@")) {
                     // 这是一个@选择器
@@ -1273,9 +1273,11 @@ object TextComponentHelper {
                         // 这个@选择器还没有被修饰，应用separator
                         separators[index] = separatorValue
                         selectorToSep[index] = sepIndex
+                    } else {
+                        // 这个@选择器已经被修饰了，遇到第一个没有被separator修饰的@选择器
+                        // 所以停止查找
+                        break
                     }
-                    // separator应该修饰前面所有@选择器，直到遇到没有被separator修饰的@选择器
-                    // 所以继续往前查找
                 }
             }
         }
@@ -1342,6 +1344,9 @@ object TextComponentHelper {
                 }
                 ComponentType.SELECTOR -> {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
+                    println("expandComponents: component.content='${component.content}'")
+                    println("  selectorEntries=$selectorEntries")
+                    println("  separatorEntries=$separatorEntries")
                     if (selectorEntries.isEmpty()) {
                         // 空内容，保留为selector组件（内容为空字符串）
                         expanded.add(TextComponent(ComponentType.SELECTOR, ""))
@@ -1350,8 +1355,10 @@ object TextComponentHelper {
                         for ((index, selector) in selectorEntries.withIndex()) {
                             // 添加separator作为副组件
                             val subComponents = mutableListOf<SubComponent>()
-                            if (index < separatorEntries.size && separatorEntries[index] != null) {
-                                subComponents.add(SubComponent(SubComponentType.SEPARATOR, separatorEntries[index]!!))
+                            val sep = if (index < separatorEntries.size) separatorEntries[index] else null
+                            println("  扩展selector[$index]='$selector', separator=$sep")
+                            if (sep != null) {
+                                subComponents.add(SubComponent(SubComponentType.SEPARATOR, sep))
                             }
                             expanded.add(TextComponent(ComponentType.SELECTOR, selector, subComponents))
                         }
