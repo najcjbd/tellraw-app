@@ -1479,8 +1479,11 @@ object TextComponentHelper {
                             println("  扩展selector[$index]='$selector', separator=$sep")
                             if (sep != null) {
                                 subComponents.add(SubComponent(SubComponentType.SEPARATOR, sep))
+                                println("  添加subComponents: ${subComponents.map { "${it.type}:${it.content}" }}")
                             }
-                            expanded.add(TextComponent(ComponentType.SELECTOR, selector, subComponents))
+                            val newComponent = TextComponent(ComponentType.SELECTOR, selector, subComponents)
+                            println("  创建的TextComponent: type=${newComponent.type}, content='${newComponent.content}', subComponents=${newComponent.subComponents.map { "${it.type}:${it.content}" }}")
+                            expanded.add(newComponent)
                         }
                     }
                 }
