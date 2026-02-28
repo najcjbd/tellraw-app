@@ -745,6 +745,7 @@ object TextComponentHelper {
                         // SELECTOR组件已展开，每个组件只包含一个条目
                         val selectorString = sub.content
                         val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
+                        println("  extra处理SELECTOR: selectorString='$selectorString', selectorEntries=$selectorEntries, separatorEntries=$separatorEntries, subComponents=${sub.subComponents.map { "${it.type}:${it.content}" }}")
 
                         if (selectorEntries.isEmpty()) {
                             subMap["text"] = sub.content
@@ -758,7 +759,7 @@ object TextComponentHelper {
                                 // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                                 // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
                                 if (javaSelector == selectorEntries[0]) {
-                                    // 没有进行任何转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
+                                    // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
                                     val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
                                         selectorEntries[0],
                                         SelectorType.JAVA,
@@ -780,9 +781,11 @@ object TextComponentHelper {
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
                                 subMap["separator"] = mapOf("text" to separatorSubComponent.content)
+                                println("  从副组件提取separator: ${separatorSubComponent.content}")
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
                                 subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
+                                println("  从separatorEntries提取separator: ${separatorEntries[0]}")
                             }
                         }
                     }
