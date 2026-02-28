@@ -571,8 +571,25 @@ object TextComponentHelper {
 ): String {
         if (components.isEmpty()) return "{}"
 
+        // 检查组件是否已经被展开（SELECTOR组件的content只包含一个selector条目）
+        val isAlreadyExpanded = components.all { component ->
+            when (component.type) {
+                ComponentType.SELECTOR -> {
+                    // SELECTOR组件的content只包含一个selector条目
+                    val (selectorEntries, _) = parseSelectorContent(component.content)
+                    selectorEntries.size <= 1
+                }
+                ComponentType.SCORE -> {
+                    // SCORE组件的content只包含一个score条目
+                    val scoreEntries = parseScoreContent(component.content)
+                    scoreEntries.size <= 1
+                }
+                else -> true
+            }
+        }
+
         // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
-        val expandedComponents = expandComponents(components)
+        val expandedComponents = if (isAlreadyExpanded) components else expandComponents(components)
 
         // 检查是否所有组件都是TEXT组件
         val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
