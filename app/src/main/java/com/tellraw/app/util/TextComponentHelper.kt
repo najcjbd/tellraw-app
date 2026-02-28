@@ -1039,112 +1039,192 @@ object TextComponentHelper {
         }
         
         // 第二步：提取selector条目（不包括sep:定义），同时记录每个selector的原始位置
-        // 规则：选择器的读取是从@一直到后面一个@(不包含后面一个@)，或者是如果后面没有@了那就表明一直到这个文本组件的结束或者一直到后面的,(不包含,)
-        // 规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数(第一个@前面的'sep':直接被忽略)
-        // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级，读取selector时必须跳过sep:定义
-        val selectors = mutableListOf<String>()
-        val selectorPositions = mutableListOf<Int>()  // 每个selector的原始位置
-        var startIndex = -1
-        var lastAtPos = -1
-        i = 0
         
-        while (i < content.length) {
-            // 跳过sep:定义（最高优先级）
-            if (content.substring(i).startsWith(",'sep':")) {
-                // 跳过整个sep:定义
-                val sepEnd = i + 7
-                val remainingText = content.substring(sepEnd)
-                val nextCommaIndex = remainingText.indexOf(',')
-                if (nextCommaIndex != -1) {
-                    i = sepEnd + nextCommaIndex + 1
-                } else {
-                    i = content.length
-                }
-                continue
-            }
-            
-            if (content[i] == '@') {
-                if (startIndex == -1) {
-                    // 第一个@，记录起点
-                    // 检查前面是否有非@文本（第一个@前面的'sep':直接被忽略）
-                    if (i > 0 && lastAtPos == -1) {
-                        // 前面有非@文本，添加为selector
-                        // 但是需要跳过sep:定义
-                        var textBeforeAt = content.substring(0, i)
-                        // 移除sep:定义
-                        while (textBeforeAt.contains(",'sep':")) {
-                            val sepStart = textBeforeAt.indexOf(",'sep':")
-                            val sepEnd = sepStart + 7
-                            val remainingText = textBeforeAt.substring(sepEnd)
-                            val nextCommaIndex = remainingText.indexOf(',')
-                            if (nextCommaIndex != -1) {
-                                textBeforeAt = textBeforeAt.substring(0, sepStart) + textBeforeAt.substring(sepEnd + nextCommaIndex + 1)
-                            } else {
-                                textBeforeAt = textBeforeAt.substring(0, sepStart)
-                            }
-                        }
-                        if (textBeforeAt.isNotEmpty()) {
-                            selectors.add(textBeforeAt)
-                            selectorPositions.add(0)  // 第一个selector的位置是0
-                        }
-                    }
-                    startIndex = i
-                } else {
-                            // 找到下一个@，提取从startIndex到i-1的selector
-                            var selector = content.substring(startIndex, i)
-                                    
-                                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
-                                    if (selector.endsWith(",")) {
-                                        selector = selector.substring(0, selector.length - 1)
-                                    }
-                                    
-                                    println("  提取selector: '$selector' (从 $startIndex 到 $i)")
-                                    
-                                    selectors.add(selector)
-                                    selectorPositions.add(startIndex)
-                                    startIndex = i
-                                }
-                lastAtPos = i
-                i++
-            } else if (content[i] == ',') {
-                // 逗号，处理当前条目
-                // 先检查逗号后面是否是sep:定义，如果是，跳过sep:定义
-                var commaIndex = i
-                var nextCharIndex = commaIndex + 1
-                while (nextCharIndex < content.length) {
-                    if (content.substring(nextCharIndex).startsWith(",'sep':")) {
-                        // 逗号后面是sep:定义，跳过整个sep:定义
-                        val sepEnd = nextCharIndex + 7
-                        val remainingText = content.substring(sepEnd)
-                        val nextCommaIndex = remainingText.indexOf(',')
-                        if (nextCommaIndex != -1) {
-                            // 跳过sep:定义和后面的逗号
-                            i = sepEnd + nextCommaIndex
-                            continue
-                        } else {
-                            // 跳过sep:定义，到达文本末尾
-                            i = content.length
-                            break
-                        }
-                    } else {
-                        break
-                    }
-                }
+                // 规则：选择器的读取是从@一直到后面一个@(不包含后面一个@)，或者是如果后面没有@了那就表明一直到这个文本组件的结束或者一直到后面的,(不包含,)
+        
+                // 规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数(第一个@前面的'sep':直接被忽略)
+        
+                // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级，读取selector时必须跳过sep:定义
+        
+                val selectors = mutableListOf<String>()
+        
+                val selectorPositions = mutableListOf<Int>()  // 每个selector的原始位置
+        
+                var startIndex = -1
+        
+                var lastAtPos = -1
+        
+                i = 0
+        
                 
-                if (startIndex != -1) {
-                    var selector = content.substring(startIndex, i)
-                    
-                    // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
-                    if (selector.endsWith(",")) {
-                        selector = selector.substring(0, selector.length - 1)
+        
+                // 跳过sep:定义查找下一个@
+        
+                fun skipSepDefinitions(startIndex: Int): Int {
+        
+                    var idx = startIndex
+        
+                    while (idx < content.length) {
+        
+                        if (content.substring(idx).startsWith(",'sep':")) {
+        
+                            // 跳过,'sep':'
+        
+                            idx += 7  // ,'sep':的长度
+        
+                            // 跳到下一个逗号或文本末尾
+        
+                            if (idx < content.length && content[idx] == ',') {
+        
+                                idx++  // 跳过sep:定义后面的逗号
+        
+                            }
+        
+                        } else {
+        
+                            break
+        
+                        }
+        
                     }
+        
+                    return idx
+        
+                }
+        
+                
+        
+                while (i < content.length) {
+        
+                    // 跳过sep:定义
+        
+                    if (content.substring(i).startsWith(",'sep':")) {
+        
+                        i = skipSepDefinitions(i)
+        
+                        continue
+        
+                    }
+        
                     
-                    println("  提取selector (逗号): '$selector' (从 $startIndex 到 $i)")
-                    
-                    selectors.add(selector)
-                    selectorPositions.add(startIndex)
-                    startIndex = -1
-                } else {
+        
+                    if (content[i] == '@') {
+        
+                        if (startIndex == -1) {
+        
+                            // 第一个@，记录起点
+        
+                            // 检查前面是否有非@文本（第一个@前面的'sep':直接被忽略）
+        
+                            if (i > 0 && lastAtPos == -1) {
+        
+                                // 前面有非@文本，添加为selector
+        
+                                // 但是需要跳过sep:定义
+        
+                                var textBeforeAt = content.substring(0, i)
+        
+                                // 移除sep:定义
+                                
+                                                                while (textBeforeAt.contains(",'sep':")) {
+                                                                    val sepStart = textBeforeAt.indexOf(",'sep':")        
+                                    if (sepStart == -1) break
+        
+                                    val sepEnd = sepStart + 7
+        
+                                    val remainingText = textBeforeAt.substring(sepEnd)
+        
+                                    val nextCommaIndex = remainingText.indexOf(',')
+        
+                                    if (nextCommaIndex != -1) {
+        
+                                        textBeforeAt = textBeforeAt.substring(0, sepStart) + textBeforeAt.substring(sepEnd + nextCommaIndex + 1)
+        
+                                    } else {
+        
+                                        textBeforeAt = textBeforeAt.substring(0, sepStart)
+        
+                                    }
+        
+                                }
+        
+                                if (textBeforeAt.isNotEmpty()) {
+        
+                                    selectors.add(textBeforeAt)
+        
+                                    selectorPositions.add(0)  // 第一个selector的位置是0
+        
+                                }
+        
+                            }
+        
+                            startIndex = i
+        
+                        } else {
+        
+                            // 找到下一个@，提取从startIndex到i-1的selector
+        
+                            var selector = content.substring(startIndex, i)
+        
+                            
+        
+                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+        
+                            if (selector.endsWith(",")) {
+        
+                                selector = selector.substring(0, selector.length - 1)
+        
+                            }
+        
+                            
+        
+                            println("  提取selector: '$selector' (从 $startIndex 到 $i)")
+        
+                            
+        
+                            selectors.add(selector)
+        
+                            selectorPositions.add(startIndex)
+        
+                            startIndex = i
+        
+                        }
+        
+                        lastAtPos = i
+        
+                        i++
+        
+                    } else if (content[i] == ',') {
+        
+                        // 逗号，处理当前条目
+        
+                        if (startIndex != -1) {
+        
+                            var selector = content.substring(startIndex, i)
+        
+                            
+        
+                            // 检查selector是否以逗号结尾，如果是，则去掉末尾的逗号
+        
+                            if (selector.endsWith(",")) {
+        
+                                selector = selector.substring(0, selector.length - 1)
+        
+                            }
+        
+                            
+        
+                            println("  提取selector (逗号): '$selector' (从 $startIndex 到 $i)")
+        
+                            
+        
+                            selectors.add(selector)
+        
+                            selectorPositions.add(startIndex)
+        
+                            startIndex = -1
+        
+                        } else {
                     // 规则：如果有,相隔并且无@，就作为一个无@文本组件参数
                     // 检查逗号后面是否有非@文本
                     var nextIndex = i + 1
