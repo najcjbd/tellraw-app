@@ -95,7 +95,7 @@ object TextComponentHelper {
                 
                 // 提取组件内容（从componentStart到i的文本）
                 val componentContent = text.substring(componentStart, i)
-                println("  -> componentContent: '$componentContent' (从$componentStart到$i)")
+                println("  -> componentContent: '$componentContent' (从 $componentStart 到 $i)")
                 
                 // 创建组件
                 val component = TextComponent(type, componentContent)
