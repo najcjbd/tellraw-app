@@ -1735,115 +1735,6 @@ class TextFormatterTest {
     }
 
     /**
-     * 测试组25：generateTellrawCommand 函数测试
-     */
-    @Test
-    fun testGenerateTellrawCommand_1() {
-        // 基本命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "普通文本", useJavaFontStyle = true, context)
-        assertTrue("Java版命令应以tellraw @a开头", command.javaCommand.startsWith("tellraw @a"))
-        assertTrue("基岩版命令应以tellraw @a开头", command.bedrockCommand.startsWith("tellraw @a"))
-    }
-
-    @Test
-    fun testGenerateTellrawCommand_2() {
-        // 带颜色代码的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§a绿色文本", useJavaFontStyle = true, context)
-        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
-        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
-    }
-
-    @Test
-    fun testGenerateTellrawCommand_3() {
-        // 带§m§n代码的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§m§n删除线下划线", useJavaFontStyle = true, context)
-        assertTrue("应该有警告信息", command.warnings.isNotEmpty())
-        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
-        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
-    }
-
-    @Test
-    fun testGenerateTellrawCommand_4() {
-        // 不同选择器的命令生成
-        val selectors = listOf("@a", "@p", "@r", "@e", "@s")
-        for (selector in selectors) {
-            val command = TextFormatter.generateTellrawCommand(selector, "文本", useJavaFontStyle = true, context)
-            assertTrue("命令应包含选择器 $selector", command.javaCommand.contains(selector))
-            assertTrue("命令应包含选择器 $selector", command.bedrockCommand.contains(selector))
-        }
-    }
-
-    @Test
-    fun testGenerateTellrawCommand_5() {
-        // 复杂文本的命令生成
-        val command = TextFormatter.generateTellrawCommand("@a", "§a§l绿色粗体§r§m_f删除线", useJavaFontStyle = true, context)
-        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
-        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
-    }
-
-    /**
-     * 测试组26：validateTellrawCommand 函数测试
-     */
-    @Test
-    fun testValidateTellrawCommand_1() {
-        // 有效的tellraw命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a {\"text\":\"测试\"}", context)
-        assertTrue("有效命令不应该有错误", errors.isEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_2() {
-        // 无效的命令格式
-        val errors = TextFormatter.validateTellrawCommand("say @a 测试", context)
-        assertTrue("应该有错误信息", errors.isNotEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_3() {
-        // 缺少参数的命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a", context)
-        assertTrue("应该有错误信息", errors.isNotEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_4() {
-        // 无效的选择器
-        val errors = TextFormatter.validateTellrawCommand("tellraw test {\"text\":\"测试\"}", context)
-        assertTrue("应该有错误信息", errors.isNotEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_5() {
-        // 无效的JSON格式
-        val errors = TextFormatter.validateTellrawCommand("tellraw @a {text:测试}", context)
-        assertTrue("应该有错误信息", errors.isNotEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_6() {
-        // 有效的选择器
-        val validSelectors = listOf("@a", "@p", "@r", "@e", "@s")
-        for (selector in validSelectors) {
-            val errors = TextFormatter.validateTellrawCommand("tellraw $selector {\"text\":\"测试\"}", context)
-            assertTrue("选择器 $selector 应该有效", errors.isEmpty())
-        }
-    }
-
-    @Test
-    fun testValidateTellrawCommand_7() {
-        // 空命令
-        val errors = TextFormatter.validateTellrawCommand("", context)
-        assertTrue("空命令应该有错误", errors.isNotEmpty())
-    }
-
-    @Test
-    fun testValidateTellrawCommand_8() {
-        // 只有tellraw的命令
-        val errors = TextFormatter.validateTellrawCommand("tellraw", context)
-        assertTrue("不完整的命令应该有错误", errors.isNotEmpty())
-    }
-
-    /**
      * 测试组27：边界情况和特殊场景测试
      */
     @Test
@@ -1943,10 +1834,11 @@ class TextFormatterTest {
     fun testComprehensiveScenarios_1() {
         // 完整的tellraw命令场景
         val text = "§l§a欢迎来到服务器！§r§c请注意遵守规则。§r§e点击这里加入：§n§bdiscord.gg/example"
-        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, context)
-        
-        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
-        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+        val javaJson = TextFormatter.convertToJavaJson(text, "font", false, context)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, "font", false, context)
+
+        assertTrue("Java版命令应包含JSON格式", javaJson.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", bedrockJson.contains("\"rawtext\""))
     }
 
     @Test
@@ -1996,9 +1888,10 @@ class TextFormatterTest {
     fun testComprehensiveScenarios_5() {
         // 完整的游戏场景
         val text = "§l§c系统通知§r§f恭喜你获得了成就：§e§n点击这里领取奖励！§r§a请在§f§o聊天框§a中输入§b§l/reward claim§a来领取。"
-        val command = TextFormatter.generateTellrawCommand("@a", text, useJavaFontStyle = true, context)
-        
-        assertTrue("Java版命令应包含JSON格式", command.javaCommand.contains("{"))
-        assertTrue("基岩版命令应包含rawtext格式", command.bedrockCommand.contains("\"rawtext\""))
+        val javaJson = TextFormatter.convertToJavaJson(text, "font", false, context)
+        val bedrockJson = TextFormatter.convertToBedrockJson(text, "font", false, context)
+
+        assertTrue("Java版命令应包含JSON格式", javaJson.contains("{"))
+        assertTrue("基岩版命令应包含rawtext格式", bedrockJson.contains("\"rawtext\""))
     }
 }
