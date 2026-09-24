@@ -680,10 +680,11 @@ object SelectorConverter {
                                 "$prefix" + "c=$limitValue"
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, limitValue))
-                        } else if (selectorVar == "@a") {
-                            // 没有limit且是@a：Java的@a[sort=nearest]是"按从近到远的全部玩家"，
-                            // 最近优先只有基岩版的@p能表达，所以转成@p[c=114514]（114514相当于不设上限），
-                            // 并提醒用户：玩家数真的超过114514时结果会不完整
+                        } else if (selectorVar == "@a" || selectorVar == "@e") {
+                            // 没有limit：Java的@a[sort=nearest]是"按从近到远的全部玩家"，
+                            // 最近优先只有基岩版的@p能表达，所以 @a 转成 @p[c=114514]；
+                            // @e 保留自己加 c=114514（和 furthest 用 c=-9999 同理）。
+                            // 114514 相当于不设上限，并提醒用户：数量真的超过114514时结果会不完整
                             paramsPart = paramsPart.replace(sortPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
@@ -700,8 +701,9 @@ object SelectorConverter {
                                     if (paramsPart.isEmpty()) "c=114514" else "$paramsPart,c=114514"
                                 }
                             }
-                            selectorVar = "@p"
-                            conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_all_converted))
+                            val sourceSelector = selectorVar
+                            if (selectorVar == "@a") selectorVar = "@p"
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_all_converted, sourceSelector, selectorVar))
                         } else {
                             // 其他大选择器：基岩版表达不了"最近优先的全部"，删除sort但必须提醒
                             paramsPart = paramsPart.replace(sortPattern) { match ->

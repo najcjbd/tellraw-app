@@ -21,13 +21,13 @@ object TextComponentHelper {
         TEXT("text", R.string.component_text),
         TRANSLATE("translate", R.string.component_translate, true),
         SCORE("score", R.string.component_score),
-        SELECTOR("selector", R.string.component_selector)
+        SELECTOR("selector", R.string.component_selector, true)
     }
     
     // 副组件类型
     enum class SubComponentType(val key: String, @StringRes val displayNameResId: Int, val parentComponent: ComponentType?) {
         WITH("with", R.string.component_with, ComponentType.TRANSLATE),
-        SEPARATOR("separator", R.string.component_with, ComponentType.SELECTOR)  // 暂时使用component_with作为displayNameResId
+        SEPARATOR("separator", R.string.component_separator, ComponentType.SELECTOR)
     }
     
     /**
@@ -999,12 +999,12 @@ object TextComponentHelper {
         
         
         
-            /**
-        
-             * 解析selector组件内容
+    /**
      * 解析selector组件内容
      * 格式：selector（支持用逗号分隔多个）
-     * 特殊语法：,'sep':分隔符（用于指定前面所有@选择器的分隔符）
+     * 特殊语法：,'sep':值（用于指定前面所有@选择器的分隔符）
+     *   带单引号是字面文本：,'sep':'kk' 的值是 kk；,'sep':'air' 就是文本 air
+     *   不带单引号才是关键字：,'sep':air 让前面的第一个@忽略所有separator
      * 转义规则：selector里方括号 [...] 内的逗号属于该选择器内部；也可以写 \, 表示一个转义逗号
      * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
      */
@@ -1017,6 +1017,8 @@ object TextComponentHelper {
         // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级
         // ,'sep':后面的文本一直到下一个,(不包含,)为一个整体，或者是如果后面没有,时，那么就是一直到结束的文本的separator
         val sepDefinitions = mutableListOf<Triple<Int, String, Int>>()  // (原始位置索引, 分隔符, selector索引)
+        // 哪些 sep:定义是不带引号的 air（关键字：让前面的第一个@忽略所有separator）
+        val airKeywordPositions = mutableSetOf<Int>()
         var i = 0
         
         while (i < content.length) {
@@ -1034,8 +1036,18 @@ object TextComponentHelper {
                 } else {
                     remainingText.trim()
                 }
-                // 引号只是分隔符值的"外壳"，值取引号里面的文字：,'sep':'kk' 的值是 kk
-                val separatorValue = stripOuterQuotes(rawSeparatorValue)
+                // 外面的单引号表示"引号里是字面文本"：,'sep':'kk' -> kk，,'sep':'air' -> 文本 air
+                // 不带单引号才是关键字：,'sep':air
+                val isQuotedLiteral = rawSeparatorValue.length >= 2 &&
+                    rawSeparatorValue.first() == '\'' && rawSeparatorValue.last() == '\''
+                val separatorValue = if (isQuotedLiteral) {
+                    rawSeparatorValue.substring(1, rawSeparatorValue.length - 1)
+                } else {
+                    rawSeparatorValue
+                }
+                if (!isQuotedLiteral && separatorValue == "air") {
+                    airKeywordPositions.add(sepStart)
+                }
                 
                 sepDefinitions.add(Triple(sepStart, separatorValue.ifEmpty { "," }, -1))  // selector索引暂时设为-1
                 
@@ -1352,7 +1364,7 @@ object TextComponentHelper {
         // 先处理'sep':'air'，标记被影响的选择器
         for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
             if (sepIndex == -1) continue
-            if (separatorValue != "air") continue
+            if (sepPos !in airKeywordPositions) continue
             
             // 找到sep:定义前面的第一个@选择器
             // 注意：sepIndex 本身就是"该 sep 前面最后一个 selector"，也就是"它前面的第一个@"，
@@ -1373,7 +1385,7 @@ object TextComponentHelper {
         // 处理sep:定义（跳过'sep':'air'和被'sep':'air'影响的选择器）
         for ((sepPos, separatorValue, sepIndex) in sepDefinitions) {
             if (sepIndex == -1) continue
-            if (separatorValue == "air") continue  // 跳过'sep':'air'，因为已经处理过了
+            if (sepPos in airKeywordPositions) continue  // 关键字air不是分隔符，已经在上面单独处理过了
             
             // 检查sep:定义是否在第一个@选择器之前
             if (firstAtSelectorIndex != -1 && sepIndex < firstAtSelectorIndex) {
@@ -1451,20 +1463,6 @@ object TextComponentHelper {
             }
         }
         return String(chars)
-    }
-
-    /**
-     * 去掉分隔符值最外层成对的引号：'kk' 或 "kk" 都取 kk
-     * 意见.txt 里 ,'sep':'n' 的写法，n 才是分隔符的值
-     */
-    private fun stripOuterQuotes(value: String): String {
-        if (value.length < 2) return value
-        val first = value.first()
-        val last = value.last()
-        if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
-            return value.substring(1, value.length - 1)
-        }
-        return value
     }
 
     /**
