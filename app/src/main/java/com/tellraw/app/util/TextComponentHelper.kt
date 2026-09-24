@@ -49,7 +49,8 @@ object TextComponentHelper {
     
     /**
      * 将原始文本（带组件标记）解析为组件列表
-     * 使用字符串搜索而不是深度计数，避免副组件的MARKER_START干扰
+     * 标记格式：content + 副组件 + MARKER_START + type.key + MARKER_END
+     * 即类型标记是它前面那段内容的后缀，副组件写在内容之后、类型标记之前
      */
     fun parseTextComponents(text: String): List<TextComponent> {
         val components = mutableListOf<TextComponent>()
@@ -79,71 +80,15 @@ object TextComponentHelper {
                     continue
                 }
                 
-                // 查找组件结束标记（最后一个MARKER_END）
-                val componentEnd = text.indexOf(MARKER_END, typeEnd + 1)
-                if (componentEnd == -1) {
-                    // 没有找到组件结束标记，将标记作为普通文本处理
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
-                    break
-                }
-                
-                // 提取组件内容（从typeEnd + 1到componentEnd）
-                val fullContent = text.substring(typeEnd + 1, componentEnd)
-                
-                // 解析副组件
-                val subComponents = mutableListOf<SubComponent>()
-                var searchStart = 0
-                while (searchStart < fullContent.length) {
-                    // 查找副组件开始标记：__type.key__
-                    val subComponentStart = fullContent.indexOf("__", searchStart)
-                    if (subComponentStart == -1) break
-                    
-                    // 查找副组件类型
-                    val subTypeStart = subComponentStart + 2  // 跳过__
-                    val subTypeEnd = fullContent.indexOf("__", subTypeStart)
-                    if (subTypeEnd == -1) break
-                    
-                    val subTypeKey = fullContent.substring(subTypeStart, subTypeEnd)
-                    val subType = SubComponentType.values().find { it.key == subTypeKey }
-                    if (subType == null) {
-                        // 不是有效的副组件类型，跳过
-                        searchStart = subTypeEnd + 2
-                        continue
-                    }
-                    
-                    // 查找副组件内容（从subTypeEnd + 2开始，到下一个__）
-                    val contentStart = subTypeEnd + 2
-                    val contentEnd = fullContent.indexOf("__", contentStart)
-                    if (contentEnd == -1) {
-                        // 没有找到结束标记，这不是有效的副组件
-                        break
-                    }
-                    
-                    val subContent = fullContent.substring(contentStart, contentEnd)
-                    subComponents.add(SubComponent(subType, subContent))
-                    
-                    searchStart = contentEnd + 2  // 跳过结束标记__
-                }
-                
-                // 提取主内容（到第一个副组件或字符串末尾）
-                val mainContent = if (subComponents.isEmpty()) {
-                    fullContent
-                } else {
-                    val firstSubComponent = fullContent.indexOf("__")
-                    if (firstSubComponent == -1) {
-                        fullContent
-                    } else {
-                        fullContent.substring(0, firstSubComponent)
-                    }
-                }
-                
-                // 创建组件
-                val component = TextComponent(type, mainContent, subComponents)
+                // 提取组件内容（从componentStart到i的文本），再从中解析出副组件
+                val componentContent = text.substring(componentStart, i)
+                val component = parseSingleComponentWithContent(type, componentContent)
+                    ?: TextComponent(type, componentContent)
                 components.add(component)
                 
                 // 更新位置
-                componentStart = componentEnd + 1
-                i = componentEnd + 1
+                componentStart = typeEnd + 1
+                i = typeEnd + 1
             } else {
                 i++
             }
@@ -159,17 +104,72 @@ object TextComponentHelper {
     }
     
     /**
+     * 解析单个组件（已知组件类型）
+     * 副组件格式：__type.key__content__，写在主内容之后
+     * 只有"类型合法 + 父组件匹配 + 以__结束"的才算有效副组件，
+     * 避免把用户输入里的 __with__ 之类误认成副组件标记
+     */
+    private fun parseSingleComponentWithContent(type: ComponentType, content: String): TextComponent? {
+        // 查找副组件
+        val subComponents = mutableListOf<SubComponent>()
+        var mainContentEnd = content.length  // 主内容的结束位置（遇到第一个有效副组件时前移）
+        var searchStart = 0
+        
+        while (searchStart < content.length) {
+            // 查找副组件开始标记：__type.key__
+            val subComponentStart = content.indexOf("__", searchStart)
+            if (subComponentStart == -1) break
+            
+            // 查找副组件类型
+            val typeStart = subComponentStart + 2  // 跳过__
+            val typeEnd = content.indexOf("__", typeStart)
+            if (typeEnd == -1) break
+            
+            val subTypeKey = content.substring(typeStart, typeEnd)
+            // 副组件类型必须与父组件匹配：WITH只属于translate，SEPARATOR只属于selector
+            val subType = SubComponentType.values().find { it.key == subTypeKey && it.parentComponent == type }
+            if (subType == null) {
+                // 不是有效的副组件类型，跳过
+                searchStart = typeEnd + 2
+                continue
+            }
+            
+            // 查找副组件内容（从typeEnd + 2开始，到下一个__）
+            val contentStart = typeEnd + 2
+            val contentEnd = content.indexOf("__", contentStart)
+            if (contentEnd == -1) {
+                // 没有找到结束标记，这不是有效的副组件
+                break
+            }
+            
+            if (subComponents.isEmpty()) {
+                // 主内容到第一个有效副组件为止
+                mainContentEnd = subComponentStart
+            }
+            val subContent = content.substring(contentStart, contentEnd)
+            subComponents.add(SubComponent(subType, subContent))
+            
+            searchStart = contentEnd + 2  // 跳过结束标记__
+        }
+        
+        // 主内容：到第一个有效副组件为止（没有副组件时就是整个内容）
+        val mainContent = content.substring(0, mainContentEnd)
+        
+        return TextComponent(type, mainContent, subComponents)
+    }
+    
+    /**
      * 将组件列表转换为标记文本
-     * 格式：MARKER_START + type.key + MARKER_END + content + MARKER_END
+     * 格式：content + 副组件 + MARKER_START + type.key + MARKER_END
      * 副组件格式：__type.key__content__
-     * 这样parseTextComponents可以直接使用字符串搜索，而不是深度计数
+     * 即类型标记是该组件内容的后缀
      */
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
                 "__${sub.type.key}__${sub.content}__"
             }
-            "$MARKER_START${component.type.key}$MARKER_END${component.content}$subComponentText$MARKER_END"
+            "${component.content}$subComponentText$MARKER_START${component.type.key}$MARKER_END"
         }
     }
     
@@ -325,14 +325,10 @@ object TextComponentHelper {
     
     /**
      * 获取指定位置的文本组件类型
+     * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
      */
     fun getComponentTypeAtPosition(text: String, position: Int): ComponentType? {
-        if (position < 0 || position >= text.length) return null
-        
-        // 跳过标记字符
-        if (text[position] == MARKER_START || text[position] == MARKER_END) {
-            return null
-        }
+        if (position < 0) return null
         
         val components = parseTextComponents(text)
         var currentPos = 0
@@ -349,20 +345,16 @@ object TextComponentHelper {
             currentPos += contentLength
         }
         
-        return ComponentType.TEXT
+        return null
     }
     
     /**
      * 获取指定位置的文本组件内容
+     * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
      * @return 组件的完整内容字符串（包括副组件内容）
      */
     fun getComponentContentAtPosition(text: String, position: Int): String? {
-        if (position < 0 || position >= text.length) return null
-        
-        // 跳过标记字符
-        if (text[position] == MARKER_START || text[position] == MARKER_END) {
-            return null
-        }
+        if (position < 0) return null
         
         val components = parseTextComponents(text)
         var currentPos = 0
@@ -385,7 +377,7 @@ object TextComponentHelper {
             currentPos += contentLength
         }
         
-        return text  // 如果没有找到组件，返回整个文本
+        return null
     }
     
     /**
@@ -627,10 +619,10 @@ object TextComponentHelper {
                 val scoreEntries = parseScoreContent(mainComponent.content)
 
                 if (scoreEntries.isEmpty()) {
-                    // 空内容，保持为score字段（与SELECTOR一致）
+                    // 空内容按通配符处理，与 expandComponents 把空score改写成":"后的结果保持一致
                     result["score"] = mapOf(
-                        "name" to "",
-                        "objective" to ""
+                        "name" to "*",
+                        "objective" to "*"
                     )
                 } else {
                     val (firstName, firstObjective) = scoreEntries[0]
@@ -727,10 +719,10 @@ object TextComponentHelper {
                         val scoreEntries = parseScoreContent(sub.content)
 
                         if (scoreEntries.isEmpty()) {
-                            // 空内容，保持为score字段（与mainComponent一致）
+                            // 空内容按通配符处理，与 mainComponent 保持一致
                             subMap["score"] = mapOf(
-                                "name" to "",
-                                "objective" to ""
+                                "name" to "*",
+                                "objective" to "*"
                             )
                         } else {
                             val (firstName, firstObjective) = scoreEntries[0]
@@ -848,10 +840,10 @@ object TextComponentHelper {
                     val scoreEntries = parseScoreContent(component.content)
 
                     if (scoreEntries.isEmpty()) {
-                        // 空内容，保持为score字段（与SELECTOR一致）
+                        // 空内容按通配符处理，与 Java 版保持一致
                         item["score"] = mapOf(
-                            "name" to "",
-                            "objective" to ""
+                            "name" to "*",
+                            "objective" to "*"
                         )
                     } else {
                         val (firstName, firstObjective) = scoreEntries[0]
@@ -993,19 +985,17 @@ object TextComponentHelper {
             /**
         
              * 解析selector组件内容
-     * 格式：selector（支持用逗号分隔多个）
-     * 特殊语法：sep:分隔符（用于指定前面一个selector的分隔符，必须完整匹配sep:）
-     * 转义规则：如果selector包含逗号，用\,表示
-     * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
-     */
-    /**
      * 解析selector组件内容
      * 格式：selector（支持用逗号分隔多个）
      * 特殊语法：,'sep':分隔符（用于指定前面所有@选择器的分隔符）
-     * 转义规则：如果selector包含逗号，用\,表示
+     * 转义规则：selector里方括号 [...] 内的逗号属于该选择器内部；也可以写 \, 表示一个转义逗号
      * @return Pair<选择器列表, 分隔符列表>（分隔符列表与选择器列表一一对应，无分隔符则为null）
      */
-    private fun parseSelectorContent(content: String): Pair<List<String>, List<String?>> {
+    private fun parseSelectorContent(rawContent: String): Pair<List<String>, List<String?>> {
+        // 先把"不该当作条目分隔符"的逗号（方括号内、\, 转义）换成等长的占位字符，
+        // 后面的扫描逻辑因此可以保持原样；字符串长度不变，位置索引依然对齐
+        val content = maskSeparatorCommas(rawContent)
+
         // 第一步：提取所有sep:定义和它们的位置
         // 规则：,'sep':作为一个整体，在selector文本组件有最高优先级
         // ,'sep':后面的文本一直到下一个,(不包含,)为一个整体，或者是如果后面没有,时，那么就是一直到结束的文本的separator
@@ -1399,9 +1389,57 @@ object TextComponentHelper {
             }
         }
         
-        return Pair(selectors, separators)
+        return Pair(
+            selectors.map { unmaskSeparatorCommas(it) },
+            separators.map { value -> value?.let { unmaskSeparatorCommas(it) } }
+        )
     }
-    
+
+    // "不该当作条目分隔符"的逗号，在扫描期间使用的占位字符
+    private const val COMMA_PLACEHOLDER = '\uE000'
+
+    /**
+     * 把"不该当作条目分隔符"的逗号换成占位字符，配合 unmaskSeparatorCommas 还原
+     * 规则：方括号 [...] 内的逗号属于该选择器内部；\, 是转义逗号
+     */
+    private fun maskSeparatorCommas(content: String): String {
+        if (!content.contains('[') && !content.contains("\\,")) return content
+
+        val chars = content.toCharArray()
+        var depth = 0
+        var i = 0
+        while (i < chars.size) {
+            when {
+                chars[i] == '\\' && i + 1 < chars.size && chars[i + 1] == ',' -> {
+                    chars[i + 1] = COMMA_PLACEHOLDER
+                    i += 2
+                }
+                chars[i] == '[' -> {
+                    depth++
+                    i++
+                }
+                chars[i] == ']' -> {
+                    if (depth > 0) depth--
+                    i++
+                }
+                chars[i] == ',' && depth > 0 -> {
+                    chars[i] = COMMA_PLACEHOLDER
+                    i++
+                }
+                else -> i++
+            }
+        }
+        return String(chars)
+    }
+
+    /**
+     * 还原占位字符：方括号内的逗号还原成逗号，\, 转义还原成逗号（去掉反斜杠）
+     */
+    private fun unmaskSeparatorCommas(value: String): String {
+        if (!value.contains(COMMA_PLACEHOLDER)) return value
+        return value.replace(COMMA_PLACEHOLDER, ',').replace("\\,", ",")
+    }
+
     /**
      * 解析translate组件的with参数
      * @return 参数列表
@@ -1507,7 +1545,7 @@ object TextComponentHelper {
      */
     private fun valueToJson(value: Any): String {
         return when (value) {
-            is String -> "\"${value.replace("\"", "\\\"")}\""
+            is String -> "\"${escapeJsonString(value)}\""
             is Number -> value.toString()
             is Boolean -> value.toString()
             is Map<*, *> -> {
@@ -1518,8 +1556,31 @@ object TextComponentHelper {
                 @Suppress("UNCHECKED_CAST")
                 listToJson(value as List<Any>)
             }
-            else -> "\"$value\""
+            else -> "\"${escapeJsonString(value.toString())}\""
         }
+    }
+
+    /**
+     * 按JSON规范转义字符串内容（反斜杠、双引号、控制字符）
+     * 只转义反斜杠是不够的：结尾的反斜杠会把闭合引号吃掉，产出非法JSON
+     */
+    private fun escapeJsonString(value: String): String {
+        val builder = StringBuilder(value.length + 8)
+        for (ch in value) {
+            when (ch) {
+                '"' -> builder.append("\\\"")
+                '\\' -> builder.append("\\\\")
+                '\n' -> builder.append("\\n")
+                '\r' -> builder.append("\\r")
+                '\t' -> builder.append("\\t")
+                else -> if (ch < ' ') {
+                    builder.append("\\u").append(ch.code.toString(16).padStart(4, '0'))
+                } else {
+                    builder.append(ch)
+                }
+            }
+        }
+        return builder.toString()
     }
     
     /**

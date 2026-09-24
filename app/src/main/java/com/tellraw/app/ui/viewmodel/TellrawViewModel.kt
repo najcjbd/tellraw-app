@@ -444,11 +444,11 @@ class TellrawViewModel @Inject constructor(
             // 前台文本长度：主内容 + 副组件内容
             val frontendContentLength = component.content.length + component.subComponents.sumOf { it.content.length }
             
-            // 后台文本长度：MARKER_START(1) + type.key.length + MARKER_END(1) + content长度 + 副组件长度 + MARKER_END(1)
-            // 注意：副组件使用__type.key__content格式，所以副组件长度 = 2 + type.key.length + content.length
-            val subComponentBackendLength = component.subComponents.sumOf { 2 + it.type.key.length + it.content.length }
+            // 后台文本长度：content长度 + 副组件长度 + MARKER_START(1) + type.key.length + MARKER_END(1)
+            // 注意：副组件使用__type.key__content__格式，所以副组件长度 = 2 + type.key.length + 2 + content.length + 2
+            val subComponentBackendLength = component.subComponents.sumOf { 2 + it.type.key.length + 2 + it.content.length + 2 }
             val backendContentLength = component.content.length + subComponentBackendLength
-            val markerLength = 1 + component.type.key.length + 1 + backendContentLength + 1
+            val markerLength = backendContentLength + 1 + component.type.key.length + 1
             
             // 记录映射
             componentMappings.add(ComponentMapping(
@@ -1600,7 +1600,11 @@ class TellrawViewModel @Inject constructor(
         lastMessageInput = newText
         
         // 更新悬停组件类型
-        if (deletePosition > 0) {
+        // 输入框被清空时必须一并清掉悬停状态，否则会残留上一个组件的简介（意见.txt:1-3）
+        if (newText.isEmpty()) {
+            _hoveredComponentType.value = null
+            _hoveredComponentContent.value = null
+        } else {
             updateHoveredComponentType(deletePosition - 1)
         }
         
