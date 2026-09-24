@@ -34,6 +34,7 @@ fun TextComponentSelector(
     onComponentSelected: (TextComponentHelper.ComponentType) -> Unit,
     onSubComponentToggle: (TextComponentHelper.ComponentType) -> Unit,
     onSubComponentSelected: (TextComponentHelper.SubComponentType) -> Unit = {},
+    onInsertPlainQuote: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -66,8 +67,38 @@ fun TextComponentSelector(
                         onSubComponentSelected = onSubComponentSelected
                     )
                 }
+                // 纯文本单引号：点一下往输入框插一个 '
+                item {
+                    PlainQuoteItem(onInsert = onInsertPlainQuote)
+                }
             }
         }
+    }
+}
+
+/**
+ * 纯文本单引号项
+ * 点一下往输入框插入一个 '，它的含义是"纯文本"，只在 ,'sep': 的值里生效：
+ * ,'sep':'''' 表示分隔符就是一个字面单引号
+ */
+@Composable
+private fun PlainQuoteItem(onInsert: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onInsert() }
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "'  " + stringResource(R.string.component_quote_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

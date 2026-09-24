@@ -506,6 +506,12 @@ private fun PortraitLayout(
                         },
                         onSubComponentSelected = { subComponent ->
                             viewModel.selectSubComponent(subComponent)
+                        },
+                        onInsertPlainQuote = {
+                            viewModel.insertTextWithComponent(
+                                messageTextFieldValue.value.selection.start,
+                                "'"
+                            )
                         }
                     )
                 }
@@ -808,6 +814,12 @@ private fun LandscapeLayout(
                                 },
                                 onSubComponentSelected = { subComponent ->
                                     viewModel.selectSubComponent(subComponent)
+                                },
+                                onInsertPlainQuote = {
+                                    viewModel.insertTextWithComponent(
+                                        messageTextFieldValue.value.selection.start,
+                                        "'"
+                                    )
                                 }
                             )
                         }

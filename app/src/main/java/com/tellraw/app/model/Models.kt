@@ -8,12 +8,6 @@ data class SelectorConversionResult(
     val wasConverted: Boolean
 )
 
-data class TellrawCommand(
-    val javaCommand: String,
-    val bedrockCommand: String,
-    val warnings: List<String>
-)
-
 data class ColorCodeMapping(
     val javaColor: String,
     val bedrockColor: String,
