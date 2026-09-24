@@ -209,6 +209,7 @@
     <string name="bedrock_selector_converted">基岩版选择器 %1$s Java版不支持，改成 %2$s</string>
     <string name="bedrock_scores_negation_removed">基岩版scores反选参数%s Java版不支持，已移除</string>
     <string name="java_sort_nearest_converted">Java版sort=nearest已转换为基岩版c=%s</string>
+    <string name="java_sort_nearest_all_converted">Java版@a[sort=nearest]已转换为基岩版@p[c=114514]。注意：@p[c=114514]是按顺序从近到远的全部玩家，若玩家数超过114514则结果不完整</string>
     <string name="java_sort_furthest_converted">Java版sort=furthest已转换为基岩版c=%s</string>
     <string name="java_sort_furthest_converted_all">Java版sort=furthest已转换为基岩版c=-9999。注意：sort=furthest是按顺序从远到近的全部，c=-9999是按顺序从远到近的最近9999个实体</string>
     <string name="java_sort_arbitrary_not_supported">Java版sort=arbitrary在基岩版不支持，已移除</string>

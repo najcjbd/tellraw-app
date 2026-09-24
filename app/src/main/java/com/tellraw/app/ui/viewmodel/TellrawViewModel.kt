@@ -906,35 +906,40 @@ class TellrawViewModel @Inject constructor(
                     else -> "color"
                 }
                 
+                // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
+                val allReminders = mutableListOf<String>()
+
                 // 检查是否启用了JAVA/基岩混合模式
                 val (javaSelector, bedrockSelector) = if (_javaBedrockMixedMode.value) {
                     val mixedReminders = mutableListOf<String>()
                     val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(selector, applicationContext, mixedReminders)
+                    allReminders.addAll(mixedReminders)
                     javaOut to bedrockOut
                 } else {
                     selector to selector
                 }
                 
                 // 生成Java版命令
-                val (javaFilteredSelector, _) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
-                val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext)
+                val (javaFilteredSelector, _, javaReminders) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
+                allReminders.addAll(javaReminders)
+                val javaWarnings = mutableListOf<String>()
+                val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings)
+                allReminders.addAll(javaWarnings)
                 val javaCommand = "tellraw $javaFilteredSelector $javaJson"
                 
                 // 生成基岩版命令
-                val (bedrockFilteredSelector, _) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
+                val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
+                allReminders.addAll(bedrockReminders)
                 val bedrockWarnings = mutableListOf<String>()
                 val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings)
+                allReminders.addAll(bedrockWarnings)
                 val bedrockCommand = "tellraw $bedrockFilteredSelector $bedrockJson"
                 
                 _javaCommand.value = javaCommand
                 _bedrockCommand.value = bedrockCommand
                 
-                // 如果有警告，显示给用户
-                if (bedrockWarnings.isNotEmpty()) {
-                    _warnings.value = bedrockWarnings
-                } else {
-                    _warnings.value = emptyList()
-                }
+                // 显示提醒（去重后）
+                _warnings.value = allReminders.distinct()
             } catch (e: IllegalArgumentException) {
                 // 处理未知§组合的异常
                 _javaCommand.value = ""

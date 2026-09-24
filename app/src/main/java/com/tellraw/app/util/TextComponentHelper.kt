@@ -534,7 +534,8 @@ object TextComponentHelper {
     components: List<TextComponent>,
     mNHandling: String = "font",
     mnCFEnabled: Boolean = false,
-    context: Context? = null
+    context: Context? = null,
+    warnings: MutableList<String>? = null
 ): String {
         if (components.isEmpty()) return "{}"
 
@@ -649,18 +650,22 @@ object TextComponentHelper {
                         
                         // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                         // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                        if (javaSelector == selectorEntries[0]) {
+                        val converted = if (javaSelector == selectorEntries[0]) {
                             // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
-                            val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
+                            val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
                                 selectorEntries[0],
                                 SelectorType.JAVA,
                                 context
                             )
+                            reminders.addAll(filterReminders)
                             filteredSelector
                         } else {
                             // 已经进行了转换，使用convertForMixedMode的结果
                             javaSelector
                         }
+                        // 组件内选择器产生的提醒交给调用方（原来直接丢弃，导致"提醒用户"全都提醒不了）
+                        warnings?.addAll(reminders)
+                        converted
                     } else {
                         // 没有Context，保持原样
                         selectorEntries[0]
@@ -749,18 +754,22 @@ object TextComponentHelper {
 
                                 // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                                 // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                                if (javaSelector == selectorEntries[0]) {
+                                val converted = if (javaSelector == selectorEntries[0]) {
                                     // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
-                                    val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
+                                    val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
                                         selectorEntries[0],
                                         SelectorType.JAVA,
                                         context
                                     )
+                                    reminders.addAll(filterReminders)
                                     filteredSelector
                                 } else {
                                     // 已经进行了转换，使用convertForMixedMode的结果
                                     javaSelector
                                 }
+                                // 组件内选择器产生的提醒交给调用方（原来直接丢弃）
+                                warnings?.addAll(reminders)
+                                converted
                             } else {
                                 // 没有Context，保持原样
                                 selectorEntries[0]
@@ -862,8 +871,12 @@ object TextComponentHelper {
                         // 空内容，作为空selector处理
                         item["selector"] = ""
                     } else {
-                        // 检测是否有separator参数
-                        if (separatorEntries.any { it != null }) {
+                        // 检测是否有separator
+                        // 注意：selector组件在这里已经被展开，separator变成了SEPARATOR子组件，
+                        // 内容里不再有 ,'sep': 字样，所以必须同时看子组件（否则这条提醒永远不会触发）
+                        if (separatorEntries.any { it != null } ||
+                            component.subComponents.any { it.type == SubComponentType.SEPARATOR }
+                        ) {
                             warnings?.add(context?.getString(R.string.bedrock_separator_not_supported) ?: "基岩版不支持separator参数，已忽略所有sep:定义")
                         }
 
@@ -872,21 +885,25 @@ object TextComponentHelper {
                             // 使用convertForMixedMode获取Java版和基岩版结果
                             val reminders = mutableListOf<String>()
                             val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
-                            
+
                             // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                             // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                            if (bedrockSelector == selectorEntries[0]) {
+                            val converted = if (bedrockSelector == selectorEntries[0]) {
                                 // 没有进行任何转换，调用filterSelectorParameters来处理Java版到基岩版的参数转换
-                            val (filteredSelector, _, _) = SelectorConverter.filterSelectorParameters(
-                                selectorEntries[0],
-                                SelectorType.BEDROCK,
-                                context
-                            )
-                            filteredSelector
+                                val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
+                                    selectorEntries[0],
+                                    SelectorType.BEDROCK,
+                                    context
+                                )
+                                reminders.addAll(filterReminders)
+                                filteredSelector
                             } else {
                                 // 已经进行了转换，使用convertForMixedMode的结果
                                 bedrockSelector
                             }
+                            // 组件内选择器产生的提醒交给调用方（原来直接丢弃，导致"删除并提醒"全都提醒不了）
+                            warnings?.addAll(reminders)
+                            converted
                         } else {
                             // 没有Context，保持原样
                             selectorEntries[0]
@@ -1338,8 +1355,10 @@ object TextComponentHelper {
             if (separatorValue != "air") continue
             
             // 找到sep:定义前面的第一个@选择器
+            // 注意：sepIndex 本身就是"该 sep 前面最后一个 selector"，也就是"它前面的第一个@"，
+            // 所以起点必须是 sepIndex；原来写 sepIndex-1 会保护到左边那个选择器（意见.txt:36-37）
             var targetIndex = -1
-            for (index in sepIndex - 1 downTo 0) {
+            for (index in sepIndex downTo 0) {
                 if (selectors[index].startsWith("@")) {
                     targetIndex = index
                     break
