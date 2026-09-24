@@ -198,12 +198,12 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null): String {
         // 检查是否包含文本组件标记
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
-            return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context)
+            return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings)
         }
         
         // 原有的转换逻辑（向后兼容）

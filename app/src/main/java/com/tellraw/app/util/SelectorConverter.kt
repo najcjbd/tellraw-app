@@ -589,7 +589,7 @@ object SelectorConverter {
                             } else if (paramsPart.endsWith("]")) {
                                 paramsPart.dropLast(1) + ",c=$cValue]"
                             } else {
-                                paramsPart + "c=$cValue"
+                                if (paramsPart.isEmpty()) "c=$cValue" else "$paramsPart,c=$cValue"
                             }
                         }
                         // 只有在转换为 c=-9999 时才显示说明
@@ -634,7 +634,7 @@ object SelectorConverter {
                                 } else if (paramsPart.endsWith("]")) {
                                     paramsPart.dropLast(1) + ",c=$cValue]"
                                 } else {
-                                    paramsPart + "c=$cValue"
+                                    if (paramsPart.isEmpty()) "c=$cValue" else "$paramsPart,c=$cValue"
                                 }
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
@@ -662,16 +662,15 @@ object SelectorConverter {
                                 } else if (paramsPart.endsWith("]")) {
                                     paramsPart.dropLast(1) + ",c=$cValue]"
                                 } else {
-                                    paramsPart + "c=$cValue"
+                                    if (paramsPart.isEmpty()) "c=$cValue" else "$paramsPart,c=$cValue"
                                 }
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, cValue))
                         }
                     }
                     "nearest" -> {
-                        // sort=nearest 是基岩版的默认排序方式，可以忽略
-                        // 但是 limit 仍然需要转换为 c
                         if (limitValue != null) {
+                            // 有limit：sort=nearest 是基岩版的默认排序，直接由 c 表达
                             paramsPart = paramsPart.replace(sortPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
@@ -681,12 +680,37 @@ object SelectorConverter {
                                 "$prefix" + "c=$limitValue"
                             }
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_converted, limitValue))
-                        } else {
-                            // 没有limit，直接删除sort参数
+                        } else if (selectorVar == "@a" || selectorVar == "@e") {
+                            // 没有limit：Java的@a[sort=nearest]是"按从近到远的全部玩家"，
+                            // 最近优先只有基岩版的@p能表达，所以 @a 转成 @p[c=114514]；
+                            // @e 保留自己加 c=114514（和 furthest 用 c=-9999 同理）。
+                            // 114514 相当于不设上限，并提醒用户：数量真的超过114514时结果会不完整
                             paramsPart = paramsPart.replace(sortPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
                             }
+                            // 添加c参数
+                            if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                                paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=114514")
+                            } else {
+                                paramsPart = if (paramsPart.endsWith("[")) {
+                                    paramsPart.dropLast(1) + "c=114514]"
+                                } else if (paramsPart.endsWith("]")) {
+                                    paramsPart.dropLast(1) + ",c=114514]"
+                                } else {
+                                    if (paramsPart.isEmpty()) "c=114514" else "$paramsPart,c=114514"
+                                }
+                            }
+                            val sourceSelector = selectorVar
+                            if (selectorVar == "@a") selectorVar = "@p"
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_nearest_all_converted, sourceSelector, selectorVar))
+                        } else {
+                            // 其他大选择器：基岩版表达不了"最近优先的全部"，删除sort但必须提醒
+                            paramsPart = paramsPart.replace(sortPattern) { match ->
+                                val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                "$prefix"
+                            }
+                            conversionReminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValue))
                         }
                     }
                     else -> {

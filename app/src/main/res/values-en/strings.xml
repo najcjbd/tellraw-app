@@ -205,6 +205,7 @@
     <string name="bedrock_selector_converted">Bedrock selector %1$s not supported in Java, converted to %2$s</string>
     <string name="bedrock_scores_negation_removed">Bedrock scores negation %s not supported in Java, removed</string>
     <string name="java_sort_nearest_converted">Java sort=nearest converted to Bedrock c=%s</string>
+    <string name="java_sort_nearest_all_converted">Java %1$s[sort=nearest] converted to Bedrock %2$s[c=114514]. Note: %2$s[c=114514] selects all ordered from nearest to farthest; if there are more than 114514 the result is incomplete</string>
     <string name="java_sort_furthest_converted">Java sort=furthest converted to Bedrock c=%s</string>
     <string name="java_sort_furthest_converted_all">Java sort=furthest converted to Bedrock c=-9999. Note: sort=furthest selects all entities from farthest to nearest, c=-9999 selects the nearest 9999 entities from farthest to nearest</string>
     <string name="java_sort_arbitrary_not_supported">Java sort=arbitrary not supported in Bedrock, removed</string>
@@ -332,6 +333,7 @@
     <string name="component_score">Score</string>
     <string name="component_selector">Selector</string>
     <string name="component_with">With</string>
+    <string name="component_separator">Separator</string>
     <string name="component_expand">Expand</string>
     <string name="component_collapse">Collapse</string>
     <string name="component_arrow">  → </string>

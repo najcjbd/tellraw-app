@@ -150,6 +150,15 @@ private fun ComponentItem(
                                 onSelected = { onSubComponentSelected(TextComponentHelper.SubComponentType.WITH) }
                             )
                         }
+                        TextComponentHelper.ComponentType.SELECTOR -> {
+                            // separator（分隔符）参数
+                            SubComponentItem(
+                                subComponent = TextComponentHelper.SubComponentType.SEPARATOR,
+                                isSelected = selectedSubComponent == TextComponentHelper.SubComponentType.SEPARATOR,
+                                parentComponent = component,
+                                onSelected = { onSubComponentSelected(TextComponentHelper.SubComponentType.SEPARATOR) }
+                            )
+                        }
                         else -> {}
                     }
                 }
