@@ -1041,7 +1041,9 @@ object TextComponentHelper {
                 val isQuotedLiteral = rawSeparatorValue.length >= 2 &&
                     rawSeparatorValue.first() == '\'' && rawSeparatorValue.last() == '\''
                 val separatorValue = if (isQuotedLiteral) {
-                    rawSeparatorValue.substring(1, rawSeparatorValue.length - 1)
+                    // 引号里出现两个连续单引号表示一个字面单引号：
+                    // ,'sep':'''' -> 分隔符就是 ' ；,'sep':'a''b' -> a'b
+                    rawSeparatorValue.substring(1, rawSeparatorValue.length - 1).replace("''", "'")
                 } else {
                     rawSeparatorValue
                 }

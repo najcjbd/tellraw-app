@@ -334,6 +334,7 @@
     <string name="component_selector">Selector</string>
     <string name="component_with">With</string>
     <string name="component_separator">Separator</string>
+    <string name="component_quote_hint">Plain-text quote (inside a ,'sep': value, '''' means one literal quote)</string>
     <string name="component_expand">Expand</string>
     <string name="component_collapse">Collapse</string>
     <string name="component_arrow">  → </string>

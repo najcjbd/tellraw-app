@@ -309,6 +309,7 @@
     <string name="component_selector">實體名稱</string>
     <string name="component_with">參數</string>
     <string name="component_separator">分隔符</string>
+    <string name="component_quote_hint">純文字單引號（在 ,'sep': 的值裡，'''' 表示一個字面單引號）</string>
     <string name="component_expand">展開</string>
     <string name="component_collapse">收起</string>
     <string name="component_arrow">  → </string>
