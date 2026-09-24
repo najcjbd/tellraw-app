@@ -1012,11 +1012,13 @@ object TextComponentHelper {
                 // 规则：,'sep':后面的文本一直到下一个,(不包含,)为一个整体，或者是如果后面没有,时，那么就是一直到结束的文本
                 val remainingText = content.substring(sepEnd)
                 val nextCommaIndex = remainingText.indexOf(',')
-                val separatorValue = if (nextCommaIndex != -1) {
+                val rawSeparatorValue = if (nextCommaIndex != -1) {
                     remainingText.substring(0, nextCommaIndex).trim()
                 } else {
                     remainingText.trim()
                 }
+                // 引号只是分隔符值的"外壳"，值取引号里面的文字：,'sep':'kk' 的值是 kk
+                val separatorValue = stripOuterQuotes(rawSeparatorValue)
                 
                 sepDefinitions.add(Triple(sepStart, separatorValue.ifEmpty { "," }, -1))  // selector索引暂时设为-1
                 
@@ -1430,6 +1432,20 @@ object TextComponentHelper {
             }
         }
         return String(chars)
+    }
+
+    /**
+     * 去掉分隔符值最外层成对的引号：'kk' 或 "kk" 都取 kk
+     * 意见.txt 里 ,'sep':'n' 的写法，n 才是分隔符的值
+     */
+    private fun stripOuterQuotes(value: String): String {
+        if (value.length < 2) return value
+        val first = value.first()
+        val last = value.last()
+        if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
+            return value.substring(1, value.length - 1)
+        }
+        return value
     }
 
     /**
