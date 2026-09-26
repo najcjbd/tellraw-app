@@ -121,7 +121,8 @@ object SelectorConverter {
         R.string.java_sort_furthest_converted_all to "Java版sort=furthest已转换为基岩版c=-9999。注意：sort=furthest是按顺序从远到近的全部，c=-9999是按顺序从远到近的最近9999个实体",
         R.string.java_sort_arbitrary_not_supported to "Java版sort=arbitrary在基岩版不支持，已移除",
         R.string.java_sort_random_converted to "Java版%1\$s[sort=random]已转换为基岩版@r[c=%2\$s]",
-        R.string.java_sort_random_to_c to "Java版sort=random已转换为基岩版c=%s",
+        R.string.java_sort_random_to_c to "Java版sort=random在基岩版无法保留随机选择，已改为只保留数量限制 c=%s",
+        R.string.java_sort_random_entities_converted to "Java版%s[sort=random]已转换为基岩版@r[type=!player,c=%s]。注意：type=!player 不会选到玩家",
         R.string.java_sort_not_supported to "Java版sort=%s在基岩版不支持，已移除",
         R.string.java_limit_converted to "Java版limit=%s已转换为基岩版c=%s",
         R.string.limit_description to "limit限制数量，c由近到远",
@@ -542,7 +543,7 @@ object SelectorConverter {
             paramsPart = convertRotationParameter(paramsPart, "y_rotation", "rym", "ry", conversionReminders, context, toJava = true)
             paramsPart = convertL_LmToLevel(paramsPart, conversionReminders, context)
             paramsPart = convertMToGamemode(paramsPart, conversionReminders, context)
-            paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context)
+            paramsPart = convertCToLimitSort(paramsPart, conversionReminders, context, selectorVar)
         } else if (targetVersion == SelectorType.BEDROCK) {
             // Java版到基岩版的参数转换
             paramsPart = convertDistanceParameters(paramsPart, conversionReminders, context)
@@ -622,10 +623,15 @@ object SelectorConverter {
                         }
                     }
                     "random" -> {
-                        // 当@a[limit=数字,sort=random]或@r[limit=数字,sort=random]时，转换为@r[c=数字]
-                        // 当只有@a[sort=random]或@r[sort=random]时，转换为基岩版的@r[c=9999]
+                        // 规则（2026-09-26 定）：
+                        //   @a / @p / @r [sort=random]        -> @r[c=9999]（有 limit=N 时 c=N）
+                        //   @e / @n     [sort=random]         -> @r[type=!player,c=…] + 警告（这样选不到玩家）
+                        //   其他大选择器（@s / @initiator …） -> 基岩版表达不了随机，删掉 sort 并提醒
                         val cValue = limitValue ?: "9999"
-                        if (selectorVar == "@a" || selectorVar == "@r") {
+                        val toRandomPlayers = selectorVar == "@a" || selectorVar == "@p" || selectorVar == "@r"
+                        val toRandomEntities = selectorVar == "@e" || selectorVar == "@n"
+                        val sourceSelectorForRandom = selectorVar
+                        if (toRandomPlayers || toRandomEntities) {
                             paramsPart = paramsPart.replace(sortPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
@@ -637,21 +643,23 @@ object SelectorConverter {
                                 }
                             }
                             // 添加c参数
-                            if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
-                                paramsPart = paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                            paramsPart = if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
+                                paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+                            } else if (paramsPart.isEmpty()) {
+                                "c=$cValue"
                             } else {
-                                paramsPart = if (paramsPart.endsWith("[")) {
-                                    paramsPart.dropLast(1) + "c=$cValue]"
-                                } else if (paramsPart.endsWith("]")) {
-                                    paramsPart.dropLast(1) + ",c=$cValue]"
-                                } else {
-                                    if (paramsPart.isEmpty()) "c=$cValue" else "$paramsPart,c=$cValue"
-                                }
+                                "$paramsPart,c=$cValue"
                             }
-                            conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, selectorVar, cValue))
-                            // 当选择器是 @a 时，更新为 @r
-                            if (selectorVar == "@a") {
+                            if (toRandomEntities) {
+                                // 基岩版没有"全部实体随机"的形式：用 @r + type=!player 近似，必须提醒
+                                if (!Regex("(^|,)type=").containsMatchIn(paramsPart)) {
+                                    paramsPart = "type=!player,$paramsPart"
+                                }
                                 selectorVar = "@r"
+                                conversionReminders.add(getStringSafely(context, R.string.java_sort_random_entities_converted, sourceSelectorForRandom, cValue))
+                            } else {
+                                selectorVar = "@r"
+                                conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, sourceSelectorForRandom, cValue))
                             }
                         } else {
                             paramsPart = paramsPart.replace(sortPattern) { match ->
@@ -1737,7 +1745,7 @@ object SelectorConverter {
     
     
     
-    private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>, context: Context): String {
+    private fun convertCToLimitSort(paramsPart: String, reminders: MutableList<String>, context: Context, selectorVar: String = ""): String {
         var result = paramsPart
 
         // 先提取并保存scores参数，避免scores内部的参数名被误处理
@@ -1808,7 +1816,11 @@ object SelectorConverter {
 
                 // 添加limit和sort参数
                 result = addParameterToResult(result, "limit=$cValue")
-                result = addParameterToResult(result, "sort=nearest")
+                // @r 本身就是"随机选取"，不需要再补 sort=nearest
+                // （sort.txt:8：基岩版 @r[c=9999] -> JAVA版 @r[limit=9999]，没有 sort）
+                if (selectorVar != "@r") {
+                    result = addParameterToResult(result, "sort=nearest")
+                }
             }
         } else {
             // 恢复scores参数（如果没有匹配到c）
