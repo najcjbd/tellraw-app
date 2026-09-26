@@ -52,6 +52,7 @@ fun MainScreen(
     val mnCFEnabled by viewModel.mnCFEnabled.collectAsState()
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val defaultUseText by viewModel.defaultUseText.collectAsState()
+    val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
@@ -195,6 +196,7 @@ fun MainScreen(
             mnCFEnabled = mnCFEnabled,
             javaBedrockMixedMode = javaBedrockMixedMode,
             defaultUseText = defaultUseText,
+            executePrefixEnabled = executePrefixEnabled,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -210,6 +212,9 @@ fun MainScreen(
             },
             onDefaultUseTextChanged = { enabled ->
                 viewModel.setDefaultUseText(enabled)
+            },
+            onExecutePrefixEnabledChanged = { enabled ->
+                viewModel.setExecutePrefixEnabled(enabled)
             }
         )
     }

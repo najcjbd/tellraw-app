@@ -58,6 +58,7 @@
     <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式開啟：找到兩版特有參數，自動轉換</string>
     <string name="default_use_text">預設使用text文本組件</string>
     <string name="default_use_text_description">生成命令時使用text文本組件</string>
+    <string name="execute_prefix_enabled">命令前置 execute</string>
     
     <!-- 顏色代碼 -->
     <string name="color_black">黑色</string>
