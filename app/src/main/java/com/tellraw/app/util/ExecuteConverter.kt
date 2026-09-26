@@ -18,6 +18,10 @@ object ExecuteConverter {
     // 一旦出现说明该子命令参数缺失，借此把 `execute as if ...` 这类退化输入判为不完整而非吞掉下一个子命令。
     private val KEYWORDS = MODIFIERS + setOf("execute", "if", "unless", "run")
 
+    // 放弃一条子命令后，"可以从中恢复解析"的关键字。注意此处不含 "execute"：
+    // 中段再出现 execute 属于非法输入，不能当作可继续解析的锚点。
+    private val RESUME_KEYWORDS = MODIFIERS + setOf("if", "unless", "run")
+
     // 坐标/方块位置在 token 层面是 3 个（x y z，如 `~ ~ ~`、`^ ^ ^`），因此占位符"<pos>"要展开成 3 个 token。
     private val POSITION_TOKENS = 3
 
@@ -61,43 +65,84 @@ object ExecuteConverter {
 
             if (name in MODIFIERS) {
                 val span = modifierSpan(tokens, idx)
-                if (span == null) {
-                    reminders.add("修饰子命令 \"$name\" 参数不完整，已放弃")
-                    break
+                if (span != null) {
+                    for (k in 0 until span) kept.add(tokens[idx + k])
+                    idx += span
+                    continue
                 }
-                for (k in 0 until span) kept.add(tokens[idx + k])
-                idx += span
+                // 已知但参数不完整：放弃它，再从后面能识别的下一个已知关键字继续
+                val resume = abandonAndResume(
+                    tokens, idx, "修饰子命令 \"$name\" 参数不完整，已放弃", reminders
+                ) ?: break
+                idx = resume
                 continue
             }
 
             if (name == "if" || name == "unless") {
                 val condName = if (idx + 1 < tokens.size) tokens[idx + 1] else null
-                if (condName == null) {
-                    reminders.add("条件子命令 \"$name\" 后缺少条件类型，已放弃")
-                    break
+                if (condName != null && condName in KNOWN_CONDITIONS) {
+                    val argCount = conditionArgCount(tokens, idx, condName)
+                    if (argCount != null && idx + 2 + argCount <= tokens.size) {
+                        // 本次不做条件互转，整段（if/unless + 条件名 + 参数）原样保留
+                        for (k in 0 until 2 + argCount) kept.add(tokens[idx + k])
+                        idx += 2 + argCount
+                        continue
+                    }
+                    val resume = abandonAndResume(
+                        tokens, idx, "条件子命令 \"$name $condName\" 参数不完整，已放弃", reminders
+                    ) ?: break
+                    idx = resume
+                    continue
                 }
-                if (condName !in KNOWN_CONDITIONS) {
-                    reminders.add("未知的条件类型 \"$condName\"（在 $name 之后），已放弃，其后内容不再解析")
-                    break
+                // 缺少条件类型，或条件类型未知：放弃这条 if/unless，再尝试从后续关键字继续
+                val reason = if (condName == null) {
+                    "条件子命令 \"$name\" 后缺少条件类型，已放弃"
+                } else {
+                    "未知的条件类型 \"$condName\"（在 $name 之后），已放弃"
                 }
-                val argCount = conditionArgCount(tokens, idx, condName)
-                if (argCount == null || idx + 2 + argCount > tokens.size) {
-                    reminders.add("条件子命令 \"$name $condName\" 参数不完整，已放弃")
-                    break
-                }
-                // 本次不做条件互转，整段（if/unless + 条件名 + 参数）原样保留
-                for (k in 0 until 2 + argCount) kept.add(tokens[idx + k])
-                idx += 2 + argCount
+                val resume = abandonAndResume(tokens, idx, reason, reminders) ?: break
+                idx = resume
                 continue
             }
 
-            // 未知子命令：命令链已断开，之后的 token 归属无法确定，
-            // 故放弃该词及其后的全部内容，避免把后续参数误当成新子命令继续保留。
-            reminders.add("未知的子命令 \"$name\"，已放弃，其后内容不再解析")
-            break
+            // 未知子命令：无法确定它到底带几个参数，只能把它后面"看起来像它参数"的 token
+            // 一直丢到下一个已知关键字为止（下一个已知关键字归属下一条子命令）。
+            val resume = abandonAndResume(
+                tokens, idx, "未知的子命令 \"$name\"，已放弃", reminders
+            ) ?: break
+            idx = resume
         }
 
         return kept
+    }
+
+    /**
+     * 放弃 idx 处（含）的子命令后，寻找其后第一个可继续解析的已知关键字。
+     *
+     * 跳过规则：把 idx+1 起、直到该关键字之前的所有 token 都当作被放弃子命令的参数丢弃
+     * （找不到关键字则丢到末尾）。返回 null 表示后缀里再没有已知关键字，调用方应结束解析；
+     * 若找到的是 "run"，调用方把它交回主循环即可由 `run` 分支停止解析。
+     */
+    private fun abandonAndResume(
+        tokens: List<String>,
+        idx: Int,
+        message: String,
+        reminders: MutableList<String>
+    ): Int? {
+        val resume = nextResumeIndex(tokens, idx + 1)
+        val skipped = if (resume == null) tokens.size - idx - 1 else resume - idx - 1
+        reminders.add("$message（跳过其后 $skipped 个 token），尝试从后续子命令继续解析")
+        return resume
+    }
+
+    /** 从 from 起找第一个 RESUME_KEYWORDS 中的 token；找不到返回 null。 */
+    private fun nextResumeIndex(tokens: List<String>, from: Int): Int? {
+        var i = from
+        while (i < tokens.size) {
+            if (tokens[i] in RESUME_KEYWORDS) return i
+            i++
+        }
+        return null
     }
 
     /**
@@ -180,38 +225,41 @@ object ExecuteConverter {
     }
 
     /**
-     * 按空格切分，但尊重 {} / [] / "" 内部的空格（NBT、选择器、JSON 参数要算作一个 token）。
-     * 括号或引号不闭合 -> 整条前缀非法，返回 null（无法可靠切分就不要猜）。
+     * 按空格切分，但尊重 {} / [] / "" / '' 内部的空格（NBT、选择器、JSON/文本参数要算作一个 token）。
+     * 引号内的 `\x` 视为转义序列：转义字符本身不闭合字符串（`\"`、`\'`、`\\` 都按此处理），
+     * 返回的 token 保留原文（反斜杠与引号一律照抄）。
+     * 括号或引号不闭合、以及 `[{]}` 这类交叉不匹配 -> 整条前缀非法，返回 null（无法可靠切分就不要猜）。
      */
     private fun tokenize(input: String): List<String>? {
         val tokens = mutableListOf<String>()
         val cur = StringBuilder()
         // 用栈记录期望的闭合符，能顺带查出 `[{]}` 这类交叉不匹配
         val closers = ArrayDeque<Char>()
-        var inQuote = false
+        // 当前所处的引号类型（null 表示不在引号内）；" 与 ' 分别独立成对
+        var quote: Char? = null
         var i = 0
 
         while (i < input.length) {
             val c = input[i]
 
-            if (inQuote) {
+            if (quote != null) {
                 cur.append(c)
                 when {
-                    // 反斜杠转义：连同下一个字符一起吞掉，避免把 \" 当成引号结束
+                    // 反斜杠转义：连同下一个字符一起吞掉，避免把 \" / \' / \\ 当成字符串结束
                     c == '\\' && i + 1 < input.length -> {
                         cur.append(input[i + 1])
                         i += 2
                         continue
                     }
-                    c == '"' -> inQuote = false
+                    c == quote -> quote = null
                 }
                 i++
                 continue
             }
 
             when (c) {
-                '"' -> {
-                    inQuote = true
+                '"', '\'' -> {
+                    quote = c
                     cur.append(c)
                 }
                 '{' -> {
@@ -237,7 +285,7 @@ object ExecuteConverter {
             i++
         }
 
-        if (inQuote || closers.isNotEmpty()) return null
+        if (quote != null || closers.isNotEmpty()) return null
         if (cur.isNotEmpty()) tokens.add(cur.toString())
         return tokens
     }
