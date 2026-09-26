@@ -220,6 +220,7 @@
     <string name="java_team_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no team system</string>
     <string name="java_predicate_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no predicate system</string>
     <string name="java_advancements_param_not_supported">Warning: Java %s not supported in Bedrock, removed. Bedrock has no advancement system</string>
+    <string name="param_unparsable_removed">Unparsable parameter %s removed</string>
     <string name="java_param_not_supported">Warning: Java %s not supported in Bedrock, removed</string>
     <string name="java_distance_converted">Java distance=%1$s converted to Bedrock rm=%2$s,r=%3$s</string>
     <string name="java_distance_to_rm">Java distance=%1$s converted to Bedrock rm=%2$s</string>

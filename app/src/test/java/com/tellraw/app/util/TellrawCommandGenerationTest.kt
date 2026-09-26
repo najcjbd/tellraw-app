@@ -22,7 +22,7 @@ import androidx.test.core.app.ApplicationProvider
     application = TestApplication::class,
     packageName = "com.tellraw.app"
 )
-class TellrawGeneratorTest {
+class TellrawCommandGenerationTest {
     private lateinit var context: Context
     
     @Before

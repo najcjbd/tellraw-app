@@ -242,6 +242,38 @@ class YiJianSimpleTest {
     }
     
     /**
+     * 测试14b：不带引号的 ,'sep':air 才是关键字（让前面的第一个@忽略所有separator）
+     * 带引号的 ,'sep':'air' 是字面文本，见上面测试14
+     */
+    @Test
+    fun testSepAirKeywordUnquoted() {
+        val message = "@a,'sep':air,@p,'sep':666\u0FC8selector\u0F34"
+        val components = TextComponentHelper.parseTextComponents(message)
+        assertEquals("应该有1个selector组件", 1, components.size)
+
+        val javaJson = TextComponentHelper.convertToJavaJson(components, "font", false, context)
+
+        // @a 被 air 保护：不能带 separator
+        assertFalse("@a 不该有 separator", javaJson.contains("\"selector\":\"@a\",\"separator\""))
+        assertTrue("应该包含@a", javaJson.contains("\"selector\":\"@a\""))
+        assertTrue("应该包含@p", javaJson.contains("\"selector\":\"@p\""))
+        assertTrue("应该包含separator {\"text\":\"666\"}", javaJson.contains("\"separator\":{\"text\":\"666\"}"))
+    }
+
+    /**
+     * 测试14c：引号里连写两个单引号表示一个字面单引号
+     */
+    @Test
+    fun testSepLiteralSingleQuote() {
+        val message = "@a@p,'sep':''''\u0FC8selector\u0F34"
+        val components = TextComponentHelper.parseTextComponents(message)
+        assertEquals("应该有1个selector组件", 1, components.size)
+
+        val javaJson = TextComponentHelper.convertToJavaJson(components, "font", false, context)
+        assertTrue("separator 应该是一个字面单引号", javaJson.contains("\"separator\":{\"text\":\"'\"}"))
+    }
+
+    /**
      * 测试15：第一个@前面的sep:定义应该被忽略
      */
     @Test

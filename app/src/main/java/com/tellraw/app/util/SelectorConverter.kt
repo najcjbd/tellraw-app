@@ -131,6 +131,7 @@ object SelectorConverter {
         R.string.java_predicate_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无谓词系统",
         R.string.java_advancements_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除。基岩版无进度系统",
         R.string.java_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除",
+        R.string.param_unparsable_removed to "警告：无法解析的参数 %s 已移除",
         R.string.bedrock_param_not_supported to "警告：基岩版%s参数在Java版不支持，已移除",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
@@ -434,6 +435,16 @@ object SelectorConverter {
         // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
         // 只有独立的 level 参数（不在 scores 内部）才需要转换
         // 因此这里不需要处理 scores 参数内部的 level
+
+        // 没有等号的裸片段（例如 @a[tag=a,b] 里的 b）会被 mergeDuplicateParameters 静默丢掉，
+        // 而丢掉会改变命令的含义（@a[tag=a,b] -> @a[tag=a]），所以必须告知玩家
+        val unparsableParams = mutableListOf<String>()
+        for (token in splitParamsTopLevel(paramsPart)) {
+            if (token.isNotBlank() && '=' !in token) {
+                unparsableParams.add(token)
+                conversionReminders.add(getStringSafely(context, R.string.param_unparsable_removed, token))
+            }
+        }
 
         // 第一次参数合并：在参数转换之前合并输入的重复参数
         // 这样可以减少需要转换的参数数量
@@ -787,6 +798,7 @@ object SelectorConverter {
         // 过滤参数并收集提醒信息
         val filteredParams = mutableListOf<String>()
         val removedParams = mutableListOf<String>()
+        removedParams.addAll(unparsableParams)
         
         for (param in params) {
             if ('=' in param) {
@@ -1945,6 +1957,61 @@ object SelectorConverter {
      * @param paramsPart 参数部分字符串（不包含方括号）
      * @return 合并后的参数部分字符串
      */
+    /**
+     * 按最外层逗号切分参数串（忽略大括号 {} 与引号 "" / '' 内部，以及 \ 转义）
+     * 用来在 mergeDuplicateParameters 重建参数串之前，找出"没有等号的裸片段"
+     */
+    private fun splitParamsTopLevel(paramsPart: String): List<String> {
+        val params = mutableListOf<String>()
+        var currentParam = ""
+        var braceCount = 0
+        var inStringValue = false
+        var stringChar = '"'
+        var escaped = false
+
+        for (char in paramsPart) {
+            when {
+                inStringValue && char == '\\' && !escaped -> {
+                    escaped = true
+                    currentParam += char
+                }
+                inStringValue && char == stringChar && !escaped -> {
+                    inStringValue = false
+                    currentParam += char
+                }
+                inStringValue -> {
+                    escaped = false
+                    currentParam += char
+                }
+                char == '"' || char == '\'' -> {
+                    inStringValue = true
+                    stringChar = char
+                    currentParam += char
+                }
+                char == '{' -> {
+                    braceCount++
+                    currentParam += char
+                }
+                char == '}' -> {
+                    braceCount--
+                    currentParam += char
+                }
+                char == ',' && braceCount == 0 -> {
+                    if (currentParam.trim().isNotEmpty()) {
+                        params.add(currentParam.trim())
+                    }
+                    currentParam = ""
+                }
+                else -> currentParam += char
+            }
+        }
+
+        if (currentParam.trim().isNotEmpty()) {
+            params.add(currentParam.trim())
+        }
+        return params
+    }
+
     private fun mergeDuplicateParameters(paramsPart: String): String {
         if (paramsPart.isEmpty()) {
             return paramsPart
