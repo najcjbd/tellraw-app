@@ -538,7 +538,8 @@ object TextComponentHelper {
     mNHandling: String = "font",
     mnCFEnabled: Boolean = false,
     context: Context? = null,
-    warnings: MutableList<String>? = null
+    warnings: MutableList<String>? = null,
+    separatorAsTextComponent: Boolean = false
 ): String {
         if (components.isEmpty()) return "{}"
 
@@ -666,10 +667,10 @@ object TextComponentHelper {
                     // 从副组件中提取separator
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
-                        result["separator"] = mapOf("text" to separatorSubComponent.content)
+                        result["separator"] = separatorJsonValue(separatorSubComponent.content, separatorAsTextComponent)
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                        result["separator"] = mapOf("text" to separatorEntries[0]!!)
+                        result["separator"] = separatorJsonValue(separatorEntries[0]!!, separatorAsTextComponent)
                     }
                 }
             }
@@ -770,10 +771,10 @@ object TextComponentHelper {
                             // 从副组件中提取separator
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
-                                subMap["separator"] = mapOf("text" to separatorSubComponent.content)
+                                subMap["separator"] = separatorJsonValue(separatorSubComponent.content, separatorAsTextComponent)
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                                subMap["separator"] = mapOf("text" to separatorEntries[0]!!)
+                                subMap["separator"] = separatorJsonValue(separatorEntries[0]!!, separatorAsTextComponent)
                             }
                         }
                     }
@@ -1641,6 +1642,13 @@ object TextComponentHelper {
             else -> "\"${escapeJsonString(value.toString())}\""
         }
     }
+
+    /**
+     * separator 的输出形态：
+     * 默认输出纯字符串；开关打开时输出文本组件 {"text": "..."}，方便玩家手动替换该组件（如加颜色）
+     */
+    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any =
+        if (asTextComponent) mapOf("text" to content) else content
 
     /**
      * 按JSON规范转义字符串内容（反斜杠、双引号、控制字符）

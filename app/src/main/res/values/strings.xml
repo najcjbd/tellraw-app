@@ -59,6 +59,7 @@
     <string name="default_use_text">默认使用text文本组件</string>
     <string name="default_use_text_description">生成命令时使用text文本组件</string>
     <string name="execute_prefix_enabled">命令前置 execute</string>
+    <string name="separator_as_text_component">separator 用文本组件</string>
     
     <!-- 颜色代码 -->
     <string name="color_black">黑色</string>

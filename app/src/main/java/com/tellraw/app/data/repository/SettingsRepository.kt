@@ -24,6 +24,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_JAVA_BEDROCK_MIXED_MODE = "java_bedrock_mixed_mode"
         private const val KEY_DEFAULT_USE_TEXT = "default_use_text"
         private const val KEY_EXECUTE_PREFIX_ENABLED = "execute_prefix_enabled"
+        private const val KEY_SEPARATOR_AS_TEXT_COMPONENT = "separator_as_text_component"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
@@ -54,6 +55,10 @@ class SettingsRepository @Inject constructor(
     // execute前置命令开关
     private val _executePrefixEnabled = MutableStateFlow(false)
     val executePrefixEnabled: Flow<Boolean> = _executePrefixEnabled.asStateFlow()
+    
+    // separator使用文本组件开关
+    private val _separatorAsTextComponent = MutableStateFlow(false)
+    val separatorAsTextComponent: Flow<Boolean> = _separatorAsTextComponent.asStateFlow()
     
     // 历史记录存储目录URI
     private val _historyStorageUri = MutableStateFlow<String?>(null)
@@ -86,6 +91,7 @@ class SettingsRepository @Inject constructor(
                         javaBedrockMixedMode = _javaBedrockMixedMode.value,
                         defaultUseText = _defaultUseText.value,
                         executePrefixEnabled = _executePrefixEnabled.value,
+                        separatorAsTextComponent = _separatorAsTextComponent.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
                     )
@@ -102,6 +108,7 @@ class SettingsRepository @Inject constructor(
                     javaBedrockMixedMode = _javaBedrockMixedMode.value,
                     defaultUseText = _defaultUseText.value,
                     executePrefixEnabled = _executePrefixEnabled.value,
+                    separatorAsTextComponent = _separatorAsTextComponent.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -114,6 +121,7 @@ class SettingsRepository @Inject constructor(
                     javaBedrockMixedMode = _javaBedrockMixedMode.value,
                     defaultUseText = _defaultUseText.value,
                     executePrefixEnabled = _executePrefixEnabled.value,
+                    separatorAsTextComponent = _separatorAsTextComponent.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -131,6 +139,7 @@ class SettingsRepository @Inject constructor(
         val javaBedrockMixedMode: Boolean,
         val defaultUseText: Boolean,
         val executePrefixEnabled: Boolean,
+        val separatorAsTextComponent: Boolean,
         val historyStorageUri: String?,
         val historyStorageFilename: String
     )
@@ -163,6 +172,8 @@ class SettingsRepository @Inject constructor(
                 val javaBedrockMixedMode = extractJsonValue(jsonString, KEY_JAVA_BEDROCK_MIXED_MODE) == "true"
                 val defaultUseText = extractJsonValue(jsonString, KEY_DEFAULT_USE_TEXT) != "false"
                 val executePrefixEnabled = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_ENABLED) == "true"
+                // 默认false，缺失该键时必须按false处理，不能用!=判断
+                val separatorAsTextComponent = extractJsonValue(jsonString, KEY_SEPARATOR_AS_TEXT_COMPONENT) == "true"
                 val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
@@ -173,6 +184,7 @@ class SettingsRepository @Inject constructor(
                 _javaBedrockMixedMode.value = javaBedrockMixedMode
                 _defaultUseText.value = defaultUseText
                 _executePrefixEnabled.value = executePrefixEnabled
+                _separatorAsTextComponent.value = separatorAsTextComponent
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
                 
@@ -193,6 +205,7 @@ class SettingsRepository @Inject constructor(
         val javaBedrockMixedMode = _javaBedrockMixedMode.value
         val defaultUseText = _defaultUseText.value
         val executePrefixEnabled = _executePrefixEnabled.value
+        val separatorAsTextComponent = _separatorAsTextComponent.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
         
@@ -204,6 +217,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_JAVA_BEDROCK_MIXED_MODE": $javaBedrockMixedMode,
               "$KEY_DEFAULT_USE_TEXT": $defaultUseText,
               "$KEY_EXECUTE_PREFIX_ENABLED": $executePrefixEnabled,
+              "$KEY_SEPARATOR_AS_TEXT_COMPONENT": $separatorAsTextComponent,
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
             }
@@ -320,6 +334,23 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun setExecutePrefixEnabled(enabled: Boolean) {
         _executePrefixEnabled.value = enabled
+        saveConfig()
+    }
+    
+    /**
+     * 获取separator使用文本组件开关
+     * @return true表示separator使用文本组件，false表示使用纯字符串
+     */
+    suspend fun getSeparatorAsTextComponent(): Boolean {
+        return _separatorAsTextComponent.value
+    }
+    
+    /**
+     * 设置separator使用文本组件开关
+     * @param enabled true表示separator使用文本组件，false表示使用纯字符串
+     */
+    suspend fun setSeparatorAsTextComponent(enabled: Boolean) {
+        _separatorAsTextComponent.value = enabled
         saveConfig()
     }
     

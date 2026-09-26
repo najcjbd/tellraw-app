@@ -145,7 +145,7 @@ class YiJianSimpleTest {
         val expandedComponents = TextComponentHelper.expandComponents(components)
         val json = TextComponentHelper.convertToJavaJson(expandedComponents)
         // separator应该是包含"text"键的对象
-        val expectedJson = """{"selector":"@a","separator":{"text":"kk"},"extra":[{"selector":"@p","separator":{"text":"kk"}},{"selector":"@e","separator":{"text":"66666"}},{"selector":"@r","separator":{"text":"66666"}}]}"""
+        val expectedJson = """{"selector":"@a","separator":"kk","extra":[{"selector":"@p","separator":"kk"},{"selector":"@e","separator":"66666"},{"selector":"@r","separator":"66666"}]}"""
         assertTrue("JSON输出应该包含'$expectedJson'", json.contains(expectedJson))
     }
     
@@ -214,7 +214,7 @@ class YiJianSimpleTest {
         val javaJson = TextComponentHelper.convertToJavaJson(components, "font", false, context)
         
         // 验证：应该包含separator（separator应该是包含"text"键的对象）
-        assertTrue("应该包含separator {\"text\":\"kk\"}", javaJson.contains("\"separator\":{\"text\":\"kk\"}"))
+        assertTrue("应该包含separator {\"text\":\"kk\"}", javaJson.contains("\"separator\":\"kk\""))
         
         // 验证：应该包含所有selector
         assertTrue("Java版应该包含\"selector\":\"@a\"", javaJson.contains("\"selector\":\"@a\""))
@@ -238,7 +238,7 @@ class YiJianSimpleTest {
         assertTrue("应该包含@a", javaJson.contains("\"selector\":\"@a\""))
         assertTrue("应该包含@p", javaJson.contains("\"selector\":\"@p\""))
         // separator应该是包含"text"键的对象
-        assertTrue("应该包含separator {\"text\":\"666\"}", javaJson.contains("\"separator\":{\"text\":\"666\"}"))
+        assertTrue("应该包含separator {\"text\":\"666\"}", javaJson.contains("\"separator\":\"666\""))
     }
     
     /**
@@ -257,7 +257,7 @@ class YiJianSimpleTest {
         assertFalse("@a 不该有 separator", javaJson.contains("\"selector\":\"@a\",\"separator\""))
         assertTrue("应该包含@a", javaJson.contains("\"selector\":\"@a\""))
         assertTrue("应该包含@p", javaJson.contains("\"selector\":\"@p\""))
-        assertTrue("应该包含separator {\"text\":\"666\"}", javaJson.contains("\"separator\":{\"text\":\"666\"}"))
+        assertTrue("应该包含separator {\"text\":\"666\"}", javaJson.contains("\"separator\":\"666\""))
     }
 
     /**
@@ -270,7 +270,7 @@ class YiJianSimpleTest {
         assertEquals("应该有1个selector组件", 1, components.size)
 
         val javaJson = TextComponentHelper.convertToJavaJson(components, "font", false, context)
-        assertTrue("separator 应该是一个字面单引号", javaJson.contains("\"separator\":{\"text\":\"'\"}"))
+        assertTrue("separator 应该是一个字面单引号", javaJson.contains("\"separator\":\"'\""))
     }
 
     /**

@@ -53,6 +53,7 @@ fun MainScreen(
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val defaultUseText by viewModel.defaultUseText.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
+    val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
@@ -197,6 +198,7 @@ fun MainScreen(
             javaBedrockMixedMode = javaBedrockMixedMode,
             defaultUseText = defaultUseText,
             executePrefixEnabled = executePrefixEnabled,
+            separatorAsTextComponent = separatorAsTextComponent,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -215,6 +217,9 @@ fun MainScreen(
             },
             onExecutePrefixEnabledChanged = { enabled ->
                 viewModel.setExecutePrefixEnabled(enabled)
+            },
+            onSeparatorAsTextComponentChanged = { enabled ->
+                viewModel.setSeparatorAsTextComponent(enabled)
             }
         )
     }
