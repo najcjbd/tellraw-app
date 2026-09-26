@@ -767,7 +767,7 @@ class SelectorConverterTest {
     @Test
     fun testHasitemNbtConversion_4() {
         // Java版nbt到基岩版hasitem：物品栏
-        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",Count:1b}]}]"
+        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",count:1}]}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
         assertTrue("基岩版选择器应包含slot.hotbar", conversion.bedrockSelector.contains("slot.hotbar"))
@@ -776,7 +776,7 @@ class SelectorConverterTest {
     @Test
     fun testHasitemNbtConversion_5() {
         // Java版nbt到基岩版hasitem：主手物品
-        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",Count:1b}}]"
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",count:1}}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("基岩版选择器应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
         assertTrue("基岩版选择器应包含slot.weapon.mainhand", conversion.bedrockSelector.contains("slot.weapon.mainhand"))
@@ -904,7 +904,7 @@ class SelectorConverterTest {
     @Test
     fun testNbtParameters_2() {
         // nbt with Inventory
-        val selector = "@a[nbt={Inventory:[{id:\"minecraft:diamond\",Count:5b,Slot:0b}]}]"
+        val selector = "@a[nbt={Inventory:[{id:\"minecraft:diamond\",count:5,Slot:0b}]}]"
         val type = SelectorConverter.detectSelectorType(selector)
         assertEquals(SelectorType.JAVA, type)
     }
@@ -912,7 +912,7 @@ class SelectorConverterTest {
     @Test
     fun testNbtParameters_3() {
         // nbt with SelectedItem
-        val selector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",Count:1b}}]"
+        val selector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",count:1}}]"
         val type = SelectorConverter.detectSelectorType(selector)
         assertEquals(SelectorType.JAVA, type)
     }
@@ -944,7 +944,7 @@ class SelectorConverterTest {
     @Test
     fun testNbtParameters_7() {
         // nbt with complex Inventory
-        val selector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",Count:1b},{Slot:8b,id:\"minecraft:iron\",Count:64b}]}]"
+        val selector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",count:1},{Slot:8b,id:\"minecraft:iron\",count:64}]}]"
         val type = SelectorConverter.detectSelectorType(selector)
         assertEquals(SelectorType.JAVA, type)
     }
@@ -1286,7 +1286,7 @@ class SelectorConverterTest {
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含Inventory", conversion.javaSelector.contains("Inventory"))
         assertTrue("应包含Slot:8b", conversion.javaSelector.contains("Slot:8b"))
-        assertTrue("应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
+        assertTrue("应包含count:2", conversion.javaSelector.contains("count:2"))
     }
     
     @Test
@@ -1307,7 +1307,7 @@ class SelectorConverterTest {
         assertTrue("应包含equipment", conversion.javaSelector.contains("equipment"))
         assertTrue("应包含offhand", conversion.javaSelector.contains("offhand"))
         assertTrue("应包含string", conversion.javaSelector.contains("string"))
-        assertTrue("应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
+        assertTrue("应包含count:2", conversion.javaSelector.contains("count:2"))
     }
     
     @Test
@@ -1323,7 +1323,7 @@ class SelectorConverterTest {
     @Test
     fun testExampleConversions_7() {
         // 事例3反向：Java版到基岩版
-        val javaSelector = "@a[nbt={Inventory:[{Slot:8b,id:\"minecraft:diamond\",Count:2b}]}]"
+        val javaSelector = "@a[nbt={Inventory:[{Slot:8b,id:\"minecraft:diamond\",count:2}]}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
         assertTrue("应包含slot.hotbar", conversion.bedrockSelector.contains("slot.hotbar"))
@@ -1333,7 +1333,7 @@ class SelectorConverterTest {
     @Test
     fun testExampleConversions_8() {
         // 事例4反向：Java版到基岩版
-        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}},nbt={Inventory:[{id:\"minecraft:diamond\",Count:2b}]}]"
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}},nbt={Inventory:[{id:\"minecraft:diamond\",count:2}]}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
     }
@@ -1341,7 +1341,7 @@ class SelectorConverterTest {
     @Test
  fun testExampleConversions_9() {
         // 事例5反向：Java版到基岩版
-        val javaSelector = "@a[nbt={equipment:{offhand:{id:\"minecraft:string\",Count:2b}}}]"
+        val javaSelector = "@a[nbt={equipment:{offhand:{id:\"minecraft:string\",count:2}}}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
         assertTrue("应包含slot.weapon.offhand", conversion.bedrockSelector.contains("slot.weapon.offhand"))
@@ -1446,7 +1446,7 @@ class SelectorConverterTest {
         // 大数量值
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=1000}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count参数", conversion.javaSelector.contains("Count:"))
+        assertTrue("应包含Count参数", conversion.javaSelector.contains("count:"))
         assertTrue("应包含nbt参数", conversion.javaSelector.contains("nbt="))
     }
     
@@ -1861,7 +1861,7 @@ class SelectorConverterTest {
     @Test
     fun testNestedParameters_3() {
         // 嵌套的Inventory数组
-        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",Count:1b,tag:{display:{Name:\"\\\"钻石\\\"\"}}}]}]"
+        val javaSelector = "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",count:1,tag:{display:{Name:\"\\\"钻石\\\"\"}}}]}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
     }
@@ -1877,7 +1877,7 @@ class SelectorConverterTest {
     @Test
     fun testNestedParameters_5() {
         // 复杂的嵌套结构
-        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",tag:{Enchantments:[{id:\"sharpness\",lvl:5},{id:\"unbreaking\",lvl:3}]}}},nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",Count:64b,tag:{display:{Lore:[\"\\\"高品质钻石\\\"\",\"\\\"稀有物品\\\"\"]}}}]}]"
+        val javaSelector = "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\",tag:{Enchantments:[{id:\"sharpness\",lvl:5},{id:\"unbreaking\",lvl:3}]}}},nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",count:64,tag:{display:{Lore:[\"\\\"高品质钻石\\\"\",\"\\\"稀有物品\\\"\"]}}}]}]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertTrue("应包含hasitem", conversion.bedrockSelector.contains("hasitem"))
     }
@@ -2294,7 +2294,7 @@ class SelectorConverterTest {
         // quantity范围：2..
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=2..}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
+        assertTrue("应包含count:2", conversion.javaSelector.contains("count:2"))
     }
     
     @Test
@@ -2302,7 +2302,7 @@ class SelectorConverterTest {
         // quantity范围：..5
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=..5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:5b", conversion.javaSelector.contains("Count:5b"))
+        assertTrue("应包含count:5", conversion.javaSelector.contains("count:5"))
     }
     
     @Test
@@ -2310,7 +2310,7 @@ class SelectorConverterTest {
         // quantity范围：3..5（中间值4）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=3..5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:4b", conversion.javaSelector.contains("Count:4b"))
+        assertTrue("应包含count:4", conversion.javaSelector.contains("count:4"))
     }
     
     @Test
@@ -2473,7 +2473,7 @@ class SelectorConverterTest {
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=0}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         // Count为0应该被处理
-        assertTrue("Count=0应该被处理", conversion.javaSelector.contains("Count:0b"))
+        assertTrue("Count=0应该被处理", conversion.javaSelector.contains("count:0"))
     }
     
     @Test
@@ -2482,7 +2482,7 @@ class SelectorConverterTest {
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=999999}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         // 超大Count应该被处理
-        assertTrue("超大Count应该被处理", conversion.javaSelector.contains("Count:"))
+        assertTrue("超大Count应该被处理", conversion.javaSelector.contains("count:"))
     }
     
     @Test
@@ -2856,8 +2856,8 @@ class SelectorConverterTest {
         // quantity 范围：2.5.. → 3（四舍五入）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=2.5..}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:3b（2.5四舍五入）", conversion.javaSelector.contains("Count:3b"))
-        assertFalse("不应包含Count:2b", conversion.javaSelector.contains("Count:2b"))
+        assertTrue("应包含count:3（2.5四舍五入）", conversion.javaSelector.contains("count:3"))
+        assertFalse("不应包含count:2", conversion.javaSelector.contains("count:2"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
@@ -2867,8 +2867,8 @@ class SelectorConverterTest {
         // quantity 范围：..5.6 → 6（四舍五入）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=..5.6}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:6b（5.6四舍五入）", conversion.javaSelector.contains("Count:6b"))
-        assertFalse("不应包含Count:5b", conversion.javaSelector.contains("Count:5b"))
+        assertTrue("应包含count:6（5.6四舍五入）", conversion.javaSelector.contains("count:6"))
+        assertFalse("不应包含count:5", conversion.javaSelector.contains("count:5"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
@@ -2878,8 +2878,8 @@ class SelectorConverterTest {
         // quantity 范围：3.2..5.8 → 5（中间值，(3.2+5.8)/2=4.5四舍五入）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=3.2..5.8}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:5b（中间值4.5四舍五入）", conversion.javaSelector.contains("Count:5b"))
-        assertFalse("不应包含Count:4b", conversion.javaSelector.contains("Count:4b"))
+        assertTrue("应包含count:5（中间值4.5四舍五入）", conversion.javaSelector.contains("count:5"))
+        assertFalse("不应包含count:4", conversion.javaSelector.contains("count:4"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
@@ -2889,7 +2889,7 @@ class SelectorConverterTest {
         // quantity 范围：0.4.. → 0（0.4四舍五入）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=0.4..}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:0b（0.4四舍五入）", conversion.javaSelector.contains("Count:0b"))
+        assertTrue("应包含count:0（0.4四舍五入）", conversion.javaSelector.contains("count:0"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
@@ -2899,7 +2899,7 @@ class SelectorConverterTest {
         // quantity 范围：..0.5 → 1（0.5四舍五入）
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=..0.5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:1b（0.5四舍五入）", conversion.javaSelector.contains("Count:1b"))
+        assertTrue("应包含count:1（0.5四舍五入）", conversion.javaSelector.contains("count:1"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
     }
@@ -2949,7 +2949,7 @@ class SelectorConverterTest {
         // 混合小数测试：quantity=3.7,slot=2.4
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=3.7,location=slot.hotbar,slot=2.4}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:4b（3.7四舍五入）", conversion.javaSelector.contains("Count:4b"))
+        assertTrue("应包含count:4（3.7四舍五入）", conversion.javaSelector.contains("count:4"))
         assertTrue("应包含Slot:2b（2.4四舍五入）", conversion.javaSelector.contains("Slot:2b"))
         // 验证提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
@@ -2965,7 +2965,7 @@ class SelectorConverterTest {
         assertTrue("应包含y_rotation参数", conversion.javaSelector.contains("y_rotation="))
         assertTrue("应包含nbt参数", conversion.javaSelector.contains("nbt="))
         assertTrue("应包含scores参数", conversion.javaSelector.contains("scores="))
-        assertTrue("应包含Count:3b（2.5四舍五入）", conversion.javaSelector.contains("Count:3b"))
+        assertTrue("应包含count:3（2.5四舍五入）", conversion.javaSelector.contains("count:3"))
     }
 
     @Test
@@ -2999,7 +2999,7 @@ class SelectorConverterTest {
         // 验证极端小数值四舍五入
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=0.1..}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:0b（0.1四舍五入）", conversion.javaSelector.contains("Count:0b"))
+        assertTrue("应包含count:0（0.1四舍五入）", conversion.javaSelector.contains("count:0"))
     }
 
     @Test
@@ -3007,7 +3007,7 @@ class SelectorConverterTest {
         // 验证大数值四舍五入
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=999.6..}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        assertTrue("应包含Count:1000b（999.6四舍五入）", conversion.javaSelector.contains("Count:1000b"))
+        assertTrue("应包含count:1000（999.6四舍五入）", conversion.javaSelector.contains("count:1000"))
     }
 
     @Test
@@ -3016,7 +3016,7 @@ class SelectorConverterTest {
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=2.5..3.5}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         // 中间值 = (2.5+3.5)/2 = 3.0，四舍五入为3
-        assertTrue("应包含Count:3b（中间值3.0）", conversion.javaSelector.contains("Count:3b"))
+        assertTrue("应包含count:3（中间值3.0）", conversion.javaSelector.contains("count:3"))
     }
 
     @Test
@@ -3044,10 +3044,10 @@ class SelectorConverterTest {
         val bedrockSelector = "@a[hasitem=[{item=diamond,quantity=2.3..5.7,location=slot.hotbar,slot=1.2..8.8},{item=iron,quantity=0.8..4.2,location=slot.inventory,slot=10.3..20.7}]]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         // 第一个物品：quantity=(2.3+5.7)/2=4.0, slot=(1.2+8.8)/2=5.0
-        assertTrue("应包含第一个物品的Count:4b", conversion.javaSelector.contains("Count:4b"))
+        assertTrue("应包含第一个物品的count:4", conversion.javaSelector.contains("count:4"))
         assertTrue("应包含第一个物品的Slot:5b", conversion.javaSelector.contains("Slot:5b"))
         // 第二个物品：quantity=(0.8+4.2)/2=2.5四舍五入为3, slot=(10.3+20.7)/2=15.5四舍五入为16，Java版Inventory槽位=16+9=25
-        assertTrue("应包含第二个物品的Count:3b", conversion.javaSelector.contains("Count:3b"))
+        assertTrue("应包含第二个物品的count:3", conversion.javaSelector.contains("count:3"))
         assertTrue("应包含第二个物品的Slot:25b", conversion.javaSelector.contains("Slot:25b"))
         // 验证有提醒信息
         assertTrue("应包含提醒信息", conversion.javaReminders.isNotEmpty())
@@ -3216,7 +3216,7 @@ class SelectorConverterTest {
         val bedrockSelector = "@a[hasitem=[{item=diamond,quantity=3..,location=slot.hotbar,slot=0..2},{item=iron,quantity=2..}]]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
         assertTrue("应包含nbt参数", conversion.javaSelector.contains("nbt="))
-        assertTrue("应包含Count参数", conversion.javaSelector.contains("Count:"))
+        assertTrue("应包含Count参数", conversion.javaSelector.contains("count:"))
     }
 
     /**

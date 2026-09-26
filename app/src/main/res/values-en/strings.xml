@@ -98,8 +98,8 @@
     <string name="hasitem_converted">hasitem changed to nbt format, may lose some meaning</string>
     <string name="hasitem_conversion_failed">hasitem change failed, kept original</string>    <string name="nbt_converted">nbt changed to hasitem format, may lose some meaning</string>
     <string name="hasitem_location_not_supported">Warning: Bedrock location=%s not supported in Java, removed</string>
-    <string name="hasitem_quantity_min_only">Note: quantity=%1$s.. converted to %2$sb</string>
-    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$sb</string>
+    <string name="hasitem_quantity_min_only">Note: quantity=%1$s.. converted to %2$s</string>
+    <string name="hasitem_quantity_max_only">Note: quantity=..%1$s converted to %2$s</string>
     <string name="hasitem_quantity_range">Note: quantity=%1$s..%2$s changed to %3$s (middle value)</string>
     <string name="hasitem_quantity_rounded">Note: quantity=%1$s rounded to %2$sb</string>
     <string name="hasitem_quantity_negation_not_supported">Warning: quantity (!) not supported in Java, removed</string>
