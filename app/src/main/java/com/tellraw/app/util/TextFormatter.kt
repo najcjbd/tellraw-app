@@ -199,14 +199,22 @@ object TextFormatter {
      */
     fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null): String {
         // 检查是否包含文本组件标记
+        var plainText = text
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
-            return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings)
+            if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
+                return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings)
+            }
+            // 全是 TEXT 组件：说明这两个字符只是用户手打的普通字符（不是合法组件标记）。
+            // 必须继续走下面的纯文本逻辑，而且**不能原样再分派** ——
+            // 否则 TextComponentHelper 的"全 TEXT"分支会把文本回传进来，
+            // 两边互递归 → StackOverflowError（用户输入 ྈ 和 ༴ 就会闪退）
+            plainText = components.joinToString("") { it.content }
         }
         
         // 原有的转换逻辑（向后兼容）
-        var jsonText = text
+        var jsonText = plainText
         var currentFormat = mutableMapOf<String, Any>()
 
         // 预处理：将除§m/§n以外的基岩独占颜色代码转换为JAVA版的颜色代码
@@ -464,14 +472,20 @@ object TextFormatter {
      */
     fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null): String {
         // 检查是否包含文本组件标记
+        var plainText = text
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
-            return TextComponentHelper.convertToBedrockJson(components, mNHandling, mnCFEnabled, context, warnings)
+            if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
+                return TextComponentHelper.convertToBedrockJson(components, mNHandling, mnCFEnabled, context, warnings)
+            }
+            // 理由同 convertToJavaJson：全是 TEXT 时这两个字符只是普通字符，
+            // 必须继续走纯文本逻辑，否则与 TextComponentHelper 互递归崩溃
+            plainText = components.joinToString("") { it.content }
         }
         
         // 原有的转换逻辑（向后兼容）
-        var processedText = text
+        var processedText = plainText
         
         // 基岩版中，§m/§n始终作为颜色代码处理（基岩版不支持删除线和下划线格式化代码）
         // §m -> material_redstone (深红色)
