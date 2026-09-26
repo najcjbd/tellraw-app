@@ -729,10 +729,11 @@ class SelectorConverterTest {
 
     @Test
     fun testSelectorConversion_11() {
-        // Java版到基岩版：sort=random - @e转换为c参数
+        // Java版到基岩版：sort=random - @e 转为 @r[type=!player,c=…]（并提醒选不到玩家）
+        // 基岩版没有"全部实体随机"的形式，只能用 @r + type=!player 近似
         val javaSelector = "@e[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
-        assertEquals("基岩版选择器应为@e[c=9999]", "@e[c=9999]", conversion.bedrockSelector)
+        assertEquals("基岩版选择器应为@r[type=!player,c=9999]", "@r[type=!player,c=9999]", conversion.bedrockSelector)
     }
     
     /**
