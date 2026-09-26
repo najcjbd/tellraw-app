@@ -3496,10 +3496,10 @@ object SelectorConverter {
         if (quantity == null) return null
 
         return when {
-            quantity == "0.." -> {
-                // 0.. 表示不做过滤，返回 null
-                null
-            }
+            // 注意：这里原来有个 `quantity == "0.." -> null` 的特判（"不做过滤"），
+            // 但那会让输出变成"必须有该物品"，与语义相反。
+            // 按 2026-09-26 定的规则：0.. 取单值 0 -> count:0（= 没有这个物品，等同 scores 的 !x），
+            // 所以交给下面的 endsWith("..") 分支处理（取 0 并提醒）。
             quantity.endsWith("..") -> {
                 // 2.. 或 2.5.. 取四舍五入后的值
                 val value = quantity.substringBefore("..").toDoubleOrNull()?.roundToInt()
