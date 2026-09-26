@@ -539,25 +539,12 @@ object TextComponentHelper {
 ): String {
         if (components.isEmpty()) return "{}"
 
-        // 检查组件是否已经被展开（SELECTOR组件的content只包含一个selector条目）
-        val isAlreadyExpanded = components.all { component ->
-            when (component.type) {
-                ComponentType.SELECTOR -> {
-                    // SELECTOR组件的content只包含一个selector条目
-                    val (selectorEntries, _) = parseSelectorContent(component.content)
-                    selectorEntries.size <= 1
-                }
-                ComponentType.SCORE -> {
-                    // SCORE组件的content只包含一个score条目
-                    val scoreEntries = parseScoreContent(component.content)
-                    scoreEntries.size <= 1
-                }
-                else -> true
-            }
-        }
-
-        // 展开组件，将score和selector组件中的多个条目分割成独立的文本组件
-        val expandedComponents = if (isAlreadyExpanded) components else expandComponents(components)
+        // 统一展开：expandComponents 现在是幂等的（会保留组件上已有的副组件），
+        // 所以不再需要"条目数 ≤ 1 就算已展开"这种靠猜的启发式。
+        // 那个启发式会让同一个空 score 组件在"直接转换"与"先展开"两条路上给出不同结果
+        // （空内容时 0 ≤ 1 成立 -> 跳过展开 -> {"name":"","objective":""}；
+        //  先展开则被改写成 ":" -> {"name":"*","objective":"*"}）。
+        val expandedComponents = expandComponents(components)
 
         // 检查是否所有组件都是TEXT组件
         val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
@@ -1535,15 +1522,26 @@ object TextComponentHelper {
                 ComponentType.SELECTOR -> {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
                     if (selectorEntries.isEmpty()) {
-                        // 空内容，保留为selector组件（内容为空字符串）
-                        expanded.add(TextComponent(ComponentType.SELECTOR, ""))
+                        // 空内容，保留为selector组件（内容为空字符串），副组件一并保留
+                        expanded.add(TextComponent(ComponentType.SELECTOR, "", component.subComponents))
                     } else {
                         // 每个selector条目都作为独立的selector组件
                         for ((index, selector) in selectorEntries.withIndex()) {
-                            // 添加separator作为副组件
                             val subComponents = mutableListOf<SubComponent>()
+                            // 保留组件上已有的副组件（例如界面上设好的 separator）。
+                            // 只有单条目时才有意义——多条目时无法判断该挂到哪一个上。
+                            // 有了这个，expandComponents 才是幂等的：对"已展开"的组件再展开一次
+                            // 不会把 separator 丢掉。
+                            if (selectorEntries.size == 1) {
+                                component.subComponents.forEach { existing ->
+                                    if (subComponents.none { it.type == existing.type }) {
+                                        subComponents.add(existing)
+                                    }
+                                }
+                            }
+                            // 添加separator作为副组件
                             val sep = if (index < separatorEntries.size) separatorEntries[index] else null
-                            if (sep != null) {
+                            if (sep != null && subComponents.none { it.type == SubComponentType.SEPARATOR }) {
                                 subComponents.add(SubComponent(SubComponentType.SEPARATOR, sep))
                             }
                             val newComponent = TextComponent(ComponentType.SELECTOR, selector, subComponents)
