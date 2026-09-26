@@ -229,19 +229,6 @@ class TellrawViewModel @Inject constructor(
     )
     private var mnMappings = mutableListOf<MNMapping>()
     
-    /**
-     * 文本组件位置映射（类似于MNMapping）
-     * 记录前台纯文本位置和后台带标记符文本位置的对应关系
-     */
-    private data class ComponentMapping(
-        val frontendStart: Int,        // 前台文本开始位置
-        val frontendEnd: Int,          // 前台文本结束位置
-        val backendStart: Int,         // 后台文本开始位置（包括标记符）
-        val backendEnd: Int,           // 后台文本结束位置（包括标记符）
-        val componentType: TextComponentHelper.ComponentType
-    )
-    private var componentMappings = mutableListOf<ComponentMapping>()
-    
     // 上一次的输入文本内容，用于文本组件系统检测变化（类似于lastMessageContent）
     private var lastMessageInput = ""
     
@@ -308,7 +295,6 @@ class TellrawViewModel @Inject constructor(
         } else {
             // 默认使用text模式，直接同步
             _messageInputWithMarkers.value = message
-            componentMappings.clear()
             lastMessageInput = message
         }
         
@@ -335,7 +321,6 @@ class TellrawViewModel @Inject constructor(
         // 如果前台文本为空，清空后台文本和映射
         if (frontendMessage.isEmpty()) {
             _messageInputWithMarkers.value = ""
-            componentMappings.clear()
             lastMessageInput = ""
             return
         }
@@ -346,7 +331,6 @@ class TellrawViewModel @Inject constructor(
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
             _messageInputWithMarkers.value = frontendMessage
-            componentMappings.clear()
             lastMessageInput = frontendMessage
             return
         }
@@ -426,41 +410,7 @@ class TellrawViewModel @Inject constructor(
         }
         
         _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
-        buildComponentMappings(newComponents)
         lastMessageInput = frontendMessage
-    }
-    
-    /**
-     * 根据组件列表构建位置映射（支持新的标记符格式）
-     */
-    private fun buildComponentMappings(components: List<TextComponentHelper.TextComponent>) {
-        componentMappings.clear()
-        
-        var frontendPos = 0
-        var backendPos = 0
-        
-        for (component in components) {
-            // 前台文本长度：主内容 + 副组件内容
-            val frontendContentLength = component.content.length + component.subComponents.sumOf { it.content.length }
-            
-            // 后台文本长度：content长度 + 副组件长度 + MARKER_START(1) + type.key.length + MARKER_END(1)
-            // 注意：副组件使用__type.key__content__格式，所以副组件长度 = 2 + type.key.length + 2 + content.length + 2
-            val subComponentBackendLength = component.subComponents.sumOf { 2 + it.type.key.length + 2 + it.content.length + 2 }
-            val backendContentLength = component.content.length + subComponentBackendLength
-            val markerLength = backendContentLength + 1 + component.type.key.length + 1
-            
-            // 记录映射
-            componentMappings.add(ComponentMapping(
-                frontendStart = frontendPos,
-                frontendEnd = frontendPos + frontendContentLength,
-                backendStart = backendPos,
-                backendEnd = backendPos + markerLength,
-                componentType = component.type
-            ))
-            
-            frontendPos += frontendContentLength
-            backendPos += markerLength
-        }
     }
     
     /**
@@ -1457,7 +1407,6 @@ class TellrawViewModel @Inject constructor(
         } else {
             // 默认使用text模式，直接同步
             _messageInputWithMarkers.value = newText
-            componentMappings.clear()
         }
         
         // 更新lastMessageInput
@@ -1484,7 +1433,6 @@ class TellrawViewModel @Inject constructor(
         // 如果新文本为空，清空后台文本和映射
         if (newText.isEmpty()) {
             _messageInputWithMarkers.value = ""
-            componentMappings.clear()
             lastMessageInput = ""
             return
         }
@@ -1495,7 +1443,6 @@ class TellrawViewModel @Inject constructor(
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
             _messageInputWithMarkers.value = newText
-            componentMappings.clear()
             lastMessageInput = newText
             return
         }
@@ -1594,7 +1541,6 @@ class TellrawViewModel @Inject constructor(
         
         // 重新构建带标记符的文本
         _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
-        buildComponentMappings(newComponents)
         lastMessageInput = newText
     }
     
@@ -1643,7 +1589,6 @@ class TellrawViewModel @Inject constructor(
         
         // 重新构建位置映射
         val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
-        buildComponentMappings(components)
         
         // 更新lastMessageInput
         lastMessageInput = plainText
