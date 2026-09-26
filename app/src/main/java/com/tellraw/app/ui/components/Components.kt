@@ -460,12 +460,14 @@ fun SettingsDialog(
     mnCFEnabled: Boolean,
     javaBedrockMixedMode: Boolean,
     defaultUseText: Boolean,
+    executePrefixEnabled: Boolean,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
     onMNMixedModeChanged: (Boolean) -> Unit,
     onMNCFEnabledChanged: (Boolean) -> Unit,
     onJavaBedrockMixedModeChanged: (Boolean) -> Unit,
-    onDefaultUseTextChanged: (Boolean) -> Unit
+    onDefaultUseTextChanged: (Boolean) -> Unit,
+    onExecutePrefixEnabledChanged: (Boolean) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -699,6 +701,21 @@ fun SettingsDialog(
                             )
                         }
                     }
+                    
+                    // execute前置命令开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = executePrefixEnabled,
+                            onCheckedChange = onExecutePrefixEnabledChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.execute_prefix_enabled),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
                 
                 // 底部操作栏
@@ -904,6 +921,21 @@ fun SettingsDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                    
+                    // execute前置命令开关
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = executePrefixEnabled,
+                            onCheckedChange = onExecutePrefixEnabledChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.execute_prefix_enabled),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
             },

@@ -73,6 +73,9 @@ class TellrawViewModel @Inject constructor(
     private val _defaultUseText = MutableStateFlow(true)
     val defaultUseText: StateFlow<Boolean> = _defaultUseText.asStateFlow()
     
+    private val _executePrefixEnabled = MutableStateFlow(false)
+    val executePrefixEnabled: StateFlow<Boolean> = _executePrefixEnabled.asStateFlow()
+    
     // 文本组件选择相关状态
     private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
     val selectedTextComponent: StateFlow<TextComponentHelper.ComponentType?> = _selectedTextComponent.asStateFlow()
@@ -164,6 +167,9 @@ class TellrawViewModel @Inject constructor(
             
             // 加载默认使用text文本组件设置
             _defaultUseText.value = loadedSettings.defaultUseText
+            
+            // 加载execute前置命令设置
+            _executePrefixEnabled.value = loadedSettings.executePrefixEnabled
             
             // 加载历史记录文件名
             _historyStorageFilename.value = loadedSettings.historyStorageFilename
@@ -667,6 +673,14 @@ class TellrawViewModel @Inject constructor(
             settingsRepository.saveConfig()
         }
         generateCommands()
+    }
+    
+    fun setExecutePrefixEnabled(enabled: Boolean) {
+        _executePrefixEnabled.value = enabled
+        viewModelScope.launch {
+            settingsRepository.setExecutePrefixEnabled(enabled)
+            settingsRepository.saveConfig()
+        }
     }
     
     fun dismissMNDialog() {
