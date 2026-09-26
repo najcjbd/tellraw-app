@@ -64,8 +64,11 @@ object TextComponentHelper {
                 val typeEnd = text.indexOf(MARKER_END, i + 1)
                 
                 if (typeEnd == -1) {
-                    // 没有找到类型结束标记，将标记作为普通文本处理
+                    // 没有找到类型结束标记，把标记之后的全部当普通文本处理
                     components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
+                    // 必须把 componentStart 推到底：否则结尾的"处理剩余普通文本"会把同一段再加一遍
+                    // （实测 @aྈselector༴abྈ -> extra 里 abྈ 出现两次）
+                    componentStart = text.length
                     break
                 }
                 
@@ -1064,6 +1067,7 @@ object TextComponentHelper {
                 val selectorPositions = mutableListOf<Int>()  // 每个selector的原始位置
         
                 var startIndex = -1
+                var lastEntryEnd = 0   // 上一个已消费条目（含分隔符）之后的位置，用于识别"无@条目"
         
                 var lastAtPos = -1
         
@@ -1137,7 +1141,9 @@ object TextComponentHelper {
         
                                 // 但是需要跳过sep:定义
         
-                                var textBeforeAt = content.substring(0, i)
+                                // 从 lastEntryEnd 开始取：被"无@条目"逻辑消费过的部分不能再算一次
+                                // （否则 mknbt,@p 会把 mknbt 加两遍）
+                                var textBeforeAt = content.substring(lastEntryEnd, i)
         
                                 // 移除sep:定义
                                 
@@ -1163,6 +1169,11 @@ object TextComponentHelper {
         
                                 }
         
+                                // 去掉尾随逗号：mknbt,@p 会切出 "mknbt,"，逗号不属于选择器名
+                                // （同文件另外两条路径都做了这件事，这里原先漏了）
+                                if (textBeforeAt.endsWith(",")) {
+                                    textBeforeAt = textBeforeAt.substring(0, textBeforeAt.length - 1)
+                                }
                                 if (textBeforeAt.isNotEmpty()) {
         
                                     selectors.add(textBeforeAt)
@@ -1226,10 +1237,22 @@ object TextComponentHelper {
                             selectors.add(selector)
                             selectorPositions.add(startIndex)
                             startIndex = -1
-        
+                            lastEntryEnd = skipSepDefinitions(i + 1)   // 这段（含分隔符）已消费掉
+
                             // 跳过sep:定义
-                            i = skipSepDefinitions(i + 1) - 1  // -1 因为循环末尾会i++
+                            i = lastEntryEnd - 1  // -1 因为循环末尾会i++
                         } else {
+                    // 先看"这个逗号之前"有没有一段无@文本（@a,mknbt,@p 里的 mknbt）。
+                    // 原实现只向后（前瞻）看，导致夹在中间的无@条目被整段丢掉 —— 违反意见.txt:21-25
+                    val bareBefore = content.substring(lastEntryEnd, i).trim()
+                    if (bareBefore.isNotEmpty()) {
+                        selectors.add(bareBefore)
+                        selectorPositions.add(lastEntryEnd)
+                        lastEntryEnd = i + 1
+                        i++
+                        continue
+                    }
+
                     // 规则：如果有,相隔并且无@，就作为一个无@文本组件参数
                     // 检查逗号后面是否有非@文本
                     var nextIndex = i + 1
@@ -1300,9 +1323,35 @@ object TextComponentHelper {
             selectors.add(selector)
             selectorPositions.add(startIndex)
         } else if (lastAtPos == -1 && content.isNotEmpty()) {
-            // 没有@，将整个内容作为selector
-            selectors.add(content)
-            selectorPositions.add(0)
+            // 没有@：整个内容作为一个选择器。
+            // 但 ,'sep':… 必须先剥掉 —— separator 只修饰@选择器（意见.txt:32），
+            // 否则会生成 {"selector":"mknbt,'sep':kk"} 这种把语法漏进选择器的结果
+            var onlySelector = content
+            val onlySepIndex = onlySelector.indexOf(",'sep':")
+            if (onlySepIndex != -1) {
+                onlySelector = onlySelector.substring(0, onlySepIndex)
+            }
+            if (onlySelector.endsWith(",")) {
+                onlySelector = onlySelector.substring(0, onlySelector.length - 1)
+            }
+            if (onlySelector.isNotEmpty()) {
+                selectors.add(onlySelector)
+                selectorPositions.add(0)
+            }
+        } else if (startIndex == -1 && lastAtPos != -1) {
+            // @ 之后、最后一个逗号之后剩下的无@条目（例如 @a,mknbt 里的 mknbt）
+            var bareTail = content.substring(lastEntryEnd).trim()
+            val tailSepIndex = bareTail.indexOf(",'sep':")
+            if (tailSepIndex != -1) {
+                bareTail = bareTail.substring(0, tailSepIndex)
+            }
+            if (bareTail.endsWith(",")) {
+                bareTail = bareTail.substring(0, bareTail.length - 1)
+            }
+            if (bareTail.isNotEmpty()) {
+                selectors.add(bareTail)
+                selectorPositions.add(lastEntryEnd)
+            }
         }
         
         // 第三步：为每个sep:定义找到对应的selector索引
