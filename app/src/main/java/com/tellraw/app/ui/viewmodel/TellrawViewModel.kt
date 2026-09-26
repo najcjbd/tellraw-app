@@ -76,6 +76,9 @@ class TellrawViewModel @Inject constructor(
     private val _executePrefixEnabled = MutableStateFlow(false)
     val executePrefixEnabled: StateFlow<Boolean> = _executePrefixEnabled.asStateFlow()
     
+    private val _separatorAsTextComponent = MutableStateFlow(false)
+    val separatorAsTextComponent: StateFlow<Boolean> = _separatorAsTextComponent.asStateFlow()
+    
     // 文本组件选择相关状态
     private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
     val selectedTextComponent: StateFlow<TextComponentHelper.ComponentType?> = _selectedTextComponent.asStateFlow()
@@ -170,6 +173,9 @@ class TellrawViewModel @Inject constructor(
             
             // 加载execute前置命令设置
             _executePrefixEnabled.value = loadedSettings.executePrefixEnabled
+            
+            // 加载separator使用文本组件设置
+            _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
             
             // 加载历史记录文件名
             _historyStorageFilename.value = loadedSettings.historyStorageFilename
@@ -683,6 +689,14 @@ class TellrawViewModel @Inject constructor(
         }
     }
     
+    fun setSeparatorAsTextComponent(enabled: Boolean) {
+        _separatorAsTextComponent.value = enabled
+        viewModelScope.launch {
+            settingsRepository.setSeparatorAsTextComponent(enabled)
+            settingsRepository.saveConfig()
+        }
+    }
+    
     fun dismissMNDialog() {
         _showMNDialog.value = null
         generateCommands()
@@ -746,7 +760,10 @@ class TellrawViewModel @Inject constructor(
                 val (javaFilteredSelector, _, javaReminders) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
                 allReminders.addAll(javaReminders)
                 val javaWarnings = mutableListOf<String>()
-                val javaJson = TextFormatter.convertToJavaJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings)
+                val javaJson = TextFormatter.convertToJavaJson(
+                    messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
+                    _separatorAsTextComponent.value
+                )
                 allReminders.addAll(javaWarnings)
                 val javaCommand = "tellraw $javaFilteredSelector $javaJson"
                 

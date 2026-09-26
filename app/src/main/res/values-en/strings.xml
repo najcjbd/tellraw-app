@@ -56,6 +56,7 @@
     <string name="default_use_text">Default use text component</string>
     <string name="default_use_text_description">Use text component when generating commands</string>
     <string name="execute_prefix_enabled">Execute prefix command</string>
+    <string name="separator_as_text_component">Separator as text component</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>
