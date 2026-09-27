@@ -340,6 +340,8 @@ private fun PortraitLayout(
     hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
+    val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
+    val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -471,6 +473,18 @@ private fun PortraitLayout(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
                 )
+                
+                // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
+                if (executePrefixEnabled) {
+                    OutlinedTextField(
+                        value = executePrefixInput,
+                        onValueChange = { viewModel.updateExecutePrefix(it) },
+                        label = { Text(stringResource(R.string.input_execute_prefix)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        maxLines = 3
+                    )
+                }
                 
                 // 监听光标位置变化（自动更新悬停组件类型）
                 if (!defaultUseText) {
@@ -608,6 +622,8 @@ private fun LandscapeLayout(
     hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
+    val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
+    val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -779,6 +795,18 @@ private fun LandscapeLayout(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             maxLines = 5
                         )
+                        
+                        // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
+                        if (executePrefixEnabled) {
+                            OutlinedTextField(
+                                value = executePrefixInput,
+                                onValueChange = { viewModel.updateExecutePrefix(it) },
+                                label = { Text(stringResource(R.string.input_execute_prefix)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                maxLines = 3
+                            )
+                        }
                         
                         // 监听光标位置变化（自动更新悬停组件类型）
                         if (!defaultUseText) {

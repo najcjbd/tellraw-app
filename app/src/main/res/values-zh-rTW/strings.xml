@@ -59,6 +59,9 @@
     <string name="default_use_text">預設使用text文本組件</string>
     <string name="default_use_text_description">生成命令時使用text文本組件</string>
     <string name="execute_prefix_enabled">命令前置 execute</string>
+    <string name="input_execute_prefix">輸入前置 execute 指令（可留空）</string>
+    <string name="execute_prefix_invalid_ignored">%1$s：前置 execute 指令不是合法的 execute 前置詞，已忽略該前置指令，只輸出 tellraw</string>
+    <string name="execute_prefix_applied">%1$s：已把前置 execute 指令接到 tellraw 前面 -> %2$s run tellraw …</string>
     <string name="separator_as_text_component">separator 用文本組件</string>
     
     <!-- 顏色代碼 -->

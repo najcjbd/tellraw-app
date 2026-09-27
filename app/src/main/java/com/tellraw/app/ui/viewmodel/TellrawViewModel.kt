@@ -16,6 +16,7 @@ import com.tellraw.app.data.repository.SettingsRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
+import com.tellraw.app.util.ExecuteConverter
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
 import com.tellraw.app.util.TextComponentHelper
@@ -75,6 +76,10 @@ class TellrawViewModel @Inject constructor(
     
     private val _executePrefixEnabled = MutableStateFlow(false)
     val executePrefixEnabled: StateFlow<Boolean> = _executePrefixEnabled.asStateFlow()
+    
+    // execute 前置命令输入框的内容（需求七.1：与消息文本框分开，避免"玩家文本本身就是 execute"的歧义）
+    private val _executePrefixInput = MutableStateFlow("")
+    val executePrefixInput: StateFlow<String> = _executePrefixInput.asStateFlow()
     
     private val _separatorAsTextComponent = MutableStateFlow(false)
     val separatorAsTextComponent: StateFlow<Boolean> = _separatorAsTextComponent.asStateFlow()
@@ -687,6 +692,13 @@ class TellrawViewModel @Inject constructor(
             settingsRepository.setExecutePrefixEnabled(enabled)
             settingsRepository.saveConfig()
         }
+        generateCommands()
+    }
+    
+    /** 更新 execute 前置命令框的内容（需求七.1）。 */
+    fun updateExecutePrefix(prefix: String) {
+        _executePrefixInput.value = prefix
+        generateCommands()
     }
     
     fun setSeparatorAsTextComponent(enabled: Boolean) {
@@ -757,23 +769,59 @@ class TellrawViewModel @Inject constructor(
                 }
                 
                 // 生成Java版命令
-                val (javaFilteredSelector, _, javaReminders) = SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
-                allReminders.addAll(javaReminders)
                 val javaWarnings = mutableListOf<String>()
                 val javaJson = TextFormatter.convertToJavaJson(
                     messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
                     _separatorAsTextComponent.value
                 )
                 allReminders.addAll(javaWarnings)
-                val javaCommand = "tellraw $javaFilteredSelector $javaJson"
+
+                // 选择器级否定（基岩 `=!` / `hasitem quantity=0`）：Java 的选择器写不出来，要用 execute 前缀
+                // （需求二.3、需求第十一节 9）。组合规则：用户前置框写的前缀在前、必须遵从，缺的接在其后。
+                val javaUserPrefix = convertedUserPrefix(
+                    ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                    applicationContext.getString(R.string.selector_type_java),
+                    allReminders
+                )
+                val javaNegation = ExecuteConverter.bedrockSelectorNegation(javaSelector, allReminders)
+                val javaCommand = if (javaNegation != null) {
+                    val (asSelectorRaw, condTokens) = javaNegation
+                    // 选择器本体也要过一遍 Java 侧参数过滤（family/predicate 这类基岩参数要转或去掉）
+                    val (asSelector, _, asReminders) =
+                        SelectorConverter.filterSelectorParameters(asSelectorRaw, SelectorType.JAVA, applicationContext)
+                    allReminders.addAll(asReminders)
+                    val merged = mergeExecutePrefix(javaUserPrefix, listOf("as", asSelector) + condTokens)
+                    ExecuteConverter.composeTellrawCommand(merged, "tellraw @s $javaJson")
+                } else {
+                    val (javaFilteredSelector, _, javaReminders) =
+                        SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
+                    allReminders.addAll(javaReminders)
+                    val plain = "tellraw $javaFilteredSelector $javaJson"
+                    if (javaUserPrefix != null) {
+                        ExecuteConverter.composeTellrawCommand(javaUserPrefix, plain)
+                    } else {
+                        plain
+                    }
+                }
                 
-                // 生成基岩版命令
+                // 生成基岩版命令（基岩原生支持 `=!`，不需要靠 execute 承载否定）
                 val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
                 allReminders.addAll(bedrockReminders)
                 val bedrockWarnings = mutableListOf<String>()
                 val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings)
                 allReminders.addAll(bedrockWarnings)
-                val bedrockCommand = "tellraw $bedrockFilteredSelector $bedrockJson"
+                val bedrockUserPrefix = convertedUserPrefix(
+                    ExecuteConverter.Direction.JAVA_TO_BEDROCK,
+                    applicationContext.getString(R.string.selector_type_bedrock),
+                    allReminders
+                )
+                val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
+                val bedrockCommand =
+                    if (bedrockUserPrefix != null) {
+                        ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
+                    } else {
+                        bedrockPlain
+                    }
                 
                 _javaCommand.value = javaCommand
                 _bedrockCommand.value = bedrockCommand
@@ -794,6 +842,44 @@ class TellrawViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+    
+    /**
+     * 把用户在"前置命令框"写的 execute 前缀转换成目标版本（需求七.1 / 七.3）。
+     *
+     * 开关关闭、前置框为空时返回 null（现状行为）；前缀不是合法 execute 前缀时给出提醒并返回 null
+     * （"能转的尽量转，不能转的提醒后忽略"）。
+     *
+     * @param direction Java 输出用 BEDROCK_TO_JAVA（把基岩独有的条件写法转过来），
+     *                  基岩输出用 JAVA_TO_BEDROCK；另一个方向的写法会被原样保留。
+     */
+    private fun convertedUserPrefix(
+        direction: ExecuteConverter.Direction,
+        versionName: String,
+        warnings: MutableList<String>
+    ): String? {
+        if (!_executePrefixEnabled.value) return null
+        val prefix = _executePrefixInput.value.trim()
+        if (prefix.isEmpty()) return null
+
+        val converted = ExecuteConverter.convertExecutePrefix(prefix, direction, warnings)
+        if (converted == null) {
+            warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))
+            return null
+        }
+        warnings.add(applicationContext.getString(R.string.execute_prefix_applied, versionName, converted))
+        return converted
+    }
+
+    /**
+     * 合并两个 execute 前缀（需求第十一节 9：用户写的必须遵从，缺什么补在后面）。
+     *
+     * execute 是线性执行、后写的会覆盖前面的执行者/坐标，所以"用户写的在前、我们补的在后"
+     * 既保留了用户写的子命令，又能让我们补出的 `as <选择器>` / 条件真正生效。
+     */
+    private fun mergeExecutePrefix(userPrefix: String?, ourTokens: List<String>): String {
+        val ourBody = ourTokens.joinToString(" ")
+        return if (userPrefix == null) "execute $ourBody" else "$userPrefix $ourBody"
     }
     
     /**
