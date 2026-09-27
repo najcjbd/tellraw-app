@@ -91,8 +91,12 @@ object ExecuteConverter {
         for (seg in segs) {
             when (seg) {
                 is Seg.Mod -> {
-                    out.addAll(seg.tokens)
-                    exec = applyModifier(seg.tokens, exec)
+                    // 修饰子命令的选择器里也可能写 `nbt=`（如 `as @a[nbt={…}]`）：转基岩时要换成 hasitem=
+                    val toks = seg.tokens.mapIndexed { i, t ->
+                        if (i == 1 && t.startsWith("@")) convertModifierSelector(t, direction, reminders) else t
+                    }
+                    out.addAll(toks)
+                    exec = applyModifier(toks, exec)
                 }
                 is Seg.Cond -> out.addAll(convertCondition(seg, direction, exec, reminders))
             }
@@ -168,7 +172,7 @@ object ExecuteConverter {
         selector: String,
         reminders: MutableList<String>
     ): Pair<String, String>? {
-        val neg = bedrockSelectorNegation(selector, reminders) ?: return null
+        val neg = bedrockSelectorNegation(selector, reminders, preferExecute = true) ?: return null
         val (asSelector, conditionTokens) = neg
         return "execute as $asSelector " + conditionTokens.joinToString(" ") to "@s"
     }
@@ -182,10 +186,15 @@ object ExecuteConverter {
      *
      * 调用方负责：给"选择器本体"再过一遍目标版本的参数过滤，并把条件 token 折进 execute 前缀；
      * 若前缀里还要接用户自己写的前置命令，**用户写的在前，本结果接在其后**（execute需求 第十一节 9）。
+     *
+     * [preferExecute] = "命令前置 execute"配置开关：
+     *  开 -> 正向"有某物品"也拆进 execute（用 items / data，你的规则"开启了就用 execute"）；
+     *  关 -> 正向"有某物品"留在选择器里走 `nbt=`，只有"选择器写不出的"（air / quantity=0 / 0..）才拆出来。
      */
     fun bedrockSelectorNegation(
         selector: String,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        preferExecute: Boolean = false
     ): Pair<String, List<String>>? {
         if (!selector.contains('[') || !selector.endsWith("]")) return null
         val varName = selector.substringBefore('[')
@@ -225,11 +234,10 @@ object ExecuteConverter {
                         kept.add(p)
                         continue
                     }
-                    // 只有"Java 的选择器根本写不出来"的 hasitem 才拆进 execute：
-                    // item=air（"该槽为空"；按玩家决定保留该写法）、quantity=0（"没有该物品"）、
-                    // quantity=0..（"不做过滤"，条件形同虚设 -> 去掉）。
-                    // 正向"有某物品"交给原有的 nbt= 路径（避免无谓地改动既有输出）。
-                    if (objects.none { isNegationLikeHasitem(it) }) {
+                    // 开关关着（preferExecute=false）：正向"有某物品"留在选择器里走原有的 nbt= 路径
+                    // （避免无谓地改动既有输出）；开关打开时按你的规则一律用 execute。
+                    // "选择器写不出的"（item=air / quantity=0 / 0..）无论开关都要拆出来。
+                    if (!preferExecute && objects.none { isNegationLikeHasitem(it) }) {
                         kept.add(p)
                         continue
                     }
@@ -527,6 +535,7 @@ object ExecuteConverter {
                 "items" -> convertItemsJavaToBedrock(cond, reminders)
                 "score" -> convertScoreJavaToBedrock(cond, reminders)
                 "data" -> convertDataJavaToBedrock(cond, exec, reminders)
+                "entity" -> convertEntityJavaToBedrock(cond, reminders)
                 else -> if (cond.name in JAVA_ONLY_CONDITIONS) {
                     reminders.add("子条件 \"${cond.name}\" 基岩无对应写法 → 按需求十.5 舍弃该条")
                     CondOut.Drop
@@ -624,6 +633,85 @@ object ExecuteConverter {
         val range = args[3]
         val kw = if (cond.unless) "unless" else "if"
         return CondOut.Out(listOf(kw, "entity", foldParam(target, "scores={$objective=$range}")))
+    }
+
+    /**
+     * `if|unless entity <sel>[nbt={…}]` -> `if|unless entity <sel>[hasitem=…]`（第十节【有/无某物品】）。
+     *
+     * 一次只支持一个 NBT 主片段（特别提醒.txt:5）：同一条件里多个 `nbt=` 会合成一个 hasitem 数组（AND）；
+     * 其余参数原样保留。极性同 data：unless + 无数量 = "没有该物品" -> 基岩 `quantity=0`；
+     * "该槽为空"（airExistence）则基岩用 `item=air`、极性翻转。
+     */
+    private fun convertEntityJavaToBedrock(cond: Seg.Cond, reminders: MutableList<String>): CondOut {
+        val sel = cond.args.firstOrNull() ?: return dropAnd(reminders, "entity 条件缺少目标")
+        if (!sel.startsWith("@") || !sel.contains('[') || !sel.endsWith("]")) {
+            return CondOut.Out(originalTokens(cond))
+        }
+        val varName = sel.substringBefore('[')
+        val paramsPart = sel.substringAfter('[').dropLast(1)
+
+        val kept = mutableListOf<String>()
+        val hasitemObjs = mutableListOf<String>()
+        var airExistence = false
+        var sawNbt = false
+        for (p in ExecCondSupport.splitTopLevel(paramsPart, ',')) {
+            val name = p.substringBefore('=').trim()
+            if (name != "nbt") {
+                kept.add(p)
+                continue
+            }
+            sawNbt = true
+            val nbt = p.substringAfter("nbt=").trim()
+            val mapping = ExecCondSupport.nbtToHasitemItems(nbt, reminders)
+            if (mapping.items.isEmpty()) {
+                reminders.add("nbt（$nbt）无法映射到基岩 hasitem，已舍弃该参数")
+                continue
+            }
+            if (mapping.airExistence) airExistence = true
+            hasitemObjs.addAll(mapping.items)
+        }
+        if (!sawNbt) return CondOut.Out(originalTokens(cond))
+        if (hasitemObjs.isEmpty()) {
+            reminders.add("entity 条件里的 nbt 全部无法映射到基岩 hasitem，已舍弃该参数")
+            return if (kept.isEmpty()) {
+                dropAnd(reminders, "entity 条件的内容已全部舍弃")
+            } else {
+                CondOut.Out(listOf(if (cond.unless) "unless" else "if", "entity", "$varName[${kept.joinToString(",")}]"))
+            }
+        }
+
+        val hasitem = if (hasitemObjs.size == 1) {
+            "{${hasitemObjs[0]}}"
+        } else {
+            "[${hasitemObjs.joinToString(",") { "{$it}" }}]"
+        }
+        // 空气法极性（第十节 15）：Java 的 unless（该槽为空）-> 基岩 if；
+        // 普通的"没有该物品"（unless + 无数量）-> 基岩 `hasitem={…,quantity=0}`（A5/C18），关键字仍是 if
+        var kw = if (cond.unless) "unless" else "if"
+        val param: String
+        if (airExistence) {
+            kw = if (cond.unless) "if" else "unless"
+            param = "hasitem=$hasitem"
+            reminders.add(
+                "空气法极性：Java \"${if (cond.unless) "unless" else "if"} entity …\" 表示该槽位" +
+                    (if (cond.unless) "没有物品（空）" else "有物品") +
+                    "，已转成基岩 \"$kw entity …[hasitem={item=air}]\"（基岩 item=air 表示该槽为空）"
+            )
+        } else if (cond.unless) {
+            if (hasitemObjs.size > 1) {
+                return dropAnd(reminders, "\"unless + 多个 nbt\"语义为 NOT(全部同时成立)，基岩 hasitem 数组是且关系、无法表达")
+            }
+            if ("quantity=" in hasitemObjs[0]) {
+                return dropAnd(reminders, "\"unless + 带数量的 nbt\"无法用基岩 quantity=0 表达")
+            }
+            kw = "if"
+            param = "hasitem={${hasitemObjs[0]},quantity=0}"
+            reminders.add("\"没有该物品\"已用基岩 quantity=0 表示（execute需求 A5/C18）")
+        } else {
+            param = "hasitem=$hasitem"
+        }
+        val params = if (kept.isEmpty()) param else "${kept.joinToString(",")},$param"
+        return CondOut.Out(listOf(kw, "entity", "$varName[$params]"))
     }
 
     /** `if|unless data entity <target> <nbt>` -> `if|unless entity <target>[hasitem=…]` */
@@ -841,6 +929,36 @@ object ExecuteConverter {
         val negate = if (meansNone) !enclosingUnless else enclosingUnless
         val kw = if (negate) "unless" else "if"
 
+        // ---- 没写 location（= 目标的所有物品栏）：Java 里没有裸 `*` 这种槽位源
+        //      （2026-09-27 实测：`*` 不存在），按第十节【有/无某物品】改用 data + nbt ----
+        if (h.location == null) {
+            if (h.slot != null) {
+                reminders.add(
+                    "基岩 \"$obj\" 写了 slot 却没写 location（目标选择器.txt:609：slot 必须配 location），" +
+                        "已舍弃该条件项目"
+                )
+                return null
+            }
+            if (target != "@s") {
+                reminders.add(
+                    "基岩 \"$obj\" 没写 location，Java 只能用 `data entity <单一实体>` 表达，" +
+                        "而这里的目标是 $target（可能不止一个实体），已舍弃该条件项目"
+                )
+                return null
+            }
+            val nbt = ExecCondSupport.hasitemToJavaNbt(itemId)
+            reminders.add(
+                "基岩 \"$obj\" 没写 location（= 目标的所有物品栏）；Java 的 items 没有裸 `*` 槽位源" +
+                    "（2026-09-27 实测），已改用 $kw data entity @s $nbt" +
+                    "（Inventory = 物品栏 36 格，不含副手/装备那 5 格；B12）" +
+                    (if (meansNone) "；quantity=0 = \"没有该物品\"，极性用 unless" else "") +
+                    (if (quantity != null && !meansNone && quantity != "0..")
+                        "；quantity=$quantity 是\"该栏总量\"，nbt 表达不了，已放开为\"有该物品\"" else "") +
+                    "，请自行核对"
+            )
+            return listOf(kw, "data", "entity", target, nbt)
+        }
+
         // slot 取反（`=!N`，目标选择器.txt:609 允许）：Java 的 items 没有槽位取反写法，
         // 按裁决用"该槽位没有它"表达（execute + unless/if 极性反转），并提醒这是近似写法。
         val negSlot = ExecCondSupport.negatedSingleSlot(h.slot)
@@ -866,9 +984,16 @@ object ExecuteConverter {
             }
         }
 
-        // 槽位源（execute需求 第十节 13）：Java items 的 <slots> 必填且支持星号通配，
-        // 通配写 `hotbar.*` / `*`（不是"不填 slot"）。location 缺省（任意槽位）时用 `*`。
-        val slotsExpr = ExecCondSupport.hasitemToJavaSlots(h.location, h.slot) ?: "*"
+        // 槽位源（execute需求 第十节 13）：Java items 的 <slots> 必填；通配写作 `hotbar.*` / `inventory.*`
+        // （2026-09-27 实测：`hotbar.*` 可用；**裸 `*` 不存在**，所以没有"任意槽位"的通配）。
+        val slotsExpr = ExecCondSupport.hasitemToJavaSlots(h.location, h.slot)
+        if (slotsExpr == null) {
+            reminders.add(
+                "基岩 \"$obj\" 的 location=${h.location} 没有 Java `items` 槽位对应写法" +
+                    "（Java 也没有裸 `*` 通配，2026-09-27 实测），已舍弃该条件项目"
+            )
+            return null
+        }
 
         // 具体槽位：quantity 即该槽堆叠数，可精确映射，保持原行为
         if (h.slot != null) {
@@ -906,8 +1031,8 @@ object ExecuteConverter {
             meansNone -> {
                 pred = id
                 reminders.add(
-                    "基岩 hasitem quantity=$quantity 表示\"没有该物品\"（execute需求 A5/C18），" +
-                        "已转为 Java $kw items entity … $slotsExpr（* = 任意物品）"
+                    "基岩 hasitem quantity=0 表示\"没有该物品\"（execute需求 A5/C18），" +
+                        "已转为 Java $kw items entity … $slotsExpr"
                 )
             }
             // 含 0 的区间（0..N）：保留上限，Java 侧写成 count~{min:0,max:N}
@@ -933,17 +1058,10 @@ object ExecuteConverter {
                 )
             }
         }
-        if (quantity == null && h.location != null) {
+        if (quantity == null) {
             reminders.add(
                 "基岩 \"$obj\" 不写 slot 表示\"location=${h.location} 的任意槽位只要有该物品即可\"" +
                     "（目标选择器.txt:609 默认 slot=0..）；Java 用 items + $slotsExpr 通配表达"
-            )
-        }
-        if (h.location == null) {
-            reminders.add(
-                "基岩 \"$obj\" 没有写 location（= 目标的所有物品栏）；Java 的 items 用 `*` 当槽位源，" +
-                    "而 `*` 只覆盖物品栏 36 格、**不含副手/装备那 5 格**（2026-09-27 实测第三组 J3 + B12），" +
-                    "所以只会漏掉\"只在副手/装备里有该物品\"的目标，请自行核对"
             )
         }
         return listOf(kw, "items", "entity", target, slotsExpr, pred)
@@ -1024,6 +1142,58 @@ object ExecuteConverter {
     }
 
     // ---------------------- 小工具 ----------------------
+
+    /**
+     * 修饰子命令选择器的参数互转：
+     *  - Java -> 基岩：`nbt=` -> `hasitem=`（基岩选择器不支持 nbt=）
+     *  - 基岩 -> Java：`hasitem=` -> `nbt=`（Java 选择器不支持 hasitem=；转不了的原样保留 + 提醒）
+     * 例：`as @a[nbt={Inventory:[{id:"minecraft:diamond"}]}]` -> `as @a[hasitem={item=diamond}]`
+     */
+    private fun convertModifierSelector(
+        token: String,
+        direction: Direction,
+        reminders: MutableList<String>
+    ): String {
+        if (!token.startsWith("@") || !token.contains('[') || !token.endsWith("]")) return token
+        val varName = token.substringBefore('[')
+        val paramsPart = token.substringAfter('[').dropLast(1)
+        val from = if (direction == Direction.JAVA_TO_BEDROCK) "nbt=" else "hasitem="
+        if (from !in paramsPart) return token
+
+        val kept = mutableListOf<String>()
+        val objs = mutableListOf<String>()
+        for (p in ExecCondSupport.splitTopLevel(paramsPart, ',')) {
+            if (p.substringBefore('=').trim() != from.trimEnd('=')) {
+                kept.add(p)
+                continue
+            }
+            val value = p.substringAfter('=').trim()
+            if (direction == Direction.JAVA_TO_BEDROCK) {
+                val mapping = ExecCondSupport.nbtToHasitemItems(value, reminders)
+                if (mapping.items.isEmpty()) {
+                    reminders.add("nbt（$value）无法映射到基岩 hasitem，已舍弃该参数")
+                    continue
+                }
+                objs.addAll(mapping.items)
+            } else {
+                val nbt = ExecCondSupport.hasitemObjectToJavaNbt(value.removeSurrounding("{", "}"))
+                if (nbt == null) {
+                    reminders.add("hasitem（$value）无法映射到 Java nbt，已原样保留该参数（Java 可能不支持）")
+                    kept.add(p)
+                    continue
+                }
+                objs.add(nbt)
+            }
+        }
+        if (objs.isEmpty()) return if (kept.isEmpty()) varName else "$varName[${kept.joinToString(",")}]"
+        val merged = if (direction == Direction.JAVA_TO_BEDROCK) {
+            val hi = if (objs.size == 1) "{${objs[0]}}" else "[${objs.joinToString(",") { "{$it}" }}]"
+            listOf("hasitem=$hi")
+        } else {
+            objs.map { "nbt=$it" }
+        }
+        return "$varName[${(kept + merged).joinToString(",")}]"
+    }
 
     /** 往选择器里追加参数；选择器必须已带 `[...]` 或形如 `@a`。 */
     private fun foldParam(selector: String, param: String): String {
