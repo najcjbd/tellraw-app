@@ -341,7 +341,6 @@ class ExecuteConverterTest {
 
     @Test
     fun testUserPrefixComesFirstThenOurTokens() {
-        // execute需求 第十一节 9：用户写的前置在前、必须遵从；缺的（as 等）补在其后
         val neg = ExecuteConverter.bedrockSelectorNegation("@a[scores={n=!5}]", mutableListOf())!!
         val merged = "execute as @p at @s as ${neg.first} ${neg.second.joinToString(" ")}"
         assertEquals(
@@ -349,5 +348,39 @@ class ExecuteConverterTest {
                 "unless score @s n matches 5 run tellraw @s {\"text\":\"hi\"}",
             ExecuteConverter.composeTellrawCommand(merged, "tellraw @s {\"text\":\"hi\"}")
         )
+    }
+
+    // ---------------------------------------------------------------
+    //  quantity=0.. = "不做过滤"（目标选择器.txt:607 + 2026-09-27 游戏内实测）
+    //  之前按"没有该物品"处理是错的：条件形同虚设 -> 应当去掉它
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testQuantityOpenRangeMeansNoFiltering() {
+        val (out, reminders) = conv(
+            "execute as @a if entity @s[hasitem={item=diamond,quantity=0..}]", Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals("execute as @a", out)
+        assertTrue(reminders.any { it.contains("不做过滤") })
+    }
+
+    @Test
+    fun testSelectorVacuousHasitemIsRemovedAndProducesNoTokens() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond,quantity=0..}]", mutableListOf()
+        )
+        assertNotNull(neg)
+        assertEquals("@a", neg!!.first)
+        assertTrue("形同虚设的条件要去掉，且不产生条件 token", neg.second.isEmpty())
+    }
+
+    @Test
+    fun testSelectorVacuousHasitemKeepsOtherParams() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[tag=x,hasitem={item=diamond,quantity=0..}]", mutableListOf()
+        )
+        assertNotNull(neg)
+        assertEquals("@a[tag=x]", neg!!.first)
+        assertTrue(neg.second.isEmpty())
     }
 }
