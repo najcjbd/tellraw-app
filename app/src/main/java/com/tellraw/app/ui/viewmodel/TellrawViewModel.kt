@@ -784,24 +784,42 @@ class TellrawViewModel @Inject constructor(
                     allReminders
                 )
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(javaSelector, allReminders)
-                val javaCommand = if (javaNegation != null) {
+                // 目标选择器（tellraw 的收信人）与"要折进 execute 的 token"。
+                // 注：拆出来后 condTokens 可能为空（例如 quantity=0.. 这种"形同虚设"的条件被去掉），
+                // 这时不需要 execute 前缀，只用清理过的选择器即可。
+                val javaTarget: String
+                val javaInnerTokens: List<String>?
+                if (javaNegation != null) {
                     val (asSelectorRaw, condTokens) = javaNegation
                     // 选择器本体也要过一遍 Java 侧参数过滤（family/predicate 这类基岩参数要转或去掉）
                     val (asSelector, _, asReminders) =
                         SelectorConverter.filterSelectorParameters(asSelectorRaw, SelectorType.JAVA, applicationContext)
                     allReminders.addAll(asReminders)
-                    val merged = mergeExecutePrefix(javaUserPrefix, listOf("as", asSelector) + condTokens)
-                    ExecuteConverter.composeTellrawCommand(merged, "tellraw @s $javaJson")
+                    if (condTokens.isEmpty()) {
+                        javaTarget = asSelector
+                        javaInnerTokens = null
+                    } else {
+                        javaTarget = "@s"
+                        javaInnerTokens = listOf("as", asSelector) + condTokens
+                    }
                 } else {
                     val (javaFilteredSelector, _, javaReminders) =
                         SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
                     allReminders.addAll(javaReminders)
-                    val plain = "tellraw $javaFilteredSelector $javaJson"
-                    if (javaUserPrefix != null) {
-                        ExecuteConverter.composeTellrawCommand(javaUserPrefix, plain)
-                    } else {
-                        plain
-                    }
+                    javaTarget = javaFilteredSelector
+                    javaInnerTokens = null
+                }
+                val javaPlain = "tellraw $javaTarget $javaJson"
+                val javaCommand = when {
+                    javaInnerTokens == null ->
+                        if (javaUserPrefix != null) {
+                            ExecuteConverter.composeTellrawCommand(javaUserPrefix, javaPlain)
+                        } else {
+                            javaPlain
+                        }
+                    else -> ExecuteConverter.composeTellrawCommand(
+                        mergeExecutePrefix(javaUserPrefix, javaInnerTokens), javaPlain
+                    )
                 }
                 
                 // 生成基岩版命令（基岩原生支持 `=!`，不需要靠 execute 承载否定）

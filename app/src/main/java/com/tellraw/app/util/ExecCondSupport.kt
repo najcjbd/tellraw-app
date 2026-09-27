@@ -381,6 +381,10 @@ internal object ExecCondSupport {
     fun isMultiSlotItemLocation(location: String?): Boolean =
         location != null && location.trim() in MULTI_SLOT_ITEM_LOCATIONS
 
+    /** location 是否"本身只含一个槽位"（缺 slot 时也唯一，目标选择器.txt:735-740）。 */
+    fun isSingleSlotItemLocation(location: String?): Boolean =
+        location != null && location.trim() in SINGLE_SLOT_ITEM_LOCATIONS
+
     /**
      * location 形如 `container.N` / `hotbar.N` / `inventory.N`（编号内嵌在 location 里）时，
      * 返回 (前缀, N)；否则返回 null。

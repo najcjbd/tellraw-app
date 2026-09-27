@@ -194,6 +194,7 @@ object ExecuteConverter {
 
         val kept = mutableListOf<String>()
         val conditionTokens = mutableListOf<String>()
+        var changed = false
 
         for (p in params) {
             val name = p.substringBefore('=').trim()
@@ -213,6 +214,7 @@ object ExecuteConverter {
                     if (neg.isNotEmpty()) {
                         // 本次修正 D：`=!` 的口径 = "存在 ∧ ≠x"（execute需求 第十节 9）
                         conditionTokens.addAll(negatedScoreConditionTokens(neg, reminders))
+                        changed = true
                     }
                 }
                 "hasitem" -> {
@@ -224,12 +226,14 @@ object ExecuteConverter {
                         continue
                     }
                     // 只有"Java 的选择器根本写不出来"的 hasitem 才拆进 execute：
-                    // item=air（"该槽为空"）与 quantity=0/0..（"没有该物品"）。
+                    // item=air（"该槽为空"；按玩家决定保留该写法）、quantity=0（"没有该物品"）、
+                    // quantity=0..（"不做过滤"，条件形同虚设 -> 去掉）。
                     // 正向"有某物品"交给原有的 nbt= 路径（避免无谓地改动既有输出）。
                     if (objects.none { isNegationLikeHasitem(it) }) {
                         kept.add(p)
                         continue
                     }
+                    changed = true
                     for (obj in objects) {
                         // 这里由调用方补 `as <varName>`，@s 指代正确
                         val conv = hasitemToJavaConditionTokens(
@@ -246,7 +250,7 @@ object ExecuteConverter {
             }
         }
 
-        if (conditionTokens.isEmpty()) return null
+        if (!changed) return null
         val asSelector = if (kept.isEmpty()) varName else "$varName[${kept.joinToString(",")}]"
         return asSelector to conditionTokens
     }
@@ -821,12 +825,19 @@ object ExecuteConverter {
             return airHasitemToJavaTokens(obj, h, enclosingUnless, target, reminders)
         }
 
-        // "没有该物品"判定：quantity=0，或本项目的 0.. 自定义语义
+        // quantity=0.. = "当前条件项目不做过滤"（目标选择器.txt:607；2026-09-27 游戏内实测确认：
+        // 有 5 颗钻石时同样匹配）-> 条件形同虚设，**去掉它**才是等价转换（不是"没有该物品"）。
         val quantity = h.quantity
-        val meansNone = quantity == "0" || quantity == "0.."
         if (quantity == "0..") {
-            reminders.add("quantity=0.. 按本项目自定义语义视作\"没有\"（与维基\"不过滤\"冲突，待确认）")
+            reminders.add(
+                "基岩 \"$obj\" 的 quantity=0.. 表示\"当前条件项目不做过滤\"（目标选择器.txt:607，" +
+                    "2026-09-27 实测：有 5 颗钻石时同样匹配）——条件形同虚设，" +
+                    "已按等价转换去掉该条件（去掉后不再限制目标，与基岩一致），请自行核对"
+            )
+            return emptyList()
         }
+        // "没有该物品"判定：quantity=0
+        val meansNone = quantity == "0"
         val negate = if (meansNone) !enclosingUnless else enclosingUnless
         val kw = if (negate) "unless" else "if"
 
@@ -840,7 +851,13 @@ object ExecuteConverter {
                 reminders.add(
                     "基岩 \"$obj\" 的 slot=!$negSlot 是\"槽位取反\"（目标选择器.txt:609）；" +
                         "Java 的 items 没有槽位取反写法，已按\"$negSlots 这一格没有该物品\"表达为 " +
-                        "\"$negKw items entity … $negSlots …\"（近似写法，请自行核对）"
+                        "\"$negKw items entity … $negSlots …\"（近似写法，请自行核对）" +
+                        // 2026-09-27 实测：单槽位 location 的槽位编号是 0，
+                        // 所以 !0 会排除这唯一槽位（基岩里永不成立），而这里写的是"该槽没有它"。
+                        if (ExecCondSupport.isSingleSlotItemLocation(h.location)) {
+                            "；注意：location=${h.location} 是单槽位（编号 0），基岩的 !0 会把它排除（原条件永不成立），" +
+                                "本工具写成\"该槽没有该物品\"，两者不同，请自行核对"
+                        } else ""
                 )
                 return listOf(
                     negKw, "items", "entity", target, negSlots,
@@ -893,15 +910,16 @@ object ExecuteConverter {
                         "已转为 Java $kw items entity … $slotsExpr（* = 任意物品）"
                 )
             }
+            // 含 0 的区间（0..N）：保留上限，Java 侧写成 count~{min:0,max:N}
             quantity != null && quantity.startsWith("0..") -> {
-                // 含 0 的区间：Java 侧把 min 调成 0（count~{min:0,…}），保留"含 0"语义
                 val max = quantity.substring(3)
                 pred = "$id[count~{min:0,max:$max}]"
                 reminders.add(
                     "含 0 区间近似：基岩 quantity=$quantity 是\"该栏所有槽位的总量在 0..$max\"（含 0，" +
                         "会选中没有该物品的目标；目标选择器.txt:603/607）；Java 的 items 只能测" +
-                        "\"某一个槽的堆叠数\"，已写成 [count~{min:0,max:$max}] 以保留\"含 0\"语义" +
-                        "（execute需求 第十节 13），二者不等价、待确认，请自行核对"
+                        "\"某一个槽的堆叠数\"，已写成 [count~{min:0,max:$max}]。" +
+                        "注意（2026-09-27 实测，第六组）：Java 的 count~{min:0,…} **匹配不到空槽/完全没有该物品**，" +
+                        "所以\"完全没有\"的目标会被漏掉，二者不等价、请自行核对"
                 )
             }
             else -> {
@@ -919,6 +937,13 @@ object ExecuteConverter {
             reminders.add(
                 "基岩 \"$obj\" 不写 slot 表示\"location=${h.location} 的任意槽位只要有该物品即可\"" +
                     "（目标选择器.txt:609 默认 slot=0..）；Java 用 items + $slotsExpr 通配表达"
+            )
+        }
+        if (h.location == null) {
+            reminders.add(
+                "基岩 \"$obj\" 没有写 location（= 目标的所有物品栏）；Java 的 items 用 `*` 当槽位源，" +
+                    "而 `*` 只覆盖物品栏 36 格、**不含副手/装备那 5 格**（2026-09-27 实测第三组 J3 + B12），" +
+                    "所以只会漏掉\"只在副手/装备里有该物品\"的目标，请自行核对"
             )
         }
         return listOf(kw, "items", "entity", target, slotsExpr, pred)
@@ -950,7 +975,12 @@ object ExecuteConverter {
                 reminders.add(
                     "基岩 \"$obj\" 的 slot=!$negSlot 是\"槽位取反\"（目标选择器.txt:609）；" +
                         "空气法按\"$negSlots 这一格不是空的\"近似表达为 " +
-                        "\"$kw items entity … $negSlots *\"（* = 任意物品，近似写法，请自行核对）"
+                        "\"$kw items entity … $negSlots *\"（* = 任意物品，近似写法，请自行核对）" +
+                        // 2026-09-27 实测（第五组）：单槽位 location 的槽位编号是 0，!0 会排除这唯一槽位
+                        if (ExecCondSupport.isSingleSlotItemLocation(h.location)) {
+                            "；注意：location=${h.location} 是单槽位（编号 0），基岩的 !0 会把它排除（原条件永不成立），" +
+                                "本工具写成\"该槽不是空的\"，两者不同，请自行核对"
+                        } else ""
                 )
                 return listOf(kw, "items", "entity", target, negSlots, "*")
             }
@@ -985,9 +1015,10 @@ object ExecuteConverter {
         reminders.add(
             "空气法：基岩 \"$obj\"（item=air）表示\"该槽位是空的\"，已回译为 Java " +
                 "\"$kw items entity $target $slotsExpr *\"（* = 任意物品）。" +
-                "风险提醒：文档只保证 slot.saddle / 马的 slot.armor / slot.equippable 可为空气" +
-                "（目标选择器.txt:744-748），一般物品栏/装备槽写\"物品栏中空气的数量始终是0个\"（:604）；" +
-                "此写法属\"游戏里应该可用但文档没保证\"，请自行核实是否适用"
+                "可用性提醒（2026-09-27 实测第二/五组 + 目标选择器.txt:604\"物品栏中空气的数量始终是0个\"）：" +
+                "一般物品栏/装备槽里 item=air **实测不匹配**（转出来的基岩命令会永不成立）；" +
+                "只有 slot.saddle / 马的 slot.armor / slot.equippable 是文档明确允许 air 的（目标选择器.txt:744-748）。" +
+                "按玩家决定保留该写法，请务必自行核实"
         )
         return listOf(kw, "items", "entity", target, slotsExpr, "*")
     }
@@ -1018,8 +1049,10 @@ object ExecuteConverter {
     }
 
     /**
-     * 这个 hasitem 对象是不是"Java 选择器表达不了的否定"：
-     * `item=air`（表示该槽为空）或 `quantity=0` / `quantity=0..`（本项目语义 = 没有该物品）。
+     * 这个 hasitem 对象是不是"Java 选择器表达不了、必须从选择器里拆出来单独处理"的情况：
+     * - `item=air`：表示该槽为空（按玩家 2026-09-27 的决定保留这种写法，并提醒其可用性风险）；
+     * - `quantity=0`：本项目语义 = "没有该物品" -> `unless items …`；
+     * - `quantity=0..`：表示"不做过滤"（目标选择器.txt:607 + 游戏内实测），条件形同虚设 -> 去掉。
      */
     private fun isNegationLikeHasitem(obj: String): Boolean {
         val h = ExecCondSupport.parseHasitemObject(obj)
