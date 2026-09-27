@@ -176,13 +176,26 @@ class ExecuteConverterTest {
     }
 
     @Test
-    fun testBedrockQuantityZeroBecomesUnlessItems() {
+    fun testBedrockQuantityZeroWithoutLocationBecomesUnlessData() {
+        // 没写 location：Java 里没有裸 `*` 槽位源（2026-09-27 实测），按第十节【有/无某物品】改用 data + nbt
         val (out, reminders) = conv(
             "execute as @a if entity @s[hasitem={item=diamond,quantity=0}]",
             Direction.BEDROCK_TO_JAVA
         )
-        assertEquals("execute as @a unless items entity @s * minecraft:diamond", out)
+        assertEquals(
+            "execute as @a unless data entity @s {Inventory:[{id:\"minecraft:diamond\"}]}",
+            out
+        )
         assertTrue(reminders.any { it.contains("没有该物品") })
+    }
+
+    @Test
+    fun testBedrockQuantityZeroWithLocationBecomesUnlessItems() {
+        val (out, _) = conv(
+            "execute as @a if entity @s[hasitem={item=diamond,location=slot.hotbar,quantity=0}]",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals("execute as @a unless items entity @s hotbar.* minecraft:diamond", out)
     }
 
     @Test
@@ -311,7 +324,11 @@ class ExecuteConverterTest {
         val neg = ExecuteConverter.bedrockSelectorNegation("@a[hasitem={item=diamond,quantity=0}]", mutableListOf())
         assertNotNull(neg)
         assertEquals("@a", neg!!.first)
-        assertEquals(listOf("unless", "items", "entity", "@s", "*", "minecraft:diamond"), neg.second)
+        // 没写 location -> data + nbt（Java 没有裸 `*` 槽位源，2026-09-27 实测）
+        assertEquals(
+            listOf("unless", "data", "entity", "@s", "{Inventory:[{id:\"minecraft:diamond\"}]}"),
+            neg.second
+        )
     }
 
     @Test
@@ -382,5 +399,98 @@ class ExecuteConverterTest {
         assertNotNull(neg)
         assertEquals("@a[tag=x]", neg!!.first)
         assertTrue(neg.second.isEmpty())
+    }
+
+    // ---------------------------------------------------------------
+    //  "开启了 execute 前缀就用 execute；没有就用 nbt="（配置开关 preferExecute）
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testPositiveHasitemUsesExecuteWhenToggleOn() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond}]", mutableListOf(), preferExecute = true
+        )
+        assertNotNull(neg)
+        assertEquals("@a", neg!!.first)
+        // 没写 location -> data + nbt（不能写 items + 裸 *：`*` 不存在）
+        assertEquals(
+            listOf("if", "data", "entity", "@s", "{Inventory:[{id:\"minecraft:diamond\"}]}"),
+            neg.second
+        )
+    }
+
+    @Test
+    fun testPositiveHasitemWithLocationUsesItemsWhenToggleOn() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond,location=slot.hotbar}]", mutableListOf(), preferExecute = true
+        )
+        assertNotNull(neg)
+        assertEquals("@a", neg!!.first)
+        assertTrue(neg.second.joinToString(" ").contains("hotbar.*"))
+    }
+
+    @Test
+    fun testUnmappedLocationIsDroppedInsteadOfBareStar() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond,location=slot.enderchest}]", mutableListOf(), preferExecute = true
+        )
+        // 整条被舍弃 -> 选择器本体留 @a、无执行前缀，且有提醒
+        assertNotNull(neg)
+        assertEquals("@a", neg!!.first)
+        assertTrue(neg.second.isEmpty())
+    }
+
+    @Test
+    fun testEntityNbtConditionConvertsToHasitemForBedrock() {
+        val (out, _) = conv(
+            "execute as @a if entity @s[nbt={Inventory:[{id:\"minecraft:diamond\"}]}]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals("execute as @a if entity @s[hasitem={item=diamond}]", out)
+    }
+
+    @Test
+    fun testEntityNbtConditionUnlessBecomesQuantityZero() {
+        val (out, reminders) = conv(
+            "execute as @a unless entity @s[nbt={Inventory:[{id:\"minecraft:diamond\"}]}]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals("execute as @a if entity @s[hasitem={item=diamond,quantity=0}]", out)
+        assertTrue(reminders.any { it.contains("quantity=0") })
+    }
+
+    @Test
+    fun testEntityNbtConditionKeepsOtherParams() {
+        val (out, _) = conv(
+            "execute as @a if entity @s[tag=x,nbt={Inventory:[{id:\"minecraft:diamond\"}]}]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals("execute as @a if entity @s[tag=x,hasitem={item=diamond}]", out)
+    }
+
+    // ---------------------------------------------------------------
+    //  修饰子命令选择器里的 nbt= / hasitem= 互转
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testModifierSelectorNbtConvertsToHasitem() {
+        val (out, _) = conv(
+            "execute as @a[nbt={Inventory:[{id:\"minecraft:diamond\"}]}]", Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals("execute as @a[hasitem={item=diamond}]", out)
+    }
+
+    @Test
+    fun testModifierSelectorHasitemConvertsToNbt() {
+        val (out, _) = conv("execute as @a[hasitem={item=diamond}]", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute as @a[nbt={Inventory:[{id:\"minecraft:diamond\"}]}]", out)
+    }
+
+    @Test
+    fun testModifierSelectorHasitemWithSlotConvertsToNbtSlot() {
+        val (out, _) = conv(
+            "execute as @a[hasitem={item=diamond,location=slot.hotbar,slot=0}]", Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals("execute as @a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\"}]}]", out)
     }
 }

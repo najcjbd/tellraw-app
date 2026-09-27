@@ -24,6 +24,46 @@ internal object ExecCondSupport {
     fun addNs(id: String): String =
         if (id.contains(':')) id else "minecraft:$id"
 
+    /**
+     * 基岩 hasitem 的"物品" -> Java NBT 主片段，用于**没写 location**（= 目标的所有物品栏）的场合。
+     *
+     * 依据（2026-09-27 游戏内实测）：Java 的 items **没有裸 `*` 这种槽位源**（J3 失败原因是"* 不存在"），
+     * 而第十节【有/无某物品】的口径本来就是"只要有没有这个物品（不限槽位）-> 用 data"。
+     * `Inventory` = 物品栏 36 格，**不含副手/装备那 5 格**（B12）。
+     */
+    fun hasitemToJavaNbt(itemId: String): String = "{Inventory:[{id:\"${addNs(itemId)}\"}]}"
+
+    /**
+     * 基岩 hasitem 对象（`item=…,location=…,slot=…,quantity=…`）-> Java NBT 主片段。
+     * 用于修饰子命令的选择器（如 `as @a[hasitem=…]`）在"基岩 -> Java"方向上的互转。
+     *
+     * 覆盖：无 location（Inventory）、`slot.hotbar.N` / `slot.inventory.N`（Inventory + Slot）、
+     * `slot.weapon.mainhand`（SelectedItem）、`slot.weapon.offhand` 与 `slot.armor.*`（equipment）。
+     * 其余返回 null（调用方保留原样 + 提醒）。
+     */
+    fun hasitemObjectToJavaNbt(obj: String): String? {
+        val h = parseHasitemObject(obj)
+        val item = h.item ?: return null
+        val id = addNs(item)
+        val cnt = h.quantity?.toIntOrNull()?.let { "count:${it}b" }
+        val idPart = if (cnt == null) "id:\"$id\"" else "id:\"$id\",$cnt"
+        if (h.location == null) {
+            return if (h.slot == null) "{Inventory:[{$idPart}]}" else null
+        }
+        val n = h.slot?.toIntOrNull()
+        return when (h.location) {
+            "slot.weapon.mainhand" -> "{SelectedItem:{$idPart}}"
+            "slot.weapon.offhand" -> "{equipment:{offhand:{$idPart}}}"
+            "slot.armor.head" -> "{equipment:{head:{$idPart}}}"
+            "slot.armor.chest" -> "{equipment:{chest:{$idPart}}}"
+            "slot.armor.legs" -> "{equipment:{legs:{$idPart}}}"
+            "slot.armor.feet" -> "{equipment:{feet:{$idPart}}}"
+            "slot.hotbar" -> if (n != null) "{Inventory:[{Slot:${n}b,$idPart}]}" else null
+            "slot.inventory" -> if (n != null) "{Inventory:[{Slot:${n + 9}b,$idPart}]}" else null
+            else -> null
+        }
+    }
+
     /** 按 [sep] 切分，尊重 [] {} "" '' 内部的嵌套；空片段丢弃。 */
     fun splitTopLevel(s: String, sep: Char): List<String> {
         val out = mutableListOf<String>()

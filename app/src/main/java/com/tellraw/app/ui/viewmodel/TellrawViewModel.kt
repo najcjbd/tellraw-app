@@ -783,7 +783,9 @@ class TellrawViewModel @Inject constructor(
                     applicationContext.getString(R.string.selector_type_java),
                     allReminders
                 )
-                val javaNegation = ExecuteConverter.bedrockSelectorNegation(javaSelector, allReminders)
+                val javaNegation = ExecuteConverter.bedrockSelectorNegation(
+                    javaSelector, allReminders, preferExecute = _executePrefixEnabled.value
+                )
                 // 目标选择器（tellraw 的收信人）与"要折进 execute 的 token"。
                 // 注：拆出来后 condTokens 可能为空（例如 quantity=0.. 这种"形同虚设"的条件被去掉），
                 // 这时不需要 execute 前缀，只用清理过的选择器即可。
