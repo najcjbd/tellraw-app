@@ -91,11 +91,23 @@ object ExecuteConverter {
         for (seg in segs) {
             when (seg) {
                 is Seg.Mod -> {
-                    // 修饰子命令的选择器里也可能写 `nbt=`（如 `as @a[nbt={…}]`）：转基岩时要换成 hasitem=
-                    val toks = seg.tokens.mapIndexed { i, t ->
-                        if (i == 1 && t.startsWith("@")) convertModifierSelector(t, direction, reminders) else t
+                    // 修饰子命令的选择器里可能写 nbt= / hasitem= / scores 的 =!（基岩独有）：
+                    //  - Java->基岩：nbt= 换成 hasitem=
+                    //  - 基岩->Java：hasitem= 换成 nbt=；scores 的 =! 拆成"紧跟这个 as 之后的逐项条件"
+                    //    （Java 的选择器不支持 =!；拆出来后 @s 就是刚切过去的执行者，语义不变）
+                    val toks = mutableListOf<String>()
+                    val extra = mutableListOf<String>()
+                    seg.tokens.forEachIndexed { i, t ->
+                        if (i == 1 && t.startsWith("@")) {
+                            val (conv, cond) = convertModifierSelector(t, direction, reminders)
+                            toks.add(conv)
+                            extra.addAll(cond)
+                        } else {
+                            toks.add(t)
+                        }
                     }
                     out.addAll(toks)
+                    out.addAll(extra)
                     exec = applyModifier(toks, exec)
                 }
                 is Seg.Cond -> out.addAll(convertCondition(seg, direction, exec, reminders))
@@ -770,13 +782,17 @@ object ExecuteConverter {
     }
 
     /**
-     * 把基岩 scores 的 `=!` 项转成 Java 条件 token（本次修正 D）。
+     * 把基岩 scores 的 `=!` 项转成 Java 条件 token。
      *
-     * 口径（execute需求 第十节 9 / 目标选择器.txt:470）：`k=!v` = "分数存在 ∧ 分数 ≠ v"。
-     *  - 单项：`if score @s k matches <全域> unless score @s k matches v`
+     * 口径（目标选择器.txt:464/470 + **2026-09-27 游戏内实测**）：
+     * `k=!v` = "分数存在 ∧ 分数 ≠ v"，多项就是**逐项做这个判断再 AND**。
+     *  - 每项：`if score @s k matches <全域> unless score @s k matches v`
      *    （未设置时 `<全域>` 判定失败 → 排除"分数不存在"的目标；`v` 可为区间如 `1..5`）
-     *  - 多项：`unless entity @s[scores={…}]`，即 **NOT(全部条件同时成立)**（execute需求 第八节②）；
-     *    这是线性的 if/unless 链唯一能表达"非合取"的写法。
+     *
+     * 【实测纠正】原来多项用的是 `unless entity @s[scores={…}]`（= NOT(全部同时成立)，
+     * execute需求 第八节② 的裁决）。实测用例：`tt=10`（已设置）、`tt2` 未设置 时，
+     * 基岩 `scores={tt=!10,tt2=!5}` **不命中** —— 只有"逐项 AND"读法才会不命中，
+     * "NOT(全部同时成立)"读法会命中。所以按逐项 AND 实现（文档读法）。
      *
      * 前提：@s 指代正确（调用方需保证已有 `as <选择器>` 或当前执行者即目标）。
      */
@@ -784,24 +800,25 @@ object ExecuteConverter {
         neg: List<String>,
         reminders: MutableList<String>
     ): List<String> {
-        if (neg.size == 1) {
-            val i = ExecCondSupport.indexOfTopLevel(neg[0], '=')
-            val k = neg[0].substring(0, i).trim()
-            val v = neg[0].substring(i + 1).trim()
-            reminders.add(
-                "scores 的 \"$k=!$v\" 按\"分数存在 ∧ ≠$v\"转换（execute需求 第十节 9）：" +
-                    "先 `if score @s $k matches $SCORE_FULL_RANGE` 判存在，再 `unless score @s $k matches $v`"
-            )
-            return listOf(
-                "if", "score", "@s", k, "matches", SCORE_FULL_RANGE,
-                "unless", "score", "@s", k, "matches", v
+        val out = mutableListOf<String>()
+        for (item in neg) {
+            val i = ExecCondSupport.indexOfTopLevel(item, '=')
+            if (i < 0) continue
+            val k = item.substring(0, i).trim()
+            val v = item.substring(i + 1).trim()
+            out.addAll(
+                listOf(
+                    "if", "score", "@s", k, "matches", SCORE_FULL_RANGE,
+                    "unless", "score", "@s", k, "matches", v
+                )
             )
         }
         reminders.add(
-            "scores 多项 \"!\"（${neg.joinToString(",")}）按 NOT(全部条件同时成立) 处理，" +
-                "用 `unless entity @s[scores={…}]` 表达（execute需求 第八节②）"
+            "scores 的每项 \"!\" 按\"分数存在 ∧ ≠该值\"**逐项**转换后再 AND（目标选择器.txt:464/470；" +
+                "2026-09-27 游戏内实测确认：tt=10 而 tt2 未设置时基岩 scores={tt=!10,tt2=!5} 不命中 -> " +
+                "是逐项语义，不是 NOT(全部同时成立)）"
         )
-        return listOf("unless", "entity", "@s[scores={${neg.joinToString(",")}}]")
+        return out
     }
 
     /**
@@ -867,17 +884,16 @@ object ExecuteConverter {
                     }
                     if (pos.isNotEmpty()) kept.add("scores={${pos.joinToString(",")}}")
                     if (neg.isNotEmpty()) {
-                        // 本次修正 D：单项 + 目标就是 @s + 正向条件 → 用"存在 ∧ ≠v"的完整 Java 形式；
-                        // 其余（多项 / 目标是别的选择器 / unless 叠加）无法用顺序条件精确表达，退回反极性 entity 形式并提醒。
-                        if (!cond.unless && neg.size == 1 && varName == "@s") {
+                        // 目标就是执行者 @s、且不叠加 unless 时，可以精确表达：逐项"存在 ∧ ≠值"再 AND
+                        // （2026-09-27 实测确认基岩就是逐项语义）。
+                        // 其余情况（目标是别的选择器 / 叠加 unless）无法用顺序条件精确表达 -> 退化为
+                        // 反极性的 entity 条件并提醒。
+                        if (!cond.unless && varName == "@s") {
                             extra.add(negatedScoreConditionTokens(neg, reminders))
                         } else {
-                            if (neg.size >= 2) reminders.add(
-                                "scores 多项 \"!\" 按 NOT(全部条件同时成立) 处理（execute需求 第八节②）"
-                            )
                             if (varName != "@s") reminders.add(
-                                "scores 条件的目标是 $varName（非单一执行者 @s），无法加\"分数存在\"判定，" +
-                                    "改用反极性 entity 条件（语义可能包含\"分数不存在\"）"
+                                "scores 条件的目标是 $varName（非单一执行者 @s），无法逐项加\"分数存在 ∧ ≠值\"判定，" +
+                                    "改用反极性 entity 条件近似（语义可能包含\"分数不存在\"）"
                             )
                             if (cond.unless) reminders.add(
                                 "unless 与 scores=! 叠加无法用顺序条件精确表达，保留反极性 entity 形式（语义近似）"
@@ -1166,17 +1182,44 @@ object ExecuteConverter {
         token: String,
         direction: Direction,
         reminders: MutableList<String>
-    ): String {
-        if (!token.startsWith("@") || !token.contains('[') || !token.endsWith("]")) return token
+    ): Pair<String, List<String>> {
+        val unchanged = token to emptyList<String>()
+        if (!token.startsWith("@") || !token.contains('[') || !token.endsWith("]")) return unchanged
         val varName = token.substringBefore('[')
         val paramsPart = token.substringAfter('[').dropLast(1)
         val from = if (direction == Direction.JAVA_TO_BEDROCK) "nbt=" else "hasitem="
-        if (from !in paramsPart) return token
+        // 基岩->Java 时还要看 scores 里的 `=!`（Java 的选择器不支持）
+        val needScores = direction == Direction.BEDROCK_TO_JAVA && "!" in paramsPart
+        if (from !in paramsPart && !needScores) return unchanged
 
         val kept = mutableListOf<String>()
         val objs = mutableListOf<String>()
+        val extra = mutableListOf<String>()
         for (p in ExecCondSupport.splitTopLevel(paramsPart, ',')) {
-            if (p.substringBefore('=').trim() != from.trimEnd('=')) {
+            val key = p.substringBefore('=').trim()
+            if (direction == Direction.BEDROCK_TO_JAVA && key == "scores") {
+                val content = p.substringAfter("scores=").trim().removeSurrounding("{", "}")
+                val pos = mutableListOf<String>()
+                val neg = mutableListOf<String>()
+                for (e in ExecCondSupport.splitTopLevel(content, ',')) {
+                    val i = ExecCondSupport.indexOfTopLevel(e, '=')
+                    if (i < 0) continue
+                    val k = e.substring(0, i).trim()
+                    val v = e.substring(i + 1).trim()
+                    if (v.startsWith("!")) neg.add("$k=${v.substring(1)}") else pos.add("$k=$v")
+                }
+                if (pos.isNotEmpty()) kept.add("scores={${pos.joinToString(",")}}")
+                if (neg.isNotEmpty()) {
+                    // 拆成"紧跟这个 as 之后的逐项条件"（此时 @s 就是刚切过去的执行者）
+                    extra.addAll(negatedScoreConditionTokens(neg, reminders))
+                    reminders.add(
+                        "修饰子命令选择器里的 scores=! 是基岩独有写法：已从选择器里取出，" +
+                            "改成紧跟该修饰子命令之后的逐项条件（$varName 里满足这些分数的人）"
+                    )
+                }
+                continue
+            }
+            if (key != from.trimEnd('=')) {
                 kept.add(p)
                 continue
             }
@@ -1198,14 +1241,18 @@ object ExecuteConverter {
                 objs.add(nbt)
             }
         }
-        if (objs.isEmpty()) return if (kept.isEmpty()) varName else "$varName[${kept.joinToString(",")}]"
         val merged = if (direction == Direction.JAVA_TO_BEDROCK) {
-            val hi = if (objs.size == 1) "{${objs[0]}}" else "[${objs.joinToString(",") { "{$it}" }}]"
-            listOf("hasitem=$hi")
+            if (objs.isEmpty()) emptyList()
+            else {
+                val hi = if (objs.size == 1) "{${objs[0]}}" else "[${objs.joinToString(",") { "{$it}" }}]"
+                listOf("hasitem=$hi")
+            }
         } else {
             objs.map { "nbt=$it" }
         }
-        return "$varName[${(kept + merged).joinToString(",")}]"
+        val all = kept + merged
+        val newToken = if (all.isEmpty()) varName else "$varName[${all.joinToString(",")}]"
+        return newToken to extra
     }
 
     /** 往选择器里追加参数；选择器必须已带 `[...]` 或形如 `@a`。 */

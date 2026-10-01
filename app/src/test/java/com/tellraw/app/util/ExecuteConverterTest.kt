@@ -209,9 +209,16 @@ class ExecuteConverterTest {
     }
 
     @Test
-    fun testBedrockScoresMultipleNegationUsesNotConjunction() {
-        val (out, _) = conv("execute as @a if entity @s[scores={n=!5,m=!6}]", Direction.BEDROCK_TO_JAVA)
-        assertEquals("execute as @a unless entity @s[scores={n=5,m=6}]", out)
+    fun testBedrockScoresMultipleNegationIsPerItemAnd() {
+        // 2026-09-27 游戏内实测：基岩 scores={tt=!10,tt2=!5} 在"tt=10、tt2 未设置"时不命中
+        // -> 是"逐项（存在 ∧ ≠值）再 AND"，不是 NOT(全部同时成立)。
+        val (out, reminders) = conv("execute as @a if entity @s[scores={n=!5,m=!6}]", Direction.BEDROCK_TO_JAVA)
+        assertEquals(
+            "execute as @a if score @s n matches -2147483648..2147483647 unless score @s n matches 5 " +
+                "if score @s m matches -2147483648..2147483647 unless score @s m matches 6",
+            out
+        )
+        assertTrue(reminders.any { it.contains("逐项") })
     }
 
     @Test
@@ -431,13 +438,47 @@ class ExecuteConverterTest {
 
     @Test
     fun testUnmappedLocationIsDroppedInsteadOfBareStar() {
+        // slot.chest / slot.armor / slot.equippable 只属于马、驴这些实体，玩家侧没有 items 对应 -> 舍弃
         val neg = ExecuteConverter.bedrockSelectorNegation(
-            "@a[hasitem={item=diamond,location=slot.enderchest}]", mutableListOf(), preferExecute = true
+            "@a[hasitem={item=diamond,location=slot.chest}]", mutableListOf(), preferExecute = true
         )
-        // 整条被舍弃 -> 选择器本体留 @a、无执行前缀，且有提醒
         assertNotNull(neg)
         assertEquals("@a", neg!!.first)
         assertTrue(neg.second.isEmpty())
+    }
+
+    @Test
+    fun testModifierSelectorScoresNegationMovesToConditions() {
+        // Java 的选择器不支持 scores 的 =!（基岩独有）-> 从选择器里取出，改成紧跟 as 之后的逐项条件
+        val (out, reminders) = conv("execute as @a[scores={n=!5,o=!6}]", Direction.BEDROCK_TO_JAVA)
+        assertEquals(
+            "execute as @a if score @s n matches -2147483648..2147483647 unless score @s n matches 5 " +
+                "if score @s o matches -2147483648..2147483647 unless score @s o matches 6",
+            out
+        )
+        assertTrue(reminders.any { it.contains("修饰子命令选择器") })
+    }
+
+    @Test
+    fun testModifierSelectorPositiveScoresLeftAlone() {
+        val (out, _) = conv("execute as @a[scores={n=5},tag=x]", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute as @a[scores={n=5},tag=x]", out)
+    }
+
+    @Test
+    fun testEnderchestLocationMapsBothWays() {
+        // 2026-09-27 实测：基岩 location=slot.enderchest 可用 -> Java 对应 enderchest.N
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond,location=slot.enderchest,slot=0}]", mutableListOf(), preferExecute = true
+        )
+        assertNotNull(neg)
+        assertEquals("@a", neg!!.first)
+        assertEquals(
+            listOf("if", "items", "entity", "@s", "enderchest.0", "minecraft:diamond"),
+            neg.second
+        )
+        val (back, _) = conv("execute if items entity @s enderchest.0 minecraft:diamond", Direction.JAVA_TO_BEDROCK)
+        assertEquals("execute if entity @s[hasitem={item=diamond,location=slot.enderchest,slot=0}]", back)
     }
 
     @Test
