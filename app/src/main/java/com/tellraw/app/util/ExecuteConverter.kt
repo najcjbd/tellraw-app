@@ -434,26 +434,39 @@ object ExecuteConverter {
             "block" -> POSITION_TOKENS + 1
             "blocks" -> POSITION_TOKENS * 3 + 1
             "loaded" -> POSITION_TOKENS
-            "dimension", "entity", "function", "predicate", "stopwatch" -> 1
-            // score：`<target> <obj> matches <range>` 只占 4 个；比较形式（= < <= > >=）占 5 个
+            // 参数个数一律按 execute.txt 的官方签名（JE 行）核对，不靠猜：
+            //   predicate <predicate>            = 1
+            //   dimension <dimension>            = 1
+            //   entity <entities>                = 1
+            //   function <name>                  = 1
+            //   stopwatch <id> <range>           = 2
+            "dimension", "entity", "function", "predicate" -> 1
+            "stopwatch" -> 2
+            // score：`<target> <targetObjective> matches <range>` 占 4 个；
+            //        比较形式 `<target> <targetObjective> (=|<|<=|>|>=) <source> <sourceObjective>` 占 5 个
             "score" -> {
                 val op = if (idx + 4 < tokens.size) tokens[idx + 4] else null
                 if (op == "matches") 4 else 5
             }
+            //   data block <source> <path>   = 1 + 3 + 1 = 5；data entity <source> <path> = 3
             "data" -> when (source) {
                 null -> null
                 "block" -> 1 + POSITION_TOKENS + 1
                 else -> 3
             }
+            //   items block <source> <slots> <item_predicate>  = 1 + 3 + 1 + 1 = 6
+            //   items entity <source> <slots> <item_predicate> = 4
             "items" -> when (source) {
                 null -> null
                 "block" -> 1 + POSITION_TOKENS + 1 + 1
                 else -> 4
             }
+            //   slots block <source> <slots>   = 1 + 3 + 1 = 5（**没有** item_predicate！）
+            //   slots entity <source> <slots>  = 3
             "slots" -> when (source) {
                 null -> null
-                "block" -> 1 + POSITION_TOKENS + 1 + 1
-                else -> 4
+                "block" -> 1 + POSITION_TOKENS + 1
+                else -> 3
             }
             else -> null
         }

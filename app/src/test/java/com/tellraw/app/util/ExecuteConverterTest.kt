@@ -493,4 +493,36 @@ class ExecuteConverterTest {
         )
         assertEquals("execute as @a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\"}]}]", out)
     }
+
+    // ---------------------------------------------------------------
+    //  参数个数按 execute.txt 官方签名核对（曾把 slots / stopwatch 猜错）
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testStopwatchConditionTakesIdAndRange() {
+        // `stopwatch <id> <range>` 是 2 个参数（execute.txt:1068）
+        val (out, _) = conv("execute as @a if stopwatch sw ..10", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute as @a if stopwatch sw ..10", out)
+    }
+
+    @Test
+    fun testSlotsConditionEntityTakesSourceAndSlots() {
+        // `slots entity <source> <slots>` 是 3 个参数（execute.txt:1036；**没有** item_predicate）
+        val (out, _) = conv("execute as @a if slots entity @s container.0", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute as @a if slots entity @s container.0", out)
+    }
+
+    @Test
+    fun testSlotsConditionBlockTakesPosAndSlots() {
+        // `slots block <source> <slots>` 是 1+3+1 = 5 个参数（execute.txt:1035）
+        val (out, _) = conv("execute as @a if slots block ~ ~ ~ container.0", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute as @a if slots block ~ ~ ~ container.0", out)
+    }
+
+    @Test
+    fun testPositionedOverKeepsHeightmapOnly() {
+        // `positioned over <heightmap>` 没有坐标（execute.txt:614）
+        val (out, _) = conv("execute positioned over world_surface", Direction.BEDROCK_TO_JAVA)
+        assertEquals("execute positioned over world_surface", out)
+    }
 }
