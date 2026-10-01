@@ -60,6 +60,8 @@ internal object ExecCondSupport {
             "slot.armor.feet" -> "{equipment:{feet:{$idPart}}}"
             "slot.hotbar" -> if (n != null) "{Inventory:[{Slot:${n}b,$idPart}]}" else null
             "slot.inventory" -> if (n != null) "{Inventory:[{Slot:${n + 9}b,$idPart}]}" else null
+            // 末影箱在 Java 的 NBT 里是 EnderItems（Slot 就是箱内编号）
+            "slot.enderchest" -> if (n != null) "{EnderItems:[{Slot:${n}b,$idPart}]}" else null
             else -> null
         }
     }
@@ -318,6 +320,7 @@ internal object ExecCondSupport {
         //（目标选择器.txt:609 不带 slot 即 slot=0..，语义为"该栏任意槽位有该物品"）。
         if (s == "inventory.*") return Triple("slot.inventory", null, null)
         if (s == "hotbar.*") return Triple("slot.hotbar", null, null)
+        if (s == "enderchest.*") return Triple("slot.enderchest", null, null)
         when (s) {
             "weapon.mainhand" -> return Triple("slot.weapon.mainhand", "0", null)
             "weapon.offhand" -> return Triple("slot.weapon.offhand", "0", null)
@@ -341,6 +344,11 @@ internal object ExecCondSupport {
             val n = s.substringAfter("inventory.").toIntOrNull()
                 ?: return Triple(null, null, "槽位 \"$s\" 编号不是整数")
             return Triple("slot.inventory", "$n", null)
+        }
+        if (s.startsWith("enderchest.")) {
+            val n = s.substringAfter("enderchest.").toIntOrNull()
+                ?: return Triple(null, null, "槽位 \"$s\" 编号不是整数")
+            return Triple("slot.enderchest", "$n", null)
         }
         return Triple(null, null, "Java 槽位 \"$s\" 暂无基岩 hasitem 对应写法")
     }
@@ -391,6 +399,8 @@ internal object ExecCondSupport {
             "slot.hotbar" -> if (n != null) "hotbar.$n" else "hotbar.*"
             // slot.inventory.N 对应 Java 物品栏第 N+9 格，即 inventory.N（N 0-26）
             "slot.inventory" -> if (n != null) "inventory.$n" else "inventory.*"
+            // 2026-09-27 实测：基岩 location=slot.enderchest 可用 -> Java 对应 enderchest.N / enderchest.*
+            "slot.enderchest" -> if (n != null) "enderchest.$n" else "enderchest.*"
             else -> null
         }
     }
@@ -492,7 +502,8 @@ internal object ExecCondSupport {
                 "slot.hotbar" -> "hotbar.$n"
                 // slot.inventory.N 对应 Java 物品栏第 N+9 格，即 inventory.N
                 "slot.inventory" -> "inventory.$n"
-                // slot.enderchest / slot.chest / slot.armor / slot.equippable 无 Java items 对应
+                "slot.enderchest" -> "enderchest.$n"
+                // slot.chest / slot.armor / slot.equippable 只能用在马/驴等实体上，无（玩家）Java items 对应
                 else -> null
             }
         }
