@@ -448,6 +448,19 @@ class ExecuteConverterTest {
     }
 
     @Test
+    fun testHasitemQuantityToNbtUsesIntegerCount() {
+        // 2026-09-27 实测（Java 26.2）：老式 `count:2b` 不再匹配，`count:2`（整数）才匹配
+        val (out, _) = conv(
+            "execute as @a[hasitem={item=diamond,location=slot.hotbar,slot=0,quantity=2}]",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals(
+            "execute as @a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",count:2}]}]",
+            out
+        )
+    }
+
+    @Test
     fun testModifierSelectorScoresNegationMovesToConditions() {
         // Java 的选择器不支持 scores 的 =!（基岩独有）-> 从选择器里取出，改成紧跟 as 之后的逐项条件
         val (out, reminders) = conv("execute as @a[scores={n=!5,o=!6}]", Direction.BEDROCK_TO_JAVA)

@@ -45,7 +45,9 @@ internal object ExecCondSupport {
         val h = parseHasitemObject(obj)
         val item = h.item ?: return null
         val id = addNs(item)
-        val cnt = h.quantity?.toIntOrNull()?.let { "count:${it}b" }
+        // 2026-09-27 实测（Java 26.2）：`count:1b`（老式字节）**不再匹配**，`count:1`（整数）才行
+        // （1.20.5 起物品堆叠改用数据组件）。所以这里写整数、不加 b。
+        val cnt = h.quantity?.toIntOrNull()?.let { "count:$it" }
         val idPart = if (cnt == null) "id:\"$id\"" else "id:\"$id\",$cnt"
         if (h.location == null) {
             return if (h.slot == null) "{Inventory:[{$idPart}]}" else null
