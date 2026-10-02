@@ -762,6 +762,14 @@ object ExecuteConverter {
                 reminders.add("执行者身份无法确定（on / 未知选择器），SelectedItem 是否适用待确认")
             }
         }
+        // 2026-09-27 实测（Java 26.2）：玩家的主手在 SelectedItem 里，equipment.mainhand **对玩家不成立**；
+        // 只有副手/头盔等仍在 equipment.offhand / equipment.head 里。
+        if (nbt.contains("equipment") && nbt.contains("mainhand") && exec.isPlayer == true) {
+            reminders.add(
+                "注意：实测（Java 26.2）玩家的主手在 SelectedItem 里，equipment.mainhand 对玩家**不成立**" +
+                    "（那是怪物的写法）。这里按你写的 equipment.mainhand 原样转换，若目标是玩家请改用 SelectedItem"
+            )
+        }
         val hasitem = if (mapping.items.size == 1) {
             "{${mapping.items[0]}}"
         } else {
