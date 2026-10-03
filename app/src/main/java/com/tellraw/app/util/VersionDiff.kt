@@ -139,9 +139,9 @@ object VersionDiff {
      * 新值 -> 旧值。返回 null 表示"只改键名、值原样 + 提醒"。
      * 已实现：`count:1` -> `Count:1b`。
      */
-    fun modernValueToLegacy(modernKey: String, modernValue: String): String? = when (modernKey) {
+    fun modernValueToLegacy(modernKey: String, modernValue: String): String? = when (modernKey.removePrefix("minecraft:")) {
         "count" -> modernValue.trim().takeIf { it.toIntOrNull() != null }?.let { "${it}b" }
-        "minecraft:damage", "repair_cost" -> modernValue.trim().takeIf { it.toIntOrNull() != null }
+        "damage", "repair_cost" -> modernValue.trim().takeIf { it.toIntOrNull() != null }
         // 附魔：新的 {levels:{"x":N}} -> 旧的 [{id:"x",lvl:N}]
         "enchantments" -> modernEnchantmentsToLegacy(modernValue)
         // 药水：新的 {potion:"…"} -> 旧的字符串 id
@@ -190,10 +190,10 @@ object VersionDiff {
         }
 
         for (entry in ExecCondSupport.splitTopLevel(body, ',')) {
-            val i = ExecCondSupport.indexOfTopLevel(entry, ':')
-            if (i < 0) { custom.add(entry); continue }
-            val key = entry.substring(0, i).trim().removeSurrounding("\"")
-            val value = entry.substring(i + 1).trim()
+            val kv = splitKeyValue(entry)
+            if (kv == null) { custom.add(entry); continue }
+            val key = kv.first
+            val value = kv.second
 
             if (key == DISPLAY_CONTAINER && value.startsWith("{")) {
                 val end = matchBrace(value, 0) ?: return null
@@ -240,6 +240,95 @@ object VersionDiff {
         // -> 返回空串，由调用方把整个 tag:{} 去掉（并清掉多余的逗号）
         if (parsed.first.isEmpty()) return ""
         return "components:{${parsed.first.joinToString(",")}}"
+    }
+
+    /**
+     * 新 `components:{…}` 的复合体 -> 旧 `tag:{…}` 的复合体（LEGACY 模式用，正向的镜像）。
+     *  - `minecraft:custom_data:{…}` -> 它的键**摊回** tag
+     *  - 认得的组件 -> 旧键名（值形状按 [modernValueToLegacy] 反向换算；换算不了**只改键名**）
+     *  - `custom_name` / `lore` / `dyed_color` -> 包进 `display:{…}`
+     *  - `unbreakable:{}` -> `Unbreakable:1b`
+     *  - 堆栈层级的组件（如 `count`）不该出现在 tag 里 -> 归到"无处安放"，由调用方提醒
+     *
+     * 返回 (tag 体, 值形状未换算的键, 无处安放的组件)；花括号不配对返回 null（不猜）。
+     */
+    fun modernComponentsToLegacyTag(componentsBody: String): Triple<String, List<String>, List<String>>? {
+        val tagEntries = mutableListOf<String>()
+        val unshaped = mutableListOf<String>()
+        val unmappable = mutableListOf<String>()
+
+        fun unwrap(body: String, openAt: Int): String? =
+            matchBrace(body, openAt)?.let { body.substring(openAt + 1, it) }
+
+        fun putLegacy(legacyKey: String, modernKey: String, rawValue: String, wrap: String? = null) {
+            val v = modernValueToLegacy(modernKey, rawValue) ?: run { unshaped.add(legacyKey); rawValue }
+            val entry = "$legacyKey:$v"
+            if (wrap == null) tagEntries.add(entry) else tagEntries.add("$wrap:{$entry}")
+        }
+
+        val displayParts = mutableListOf<String>()
+        for (entry in ExecCondSupport.splitTopLevel(componentsBody, ',')) {
+            val kv = splitKeyValue(entry)
+            if (kv == null) { unmappable.add(entry); continue }
+            // 新组件 ID 可能带命名空间（minecraft:enchantments）——表里统一按不带命名空间查
+            val key = kv.first.removePrefix("minecraft:")
+            val value = kv.second
+
+            when {
+                // 自定义数据摊回 tag
+                key == MODERN_CUSTOM_DATA_KEY -> {
+                    if (!value.startsWith("{")) { unmappable.add(key); continue }
+                    val inner = unwrap(value, 0) ?: return null
+                    tagEntries.addAll(ExecCondSupport.splitTopLevel(inner, ','))
+                }
+                key == "unbreakable" -> {
+                    tagEntries.add("Unbreakable:1b")
+                }
+                key in DISPLAY_RENAMES.values -> {
+                    val legacySub = DISPLAY_RENAMES.entries.firstOrNull { it.value == key }?.key
+                    if (legacySub == null) {
+                        unmappable.add(key)
+                    } else {
+                        // 旧格式只有一个 display 复合 -> 先攒着，最后合并
+                        val v = modernValueToLegacy(key, value) ?: run { unshaped.add(key); value }
+                        displayParts.add("$legacySub:$v")
+                    }
+                }
+                key in STACK_LEVEL_RENAMES.values -> {
+                    // count 是物品堆栈层级，不该塞进 tag
+                    unmappable.add(key)
+                }
+                else -> {
+                    val legacy = MODERN_TO_LEGACY_KEY[key] ?: MODERN_TO_LEGACY_KEY["minecraft:$key"]
+                    if (legacy == null || legacy.startsWith("$DISPLAY_CONTAINER.")) unmappable.add(key)
+                    else putLegacy(legacy, key, value)
+                }
+            }
+        }
+        if (displayParts.isNotEmpty()) {
+            tagEntries.add("$DISPLAY_CONTAINER:{${displayParts.joinToString(",")}}")
+        }
+        return Triple(tagEntries.joinToString(","), unshaped, unmappable)
+    }
+
+    /** 正向：旧 tag 体 -> 新 components 体（含"值形状未换算"的键名）。 */
+    fun legacyTagBodyToComponentsBody(body: String): Pair<String, List<String>>? {
+        val parsed = legacyTagBodyToComponentMap(body) ?: return null
+        return parsed.first.joinToString(",") to parsed.second
+    }
+
+    /**
+     * 把一条 `键:值` 拆开。**键可能带命名空间**（`minecraft:custom_data`），
+     * 所以不能简单取第一个冒号——要按"键 = 标识符[:标识符]"的形状匹配。
+     * 解析不了返回 null。
+     */
+    private fun splitKeyValue(entry: String): Pair<String, String>? {
+        val t = entry.trim()
+        val m = Regex("^\"?([A-Za-z0-9_]+(?::[A-Za-z0-9_./-]+)?)\"?\\s*:\\s*(.*)$", RegexOption.DOT_MATCHES_ALL)
+            .find(t) ?: return null
+        val key = m.groupValues[1]
+        val value = m.groupValues[2].trim()
+        return if (value.isEmpty()) null else key to value
     }
 
     /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
