@@ -120,6 +120,45 @@ class VersionDiffTest {
     }
 
     @Test
+    fun testModernComponentsToLegacyTag() {
+        // custom_data 摊回 tag
+        assertEquals(
+            "foo:1,bar:2",
+            VersionDiff.modernComponentsToLegacyTag("minecraft:custom_data:{foo:1,bar:2}")!!.first
+        )
+        // 损耗值 / 不毁
+        assertEquals("Damage:5", VersionDiff.modernComponentsToLegacyTag("minecraft:damage:5")!!.first)
+        assertEquals("Unbreakable:1b", VersionDiff.modernComponentsToLegacyTag("minecraft:unbreakable:{}")!!.first)
+        // 附魔反向
+        assertEquals(
+            "Enchantments:[{id:\"minecraft:sharpness\",lvl:3}]",
+            VersionDiff.modernComponentsToLegacyTag(
+                "minecraft:enchantments:{levels:{\"minecraft:sharpness\":3}}"
+            )!!.first
+        )
+        // display 三件套 -> 合并成一个 display 复合（旧格式只有一个 display）
+        assertEquals(
+            "display:{Name:\"n\",Lore:[\"a\"],color:16711680}",
+            VersionDiff.modernComponentsToLegacyTag("custom_name:\"n\",lore:[\"a\"],dyed_color:16711680")!!.first
+        )
+        // 堆栈层级的 count 不该塞进 tag；新版专有组件无处安放（两者都要提醒）
+        val c = VersionDiff.modernComponentsToLegacyTag("count:5")!!
+        assertEquals("", c.first)
+        assertTrue(c.third.contains("count"))
+        val e = VersionDiff.modernComponentsToLegacyTag("minecraft:enchantable:{value:15}")!!
+        assertTrue(e.third.contains("enchantable"))
+    }
+
+    @Test
+    fun testLegacyModernRoundTrip() {
+        // 旧 -> 新 -> 旧 应当回到原样（已实现值形状换算的键）
+        for (body in listOf("Damage:5", "RepairCost:2", "Unbreakable:1b", "foo:1,bar:2")) {
+            val fwd = VersionDiff.legacyTagBodyToComponentsBody(body)!!.first
+            assertEquals(body, VersionDiff.modernComponentsToLegacyTag(fwd)!!.first)
+        }
+    }
+
+    @Test
     fun testLegacyTagBodyRules() {
         assertTrue(VersionDiff.legacyTagBodyToComponents("Damage:5").contains("minecraft:damage"))
         assertTrue(VersionDiff.legacyTagBodyToComponents("Damage:5b").contains("minecraft:damage"))
