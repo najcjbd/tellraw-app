@@ -23,6 +23,49 @@ class SelectorConverterTest {
     fun setup() {
         context = RuntimeEnvironment.getApplication()
     }
+
+    /**
+     * Java 的选择器写不出来的三种基岩写法：不能退化成 count:0 / id:"minecraft:air"（那是"永远不匹配"的静默错误），
+     * 应当去掉该条件并给出提醒（2026-09-27 实测口径）。
+     */
+    @Test
+    fun testBedrockOnlyItemSemanticsAreRemovedNotTurnedIntoImpossibleNbt() {
+        // quantity=0 = "没有该物品"
+        val q0 = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond,quantity=0}]", SelectorType.JAVA, context
+        )
+        assertEquals("@a", q0.first)
+        assertFalse("不能写出 count:0", q0.first.contains("count:0"))
+
+        // quantity=0.. = "不做过滤"（条件形同虚设）
+        val qOpen = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond,quantity=0..}]", SelectorType.JAVA, context
+        )
+        assertEquals("@a", qOpen.first)
+
+        // item=air = "该槽为空"
+        val air = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=air,location=slot.hotbar,slot=5}]", SelectorType.JAVA, context
+        )
+        assertEquals("@a", air.first)
+        assertFalse("不能写出 minecraft:air 这个物品谓词", air.first.contains("minecraft:air"))
+
+        // 正常的 quantity=N 仍然照常（整数 count，不带 b）
+        val q2 = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond,location=slot.hotbar,slot=5,quantity=2}]", SelectorType.JAVA, context
+        )
+        assertTrue(q2.first.contains("count:2"))
+        assertFalse("老式 count:2b 在新版失效", q2.first.contains("count:2b"))
+    }
+
+    /** slot.enderchest 在两条代码路径上都要能转（与前置框那条路保持一致） */
+    @Test
+    fun testEnderchestMapsToEnderItems() {
+        val r = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond,location=slot.enderchest,slot=0}]", SelectorType.JAVA, context
+        )
+        assertTrue("应转成 EnderItems", r.first.contains("EnderItems"))
+    }
     
     /**
      * 测试组1：目标选择器变量测试
@@ -2470,11 +2513,17 @@ class SelectorConverterTest {
     
     @Test
     fun testEdgeCases_7() {
-        // Count为0
+        // quantity=0 在基岩里是"没有该物品"，Java 的选择器写不出来。
+        // 2026-09-27 端末实测/复核对账后纠正：**不能**写成 count:0——物品堆叠不可能是 0 个，
+        // 那会变成"永远不匹配"的静默错误。正确做法是去掉该条件 + 提醒（要用 execute 才能表达）。
         val bedrockSelector = "@a[hasitem={item=diamond,quantity=0}]"
         val conversion = SelectorConverter.convertBedrockToJava(bedrockSelector, context)
-        // Count为0应该被处理
-        assertTrue("Count=0应该被处理", conversion.javaSelector.contains("count:0"))
+        assertEquals("@a", conversion.javaSelector)
+        assertFalse("不能退化成 count:0（永远不匹配）", conversion.javaSelector.contains("count:0"))
+        assertTrue(
+            "必须提醒玩家",
+            conversion.javaReminders.any { it.isNotBlank() }
+        )
     }
     
     @Test

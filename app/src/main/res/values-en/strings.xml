@@ -379,4 +379,7 @@
 • Warning messages may be incomplete</string>
     <string name="java_bedrock_mixed_mode_warning_message">Warning: Please test the conversion results before official use to ensure they meet your expectations!</string>
     <string name="please_wait_seconds">Please wait %d seconds before clicking OK</string>
+    <string name="hasitem_air_cannot_express">Bedrock hasitem item=air means "this slot is empty"; Java selectors cannot express that (air is never an item stack), so the condition was removed. Use execute instead, e.g. execute unless items entity @s &lt;slot&gt; *</string>
+    <string name="hasitem_quantity_zero_cannot_express">Bedrock hasitem quantity=0 means "the target does not have this item"; Java selectors cannot express that, so the condition was removed. Use execute instead, e.g. execute unless items entity @s &lt;slot&gt; &lt;item&gt;</string>
+    <string name="hasitem_quantity_open_range_removed">Bedrock hasitem quantity=0.. means "this condition item does not filter" (confirmed in game); the condition is vacuous and was removed (behaviour now matches Bedrock)</string>
 </resources>

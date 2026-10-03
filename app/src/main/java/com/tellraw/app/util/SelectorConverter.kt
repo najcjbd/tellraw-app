@@ -2601,6 +2601,28 @@ object SelectorConverter {
         // 处理物品ID
         val itemId = if (item.startsWith("minecraft:")) item else "minecraft:$item"
 
+        // ---- 三种"Java 的选择器表达不出来"的写法：去掉该参数并提醒（2026-09-27 实测口径）----
+        //  item=air        : 基岩表示"该槽为空"（实测：一般物品栏/装备槽里 item=air 永不匹配）。
+        //                    Java 的选择器写不出"空槽"（air 不会作为物品堆叠存在），只能靠 execute。
+        //  quantity=0      : 基岩表示"没有该物品"，Java 的选择器写不出"没有"。
+        //  quantity=0..    : 基岩表示"当前条件项目不做过滤"（实测：有钻石时同样匹配），条件形同虚设。
+        // 三者都不能写成 `count:0` / `id:"minecraft:air"`——那会变成"永远不匹配"的静默错误。
+        // （App 的选择器框会先用 execute 前缀接走这三类；这里兜底 + 覆盖混合模式那条路。）
+        if (itemId == "minecraft:air") {
+            reminders.add(getStringSafely(context, R.string.hasitem_air_cannot_express))
+            return ""
+        }
+        if (quantity == "0" || quantity == "0..") {
+            reminders.add(
+                getStringSafely(
+                    context,
+                    if (quantity == "0") R.string.hasitem_quantity_zero_cannot_express
+                    else R.string.hasitem_quantity_open_range_removed
+                )
+            )
+            return ""
+        }
+
         // 处理 quantity 范围
         val processedQuantity = processQuantityRange(quantity, reminders, context)
 
@@ -2755,6 +2777,23 @@ object SelectorConverter {
 
             // 处理物品ID
             val itemId = if (item.startsWith("minecraft:")) item else "minecraft:$item"
+
+            // 与单对象那条路一致：item=air / quantity=0 / quantity=0.. 这三种 Java 的选择器写不出来，
+            // 不能写成 count:0 / id:"minecraft:air"（那是"永远不匹配"的静默错误）-> 去掉该对象 + 提醒
+            if (itemId == "minecraft:air") {
+                reminders.add(getStringSafely(context, R.string.hasitem_air_cannot_express))
+                continue
+            }
+            if (quantity == "0" || quantity == "0..") {
+                reminders.add(
+                    getStringSafely(
+                        context,
+                        if (quantity == "0") R.string.hasitem_quantity_zero_cannot_express
+                        else R.string.hasitem_quantity_open_range_removed
+                    )
+                )
+                continue
+            }
 
             // 处理 quantity 范围
             val processedQuantity = processQuantityRange(quantity, reminders, context)
