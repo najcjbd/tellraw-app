@@ -2655,6 +2655,18 @@ object SelectorConverter {
                     "nbt={Inventory:[${nbtItems.joinToString(",")}]}"
                 }
             }
+            "slot.enderchest" -> {
+                // 末影箱 -> EnderItems（Slot 就是箱内编号，不做 +9）
+                // 2026-09-27 实测：基岩 slot.enderchest 可用 -> 与前置框那条路保持一致
+                val slotNumbers = parseSlotRange(slot, location, reminders, context)
+                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
+                if (slotNumbers.isEmpty()) {
+                    "nbt={EnderItems:[{id:\"$itemId\"$countPart}]}"
+                } else {
+                    val nbtItems = slotNumbers.map { "{Slot:${it}b,id:\"$itemId\"$countPart}" }
+                    "nbt={EnderItems:[${nbtItems.joinToString(",")}]}"
+                }
+            }
             null -> {
                 // 没有指定位置，使用通用格式（不指定槽位）
                 val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
@@ -2714,6 +2726,7 @@ object SelectorConverter {
         // 解析每个对象，分类处理
         val equipmentItems = mutableMapOf<String, String>()  // head, chest, legs, feet, offhand
         val inventoryItems = mutableListOf<String>()  // 物品栏物品
+        val enderItems = mutableListOf<String>()  // 末影箱物品（Java 的 EnderItems）
         val selectedItem = mutableListOf<String>()  // 主手物品
 
         for (obj in objects) {
@@ -2790,6 +2803,17 @@ object SelectorConverter {
                         }
                     }
                 }
+                "slot.enderchest" -> {
+                    // 末影箱 -> EnderItems（Slot 就是箱内编号，不做 +9）
+                    val slotNumbers = parseSlotRange(slot, location, reminders, context)
+                    if (slotNumbers.isEmpty()) {
+                        enderItems.add("{id:\"$itemId\"$countPart}")
+                    } else {
+                        for (slotNum in slotNumbers) {
+                            enderItems.add("{Slot:${slotNum}b,id:\"$itemId\"$countPart}")
+                        }
+                    }
+                }
                 null -> {
                     // 没有指定位置，使用通用格式（不指定槽位）
                     inventoryItems.add("{id:\"$itemId\"$countPart}")
@@ -2815,6 +2839,11 @@ object SelectorConverter {
         // 添加 Inventory (独立的nbt参数)
         if (inventoryItems.isNotEmpty()) {
             nbtParams.add("nbt={Inventory:[${inventoryItems.joinToString(",")}]}")
+        }
+
+        // 添加 EnderItems (独立的nbt参数)
+        if (enderItems.isNotEmpty()) {
+            nbtParams.add("nbt={EnderItems:[${enderItems.joinToString(",")}]}")
         }
 
         // 返回多个独立的nbt参数,用逗号分隔
