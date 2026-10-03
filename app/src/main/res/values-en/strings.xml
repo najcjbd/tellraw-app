@@ -383,4 +383,8 @@
     <string name="hasitem_quantity_zero_cannot_express">Bedrock hasitem quantity=0 means "the target does not have this item"; Java selectors cannot express that, so the condition was removed. Use execute instead, e.g. execute unless items entity @s &lt;slot&gt; &lt;item&gt;</string>
     <string name="hasitem_quantity_open_range_removed">Bedrock hasitem quantity=0.. means "this condition item does not filter" (confirmed in game); the condition is vacuous and was removed (behaviour now matches Bedrock)</string>
     <string name="legacy_tag_rewritten">The input contains the legacy tag:{…}: since 1.20.5 Java replaced tag with data components (measured: tag:{} no longer matches in 26.2), so it was rewritten to the components form (custom data -> minecraft:custom_data, damage value Damage -> minecraft:damage). If the original keys were vanilla tags (display / Enchantments / Unbreakable ...), the component names differ - please verify.</string>
+    <string name="nbt_syntax_title">Old/new item syntax (data components / legacy NBT)</string>
+    <string name="nbt_syntax_modern">Modern (components)</string>
+    <string name="nbt_syntax_legacy">Legacy (old NBT)</string>
+    <string name="nbt_syntax_follow">Follow input</string>
 </resources>
