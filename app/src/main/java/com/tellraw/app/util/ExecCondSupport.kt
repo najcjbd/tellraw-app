@@ -90,16 +90,10 @@ internal object ExecCondSupport {
             val open = start + 4
             val end = matchBrace(out, open) ?: break
             val body = out.substring(open + 1, end)
-            out = out.substring(0, start) + legacyTagBodyToComponents(body) + out.substring(end + 1)
+            out = out.substring(0, start) + VersionDiff.legacyTagBodyToComponents(body) + out.substring(end + 1)
             changed = true
         }
         return out to changed
-    }
-
-    private fun legacyTagBodyToComponents(body: String): String {
-        val dmg = Regex("^Damage\\s*:\\s*(\\d+)[bBsSlL]?$").find(body.trim())?.groupValues?.get(1)
-        return if (dmg != null) "components:{\"minecraft:damage\":$dmg}"
-        else "components:{\"minecraft:custom_data\":{$body}}"
     }
 
     /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
@@ -394,7 +388,9 @@ internal object ExecCondSupport {
      */
     fun damageTestForData(data: String?): String? {
         val n = data?.trim()?.toIntOrNull() ?: return null
-        return if (n > 0) "damage=$n" else null
+        // 谓词里的测试名来自统一表：KEY_RENAMES["Damage"] = "minecraft:damage" -> "damage"
+        val testName = stripNs(VersionDiff.KEY_RENAMES["Damage"] ?: "minecraft:damage")
+        return if (n > 0) "$testName=$n" else null
     }
 
     /** hasitem 对象 -> Java 物品谓词（含命名空间）。count 与 damage 合并成同一个 [] 列表。 */

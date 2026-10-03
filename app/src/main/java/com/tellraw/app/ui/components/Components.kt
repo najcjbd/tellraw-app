@@ -453,6 +453,36 @@ fun MNCodeDialog(
     }
 }
 
+/**
+ * 新旧版本差异策略选择（见 need/新旧版本差异规范.txt）：
+ *  - 新版：一律按 1.20.5+ 的数据组件写法
+ *  - 旧版：一律按 1.20.4- 的旧 NBT 写法
+ *  - 跟随输入：全是新版就新版、全是旧版就旧版、新旧混用会问一嘴
+ */
+@Composable
+private fun NbtSyntaxSelector(value: String, onChange: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.nbt_syntax_title),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                "modern" to R.string.nbt_syntax_modern,
+                "legacy" to R.string.nbt_syntax_legacy,
+                "follow" to R.string.nbt_syntax_follow
+            ).forEach { (v, labelRes) ->
+                FilterChip(
+                    selected = value == v,
+                    onClick = { onChange(v) },
+                    label = { Text(stringResource(labelRes)) }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsDialog(
     useJavaFontStyle: Boolean,
@@ -462,6 +492,7 @@ fun SettingsDialog(
     defaultUseText: Boolean,
     executePrefixEnabled: Boolean,
     separatorAsTextComponent: Boolean,
+    nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
     onMNMixedModeChanged: (Boolean) -> Unit,
@@ -469,7 +500,8 @@ fun SettingsDialog(
     onJavaBedrockMixedModeChanged: (Boolean) -> Unit,
     onDefaultUseTextChanged: (Boolean) -> Unit,
     onExecutePrefixEnabledChanged: (Boolean) -> Unit,
-    onSeparatorAsTextComponentChanged: (Boolean) -> Unit
+    onSeparatorAsTextComponentChanged: (Boolean) -> Unit,
+    onNbtSyntaxChanged: (String) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -733,6 +765,8 @@ fun SettingsDialog(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+
+                    NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
                 }
                 
                 // 底部操作栏
@@ -969,6 +1003,8 @@ fun SettingsDialog(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+
+                    NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
                 }
             },
             confirmButton = {

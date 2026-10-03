@@ -77,6 +77,10 @@ class TellrawViewModel @Inject constructor(
     private val _executePrefixEnabled = MutableStateFlow(false)
     val executePrefixEnabled: StateFlow<Boolean> = _executePrefixEnabled.asStateFlow()
     
+    // 新旧版本差异的统一策略（need/新旧版本差异规范.txt）：modern / legacy / follow
+    private val _nbtSyntax = MutableStateFlow("modern")
+    val nbtSyntax: StateFlow<String> = _nbtSyntax.asStateFlow()
+
     // execute 前置命令输入框的内容（需求七.1：与消息文本框分开，避免"玩家文本本身就是 execute"的歧义）
     private val _executePrefixInput = MutableStateFlow("")
     val executePrefixInput: StateFlow<String> = _executePrefixInput.asStateFlow()
@@ -178,6 +182,7 @@ class TellrawViewModel @Inject constructor(
             
             // 加载execute前置命令设置
             _executePrefixEnabled.value = loadedSettings.executePrefixEnabled
+            _nbtSyntax.value = loadedSettings.nbtSyntax
             
             // 加载separator使用文本组件设置
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
@@ -695,6 +700,16 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
     
+    /** 设置"新旧版本差异"策略（modern / legacy / follow）。 */
+    fun setNbtSyntax(value: String) {
+        _nbtSyntax.value = value
+        viewModelScope.launch {
+            settingsRepository.setNbtSyntax(value)
+            settingsRepository.saveConfig()
+        }
+        generateCommands()
+    }
+
     /** 更新 execute 前置命令框的内容（需求七.1）。 */
     fun updateExecutePrefix(prefix: String) {
         _executePrefixInput.value = prefix

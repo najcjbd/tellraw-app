@@ -386,4 +386,8 @@
     <string name="hasitem_quantity_zero_cannot_express">基岩 hasitem 的 quantity=0 表示"没有该物品"，Java 的选择器写不出来，已去掉该条件。若要保留语义请用 execute，如 execute unless items entity @s &lt;槽位&gt; &lt;物品&gt;</string>
     <string name="hasitem_quantity_open_range_removed">基岩 hasitem 的 quantity=0.. 表示"当前条件项目不做过滤"（实测确认），条件形同虚设，已去掉该条件（去掉后与基岩语义一致）</string>
     <string name="legacy_tag_rewritten">输入里有老式 tag:{…}：1.20.5 起 Java 用数据组件取代了 tag（实测 tag:{} 在 26.2 已不匹配），已改写成 components 写法（自定义数据 -> minecraft:custom_data，损耗值 Damage -> minecraft:damage）。若原键是原版标签（display / Enchantments / Unbreakable 等），组件名与之不同，请自行核对</string>
+    <string name="nbt_syntax_title">新旧版本写法（数据组件 / 旧 NBT）</string>
+    <string name="nbt_syntax_modern">新版（数据组件）</string>
+    <string name="nbt_syntax_legacy">旧版（旧 NBT）</string>
+    <string name="nbt_syntax_follow">跟随输入</string>
 </resources>

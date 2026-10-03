@@ -54,6 +54,7 @@ fun MainScreen(
     val defaultUseText by viewModel.defaultUseText.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
+    val nbtSyntax by viewModel.nbtSyntax.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
@@ -199,6 +200,7 @@ fun MainScreen(
             defaultUseText = defaultUseText,
             executePrefixEnabled = executePrefixEnabled,
             separatorAsTextComponent = separatorAsTextComponent,
+            nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -220,6 +222,9 @@ fun MainScreen(
             },
             onSeparatorAsTextComponentChanged = { enabled ->
                 viewModel.setSeparatorAsTextComponent(enabled)
+            },
+            onNbtSyntaxChanged = { v ->
+                viewModel.setNbtSyntax(v)
             }
         )
     }

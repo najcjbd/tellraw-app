@@ -25,6 +25,11 @@ class SettingsRepository @Inject constructor(
         private const val KEY_DEFAULT_USE_TEXT = "default_use_text"
         private const val KEY_EXECUTE_PREFIX_ENABLED = "execute_prefix_enabled"
         private const val KEY_SEPARATOR_AS_TEXT_COMPONENT = "separator_as_text_component"
+        // 新旧版本差异的统一策略（见 need/新旧版本差异规范.txt）：modern / legacy / follow
+        private const val KEY_NBT_SYNTAX = "nbt_syntax"
+        const val NBT_SYNTAX_MODERN = "modern"
+        const val NBT_SYNTAX_LEGACY = "legacy"
+        const val NBT_SYNTAX_FOLLOW = "follow"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
@@ -59,6 +64,10 @@ class SettingsRepository @Inject constructor(
     // separator使用文本组件开关
     private val _separatorAsTextComponent = MutableStateFlow(false)
     val separatorAsTextComponent: Flow<Boolean> = _separatorAsTextComponent.asStateFlow()
+
+    /** 新旧版本差异策略：默认"新版"（数据组件）。 */
+    private val _nbtSyntax = MutableStateFlow(NBT_SYNTAX_MODERN)
+    val nbtSyntax: Flow<String> = _nbtSyntax.asStateFlow()
     
     // 历史记录存储目录URI
     private val _historyStorageUri = MutableStateFlow<String?>(null)
@@ -92,6 +101,7 @@ class SettingsRepository @Inject constructor(
                         defaultUseText = _defaultUseText.value,
                         executePrefixEnabled = _executePrefixEnabled.value,
                         separatorAsTextComponent = _separatorAsTextComponent.value,
+                        nbtSyntax = _nbtSyntax.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
                     )
@@ -109,6 +119,7 @@ class SettingsRepository @Inject constructor(
                     defaultUseText = _defaultUseText.value,
                     executePrefixEnabled = _executePrefixEnabled.value,
                     separatorAsTextComponent = _separatorAsTextComponent.value,
+                    nbtSyntax = _nbtSyntax.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -122,6 +133,7 @@ class SettingsRepository @Inject constructor(
                     defaultUseText = _defaultUseText.value,
                     executePrefixEnabled = _executePrefixEnabled.value,
                     separatorAsTextComponent = _separatorAsTextComponent.value,
+                    nbtSyntax = _nbtSyntax.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -140,6 +152,7 @@ class SettingsRepository @Inject constructor(
         val defaultUseText: Boolean,
         val executePrefixEnabled: Boolean,
         val separatorAsTextComponent: Boolean,
+        val nbtSyntax: String,
         val historyStorageUri: String?,
         val historyStorageFilename: String
     )
@@ -174,6 +187,10 @@ class SettingsRepository @Inject constructor(
                 val executePrefixEnabled = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_ENABLED) == "true"
                 // 默认false，缺失该键时必须按false处理，不能用!=判断
                 val separatorAsTextComponent = extractJsonValue(jsonString, KEY_SEPARATOR_AS_TEXT_COMPONENT) == "true"
+                // 默认"新版"；非法值一律回落成"新版"
+                val nbtSyntax = extractJsonValue(jsonString, KEY_NBT_SYNTAX)
+                    ?.takeIf { it in listOf(NBT_SYNTAX_MODERN, NBT_SYNTAX_LEGACY, NBT_SYNTAX_FOLLOW) }
+                    ?: NBT_SYNTAX_MODERN
                 val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
@@ -185,6 +202,7 @@ class SettingsRepository @Inject constructor(
                 _defaultUseText.value = defaultUseText
                 _executePrefixEnabled.value = executePrefixEnabled
                 _separatorAsTextComponent.value = separatorAsTextComponent
+                _nbtSyntax.value = nbtSyntax
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
                 
@@ -206,6 +224,7 @@ class SettingsRepository @Inject constructor(
         val defaultUseText = _defaultUseText.value
         val executePrefixEnabled = _executePrefixEnabled.value
         val separatorAsTextComponent = _separatorAsTextComponent.value
+        val nbtSyntax = _nbtSyntax.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
         
@@ -218,6 +237,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_DEFAULT_USE_TEXT": $defaultUseText,
               "$KEY_EXECUTE_PREFIX_ENABLED": $executePrefixEnabled,
               "$KEY_SEPARATOR_AS_TEXT_COMPONENT": $separatorAsTextComponent,
+              "$KEY_NBT_SYNTAX": "$nbtSyntax",
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
             }
@@ -344,6 +364,11 @@ class SettingsRepository @Inject constructor(
     suspend fun getSeparatorAsTextComponent(): Boolean {
         return _separatorAsTextComponent.value
     }
+
+    /** 读取"新旧版本差异"策略（modern / legacy / follow）。 */
+    fun getNbtSyntax(): String {
+        return _nbtSyntax.value
+    }
     
     /**
      * 设置separator使用文本组件开关
@@ -351,6 +376,12 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun setSeparatorAsTextComponent(enabled: Boolean) {
         _separatorAsTextComponent.value = enabled
+        saveConfig()
+    }
+
+    /** 设置"新旧版本差异"策略（modern / legacy / follow）。 */
+    suspend fun setNbtSyntax(value: String) {
+        _nbtSyntax.value = value
         saveConfig()
     }
     
