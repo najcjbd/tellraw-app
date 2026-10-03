@@ -569,9 +569,14 @@ object ExecuteConverter {
                 }
             }
             Direction.BEDROCK_TO_JAVA -> when (cond.name) {
-                "entity" -> convertEntityBedrockToJava(cond, reminders)
-                // items/data/slots 本就是 Java 语法，目标版本即 Java，原样保留即正确
-                else -> CondOut.Out(originalTokens(cond))
+                "entity" -> {
+                    // 保真路径里也可能带着老式 tag:{…} -> 交给 rewriteLegacyTags 统一处理
+                    val r = convertEntityBedrockToJava(cond, reminders)
+                    if (r is CondOut.Out) CondOut.Out(rewriteLegacyTags(r.tokens, reminders)) else r
+                }
+                // items/data/slots 本就是 Java 语法，目标版本即 Java，原样保留即正确；
+                // 但要顺手把老式 tag:{…} 改写成数据组件写法（1.20.5 起 tag 失效）
+                else -> CondOut.Out(rewriteLegacyTags(originalTokens(cond), reminders))
             }
         }
         return when (out) {
@@ -595,6 +600,12 @@ object ExecuteConverter {
         if (target == "*") return dropAnd(reminders, "items 的目标 * (所有被追踪实体) 基岩无对应")
         val pred = ExecCondSupport.parseJavaPredicate(predicateRaw)
         if (pred.reason != null) return dropAnd(reminders, "物品谓词无法映射到 hasitem：${pred.reason}")
+        pred.damage?.let {
+            reminders.add(
+                "物品谓词里的 damage 组件（有耐久物品的已损耗耐久）已写成基岩的 data=$it" +
+                    "（数据组件.txt:569 / 谓词.txt:10-12）；若该物品不是有耐久的物品，基岩 data 的含义不同，请自行核对"
+            )
+        }
         val (loc, slot, err) = ExecCondSupport.javaSlotsToHasitem(slots, reminders)
         if (err != null) return dropAnd(reminders, "Java 槽位无法映射到 hasitem：$err")
 
@@ -966,6 +977,22 @@ object ExecuteConverter {
         val negate = if (meansNone) !enclosingUnless else enclosingUnless
         val kw = if (negate) "unless" else "if"
 
+        // 基岩 data= 的提醒（2026-09-27：以前被静默丢掉，实测它仍然有效）
+        if (h.data != null) {
+            val n = h.data.toIntOrNull()
+            reminders.add(
+                if (n != null && n > 0)
+                    "基岩 \"$obj\" 的 data=$n 是**有耐久物品的损耗值**，已映射成 Java 的 damage 组件测试 " +
+                        "[damage=$n]（数据组件.txt:569 / 谓词.txt:10-12 / minecraft.wiki：1.20.5 起 tag 被数据组件取代）。" +
+                        "若该物品不是有耐久的物品，data 的含义不同（旧式变体值），请自行核对"
+                else if (n == 0)
+                    "基岩 \"$obj\" 的 data=0 表示**未受损**；Java 里\"没有 damage 组件\"就是未受损（默认），" +
+                        "所以未加组件测试，请自行核对"
+                else
+                    "基岩 \"$obj\" 的 data=${h.data} 不是 0..32767 的整数（文档要求），无法映射到 Java 的 damage 组件，已忽略该限制"
+            )
+        }
+
         // ---- 没写 location（= 目标的所有物品栏）：Java 里没有裸 `*` 这种槽位源
         //      （2026-09-27 实测：`*` 不存在），按第十节【有/无某物品】改用 data + nbt ----
         if (h.location == null) {
@@ -1261,6 +1288,25 @@ object ExecuteConverter {
         val all = kept + merged
         val newToken = if (all.isEmpty()) varName else "$varName[${all.joinToString(",")}]"
         return newToken to extra
+    }
+
+    /** Java 版输出时把老式 `tag:{…}` 改写成数据组件写法（用户选的"提醒 + 尝试改写"）。 */
+    private fun rewriteLegacyTags(tokens: List<String>, reminders: MutableList<String>): List<String> {
+        var changed = false
+        val out = tokens.map { t ->
+            if ("tag:{" in t) {
+                val (r, c) = ExecCondSupport.rewriteLegacyTag(t)
+                if (c) { changed = true; r } else t
+            } else t
+        }
+        if (changed) {
+            reminders.add(
+                "输入里有老式 tag:{…}：1.20.5 起 Java 用数据组件取代了 tag（实测 `tag:{}` 在 26.2 已不匹配），" +
+                    "已改写为 components 写法（自定义数据 -> minecraft:custom_data，损耗值 Damage -> minecraft:damage）。" +
+                    "若原键是原版标签（display / Enchantments / Unbreakable 等），组件名与之不同，请自行核对"
+            )
+        }
+        return out
     }
 
     /** 往选择器里追加参数；选择器必须已带 `[...]` 或形如 `@a`。 */

@@ -68,6 +68,60 @@ internal object ExecCondSupport {
         }
     }
 
+    /**
+     * 把老式 NBT 里的 `tag:{…}` 改写成 1.20.5+ 的数据组件写法（用户选的"提醒 + 尝试改写"）。
+     *  - `tag:{Damage:N}`（旧式损耗值）-> `components:{"minecraft:damage":N}`
+     *  - 其它 `tag:{X:V,…}`（自定义数据）-> `components:{"minecraft:custom_data":{X:V,…}}`
+     *
+     * 依据：minecraft.wiki（1.20.5 "Replaced tag and all underlying item-specific tags with data
+     * components"；`minecraft:custom_data` = 任意自定义数据，原例 `iron_sword[custom_data={foo:1}]`；
+     * `minecraft:damage` = 已消耗的耐久值）、数据组件.txt:538-542 / 566-569。
+     * 注意：原版标签（display / Enchantments / Unbreakable 等）的组件名与原键名**不同**，
+     * 只有 Damage 与 damage 同名同义才特判；其余一律按"自定义数据"改写并由调用方提醒。
+     *
+     * 返回 (结果, 是否发生过改写)。花括号不配对时原样返回（不猜）。
+     */
+    fun rewriteLegacyTag(text: String): Pair<String, Boolean> {
+        var out = text
+        var changed = false
+        while (true) {
+            val start = out.indexOf("tag:{")
+            if (start < 0) break
+            val open = start + 4
+            val end = matchBrace(out, open) ?: break
+            val body = out.substring(open + 1, end)
+            out = out.substring(0, start) + legacyTagBodyToComponents(body) + out.substring(end + 1)
+            changed = true
+        }
+        return out to changed
+    }
+
+    private fun legacyTagBodyToComponents(body: String): String {
+        val dmg = Regex("^Damage\\s*:\\s*(\\d+)[bBsSlL]?$").find(body.trim())?.groupValues?.get(1)
+        return if (dmg != null) "components:{\"minecraft:damage\":$dmg}"
+        else "components:{\"minecraft:custom_data\":{$body}}"
+    }
+
+    /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
+    private fun matchBrace(s: String, open: Int): Int? {
+        var depth = 0
+        var quote: Char? = null
+        var i = open
+        while (i < s.length) {
+            val c = s[i]
+            if (quote != null) {
+                if (c == '\\' && i + 1 < s.length) { i += 2; continue }
+                if (c == quote) quote = null
+            } else when (c) {
+                '"', '\'' -> quote = c
+                '{' -> depth++
+                '}' -> { depth--; if (depth == 0) return i }
+            }
+            i++
+        }
+        return null
+    }
+
     /** 按 [sep] 切分，尊重 [] {} "" '' 内部的嵌套；空片段丢弃。 */
     fun splitTopLevel(s: String, sep: Char): List<String> {
         val out = mutableListOf<String>()
@@ -157,7 +211,9 @@ internal object ExecCondSupport {
         val itemId: String?,
         val count: String?,
         val countNegated: Boolean,
-        val reason: String?
+        val reason: String?,
+        /** `[damage=N]`：有耐久物品的**已损耗耐久** -> 基岩的 `data=N`（数据组件.txt:569 / wiki）。 */
+        val damage: String? = null
     )
 
     fun parseJavaPredicate(raw: String): JavaPredicate {
@@ -174,11 +230,44 @@ internal object ExecCondSupport {
         val inner = tests.substring(1, tests.length - 1).trim()
         if (inner.isEmpty()) return JavaPredicate(idPart, null, false, null)
 
-        // hasitem 只能表达"单一数量约束"，出现顶层 , / | 组合（与/或）或组件测试时无法映射
-        if (hasTopLevel(inner, setOf(',', '|'))) {
-            return JavaPredicate(null, null, false, "物品谓词含多个测试项（, / |），hasitem 只能表达单一数量约束")
+        // hasitem 只有 quantity / data 两个子选项 -> 只允许"一个 count 测试 + 一个 damage 测试"这一种组合；
+        // 出现 | （或）或其它组件测试项 -> 无法映射
+        if (hasTopLevel(inner, setOf('|'))) {
+            return JavaPredicate(null, null, false, "物品谓词含 | （或）组合，hasitem 表达不了")
         }
-        return parseCountTest(idPart, inner)
+        val parts = splitTopLevel(inner, ',')
+        if (parts.size > 2) {
+            return JavaPredicate(null, null, false, "物品谓词测试项太多（hasitem 只有 quantity / data 两个子选项）")
+        }
+        var count: String? = null
+        var countNeg = false
+        var damage: String? = null
+        for (part in parts) {
+            val t = part.trim()
+            if (t == "damage" || t.startsWith("damage=") || t.startsWith("damage~") || t.startsWith("!damage")) {
+                damage = parseDamageTest(t) ?: return JavaPredicate(
+                    null, null, false, "damage 测试 \"$t\" 无法映射到基岩的 data（data 只支持 0..32767 的单个值）"
+                )
+                continue
+            }
+            val cp = parseCountTest(idPart, t)
+            if (cp.reason != null) return cp
+            count = cp.count
+            countNeg = cp.countNegated
+        }
+        return JavaPredicate(idPart, count, countNeg, null, damage)
+    }
+
+    /**
+     * Java 物品谓词里的 damage 测试 -> 基岩 `data` 值。
+     * `damage=N` -> N；`!damage`（没有 damage 组件）与 `damage=0` 都是"未受损" -> "0"；
+     * `damage~{…}` 是区间，而基岩 data 只接受 0..32767 的**单个值** -> null（调用方提醒）。
+     */
+    private fun parseDamageTest(t: String): String? {
+        if (t.startsWith("!")) return if (t.substring(1).trim() == "damage") "0" else null
+        if (t == "damage") return null
+        if (t.startsWith("damage=")) return t.substringAfter("damage=").trim().toIntOrNull()?.takeIf { it in 0..32767 }?.toString()
+        return null
     }
 
     private fun parseCountTest(idPart: String, test: String): JavaPredicate {
@@ -235,6 +324,8 @@ internal object ExecCondSupport {
         if (location != null) parts.add("location=$location")
         if (slot != null) parts.add("slot=$slot")
         if (!dropQuantity) quantityForPredicate(pred)?.let { parts.add("quantity=$it") }
+        // damage 组件 -> 基岩 data（有耐久物品的损耗值）
+        pred.damage?.let { parts.add("data=$it") }
         return parts.joinToString(",")
     }
 
@@ -245,7 +336,9 @@ internal object ExecCondSupport {
         val quantity: String?,
         val location: String?,
         val slot: String?,
-        val reason: String?
+        val reason: String?,
+        /** 基岩 `data=`：有耐久物品的**损耗值**（数据组件.txt:569 "物品的损坏值"）；其它物品是旧式变体值。 */
+        val data: String? = null
     )
 
     fun parseHasitemObject(s: String): Hasitem {
@@ -253,6 +346,7 @@ internal object ExecCondSupport {
         var quantity: String? = null
         var location: String? = null
         var slot: String? = null
+        var data: String? = null
         for (part in splitTopLevel(s, ',')) {
             val i = part.indexOf('=')
             if (i < 0) continue
@@ -261,10 +355,12 @@ internal object ExecCondSupport {
                 "quantity" -> quantity = part.substring(i + 1).trim().trim('"')
                 "location" -> location = part.substring(i + 1).trim().trim('"')
                 "slot" -> slot = part.substring(i + 1).trim().trim('"')
+                // 2026-09-27：data 以前被静默丢掉（实测它仍然有效，见自检包 x7=1），现在读进来
+                "data" -> data = part.substring(i + 1).trim().trim('"')
             }
         }
-        if (item.isNullOrBlank()) return Hasitem(null, quantity, location, slot, "hasitem 缺少必填的 item")
-        return Hasitem(item, quantity, location, slot, null)
+        if (item.isNullOrBlank()) return Hasitem(null, quantity, location, slot, "hasitem 缺少必填的 item", data)
+        return Hasitem(item, quantity, location, slot, null, data)
     }
 
     /** quantity -> Java 物品谓词的 count 测试；null 表示无。 */
@@ -287,10 +383,27 @@ internal object ExecCondSupport {
         }
     }
 
-    /** hasitem 对象 -> Java 物品谓词（含命名空间）。 */
+    /**
+     * 基岩 `data=` -> Java 物品谓词里的组件测试（**有耐久物品的损耗值**）。
+     *
+     * 依据：数据组件.txt:566-569（`minecraft:damage` = "物品的损坏值"，值≥0，默认 0）、
+     *      谓词.txt:10-12（`<数据组件ID>=<值>`，如 `*[damage=0]`）、
+     *      minecraft.wiki（1.20.5 起 `tag` 被数据组件取代；`damage` 是"已消耗的耐久值"）。
+     * `data=0`（未受损）在 Java 里是**默认状态**（没有 damage 组件）-> 不加测试，只提醒。
+     * 返回 null 表示"没有可加的测试"；非整数也返回 null（由调用方提醒）。
+     */
+    fun damageTestForData(data: String?): String? {
+        val n = data?.trim()?.toIntOrNull() ?: return null
+        return if (n > 0) "damage=$n" else null
+    }
+
+    /** hasitem 对象 -> Java 物品谓词（含命名空间）。count 与 damage 合并成同一个 [] 列表。 */
     fun javaPredicateForHasitem(h: Hasitem): String {
         val id = addNs(h.item!!)
-        return id + (countTestForQuantity(h.quantity) ?: "")
+        val tests = mutableListOf<String>()
+        countTestForQuantity(h.quantity)?.let { tests.add(it.removeSurrounding("[", "]")) }
+        damageTestForData(h.data)?.let { tests.add(it) }
+        return if (tests.isEmpty()) id else "$id[${tests.joinToString(",")}]"
     }
 
     // ========================== 槽位映射 ==========================
@@ -532,6 +645,14 @@ internal object ExecCondSupport {
      */
     fun nbtToHasitemItems(nbt: String, reminders: MutableList<String>): NbtMap {
         val t = nbt.trim()
+        // 老式 tag:{…}：基岩 hasitem 表达不了自定义数据/组件 -> 会被丢掉，必须提醒（不能静默放宽条件）
+        if ("tag:" in t) {
+            reminders.add(
+                "NBT 里含老式 tag:{…}：基岩 hasitem **表达不了**自定义数据/组件，该部分已被丢掉（条件被放宽）。" +
+                    "另外 1.20.5 起 Java 也用数据组件取代了 tag（实测：`tag:{}` 在 26.2 上已不匹配）：" +
+                    "自定义数据写成 components:{\"minecraft:custom_data\":{…}}，损耗值写成 components:{\"minecraft:damage\":N}"
+            )
+        }
         // NBT 路径不一定带花括号（execute.txt:1223,1235）：`equipment.head.id`、
         // `Inventory[{Slot:21b,id:"…"}]`、`SelectedItem.id` 等点号/方括号形式单独处理。
         if (!t.startsWith("{")) return nbtPathToHasitemItems(t, reminders)

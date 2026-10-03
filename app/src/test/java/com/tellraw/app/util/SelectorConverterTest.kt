@@ -58,6 +58,21 @@ class SelectorConverterTest {
         assertFalse("老式 count:2b 在新版失效", q2.first.contains("count:2b"))
     }
 
+    /** 老式 tag:{…} 在 Java 输出里应改写成数据组件写法（1.20.5 起 tag 失效，实测 tag:{} 不匹配） */
+    @Test
+    fun testLegacyTagRewrittenInJavaSelector() {
+        val custom = SelectorConverter.filterSelectorParameters(
+            "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond\",tag:{foo:1}}]}]", SelectorType.JAVA, context
+        )
+        assertTrue("自定义数据应改写为 custom_data", custom.first.contains("custom_data"))
+        assertFalse("不应再留 tag:", custom.first.contains("tag:"))
+
+        val dmg = SelectorConverter.filterSelectorParameters(
+            "@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:diamond_sword\",tag:{Damage:5}}]}]", SelectorType.JAVA, context
+        )
+        assertTrue("损耗值应改写为 damage 组件", dmg.first.contains("\"minecraft:damage\":5"))
+    }
+
     /** slot.enderchest 在两条代码路径上都要能转（与前置框那条路保持一致） */
     @Test
     fun testEnderchestMapsToEnderItems() {
