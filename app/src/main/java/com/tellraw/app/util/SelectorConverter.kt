@@ -883,6 +883,17 @@ object SelectorConverter {
             }
         }
 
+        // 老式 tag:{…} 改写（只对 Java 版输出做；Bedrock 没有数据组件）。
+        // 1.20.5 起 Java 用数据组件取代了 tag（实测：`tag:{}` 在 26.2 上已不匹配），
+        // 自定义数据 -> custom_data，损耗值 Damage -> damage。这是"提醒 + 尝试改写"里的改写那一半。
+        if (targetVersion == SelectorType.JAVA && "tag:{" in finalSelector) {
+            val (rewritten, changed) = ExecCondSupport.rewriteLegacyTag(finalSelector)
+            if (changed) {
+                finalSelector = rewritten
+                conversionReminders.add(getStringSafely(context, R.string.legacy_tag_rewritten))
+            }
+        }
+
         return Triple(finalSelector, removedParams, conversionReminders)
     }
     

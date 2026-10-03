@@ -386,4 +386,5 @@
     <string name="hasitem_air_cannot_express">基岩 hasitem 的 item=air 表示"該槽位是空的"，Java 的選擇器寫不出來（air 不會作為物品堆疊存在），已去掉該條件。要表達"該槽為空"請用 execute，如 execute unless items entity @s &lt;槽位&gt; *</string>
     <string name="hasitem_quantity_zero_cannot_express">基岩 hasitem 的 quantity=0 表示"沒有該物品"，Java 的選擇器寫不出來，已去掉該條件。若要保留語意請用 execute，如 execute unless items entity @s &lt;槽位&gt; &lt;物品&gt;</string>
     <string name="hasitem_quantity_open_range_removed">基岩 hasitem 的 quantity=0.. 表示"當前條件項目不做過濾"（實測確認），條件形同虛設，已去掉該條件（去掉後與基岩語意一致）</string>
+    <string name="legacy_tag_rewritten">輸入裡有老式 tag:{…}：1.20.5 起 Java 用資料組件取代了 tag（實測 tag:{} 在 26.2 已不匹配），已改寫成 components 寫法（自訂資料 -> minecraft:custom_data，損耗值 Damage -> minecraft:damage）。若原鍵是原版標籤（display / Enchantments / Unbreakable 等），組件名與之不同，請自行核對</string>
 </resources>

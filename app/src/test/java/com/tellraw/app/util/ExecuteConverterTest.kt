@@ -447,6 +447,92 @@ class ExecuteConverterTest {
         assertTrue(neg.second.isEmpty())
     }
 
+    // ---------------------------------------------------------------
+    //  基岩 data（有耐久物品的损耗值）<-> Java damage 组件
+    //  数据组件.txt:569 / 谓词.txt:10-12 / minecraft.wiki（1.20.5 起 tag 被数据组件取代）
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testBedrockDataMapsToJavaDamageComponent() {
+        val (out, reminders) = conv(
+            "execute as @a if entity @s[hasitem={item=diamond_sword,location=slot.weapon.mainhand,data=5}]",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals("execute as @a if items entity @s weapon.mainhand minecraft:diamond_sword[damage=5]", out)
+        assertTrue(reminders.any { it.contains("损耗值") })
+    }
+
+    @Test
+    fun testBedrockDataZeroAddsNoComponentTest() {
+        val (out, reminders) = conv(
+            "execute as @a if entity @s[hasitem={item=diamond_sword,location=slot.weapon.mainhand,data=0}]",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals("execute as @a if items entity @s weapon.mainhand minecraft:diamond_sword", out)
+        assertTrue(reminders.any { it.contains("未受损") })
+    }
+
+    @Test
+    fun testJavaDamageComponentMapsToBedrockData() {
+        val (out, reminders) = conv(
+            "execute as @a if items entity @s weapon.mainhand minecraft:diamond_sword[count=1,damage=5]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals(
+            "execute as @a if entity @s[hasitem={item=diamond_sword,location=slot.weapon.mainhand,slot=0,quantity=1,data=5}]",
+            out
+        )
+        assertTrue(reminders.any { it.contains("data=5") })
+    }
+
+    @Test
+    fun testJavaDamageRangeIsDroppedWithReason() {
+        val (out, reminders) = conv(
+            "execute as @a if items entity @s weapon.mainhand minecraft:diamond_sword[damage~{min:1}]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertEquals("execute as @a", out)
+        assertTrue(reminders.any { it.contains("data 只支持") })
+    }
+
+    // ---------------------------------------------------------------
+    //  老式 tag:{…}：Java 输出改写 / 基岩输出丢掉并提醒
+    // ---------------------------------------------------------------
+
+    @Test
+    fun testLegacyTagRewrittenToCustomDataInJavaOutput() {
+        val (out, reminders) = conv(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1}}]}",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertEquals(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\"," +
+                "components:{\"minecraft:custom_data\":{foo:1}}}]}",
+            out
+        )
+        assertTrue(reminders.any { it.contains("tag:{…}") })
+    }
+
+    @Test
+    fun testLegacyDamageTagRewrittenToDamageComponent() {
+        val (out, _) = conv(
+            "execute as @a if entity @s[nbt={Inventory:[{id:\"minecraft:diamond_sword\",tag:{Damage:3}}]}]",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertTrue(out!!.contains("components:{\"minecraft:damage\":3}"))
+    }
+
+    @Test
+    fun testLegacyTagDroppedWithReminderForBedrockOutput() {
+        val (out, reminders) = conv(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1}}]}",
+            Direction.JAVA_TO_BEDROCK
+        )
+        // 输入没写 Slot -> 不限槽位，基岩侧就是 hasitem={item=diamond}（实测输出）
+        assertEquals("execute as @a if entity @s[hasitem={item=diamond}]", out)
+        assertTrue(reminders.any { it.contains("表达不了") })
+    }
+
     @Test
     fun testHasitemQuantityToNbtUsesIntegerCount() {
         // 2026-09-27 实测（Java 26.2）：老式 `count:2b` 不再匹配，`count:2`（整数）才匹配
