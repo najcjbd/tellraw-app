@@ -382,4 +382,7 @@
 • 提醒信息可能不完整</string>
     <string name="java_bedrock_mixed_mode_warning_message">警告：请在正式使用前先测试转换结果，确保符合预期！</string>
     <string name="please_wait_seconds">请等待 %d 秒后再点击确定</string>
+    <string name="hasitem_air_cannot_express">基岩 hasitem 的 item=air 表示"该槽位是空的"，Java 的选择器写不出来（air 不会作为物品堆叠存在），已去掉该条件。要表达"该槽为空"请用 execute，如 execute unless items entity @s &lt;槽位&gt; *</string>
+    <string name="hasitem_quantity_zero_cannot_express">基岩 hasitem 的 quantity=0 表示"没有该物品"，Java 的选择器写不出来，已去掉该条件。若要保留语义请用 execute，如 execute unless items entity @s &lt;槽位&gt; &lt;物品&gt;</string>
+    <string name="hasitem_quantity_open_range_removed">基岩 hasitem 的 quantity=0.. 表示"当前条件项目不做过滤"（实测确认），条件形同虚设，已去掉该条件（去掉后与基岩语义一致）</string>
 </resources>
