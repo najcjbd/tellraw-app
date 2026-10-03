@@ -90,7 +90,15 @@ internal object ExecCondSupport {
             val open = start + 4
             val end = matchBrace(out, open) ?: break
             val body = out.substring(open + 1, end)
-            out = out.substring(0, start) + VersionDiff.legacyTagBodyToComponents(body) + out.substring(end + 1)
+            val replacement = VersionDiff.legacyTagBodyToComponents(body)
+            out = if (replacement.isEmpty()) {
+                // 整个 tag 被去掉了（例如 Unbreakable:0b）-> 顺手清掉它前面/后面多余的逗号
+                val before = out.substring(0, start).trimEnd().removeSuffix(",")
+                val after = out.substring(end + 1).trimStart().removePrefix(",")
+                before + after
+            } else {
+                out.substring(0, start) + replacement + out.substring(end + 1)
+            }
             changed = true
         }
         return out to changed

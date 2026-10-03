@@ -60,6 +60,34 @@ object VersionDiff {
         "Charged" to "charged_projectiles",
     )
 
+    /**
+     * 只出现在**物品堆栈层级**的键（`id` / `Count` / `tag` 的兄弟），不在 tag 体内。
+     */
+    val STACK_LEVEL_RENAMES: Map<String, String> = linkedMapOf(
+        "Count" to "count",
+    )
+
+    /**
+     * 出现在 **tag 体内**的键 -> 新组件 ID（1.20.5 起它们都变成平级组件）。
+     * `Count` 不在此表（它是堆栈层级）。
+     */
+    val TAG_BODY_RENAMES: Map<String, String> = linkedMapOf(
+        "Damage" to "minecraft:damage",
+        "Unbreakable" to "unbreakable",
+        "Enchantments" to "enchantments",
+        "AttributeModifiers" to "attribute_modifiers",
+        "CanDestroy" to "can_break",
+        "CanPlaceOn" to "can_place_on",
+        "HideFlags" to "tooltip_display",
+        "RepairCost" to "repair_cost",
+        "SkullOwner" to "profile",
+        "Potion" to "potion_contents",
+        "Charged" to "charged_projectiles",
+    )
+
+    /** 旧写法里 `display:<复合>` 的子键 -> 新组件 ID（这三个在新版是**平级**组件，display 壳被拆掉）。 */
+    val DISPLAY_CONTAINER = "display"
+
     /** `display.<子键>` -> 新组件 ID（旧写法把这三个塞在 display 复合里）。 */
     val DISPLAY_RENAMES: Map<String, String> = linkedMapOf(
         "Name" to "custom_name",
@@ -79,8 +107,32 @@ object VersionDiff {
      * 已实现：`Count:1b` -> `count:1`（1.20.5 起 count 是整数，实测 v2=0 / v3=1）。
      */
     fun legacyValueToModern(legacyKey: String, legacyValue: String): String? = when (legacyKey) {
-        "Count" -> legacyValue.trim().removeSuffix("b").removeSuffix("B").takeIf { it.toIntOrNull() != null }
+        "Count", "Damage", "RepairCost" ->
+            stripByteSuffix(legacyValue)?.takeIf { it.toIntOrNull() != null }
+        // 附魔：旧的 [{id:"x",lvl:N}] -> 新的 {levels:{"x":N}}
+        "Enchantments" -> legacyEnchantmentsToModern(legacyValue)
+        // 药水：旧的字符串 id -> 新的 {potion:"…"}
+        "Potion" -> legacyValue.trim().removeSurrounding("\"")
+            .takeIf { it.isNotBlank() }?.let { "{potion:\"$it\"}" }
         else -> null
+    }
+
+    private fun stripByteSuffix(v: String): String? =
+        v.trim().removeSuffix("b").removeSuffix("B").trim().takeIf { it.isNotBlank() }
+
+    /** `[{id:"minecraft:x",lvl:2},{…}]` -> `{levels:{"minecraft:x":2,…}}`。解析不了返回 null。 */
+    private fun legacyEnchantmentsToModern(value: String): String? {
+        val body = value.trim().removeSurrounding("[", "]")
+        if (value.trim() == "[]") return "{levels:{}}"
+        val entries = ExecCondSupport.splitTopLevel(body, ',')
+        if (entries.isEmpty()) return null
+        val pairs = mutableListOf<String>()
+        for (e in entries) {
+            val id = Regex("id\\s*:\\s*\"([^\"]+)\"").find(e)?.groupValues?.get(1) ?: return null
+            val lvl = Regex("lvl\\s*:\\s*(-?\\d+)").find(e)?.groupValues?.get(1) ?: return null
+            pairs.add("\"$id\":$lvl")
+        }
+        return "{levels:{${pairs.joinToString(",")}}}"
     }
 
     /**
@@ -89,20 +141,124 @@ object VersionDiff {
      */
     fun modernValueToLegacy(modernKey: String, modernValue: String): String? = when (modernKey) {
         "count" -> modernValue.trim().takeIf { it.toIntOrNull() != null }?.let { "${it}b" }
+        "minecraft:damage", "repair_cost" -> modernValue.trim().takeIf { it.toIntOrNull() != null }
+        // 附魔：新的 {levels:{"x":N}} -> 旧的 [{id:"x",lvl:N}]
+        "enchantments" -> modernEnchantmentsToLegacy(modernValue)
+        // 药水：新的 {potion:"…"} -> 旧的字符串 id
+        "potion_contents" -> Regex("potion\\s*:\\s*\"([^\"]+)\"").find(modernValue)?.groupValues?.get(1)
         else -> null
     }
 
+    /** `{levels:{"minecraft:x":2}}` -> `[{id:"minecraft:x",lvl:2}]`。解析不了返回 null。 */
+    private fun modernEnchantmentsToLegacy(value: String): String? {
+        val m = Regex("levels\\s*:\\s*\\{").find(value) ?: return null
+        val open = m.range.last
+        val end = matchBrace(value, open) ?: return null
+        val body = value.substring(open + 1, end)
+        if (body.isBlank()) return "[]"
+        val out = mutableListOf<String>()
+        for (e in ExecCondSupport.splitTopLevel(body, ',')) {
+            val i = e.lastIndexOf(':')
+            if (i < 0) return null
+            val id = e.substring(0, i).trim().removeSurrounding("\"")
+            val lvl = e.substring(i + 1).trim().toIntOrNull() ?: return null
+            out.add("{id:\"$id\",lvl:$lvl}")
+        }
+        return "[${out.joinToString(",")}]"
+    }
+
     /**
-     * 旧 `tag:{…}` 的复合体 -> 新组件写法（整段搬运规则）。
-     *  - 只有 `Damage:N` 一项时 -> `components:{"minecraft:damage":N}`（同名同义，特判）
-     *  - 其余 -> `components:{"minecraft:custom_data":{…}}`（wiki：custom_data = 任意自定义数据）
+     * 旧 `tag:{…}` 的复合体 -> 新写法的组件列表（每个元素形如 `"minecraft:damage":3`）。
+     *
+     * 规则（wiki："Replaced tag and all underlying item-specific tags with data components"）：
+     *  - **认得的原版键** -> 各自变成平级组件（值形状按表换算；换算不了的**只改键名**，键名交给调用方提醒）
+     *  - `display:{…}` 里的 Name/Lore/color -> 平级的 custom_name / lore / dyed_color（display 壳拆掉）；
+     *    display 里其它子键仍算自定义数据
+     *  - `Unbreakable:1b` -> `unbreakable:{}`（存在即"不毁"）；`0b` -> 新版就是"没有该组件"，不输出
+     *  - **不认得的键** -> 收集进 `custom_data`（wiki：custom_data = 任意自定义数据）
+     *
+     * 返回 (组件列表, 值形状没能换算的键名列表)；花括号不配对返回 null（不猜）。
+     */
+    fun legacyTagBodyToComponentMap(body: String): Pair<List<String>, List<String>>? {
+        val components = mutableListOf<String>()
+        val custom = mutableListOf<String>()
+        val unshaped = mutableListOf<String>()
+
+        fun putComponent(modernId: String, key: String, rawValue: String) {
+            val v = legacyValueToModern(key, rawValue) ?: run { unshaped.add(key); rawValue }
+            components.add("\"$modernId\":$v")
+        }
+
+        for (entry in ExecCondSupport.splitTopLevel(body, ',')) {
+            val i = ExecCondSupport.indexOfTopLevel(entry, ':')
+            if (i < 0) { custom.add(entry); continue }
+            val key = entry.substring(0, i).trim().removeSurrounding("\"")
+            val value = entry.substring(i + 1).trim()
+
+            if (key == DISPLAY_CONTAINER && value.startsWith("{")) {
+                val end = matchBrace(value, 0) ?: return null
+                val rest = mutableListOf<String>()
+                for (sub in ExecCondSupport.splitTopLevel(value.substring(1, end), ',')) {
+                    val j = ExecCondSupport.indexOfTopLevel(sub, ':')
+                    if (j < 0) { rest.add(sub); continue }
+                    val subKey = sub.substring(0, j).trim().removeSurrounding("\"")
+                    val subVal = sub.substring(j + 1).trim()
+                    val modern = DISPLAY_RENAMES[subKey]
+                    if (modern == null) rest.add(sub) else putComponent(modern, "$DISPLAY_CONTAINER.$subKey", subVal)
+                }
+                if (rest.isNotEmpty()) custom.add("$DISPLAY_CONTAINER:{${rest.joinToString(",")}}")
+                continue
+            }
+
+            if (key == "Unbreakable") {
+                when (value.trim().removeSuffix("b").removeSuffix("B").trim()) {
+                    "1", "true" -> components.add("\"unbreakable\":{}")
+                    "0", "false" -> { /* 旧版"不毁=假" -> 新版 = 没有这个组件 */ }
+                    else -> { unshaped.add(key); components.add("\"unbreakable\":$value") }
+                }
+                continue
+            }
+
+            val modern = TAG_BODY_RENAMES[key]
+            if (modern != null) putComponent(modern, key, value) else custom.add(entry)
+        }
+
+        if (custom.isNotEmpty()) {
+            components.add("\"minecraft:$MODERN_CUSTOM_DATA_KEY\":{${custom.joinToString(",")}}")
+        }
+        return components to unshaped
+    }
+
+    /**
+     * 兼容旧调用：把 tag 体直接转成 `components:{…}` 文本。
+     * （不认识的键进 custom_data；解析失败时整体按自定义数据处理，与旧行为一致。）
      */
     fun legacyTagBodyToComponents(body: String): String {
-        val dmg = Regex("^Damage\\s*:\\s*(\\d+)[bBsSlL]?$").find(body.trim())?.groupValues?.get(1)
-        return if (dmg != null) {
-            "components:{\"${KEY_RENAMES["Damage"]}\":$dmg}"
-        } else {
-            "components:{\"minecraft:$MODERN_CUSTOM_DATA_KEY\":{$body}}"
+        val parsed = legacyTagBodyToComponentMap(body)
+            ?: return "components:{\"minecraft:$MODERN_CUSTOM_DATA_KEY\":{$body}}"
+        // 一个组件都没有（例如旧版写着 Unbreakable:0b = "不毁=假" = 新版默认状态）
+        // -> 返回空串，由调用方把整个 tag:{} 去掉（并清掉多余的逗号）
+        if (parsed.first.isEmpty()) return ""
+        return "components:{${parsed.first.joinToString(",")}}"
+    }
+
+    /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
+    private fun matchBrace(s: String, open: Int): Int? {
+        var depth = 0
+        var quote: Char? = null
+        var i = open
+        while (i < s.length) {
+            val c = s[i]
+            if (quote != null) {
+                if (c == '\\' && i + 1 < s.length) { i += 2; continue }
+                if (c == quote) quote = null
+            } else when (c) {
+                '"', '\'' -> quote = c
+                '{' -> depth++
+                '}' -> { depth--; if (depth == 0) return i }
+            }
+            i++
         }
+        return null
     }
 }
