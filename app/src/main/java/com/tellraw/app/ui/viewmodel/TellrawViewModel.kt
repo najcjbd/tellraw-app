@@ -800,7 +800,7 @@ class TellrawViewModel @Inject constructor(
                 )
                 val nbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
-                    javaSelector, allReminders, preferExecute = _executePrefixEnabled.value
+                    javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
                 )
                 // 目标选择器（tellraw 的收信人）与"要折进 execute 的 token"。
                 // 注：拆出来后 condTokens 可能为空（例如 quantity=0.. 这种"形同虚设"的条件被去掉），

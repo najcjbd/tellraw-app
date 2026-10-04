@@ -597,6 +597,57 @@ class ExecuteConverterTest {
     }
 
     @Test
+    fun testVersionPolicyLegacyDegradesItemsToNbt() {
+        // LEGACY：<1.20.5 **没有** execute items（execute.txt:1259）-> 改用 nbt 形式
+        val (out, reminders) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond,location=slot.hotbar,slot=5}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals("execute as @a if data entity @s {Inventory:[{Slot:5b,id:\"minecraft:diamond\"}]}", out)
+        assertTrue(reminders.any { it.contains("没有 execute items") })
+    }
+
+    @Test
+    fun testVersionPolicyLegacyQuantityZeroUsesExistence() {
+        // quantity=0 = "没有该物品"：LEGACY 下不能写 count:0（那是"永不匹配"）-> 去掉数量 + unless
+        val (out, _) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond,quantity=0}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals("execute as @a unless data entity @s {Inventory:[{id:\"minecraft:diamond\"}]}", out)
+    }
+
+    @Test
+    fun testVersionPolicyLegacyCountUsesByteForm() {
+        // LEGACY 下物品堆叠数是旧写法 `Count:Nb`
+        val (out, _) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond,location=slot.hotbar,slot=5,quantity=3}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertTrue("旧版应写 Count:3b，实际：$out", out!!.contains("Count:3b"))
+    }
+
+    @Test
+    fun testVersionPolicyLegacyAirIsDroppedWithReason() {
+        val (out, reminders) = convWith(
+            "execute as @a if entity @s[hasitem={item=air,location=slot.armor.head}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals("execute as @a", out)
+        assertTrue(reminders.any { it.contains("没有 execute items") })
+    }
+
+    @Test
+    fun testVersionPolicyModernStillUsesItems() {
+        // 对照：MODERN 下仍然是 items（默认行为不变）
+        val (out, _) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond,location=slot.hotbar,slot=5}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.MODERN
+        )
+        assertEquals("execute as @a if items entity @s hotbar.5 minecraft:diamond", out)
+    }
+
+    @Test
     fun testHasitemQuantityToNbtUsesIntegerCount() {
         // 2026-09-27 实测（Java 26.2）：老式 `count:2b` 不再匹配，`count:2`（整数）才匹配
         val (out, _) = conv(
