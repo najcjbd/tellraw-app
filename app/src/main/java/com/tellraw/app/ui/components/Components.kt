@@ -454,6 +454,49 @@ fun MNCodeDialog(
 }
 
 /**
+ * 新旧写法混用（同一条里既有 `tag:{…}` 又有 `components:{…}`）时的"问一嘴"对话框。
+ * 参照 §m/§n 混合模式的做法：选定之后**整条都按那一个处理**（need/新旧版本差异规范.txt 2.4）。
+ */
+@Composable
+fun SyntaxMixedDialog(
+    onChoice: (modern: Boolean, remember: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var remember by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.syntax_mixed_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.syntax_mixed_message),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = remember, onCheckedChange = { remember = it })
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.syntax_mixed_remember),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onChoice(true, remember) }) {
+                Text(stringResource(R.string.nbt_syntax_modern))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onChoice(false, remember) }) {
+                Text(stringResource(R.string.nbt_syntax_legacy))
+            }
+        }
+    )
+}
+
+/**
  * 新旧版本差异策略选择（见 need/新旧版本差异规范.txt）：
  *  - 新版：一律按 1.20.5+ 的数据组件写法
  *  - 旧版：一律按 1.20.4- 的旧 NBT 写法

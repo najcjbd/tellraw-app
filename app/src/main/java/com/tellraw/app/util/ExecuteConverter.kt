@@ -1365,8 +1365,8 @@ object ExecuteConverter {
             }
             VersionDiff.Decision.ASK -> {
                 reminders.add(
-                    "检测到新旧写法混用（tag: 与 components: 同时出现）：**弹窗功能尚未实现**，暂按\"新版\"处理" +
-                        "（把 tag 改写成数据组件），请自行核对"
+                    "检测到新旧写法混用（tag: 与 components: 同时出现）：**请在弹出的对话框里选择**；" +
+                        "在你选定之前，这里先按\"新版\"处理（把 tag 改写成数据组件），请自行核对"
                 )
                 rewriteLegacyTags(listOf(t), reminders)
             }

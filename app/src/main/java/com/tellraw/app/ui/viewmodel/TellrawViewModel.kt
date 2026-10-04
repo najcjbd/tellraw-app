@@ -81,6 +81,16 @@ class TellrawViewModel @Inject constructor(
     private val _nbtSyntax = MutableStateFlow("modern")
     val nbtSyntax: StateFlow<String> = _nbtSyntax.asStateFlow()
 
+    // 新旧写法混用（tag: 与 components:）时的"问一嘴"对话框（版本差异规范 2.4）
+    private val _showSyntaxMixedDialog = MutableStateFlow(false)
+    val showSyntaxMixedDialog: StateFlow<Boolean> = _showSyntaxMixedDialog.asStateFlow()
+
+    /** 用户在对话框里做的选择，只对**当前输入**生效（输入变化时清掉）。 */
+    private var syntaxOverride: com.tellraw.app.util.VersionDiff.NbtSyntax? = null
+
+    /** 上一次"混用"是否已经问过（只在"从没混用 -> 出现混用"这一刻问一次，避免打字时反复弹）。 */
+    private var syntaxMixAsked = false
+
     // execute 前置命令输入框的内容（需求七.1：与消息文本框分开，避免"玩家文本本身就是 execute"的歧义）
     private val _executePrefixInput = MutableStateFlow("")
     val executePrefixInput: StateFlow<String> = _executePrefixInput.asStateFlow()
@@ -302,6 +312,7 @@ class TellrawViewModel @Inject constructor(
     val writeFileMessage: StateFlow<String?> = _writeFileMessage.asStateFlow()
     
     fun updateSelector(selector: String) {
+        syntaxOverride = null
         _selectorInput.value = selector
         detectSelectorType()
         generateCommands()
@@ -700,6 +711,31 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
     
+    /** 用户在"新旧写法混用"对话框里做了选择：整条都按那一个处理（remember = 写进配置）。 */
+    fun handleSyntaxMixedChoice(modern: Boolean, remember: Boolean) {
+        val chosen = if (modern) {
+            com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN
+        } else {
+            com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
+        }
+        syntaxOverride = chosen
+        if (remember) {
+            val value = if (modern) "modern" else "legacy"
+            _nbtSyntax.value = value
+            viewModelScope.launch {
+                settingsRepository.setNbtSyntax(value)
+                settingsRepository.saveConfig()
+            }
+        }
+        _showSyntaxMixedDialog.value = false
+        generateCommands()
+    }
+
+    /** 关掉对话框（不改策略，本次也不覆盖）。 */
+    fun dismissSyntaxMixedDialog() {
+        _showSyntaxMixedDialog.value = false
+    }
+
     /** 设置"新旧版本差异"策略（modern / legacy / follow）。 */
     fun setNbtSyntax(value: String) {
         _nbtSyntax.value = value
@@ -712,6 +748,7 @@ class TellrawViewModel @Inject constructor(
 
     /** 更新 execute 前置命令框的内容（需求七.1）。 */
     fun updateExecutePrefix(prefix: String) {
+        syntaxOverride = null
         _executePrefixInput.value = prefix
         generateCommands()
     }
@@ -798,7 +835,8 @@ class TellrawViewModel @Inject constructor(
                     applicationContext.getString(R.string.selector_type_java),
                     allReminders
                 )
-                val nbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+                val nbtSyntax = syntaxOverride
+                    ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
                 )
@@ -863,6 +901,22 @@ class TellrawViewModel @Inject constructor(
                         bedrockPlain
                     }
                 
+                // 新旧写法混用 -> 问一嘴（版本差异规范 2.4）。
+                // 只在"从没混用 -> 出现混用"这一刻问一次；用户在对话框里的选择会覆盖本次输出。
+                if (syntaxOverride == null) {
+                    val mixed = listOf(selector, _executePrefixInput.value).any {
+                        com.tellraw.app.util.VersionDiff.decide(
+                            com.tellraw.app.util.VersionDiff.NbtSyntax.FOLLOW_INPUT, it
+                        ) == com.tellraw.app.util.VersionDiff.Decision.ASK
+                    }
+                    if (mixed && !syntaxMixAsked) {
+                        syntaxMixAsked = true
+                        _showSyntaxMixedDialog.value = true
+                    } else if (!mixed) {
+                        syntaxMixAsked = false
+                    }
+                }
+
                 _javaCommand.value = javaCommand
                 _bedrockCommand.value = bedrockCommand
                 

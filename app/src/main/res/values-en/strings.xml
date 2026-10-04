@@ -388,5 +388,8 @@
     <string name="nbt_syntax_legacy">Legacy (old NBT)</string>
     <string name="nbt_syntax_follow">Follow input</string>
     <string name="modern_components_downgraded">Downgraded data components to legacy NBT per the "legacy" policy; please verify these keys (no legacy equivalent or a different value shape): %1$s</string>
-    <string name="syntax_mixed_treated_as_modern">Mixed old/new item syntax detected (both tag: and components:), but the prompt dialog is not implemented yet, so it was treated as "modern"</string>
+    <string name="syntax_mixed_treated_as_modern">Mixed old/new item syntax detected (both tag: and components:): please choose in the dialog; until you choose it is treated as “modern”</string>
+    <string name="syntax_mixed_title">Mixed old/new item syntax detected</string>
+    <string name="syntax_mixed_message">This entry contains both the legacy form (tag:{…}) and the modern form (components:{…}). Choose which one to apply to the whole entry: modern rewrites the legacy part into data components; legacy downgrades the components back to old NBT.</string>
+    <string name="syntax_mixed_remember">Always do this (save to settings)</string>
 </resources>
