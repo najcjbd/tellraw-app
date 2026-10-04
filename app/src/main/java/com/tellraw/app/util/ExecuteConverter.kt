@@ -82,7 +82,8 @@ object ExecuteConverter {
     fun convertExecutePrefix(
         prefix: String,
         direction: Direction,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
     ): String? {
         val segs = parseSegments(prefix, reminders) ?: return null
         mergeSafetyNotice(segs, reminders)
@@ -110,7 +111,7 @@ object ExecuteConverter {
                     out.addAll(extra)
                     exec = applyModifier(toks, exec)
                 }
-                is Seg.Cond -> out.addAll(convertCondition(seg, direction, exec, reminders))
+                is Seg.Cond -> out.addAll(convertCondition(seg, direction, exec, reminders, nbtSyntax))
             }
         }
         return out.joinToString(" ")
@@ -553,7 +554,8 @@ object ExecuteConverter {
         cond: Seg.Cond,
         direction: Direction,
         exec: ExecState,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
     ): List<String> {
         val out: CondOut = when (direction) {
             Direction.JAVA_TO_BEDROCK -> when (cond.name) {
@@ -570,13 +572,13 @@ object ExecuteConverter {
             }
             Direction.BEDROCK_TO_JAVA -> when (cond.name) {
                 "entity" -> {
-                    // 保真路径里也可能带着老式 tag:{…} -> 交给 rewriteLegacyTags 统一处理
+                    // 保真路径里也可能带着老式 tag:{…} / components:{…} -> 统一按策略处理
                     val r = convertEntityBedrockToJava(cond, reminders)
-                    if (r is CondOut.Out) CondOut.Out(rewriteLegacyTags(r.tokens, reminders)) else r
+                    if (r is CondOut.Out) CondOut.Out(applyVersionPolicy(r.tokens, nbtSyntax, reminders)) else r
                 }
                 // items/data/slots 本就是 Java 语法，目标版本即 Java，原样保留即正确；
                 // 但要顺手把老式 tag:{…} 改写成数据组件写法（1.20.5 起 tag 失效）
-                else -> CondOut.Out(rewriteLegacyTags(originalTokens(cond), reminders))
+                else -> CondOut.Out(applyVersionPolicy(originalTokens(cond), nbtSyntax, reminders))
             }
         }
         return when (out) {
@@ -1288,6 +1290,46 @@ object ExecuteConverter {
         val all = kept + merged
         val newToken = if (all.isEmpty()) varName else "$varName[${all.joinToString(",")}]"
         return newToken to extra
+    }
+
+    /**
+     * 按"新旧版本策略"处理一串 token（Java 输出用）：
+     *  MODERN -> 老式 tag 改写成数据组件；LEGACY -> 数据组件降级回旧 tag；
+     *  FOLLOW_INPUT -> 混用时先按新版处理并提醒（弹窗功能未做，见 need/新旧版本差异规范.txt 步骤 ④）。
+     */
+    private fun applyVersionPolicy(
+        tokens: List<String>,
+        syntax: VersionDiff.NbtSyntax,
+        reminders: MutableList<String>
+    ): List<String> = tokens.flatMap { t ->
+        when (VersionDiff.decide(syntax, t)) {
+            VersionDiff.Decision.TO_MODERN -> rewriteLegacyTags(listOf(t), reminders)
+            VersionDiff.Decision.TO_LEGACY -> {
+                val r = ExecCondSupport.rewriteModernComponents(t)
+                if (!r.changed) {
+                    listOf(t)
+                } else {
+                    reminders.add(
+                        "按\"旧版\"策略把数据组件降级回旧 NBT：" + r.text +
+                            (if (r.unmappable.isNotEmpty())
+                                "；这些组件旧版没有对应写法、已丢掉：${r.unmappable.joinToString("、")}（请自行核对）"
+                            else "") +
+                            (if (r.unshaped.isNotEmpty())
+                                "；这些键只改了名字、值形状可能不同：${r.unshaped.joinToString("、")}（请自行核对）"
+                            else "")
+                    )
+                    listOf(r.text)
+                }
+            }
+            VersionDiff.Decision.ASK -> {
+                reminders.add(
+                    "检测到新旧写法混用（tag: 与 components: 同时出现）：**弹窗功能尚未实现**，暂按\"新版\"处理" +
+                        "（把 tag 改写成数据组件），请自行核对"
+                )
+                rewriteLegacyTags(listOf(t), reminders)
+            }
+            VersionDiff.Decision.KEEP -> listOf(t)
+        }
     }
 
     /** Java 版输出时把老式 `tag:{…}` 改写成数据组件写法（用户选的"提醒 + 尝试改写"）。 */
