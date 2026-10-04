@@ -37,7 +37,62 @@ object VersionDiff {
         }
     }
 
-    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */
+    // ==================================================================
+    //  策略决策：输入形态 -> 怎么处理
+    // ==================================================================
+
+    /** 一段 NBT 文本里"新旧写法"的形态（结构标记就是 `tag:{` 与 `components:{`）。 */
+    enum class InputShape { ONLY_LEGACY, ONLY_MODERN, MIXED, NEITHER }
+
+    fun shapeOf(text: String): InputShape {
+        val old = "tag:{" in text
+        val modern = "components:{" in text
+        return when {
+            old && modern -> InputShape.MIXED
+            old -> InputShape.ONLY_LEGACY
+            modern -> InputShape.ONLY_MODERN
+            else -> InputShape.NEITHER
+        }
+    }
+
+    /** 按策略决定怎么处理。 */
+    enum class Decision {
+        /** 原样（不改写）。 */
+        KEEP,
+        /** 改写成新版（数据组件）。 */
+        TO_MODERN,
+        /** 改写成旧版（旧 NBT）。 */
+        TO_LEGACY,
+        /** 新旧混用 + 跟随输入 -> 需要问用户（弹窗）。 */
+        ASK,
+    }
+
+    /**
+     * 策略（你的裁决）：
+     *  - MODERN（默认）：只要出现旧写法（含混用）就改写成新版；全是新版/无关 -> 原样
+     *  - LEGACY：只要出现新写法（含混用）就改写成旧版；全是旧版/无关 -> 原样
+     *  - FOLLOW_INPUT：全是旧 -> 原样（**按你的裁决 B：尊重玩家写法**）；全是新 -> 原样；
+     *    混用 -> 问一嘴（弹窗）；无关 -> 原样
+     */
+    fun decide(syntax: NbtSyntax, text: String): Decision {
+        val shape = shapeOf(text)
+        return when (syntax) {
+            NbtSyntax.MODERN -> when (shape) {
+                InputShape.ONLY_LEGACY, InputShape.MIXED -> Decision.TO_MODERN
+                else -> Decision.KEEP
+            }
+            NbtSyntax.LEGACY -> when (shape) {
+                InputShape.ONLY_MODERN, InputShape.MIXED -> Decision.TO_LEGACY
+                else -> Decision.KEEP
+            }
+            NbtSyntax.FOLLOW_INPUT -> when (shape) {
+                InputShape.MIXED -> Decision.ASK
+                else -> Decision.KEEP
+            }
+        }
+    }
+
+    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */
     const val LEGACY_CUSTOM_DATA_TAG = "tag:"
     const val MODERN_CUSTOM_DATA_KEY = "custom_data"
 

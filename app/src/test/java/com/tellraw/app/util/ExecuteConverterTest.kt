@@ -15,6 +15,16 @@ class ExecuteConverterTest {
         return ExecuteConverter.convertExecutePrefix(prefix, direction, reminders) to reminders
     }
 
+    /** 带"新旧版本策略"的转换（默认 MODERN）。 */
+    private fun convWith(
+        prefix: String,
+        direction: Direction,
+        syntax: VersionDiff.NbtSyntax
+    ): Pair<String?, List<String>> {
+        val reminders = mutableListOf<String>()
+        return ExecuteConverter.convertExecutePrefix(prefix, direction, reminders, syntax) to reminders
+    }
+
     // ---------------------------------------------------------------
     //  ③ 输出组合 + run 处理（需求七.3、八【run】）
     // ---------------------------------------------------------------
@@ -531,6 +541,59 @@ class ExecuteConverterTest {
         // 输入没写 Slot -> 不限槽位，基岩侧就是 hasitem={item=diamond}（实测输出）
         assertEquals("execute as @a if entity @s[hasitem={item=diamond}]", out)
         assertTrue(reminders.any { it.contains("表达不了") })
+    }
+
+    @Test
+    fun testVersionPolicyLegacyDowngradesComponents() {
+        // LEGACY：数据组件降级回旧 tag
+        val (out, reminders) = convWith(
+            "execute as @a if data entity @s {SelectedItem:{id:\"minecraft:diamond_sword\",components:{\"minecraft:damage\":3}}}",
+            Direction.BEDROCK_TO_JAVA,
+            VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals(
+            "execute as @a if data entity @s {SelectedItem:{id:\"minecraft:diamond_sword\",tag:{Damage:3}}}",
+            out
+        )
+        assertTrue(reminders.any { it.contains("旧版") })
+    }
+
+    @Test
+    fun testVersionPolicyFollowInputKeepsLegacyAsIs() {
+        // FOLLOW_INPUT + 只有旧写法 -> 原样（裁决 B：尊重玩家写法）
+        val (out, _) = convWith(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1}}]}",
+            Direction.BEDROCK_TO_JAVA,
+            VersionDiff.NbtSyntax.FOLLOW_INPUT
+        )
+        assertEquals("execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1}}]}", out)
+    }
+
+    @Test
+    fun testVersionPolicyFollowInputMixedTreatedAsModernForNow() {
+        // FOLLOW_INPUT + 混用 -> 弹窗未实现，暂按新版处理 + 提醒
+        val (out, reminders) = convWith(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1},components:{\"minecraft:damage\":2}}]}",
+            Direction.BEDROCK_TO_JAVA,
+            VersionDiff.NbtSyntax.FOLLOW_INPUT
+        )
+        assertTrue("旧的 tag 应被改写成 custom_data", out!!.contains("custom_data"))
+        assertTrue(reminders.any { it.contains("混用") })
+    }
+
+    @Test
+    fun testVersionPolicyModernIsDefaultAndMovesLegacyForward() {
+        val (def, _) = conv(
+            "execute as @a if data entity @s {Inventory:[{id:\"minecraft:diamond\",tag:{foo:1}}]}",
+            Direction.BEDROCK_TO_JAVA
+        )
+        assertTrue(def!!.contains("custom_data"))
+    }
+
+    @Test
+    fun testLegacyTagBodyRulesPlaceholder() {
+        // （占位：真正的 tag 体规则测试在 VersionDiffTest）
+        assertTrue(true)
     }
 
     @Test

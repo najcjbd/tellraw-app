@@ -159,6 +159,30 @@ class VersionDiffTest {
     }
 
     @Test
+    fun testPolicyDecisionMatrix() {
+        val onlyLegacy = "{id:\"minecraft:diamond\",tag:{foo:1}}"
+        val onlyModern = "{id:\"minecraft:diamond\",components:{\"minecraft:custom_data\":{foo:1}}}"
+        val mixed = "{id:\"minecraft:diamond\",tag:{foo:1},components:{\"minecraft:damage\":2}}"
+        val neither = "{id:\"minecraft:diamond\"}"
+
+        // MODERN（默认）：出现旧写法（含混用）就改写成新版
+        assertEquals(VersionDiff.Decision.TO_MODERN, VersionDiff.decide(VersionDiff.NbtSyntax.MODERN, onlyLegacy))
+        assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.MODERN, onlyModern))
+        assertEquals(VersionDiff.Decision.TO_MODERN, VersionDiff.decide(VersionDiff.NbtSyntax.MODERN, mixed))
+        assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.MODERN, neither))
+
+        // LEGACY：出现新写法（含混用）就降级回旧版
+        assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.LEGACY, onlyLegacy))
+        assertEquals(VersionDiff.Decision.TO_LEGACY, VersionDiff.decide(VersionDiff.NbtSyntax.LEGACY, onlyModern))
+        assertEquals(VersionDiff.Decision.TO_LEGACY, VersionDiff.decide(VersionDiff.NbtSyntax.LEGACY, mixed))
+
+        // FOLLOW_INPUT：只有旧/只有新都原样（你的裁决 B：尊重玩家写法）；混用才问一嘴
+        assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, onlyLegacy))
+        assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, onlyModern))
+        assertEquals(VersionDiff.Decision.ASK, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, mixed))
+    }
+
+    @Test
     fun testLegacyTagBodyRules() {
         assertTrue(VersionDiff.legacyTagBodyToComponents("Damage:5").contains("minecraft:damage"))
         assertTrue(VersionDiff.legacyTagBodyToComponents("Damage:5b").contains("minecraft:damage"))

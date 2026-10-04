@@ -410,7 +410,12 @@ object SelectorConverter {
      * 与Python版本的filter_selector_parameters函数逻辑一致
      * 返回: Triple<完整的选择器字符串(包括变量和参数), 移除的参数列表, 转换提醒>
      */
-    fun filterSelectorParameters(selector: String, targetVersion: SelectorType, context: android.content.Context): Triple<String, List<String>, List<String>> {
+    fun filterSelectorParameters(
+        selector: String,
+        targetVersion: SelectorType,
+        context: android.content.Context,
+        nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN
+    ): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
 
         // Java版特有参数（完全不支持，无法转换）
@@ -883,14 +888,36 @@ object SelectorConverter {
             }
         }
 
-        // 老式 tag:{…} 改写（只对 Java 版输出做；Bedrock 没有数据组件）。
-        // 1.20.5 起 Java 用数据组件取代了 tag（实测：`tag:{}` 在 26.2 上已不匹配），
-        // 自定义数据 -> custom_data，损耗值 Damage -> damage。这是"提醒 + 尝试改写"里的改写那一半。
-        if (targetVersion == SelectorType.JAVA && "tag:{" in finalSelector) {
-            val (rewritten, changed) = ExecCondSupport.rewriteLegacyTag(finalSelector)
-            if (changed) {
-                finalSelector = rewritten
-                conversionReminders.add(getStringSafely(context, R.string.legacy_tag_rewritten))
+        // 新旧版本差异：按策略处理（只对 Java 版输出做；Bedrock 没有数据组件）
+        //  默认 MODERN：老式 tag:{…} 改写成数据组件（1.20.5 起 tag 失效，实测 tag:{} 在 26.2 不匹配）
+        //  LEGACY：数据组件降级回旧 tag（旧版没有 components）
+        if (targetVersion == SelectorType.JAVA) {
+            when (VersionDiff.decide(nbtSyntax, finalSelector)) {
+                VersionDiff.Decision.TO_MODERN -> {
+                    val (rewritten, changed) = ExecCondSupport.rewriteLegacyTag(finalSelector)
+                    if (changed) {
+                        finalSelector = rewritten
+                        conversionReminders.add(getStringSafely(context, R.string.legacy_tag_rewritten))
+                    }
+                }
+                VersionDiff.Decision.TO_LEGACY -> {
+                    val r = ExecCondSupport.rewriteModernComponents(finalSelector)
+                    if (r.changed) {
+                        finalSelector = r.text
+                        conversionReminders.add(
+                            getStringSafely(
+                                context, R.string.modern_components_downgraded,
+                                (r.unmappable + r.unshaped).distinct().joinToString("、")
+                            )
+                        )
+                    }
+                }
+                VersionDiff.Decision.ASK -> {
+                    val (rewritten, changed) = ExecCondSupport.rewriteLegacyTag(finalSelector)
+                    if (changed) finalSelector = rewritten
+                    conversionReminders.add(getStringSafely(context, R.string.syntax_mixed_treated_as_modern))
+                }
+                VersionDiff.Decision.KEEP -> {}
             }
         }
 

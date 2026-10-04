@@ -104,6 +104,48 @@ internal object ExecCondSupport {
         return out to changed
     }
 
+    /** [rewriteModernComponents] 的结果。 */
+    class ModernRewrite(
+        val text: String,
+        val changed: Boolean,
+        /** 值形状没能换算、只改了键名的旧键名。 */
+        val unshaped: List<String>,
+        /** 旧版没有对应写法、被丢掉的组件（要提醒）。 */
+        val unmappable: List<String>
+    )
+
+    /**
+     * 反向：把新式 `components:{…}` 改写成旧 `tag:{…}`（LEGACY 模式用）。
+     * 与 [rewriteLegacyTag] 对称；用 [VersionDiff.modernComponentsToLegacyTag] 做转换。
+     */
+    fun rewriteModernComponents(text: String): ModernRewrite {
+        var out = text
+        var changed = false
+        val unshaped = mutableListOf<String>()
+        val unmappable = mutableListOf<String>()
+        while (true) {
+            val start = out.indexOf("components:{")
+            if (start < 0) break
+            val open = start + "components:".length
+            val end = matchBrace(out, open) ?: break
+            val body = out.substring(open + 1, end)
+            val r = VersionDiff.modernComponentsToLegacyTag(body) ?: break
+            unshaped.addAll(r.second)
+            unmappable.addAll(r.third)
+            val replacement = if (r.first.isEmpty()) "" else "tag:{${r.first}}"
+            out = if (replacement.isEmpty()) {
+                val before = out.substring(0, start).trimEnd().removeSuffix(",")
+                val after = out.substring(end + 1).trimStart().removePrefix(",")
+                before + after
+            } else {
+                out.substring(0, start) + replacement + out.substring(end + 1)
+            }
+            changed = true
+        }
+        return ModernRewrite(out, changed, unshaped.distinct(), unmappable.distinct())
+    }
+
+    /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
     /** 返回 s[open]（'{'）配对 '}' 的下标；找不到返回 null。跳过引号内的字符。 */
     private fun matchBrace(s: String, open: Int): Int? {
         var depth = 0

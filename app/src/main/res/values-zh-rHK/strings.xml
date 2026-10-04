@@ -391,4 +391,6 @@
     <string name="nbt_syntax_modern">新版（資料組件）</string>
     <string name="nbt_syntax_legacy">舊版（舊 NBT）</string>
     <string name="nbt_syntax_follow">跟隨輸入</string>
+    <string name="modern_components_downgraded">按"舊版"策略把資料組件降級回舊 NBT；這些鍵需要你自己核對（舊版沒有對應寫法或值形狀不同）：%1$s</string>
+    <string name="syntax_mixed_treated_as_modern">偵測到新舊寫法混用（tag: 與 components: 同時出現），但"問一嘴"彈窗尚未實作，已暫按"新版"處理</string>
 </resources>

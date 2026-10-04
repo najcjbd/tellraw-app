@@ -798,6 +798,7 @@ class TellrawViewModel @Inject constructor(
                     applicationContext.getString(R.string.selector_type_java),
                     allReminders
                 )
+                val nbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value
                 )
@@ -810,7 +811,9 @@ class TellrawViewModel @Inject constructor(
                     val (asSelectorRaw, condTokens) = javaNegation
                     // 选择器本体也要过一遍 Java 侧参数过滤（family/predicate 这类基岩参数要转或去掉）
                     val (asSelector, _, asReminders) =
-                        SelectorConverter.filterSelectorParameters(asSelectorRaw, SelectorType.JAVA, applicationContext)
+                        SelectorConverter.filterSelectorParameters(
+                            asSelectorRaw, SelectorType.JAVA, applicationContext, nbtSyntax
+                        )
                     allReminders.addAll(asReminders)
                     if (condTokens.isEmpty()) {
                         javaTarget = asSelector
@@ -821,7 +824,9 @@ class TellrawViewModel @Inject constructor(
                     }
                 } else {
                     val (javaFilteredSelector, _, javaReminders) =
-                        SelectorConverter.filterSelectorParameters(javaSelector, SelectorType.JAVA, applicationContext)
+                        SelectorConverter.filterSelectorParameters(
+                            javaSelector, SelectorType.JAVA, applicationContext, nbtSyntax
+                        )
                     allReminders.addAll(javaReminders)
                     javaTarget = javaFilteredSelector
                     javaInnerTokens = null
@@ -897,7 +902,10 @@ class TellrawViewModel @Inject constructor(
         val prefix = _executePrefixInput.value.trim()
         if (prefix.isEmpty()) return null
 
-        val converted = ExecuteConverter.convertExecutePrefix(prefix, direction, warnings)
+        val converted = ExecuteConverter.convertExecutePrefix(
+            prefix, direction, warnings,
+            com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        )
         if (converted == null) {
             warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))
             return null
