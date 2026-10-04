@@ -41,13 +41,17 @@ internal object ExecCondSupport {
      * `slot.weapon.mainhand`（SelectedItem）、`slot.weapon.offhand` 与 `slot.armor.*`（equipment）。
      * 其余返回 null（调用方保留原样 + 提醒）。
      */
-    fun hasitemObjectToJavaNbt(obj: String): String? {
+    fun hasitemObjectToJavaNbt(obj: String, legacyCount: Boolean = false): String? {
         val h = parseHasitemObject(obj)
         val item = h.item ?: return null
         val id = addNs(item)
         // 2026-09-27 实测（Java 26.2）：`count:1b`（老式字节）**不再匹配**，`count:1`（整数）才行
         // （1.20.5 起物品堆叠改用数据组件）。所以这里写整数、不加 b。
-        val cnt = h.quantity?.toIntOrNull()?.let { "count:$it" }
+        // [legacyCount] = true（LEGACY 策略）时才写回旧版的 `Count:Nb`（旧版的键是大写 C、值是字节）。
+        val cnt = h.quantity?.toIntOrNull()?.let {
+            if (legacyCount) "Count:${VersionDiff.modernValueToLegacy("count", it.toString()) ?: "${it}b"}"
+            else "count:$it"
+        }
         val idPart = if (cnt == null) "id:\"$id\"" else "id:\"$id\",$cnt"
         if (h.location == null) {
             return if (h.slot == null) "{Inventory:[{$idPart}]}" else null

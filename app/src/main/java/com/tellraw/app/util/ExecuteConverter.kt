@@ -207,7 +207,8 @@ object ExecuteConverter {
     fun bedrockSelectorNegation(
         selector: String,
         reminders: MutableList<String>,
-        preferExecute: Boolean = false
+        preferExecute: Boolean = false,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
     ): Pair<String, List<String>>? {
         if (!selector.contains('[') || !selector.endsWith("]")) return null
         val varName = selector.substringBefore('[')
@@ -258,7 +259,7 @@ object ExecuteConverter {
                     for (obj in objects) {
                         // 这里由调用方补 `as <varName>`，@s 指代正确
                         val conv = hasitemToJavaConditionTokens(
-                            obj, enclosingUnless = false, target = "@s", reminders
+                            obj, enclosingUnless = false, target = "@s", reminders, nbtSyntax
                         )
                         if (conv == null) {
                             reminders.add("hasitem（$obj）无法回译成 Java 条件，已忽略该条件项目")
@@ -573,7 +574,7 @@ object ExecuteConverter {
             Direction.BEDROCK_TO_JAVA -> when (cond.name) {
                 "entity" -> {
                     // 保真路径里也可能带着老式 tag:{…} / components:{…} -> 统一按策略处理
-                    val r = convertEntityBedrockToJava(cond, reminders)
+                    val r = convertEntityBedrockToJava(cond, reminders, nbtSyntax)
                     if (r is CondOut.Out) CondOut.Out(applyVersionPolicy(r.tokens, nbtSyntax, reminders)) else r
                 }
                 // items/data/slots 本就是 Java 语法，目标版本即 Java，原样保留即正确；
@@ -862,7 +863,11 @@ object ExecuteConverter {
      * hasitem 折成 `if/unless data|items`；scores 的 `=!` 用反极性的 entity 条件表达；
      * 无法转换的部分按需求十.5 舍弃（只丢那一个参数）并提醒。
      */
-    private fun convertEntityBedrockToJava(cond: Seg.Cond, reminders: MutableList<String>): CondOut {
+    private fun convertEntityBedrockToJava(
+        cond: Seg.Cond,
+        reminders: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+    ): CondOut {
         if (cond.args.size < 1) return dropAnd(reminders, "entity 条件缺少目标")
         val selector = cond.args[0]
         if (!selector.startsWith("@") || !selector.contains('[')) return CondOut.Out(originalTokens(cond))
@@ -887,7 +892,7 @@ object ExecuteConverter {
                     }
                     for (obj in objs) {
                         // 条件目标用选择器本身（可能是 @a 等），不能一律折成 @s（修正 C：同一单一实体）
-                        val conv = hasitemToJavaConditionTokens(obj, cond.unless, varName, reminders)
+                        val conv = hasitemToJavaConditionTokens(obj, cond.unless, varName, reminders, nbtSyntax)
                         if (conv == null) reminders.add("hasitem（$obj）无法回译成 Java 条件，已舍弃该参数")
                         else extra.add(conv)
                     }
@@ -949,7 +954,8 @@ object ExecuteConverter {
         obj: String,
         enclosingUnless: Boolean,
         target: String,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
     ): List<String>? {
         val h = ExecCondSupport.parseHasitemObject(obj)
         if (h.reason != null) {
@@ -957,6 +963,15 @@ object ExecuteConverter {
             return null
         }
         val itemId = h.item!!
+
+        // LEGACY（<1.20.5 没有 execute items，execute.txt:1259）：空槽也无法用 nbt 表达 -> 舍弃 + 提醒
+        if (nbtSyntax == VersionDiff.NbtSyntax.LEGACY && ExecCondSupport.stripNs(itemId) == "air") {
+            reminders.add(
+                "按\"旧版\"策略：你的版本没有 execute items（1.20.5 才加入），且 item=air（表示该槽为空）" +
+                    "也无法用 nbt 表达，已舍弃该条件项目"
+            )
+            return null
+        }
 
         // ---- 空气法：基岩 item=air 表示"该槽位是空的"（execute需求 第十节 15）----
         if (ExecCondSupport.stripNs(itemId) == "air") {
@@ -978,6 +993,33 @@ object ExecuteConverter {
         val meansNone = quantity == "0"
         val negate = if (meansNone) !enclosingUnless else enclosingUnless
         val kw = if (negate) "unless" else "if"
+
+        // LEGACY（<1.20.5 没有 execute items，execute.txt:1259）-> 改用 nbt 形式的 data 条件
+        if (nbtSyntax == VersionDiff.NbtSyntax.LEGACY) {
+            // quantity=0 表示"没有该物品"：nbt 里不能写 count:0（那是"永不匹配"），
+            // 要把数量约束去掉、用存在性 + unless 表达（这正是旧版能写的）
+            val objForNbt = if (meansNone) {
+                ExecCondSupport.splitTopLevel(obj, ',')
+                    .filterNot { it.trim().startsWith("quantity=") }
+                    .joinToString(",")
+            } else obj
+            val nbt = ExecCondSupport.hasitemObjectToJavaNbt(objForNbt, legacyCount = true)
+            if (nbt == null) {
+                reminders.add(
+                    "按\"旧版\"策略：你的版本没有 execute items（1.20.5 才加入），" +
+                        "且这个 hasitem 无法用 nbt 表达，已舍弃该条件项目"
+                )
+                return null
+            }
+            reminders.add(
+                "按\"旧版\"策略：<1.20.5 没有 execute items（execute.txt:1259），已改用 nbt 形式 " +
+                    "-> `$kw data entity $target $nbt`" +
+                    (if (meansNone) "（quantity=0 表示\"没有该物品\"，已去掉数量约束、用存在性表达）" else "") +
+                    (if (h.quantity != null && !meansNone)
+                        "（quantity=${h.quantity} 是\"该栏总量\"，nbt 表达不了，请自行核对）" else "")
+            )
+            return listOf(kw, "data", "entity", target, nbt)
+        }
 
         // 基岩 data= 的提醒（2026-09-27：以前被静默丢掉，实测它仍然有效）
         if (h.data != null) {
