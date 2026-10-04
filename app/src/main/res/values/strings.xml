@@ -391,5 +391,8 @@
     <string name="nbt_syntax_legacy">旧版（旧 NBT）</string>
     <string name="nbt_syntax_follow">跟随输入</string>
     <string name="modern_components_downgraded">按"旧版"策略把数据组件降级回旧 NBT；这些键需要你自己核对（旧版没有对应写法或值形状不同）：%1$s</string>
-    <string name="syntax_mixed_treated_as_modern">检测到新旧写法混用（tag: 与 components: 同时出现），但"问一嘴"弹窗尚未实现，已暂按"新版"处理</string>
+    <string name="syntax_mixed_treated_as_modern">检测到新旧写法混用（tag: 与 components: 同时出现）：请在弹出的对话框里选择；在你选定之前，已暂按“新版”处理</string>
+    <string name="syntax_mixed_title">检测到新旧写法混用</string>
+    <string name="syntax_mixed_message">同一条里既有旧写法（tag:{…}），又有新写法（components:{…}）。请选用哪一种来理解整条：选新版会把旧的改写成数据组件；选旧版会把数据组件降级回旧 NBT。选定后整条都按那一个处理。</string>
+    <string name="syntax_mixed_remember">以后都这么办（写进设置）</string>
 </resources>

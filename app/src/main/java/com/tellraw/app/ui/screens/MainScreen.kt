@@ -55,6 +55,7 @@ fun MainScreen(
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val nbtSyntax by viewModel.nbtSyntax.collectAsState()
+    val showSyntaxMixedDialog by viewModel.showSyntaxMixedDialog.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
@@ -190,6 +191,14 @@ fun MainScreen(
         )
     }
     
+    // 新旧写法混用 -> 问一嘴（版本差异规范 2.4）
+    if (showSyntaxMixedDialog) {
+        SyntaxMixedDialog(
+            onChoice = { modern, remember -> viewModel.handleSyntaxMixedChoice(modern, remember) },
+            onDismiss = { viewModel.dismissSyntaxMixedDialog() }
+        )
+    }
+
     // 设置对话框
     if (showSettingsDialog.value) {
         SettingsDialog(
