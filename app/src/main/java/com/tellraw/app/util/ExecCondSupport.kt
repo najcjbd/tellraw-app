@@ -38,10 +38,16 @@ internal object ExecCondSupport {
      * 用于修饰子命令的选择器（如 `as @a[hasitem=…]`）在"基岩 -> Java"方向上的互转。
      *
      * 覆盖：无 location（Inventory）、`slot.hotbar.N` / `slot.inventory.N`（Inventory + Slot）、
-     * `slot.weapon.mainhand`（SelectedItem）、`slot.weapon.offhand` 与 `slot.armor.*`（equipment）。
+     * `slot.weapon.mainhand`（SelectedItem）、`slot.weapon.offhand` 与 `slot.armor.*`（新版 equipment）。
      * 其余返回 null（调用方保留原样 + 提醒）。
+     *
+     * [legacyCount] = true（LEGACY 策略）写回旧版堆叠数 `Count:Nb`。
+     * [legacySlots] = true（LEGACY 策略，pre-1.20.5）时，副手/装备改用**玩家 `Inventory` 数字槽**：
+     *   头盔=103b、胸甲=102b、护腿=101b、靴子=100b、副手=-106b
+     *   （2026-10-07 在 1.20.4 真机实测：这些全 =1；`ArmorItems`/`HandItems` =0；`equipment` 字段当时不存在）。
+     * 主手两版都用 `SelectedItem`（1.20.4 实测 =1，无需区分）。
      */
-    fun hasitemObjectToJavaNbt(obj: String, legacyCount: Boolean = false): String? {
+    fun hasitemObjectToJavaNbt(obj: String, legacyCount: Boolean = false, legacySlots: Boolean = false): String? {
         val h = parseHasitemObject(obj)
         val item = h.item ?: return null
         val id = addNs(item)
@@ -57,15 +63,16 @@ internal object ExecCondSupport {
             return if (h.slot == null) "{Inventory:[{$idPart}]}" else null
         }
         val n = h.slot?.toIntOrNull()
+        val invSlot: (Int) -> String = { "{Inventory:[{Slot:${it}b,$idPart}]}" }
         return when (h.location) {
             "slot.weapon.mainhand" -> "{SelectedItem:{$idPart}}"
-            "slot.weapon.offhand" -> "{equipment:{offhand:{$idPart}}}"
-            "slot.armor.head" -> "{equipment:{head:{$idPart}}}"
-            "slot.armor.chest" -> "{equipment:{chest:{$idPart}}}"
-            "slot.armor.legs" -> "{equipment:{legs:{$idPart}}}"
-            "slot.armor.feet" -> "{equipment:{feet:{$idPart}}}"
-            "slot.hotbar" -> if (n != null) "{Inventory:[{Slot:${n}b,$idPart}]}" else null
-            "slot.inventory" -> if (n != null) "{Inventory:[{Slot:${n + 9}b,$idPart}]}" else null
+            "slot.weapon.offhand" -> if (legacySlots) invSlot(-106) else "{equipment:{offhand:{$idPart}}}"
+            "slot.armor.head" -> if (legacySlots) invSlot(103) else "{equipment:{head:{$idPart}}}"
+            "slot.armor.chest" -> if (legacySlots) invSlot(102) else "{equipment:{chest:{$idPart}}}"
+            "slot.armor.legs" -> if (legacySlots) invSlot(101) else "{equipment:{legs:{$idPart}}}"
+            "slot.armor.feet" -> if (legacySlots) invSlot(100) else "{equipment:{feet:{$idPart}}}"
+            "slot.hotbar" -> if (n != null) invSlot(n) else null
+            "slot.inventory" -> if (n != null) invSlot(n + 9) else null
             // 末影箱在 Java 的 NBT 里是 EnderItems（Slot 就是箱内编号）
             "slot.enderchest" -> if (n != null) "{EnderItems:[{Slot:${n}b,$idPart}]}" else null
             else -> null

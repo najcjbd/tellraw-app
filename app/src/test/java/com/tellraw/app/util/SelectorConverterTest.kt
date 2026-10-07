@@ -84,6 +84,23 @@ class SelectorConverterTest {
         assertFalse(modern.third.any { it.contains("1.21.5") })
     }
 
+    /** LEGACY（pre-1.20.5）：装备走 Inventory 数字槽（1.20.4 实测），不再写 equipment */
+    @Test
+    fun testLegacyArmorUsesInventoryNumericSlotsInSelector() {
+        val head = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=0}]",
+            SelectorType.JAVA, context, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertTrue("旧版头盔应为 Slot:103b，实际：${head.first}", head.first.contains("Slot:103b"))
+        assertFalse("旧版不该出现 equipment", head.first.contains("equipment"))
+
+        val off = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond_sword,location=slot.weapon.offhand,slot=0}]",
+            SelectorType.JAVA, context, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertTrue("旧版副手应为 Slot:-106b，实际：${off.first}", off.first.contains("Slot:-106b"))
+    }
+
     /** 老式 tag:{…} 在 Java 输出里应改写成数据组件写法（1.20.5 起 tag 失效，实测 tag:{} 不匹配） */
     @Test
     fun testLegacyTagRewrittenInJavaSelector() {

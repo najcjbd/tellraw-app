@@ -679,6 +679,39 @@ class ExecuteConverterTest {
     }
 
     @Test
+    fun testVersionPolicyLegacyArmorUsesInventoryNumericSlots() {
+        // 2026-10-07 在 1.20.4 真机实测：旧版没有 equipment 字段，装备走玩家 Inventory 数字槽
+        // （头盔 103b/胸甲 102b/护腿 101b/靴子 100b/副手 -106b）；主手仍用 SelectedItem（也实测 =1）。
+        val (head, rh) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond_helmet,location=slot.armor.head}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals(
+            "execute as @a if data entity @s {Inventory:[{Slot:103b,id:\"minecraft:diamond_helmet\"}]}",
+            head
+        )
+        assertTrue(rh.any { it.contains("Inventory 数字槽") })
+
+        val (off, _) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond_sword,location=slot.weapon.offhand}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals(
+            "execute as @a if data entity @s {Inventory:[{Slot:-106b,id:\"minecraft:diamond_sword\"}]}",
+            off
+        )
+
+        val (mh, _) = convWith(
+            "execute as @a if entity @s[hasitem={item=diamond_sword,location=slot.weapon.mainhand}]",
+            Direction.BEDROCK_TO_JAVA, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertEquals(
+            "execute as @a if data entity @s {SelectedItem:{id:\"minecraft:diamond_sword\"}}",
+            mh
+        )
+    }
+
+    @Test
     fun testVersionPolicyLegacyAirIsDroppedWithReason() {
         val (out, reminders) = convWith(
             "execute as @a if entity @s[hasitem={item=air,location=slot.armor.head}]",

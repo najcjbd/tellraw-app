@@ -526,7 +526,8 @@ object SelectorConverter {
 
         // 处理hasitem到nbt的转换（基岩版到Java版）
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
-            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
+            val legacy = nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
+            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
         }
@@ -2416,7 +2417,7 @@ object SelectorConverter {
      * 处理 hasitem 参数转换为 nbt 参数（基岩版到Java版）
      * 支持完整的转换逻辑，包括装备槽位和物品栏槽位
      */
-    private fun convertHasitemToNbt(paramsPart: String, context: Context): Pair<String, List<String>> {
+    private fun convertHasitemToNbt(paramsPart: String, context: Context, legacy: Boolean = false): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
 
@@ -2452,7 +2453,7 @@ object SelectorConverter {
                 if (arrayContent != null) {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     val fullMatch = result.substring(startIndex, bracketIndex + arrayContent.length + 1)
-                    val nbtResult = parseHasitemArray(arrayContent, reminders, context)
+                    val nbtResult = parseHasitemArray(arrayContent, reminders, context, legacy)
 
                 if (nbtResult.isNotEmpty()) {
                         // 添加提醒信息：hasitem 已转换为 nbt 格式
@@ -2497,7 +2498,7 @@ object SelectorConverter {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     // +2 是为了包含 objectContent 后面的 '}' 字符
                     val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 2)
-                    val nbtResult = parseHasitemSingle(objectContent, reminders, context)
+                    val nbtResult = parseHasitemSingle(objectContent, reminders, context, legacy)
 
                 if (nbtResult.isNotEmpty()) {
                         // 精确替换
@@ -2622,7 +2623,7 @@ object SelectorConverter {
     /**
      * 解析单个 hasitem 条目
      */
-    private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context): String {
+    private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false): String {
         val params = mutableMapOf<String, String>()
         val parts = parseHasitemObjectParams(content)
 
@@ -2673,39 +2674,27 @@ object SelectorConverter {
 
         // 处理 quantity 范围
         val processedQuantity = processQuantityRange(quantity, reminders, context)
+        // 新版 count:N（整数，堆栈用数据组件）；旧版（pre-1.20.5）是堆栈层级的 Count:Nb（大写 C、字节值）
+        val countPart = if (processedQuantity == null) ""
+            else if (legacy) ",Count:${processedQuantity}b" else ",count:${processedQuantity}"
+        // 旧版（pre-1.20.5）没有 equipment 字段：副手/装备改用玩家 Inventory 数字槽
+        // （头盔 103b/胸甲 102b/护腿 101b/靴子 100b/副手 -106b；2026-10-07 在 1.20.4 真机实测）。
+        val legacyInv = { s: Int -> "nbt={Inventory:[{Slot:${s}b,id:\"$itemId\"$countPart}]}" }
 
         // 根据位置类型转换
         return when (location) {
-            "slot.weapon.mainhand" -> {
-                // 主手 → SelectedItem
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
-            }
-            "slot.weapon.offhand" -> {
-                // 副手 → equipment.offhand
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
-            }
-            "slot.armor.head" -> {
-                // 头盔 → equipment.head
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={equipment:{head:{id:\"$itemId\"$countPart}}}"
-            }
-            "slot.armor.chest" -> {
-                // 胸甲 → equipment.chest
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={equipment:{chest:{id:\"$itemId\"$countPart}}}"
-            }
-            "slot.armor.legs" -> {
-                // 护腿 → equipment.legs
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={equipment:{legs:{id:\"$itemId\"$countPart}}}"
-            }
-            "slot.armor.feet" -> {
-                // 靴子 → equipment.feet
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                "nbt={equipment:{feet:{id:\"$itemId\"$countPart}}}"
-            }
+            // 主手两版都用 SelectedItem（1.20.4 实测 =1）
+            "slot.weapon.mainhand" -> "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
+            "slot.weapon.offhand" ->
+                if (legacy) legacyInv(-106) else "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
+            "slot.armor.head" ->
+                if (legacy) legacyInv(103) else "nbt={equipment:{head:{id:\"$itemId\"$countPart}}}"
+            "slot.armor.chest" ->
+                if (legacy) legacyInv(102) else "nbt={equipment:{chest:{id:\"$itemId\"$countPart}}}"
+            "slot.armor.legs" ->
+                if (legacy) legacyInv(101) else "nbt={equipment:{legs:{id:\"$itemId\"$countPart}}}"
+            "slot.armor.feet" ->
+                if (legacy) legacyInv(100) else "nbt={equipment:{feet:{id:\"$itemId\"$countPart}}}"
             "slot.hotbar", "slot.inventory" -> {
                 // 物品栏 → Inventory
                 // 转换规则：
@@ -2719,7 +2708,6 @@ object SelectorConverter {
                     // 构建多个槽位的 NBT
                     // parseSlotRange 已经返回了转换后的 Java 版槽位编号
                     val nbtItems = slotNumbers.map { slotNum ->
-                        val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
                         "{Slot:${slotNum}b,id:\"$itemId\"$countPart}"
                     }
                     "nbt={Inventory:[${nbtItems.joinToString(",")}]}"
@@ -2729,7 +2717,6 @@ object SelectorConverter {
                 // 末影箱 -> EnderItems（Slot 就是箱内编号，不做 +9）
                 // 2026-09-27 实测：基岩 slot.enderchest 可用 -> 与前置框那条路保持一致
                 val slotNumbers = parseSlotRange(slot, location, reminders, context)
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
                 if (slotNumbers.isEmpty()) {
                     "nbt={EnderItems:[{id:\"$itemId\"$countPart}]}"
                 } else {
@@ -2739,9 +2726,7 @@ object SelectorConverter {
             }
             null -> {
                 // 没有指定位置，使用通用格式（不指定槽位）
-                val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
-                val nbtStr = "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
-                nbtStr
+                "nbt={Inventory:[{id:\"$itemId\"$countPart}]}"
             }
             else -> {
                 // 不支持的位置
@@ -2756,7 +2741,7 @@ object SelectorConverter {
      * 根据特别提醒.txt的要求:SelectedItem, Inventory, equipment这三大nbt参数不能放在同一个nbt大括里面
      * 需要返回多个独立的nbt参数
      */
-    private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context): String {
+    private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false): String {
         // 如果内容为空，返回空字符串（表示移除该参数）
         if (content.trim().isEmpty()) {
             return ""
@@ -2845,34 +2830,28 @@ object SelectorConverter {
 
             // 处理 quantity 范围
             val processedQuantity = processQuantityRange(quantity, reminders, context)
-            val countPart = if (processedQuantity != null) ",count:${processedQuantity}" else ""
+            val countPart = if (processedQuantity == null) ""
+                else if (legacy) ",Count:${processedQuantity}b" else ",count:${processedQuantity}"
+            // 旧版（pre-1.20.5）没有 equipment 字段：副手/装备走 Inventory 数字槽
+            // （头盔 103b/胸甲 102b/护腿 101b/靴子 100b/副手 -106b；1.20.4 实测）。
+            fun legacyInv(s: Int) = inventoryItems.add("{Slot:${s}b,id:\"$itemId\"$countPart}")
 
             // 根据位置类型分类
             when (location) {
                 "slot.weapon.mainhand" -> {
-                    // 主手 → SelectedItem
+                    // 主手 → SelectedItem（两版相同，1.20.4 实测 =1）
                     selectedItem.add("{id:\"$itemId\"$countPart}")
                 }
-                "slot.weapon.offhand" -> {
-                    // 副手 → equipment.offhand
-                    equipmentItems["offhand"] = "{id:\"$itemId\"$countPart}"
-                }
-                "slot.armor.head" -> {
-                    // 头盔 → equipment.head
-                    equipmentItems["head"] = "{id:\"$itemId\"$countPart}"
-                }
-                "slot.armor.chest" -> {
-                    // 胸甲 → equipment.chest
-                    equipmentItems["chest"] = "{id:\"$itemId\"$countPart}"
-                }
-                "slot.armor.legs" -> {
-                    // 护腿 → equipment.legs
-                    equipmentItems["legs"] = "{id:\"$itemId\"$countPart}"
-                }
-                "slot.armor.feet" -> {
-                    // 靴子 → equipment.feet
-                    equipmentItems["feet"] = "{id:\"$itemId\"$countPart}"
-                }
+                "slot.weapon.offhand" -> if (legacy) legacyInv(-106)
+                    else equipmentItems["offhand"] = "{id:\"$itemId\"$countPart}"
+                "slot.armor.head" -> if (legacy) legacyInv(103)
+                    else equipmentItems["head"] = "{id:\"$itemId\"$countPart}"
+                "slot.armor.chest" -> if (legacy) legacyInv(102)
+                    else equipmentItems["chest"] = "{id:\"$itemId\"$countPart}"
+                "slot.armor.legs" -> if (legacy) legacyInv(101)
+                    else equipmentItems["legs"] = "{id:\"$itemId\"$countPart}"
+                "slot.armor.feet" -> if (legacy) legacyInv(100)
+                    else equipmentItems["feet"] = "{id:\"$itemId\"$countPart}"
                 "slot.hotbar", "slot.inventory" -> {
                     // 物品栏 → Inventory
                     // 转换规则：
