@@ -31,6 +31,7 @@ class SettingsRepository @Inject constructor(
         const val NBT_SYNTAX_MODERN_PRE_1_21_5 = "modern-pre-1.21.5"
         const val NBT_SYNTAX_LEGACY = "legacy"
         const val NBT_SYNTAX_FOLLOW = "follow"
+        private const val KEY_EXECUTE_PREFIX_INPUT = "execute_prefix_input"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
@@ -65,6 +66,10 @@ class SettingsRepository @Inject constructor(
     // separator使用文本组件开关
     private val _separatorAsTextComponent = MutableStateFlow(false)
     val separatorAsTextComponent: Flow<Boolean> = _separatorAsTextComponent.asStateFlow()
+
+    /** execute 前置框的文本内容（默认空）。 */
+    private val _executePrefixInput = MutableStateFlow("")
+    val executePrefixInput: Flow<String> = _executePrefixInput.asStateFlow()
 
     /** 新旧版本差异策略：默认"新版"（数据组件）。 */
     private val _nbtSyntax = MutableStateFlow(NBT_SYNTAX_MODERN)
@@ -103,6 +108,7 @@ class SettingsRepository @Inject constructor(
                         executePrefixEnabled = _executePrefixEnabled.value,
                         separatorAsTextComponent = _separatorAsTextComponent.value,
                         nbtSyntax = _nbtSyntax.value,
+                        executePrefixInput = _executePrefixInput.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
                     )
@@ -121,6 +127,7 @@ class SettingsRepository @Inject constructor(
                     executePrefixEnabled = _executePrefixEnabled.value,
                     separatorAsTextComponent = _separatorAsTextComponent.value,
                     nbtSyntax = _nbtSyntax.value,
+                    executePrefixInput = _executePrefixInput.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -135,6 +142,7 @@ class SettingsRepository @Inject constructor(
                     executePrefixEnabled = _executePrefixEnabled.value,
                     separatorAsTextComponent = _separatorAsTextComponent.value,
                     nbtSyntax = _nbtSyntax.value,
+                    executePrefixInput = _executePrefixInput.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -154,6 +162,7 @@ class SettingsRepository @Inject constructor(
         val executePrefixEnabled: Boolean,
         val separatorAsTextComponent: Boolean,
         val nbtSyntax: String,
+        val executePrefixInput: String,
         val historyStorageUri: String?,
         val historyStorageFilename: String
     )
@@ -195,6 +204,7 @@ class SettingsRepository @Inject constructor(
                 val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
+                val executePrefixInput = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_INPUT) ?: ""
                 
                 _mnHandlingMode.value = mnHandlingMode == VALUE_MODE_FONT
                 _mnMixedMode.value = mnMixedMode
@@ -204,6 +214,7 @@ class SettingsRepository @Inject constructor(
                 _executePrefixEnabled.value = executePrefixEnabled
                 _separatorAsTextComponent.value = separatorAsTextComponent
                 _nbtSyntax.value = nbtSyntax
+                _executePrefixInput.value = executePrefixInput
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
                 
@@ -226,6 +237,7 @@ class SettingsRepository @Inject constructor(
         val executePrefixEnabled = _executePrefixEnabled.value
         val separatorAsTextComponent = _separatorAsTextComponent.value
         val nbtSyntax = _nbtSyntax.value
+        val executePrefixInput = _executePrefixInput.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
         
@@ -239,6 +251,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_EXECUTE_PREFIX_ENABLED": $executePrefixEnabled,
               "$KEY_SEPARATOR_AS_TEXT_COMPONENT": $separatorAsTextComponent,
               "$KEY_NBT_SYNTAX": "$nbtSyntax",
+              "$KEY_EXECUTE_PREFIX_INPUT": "$executePrefixInput",
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
             }
@@ -383,6 +396,17 @@ class SettingsRepository @Inject constructor(
     /** 设置"新旧版本差异"策略（modern / legacy / follow）。 */
     suspend fun setNbtSyntax(value: String) {
         _nbtSyntax.value = value
+        saveConfig()
+    }
+
+    /** execute 前置框的文本内容。 */
+    fun getExecutePrefixInput(): String {
+        return _executePrefixInput.value
+    }
+
+    /** 保存 execute 前置框的文本内容。 */
+    suspend fun setExecutePrefixInput(value: String) {
+        _executePrefixInput.value = value
         saveConfig()
     }
     
