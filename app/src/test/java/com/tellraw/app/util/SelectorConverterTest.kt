@@ -830,11 +830,47 @@ class SelectorConverterTest {
 
     @Test
     fun testSelectorConversion_11() {
-        // Java版到基岩版：sort=random - @e 转为 @r[type=!player,c=…]（并提醒选不到玩家）
-        // 基岩版没有"全部实体随机"的形式，只能用 @r + type=!player 近似
+        // Java版到基岩版：sort=random（无 limit）且大选择器不是 @a/@r -> 只删 sort，**保留原选择器**，并提醒
+        // （sort.txt 原文；不再改写成 @r[type=!player]，那会改变语义）
         val javaSelector = "@e[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
-        assertEquals("基岩版选择器应为@r[type=!player,c=9999]", "@r[type=!player,c=9999]", conversion.bedrockSelector)
+        assertEquals("基岩版选择器应保留 @e、只删 sort（不补 c）", "@e", conversion.bedrockSelector)
+        assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
+    }
+
+    @Test
+    fun testSelectorConversion_11b() {
+        // sort=random + limit，非 @a/@r -> 保留原选择器 + [c=N] + 提醒（只保留数量限制）
+        val javaSelector = "@e[limit=5,sort=random]"
+        val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
+        assertEquals("基岩版选择器应为@e[c=5]", "@e[c=5]", conversion.bedrockSelector)
+        assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
+    }
+
+    @Test
+    fun testSelectorConversion_11c() {
+        // @p 不在 sort.txt 的"转 @r"之列 -> 保留 @p（正/负两种情形）
+        val noLimit = SelectorConverter.convertJavaToBedrock("@p[sort=random]", context)
+        assertEquals("无 limit 时保留 @p", "@p", noLimit.bedrockSelector)
+        val withLimit = SelectorConverter.convertJavaToBedrock("@p[limit=3,sort=random]", context)
+        assertEquals("有 limit 时保留 @p + c", "@p[c=3]", withLimit.bedrockSelector)
+    }
+
+    @Test
+    fun testSelectorConversion_arbitraryDropsLimitToo() {
+        // sort=arbitrary（@a/@e 静默删；连 limit 一起删，因为基岩版不认 limit）
+        val a = SelectorConverter.convertJavaToBedrock("@a[limit=5,sort=arbitrary]", context)
+        assertEquals("@a", a.bedrockSelector)
+        val e = SelectorConverter.convertJavaToBedrock("@e[limit=5,sort=arbitrary,type=zombie]", context)
+        assertEquals("@e[type=zombie]", e.bedrockSelector)
+    }
+
+    @Test
+    fun testSelectorConversion_nearestWithoutLimitDropsSortNoInventedC() {
+        // sort=nearest 无 limit：只删 sort + 提醒（不再自创 @a→@p[c=114514]）
+        val a = SelectorConverter.convertJavaToBedrock("@a[sort=nearest]", context)
+        assertEquals("@a", a.bedrockSelector)
+        assertTrue("不应出现 114514", !a.bedrockSelector.contains("114514"))
     }
     
     /**
@@ -1114,6 +1150,18 @@ class SelectorConverterTest {
         val (filtered, removed, _) = SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context)
         // 检查转换后的选择器
         assertTrue("应保留scores参数", filtered.contains("scores"))
+    }
+
+    @Test
+    fun testScoresNegationKeepsPositiveEntries() {
+        // 混合：正向 a=5 保留、反选 b=!3 去掉 + 提醒
+        // （原实现把整条 scores 都删了，连正向约束一起丢）
+        val (filtered, _, reminders) = SelectorConverter.filterSelectorParameters(
+            "@e[scores={a=5,b=!3}]", SelectorType.JAVA, context
+        )
+        assertTrue("正向项 a=5 应保留：$filtered", filtered.contains("scores={a=5}"))
+        assertFalse("反选项 b=!3 应去掉：$filtered", filtered.contains("!"))
+        assertTrue("应有反选移除提醒", reminders.any { it.contains("scores") })
     }
     
     /**
