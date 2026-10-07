@@ -1157,7 +1157,7 @@ class TextFormatterTest {
         assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
         assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
         assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("g"))
-        assertTrue("应包含合并的文本ig", json.contains("\"ig\""))
+        assertTrue("应包含 #CECACA", json.contains("\"#CECACA\""))
     }
 
     @Test
@@ -1168,7 +1168,7 @@ class TextFormatterTest {
         assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
         assertTrue("应包含 #47A036", json.contains("\"#47A036\""))
         assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("k") && json.contains("p"))
-        assertTrue("应包含合并的文本ik", json.contains("\"ik\""))
+        assertTrue("应包含 #CECACA", json.contains("\"#CECACA\""))
     }
 
     @Test
