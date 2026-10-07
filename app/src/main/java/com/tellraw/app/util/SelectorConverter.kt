@@ -3731,7 +3731,8 @@ object SelectorConverter {
     fun convertForMixedMode(
         selector: String,
         context: Context,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN
     ): Pair<String, String> {
         // 提取选择器变量和参数
         if ('[' !in selector || ']' !in selector) {
@@ -3816,7 +3817,8 @@ object SelectorConverter {
         val (javaConvertedBedrock, _, _) = filterSelectorParameters(
             "a[$tempBedrockParamsPart]",
             SelectorType.JAVA,
-            context
+            context,
+            nbtSyntax
         )
         // 提取转换后的参数
         if ('[' in javaConvertedBedrock && ']' in javaConvertedBedrock) {
@@ -3860,7 +3862,8 @@ object SelectorConverter {
         val (bedrockConvertedJava, _, _) = filterSelectorParameters(
             "a[$tempJavaParamsPart]",
             SelectorType.BEDROCK,
-            context
+            context,
+            nbtSyntax
         )
         // 提取转换后的参数
         if ('[' in bedrockConvertedJava && ']' in bedrockConvertedJava) {

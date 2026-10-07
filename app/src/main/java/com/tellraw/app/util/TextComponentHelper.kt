@@ -539,7 +539,8 @@ object TextComponentHelper {
     mnCFEnabled: Boolean = false,
     context: Context? = null,
     warnings: MutableList<String>? = null,
-    separatorAsTextComponent: Boolean = false
+    separatorAsTextComponent: Boolean = false,
+    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
 ): String {
         if (components.isEmpty()) return "{}"
 
@@ -555,7 +556,7 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context)
+            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax)
         }
 
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
@@ -637,7 +638,7 @@ object TextComponentHelper {
                     val convertedSelector = if (context != null) {
                         // 使用convertForMixedMode获取Java版和基岩版结果
                         val reminders = mutableListOf<String>()
-                        val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                        val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
                         
                         // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                         // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
@@ -646,7 +647,8 @@ object TextComponentHelper {
                             val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
                                 selectorEntries[0],
                                 SelectorType.JAVA,
-                                context
+                                context,
+                                nbtSyntax
                             )
                             reminders.addAll(filterReminders)
                             filteredSelector
@@ -741,7 +743,7 @@ object TextComponentHelper {
                             val convertedSelector = if (context != null) {
                                 // 使用convertForMixedMode获取Java版和基岩版结果
                                 val reminders = mutableListOf<String>()
-                                val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                                val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
 
                                 // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                                 // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
@@ -750,7 +752,8 @@ object TextComponentHelper {
                                     val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
                                         selectorEntries[0],
                                         SelectorType.JAVA,
-                                        context
+                                        context,
+                                        nbtSyntax
                                     )
                                     reminders.addAll(filterReminders)
                                     filteredSelector
@@ -795,7 +798,8 @@ object TextComponentHelper {
     mNHandling: String = "font", 
     mnCFEnabled: Boolean = false,
     context: Context? = null,
-    warnings: MutableList<String>? = null
+    warnings: MutableList<String>? = null,
+    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
 ): String {
         if (components.isEmpty()) return """{"rawtext":[]}"""
 
@@ -807,7 +811,7 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled)
+            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax)
         }
 
         val rawtext = expandedComponents.map { component ->
@@ -875,7 +879,7 @@ object TextComponentHelper {
                         val convertedSelector = if (context != null) {
                             // 使用convertForMixedMode获取Java版和基岩版结果
                             val reminders = mutableListOf<String>()
-                            val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders)
+                            val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
 
                             // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
                             // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
@@ -884,7 +888,8 @@ object TextComponentHelper {
                                 val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
                                     selectorEntries[0],
                                     SelectorType.BEDROCK,
-                                    context
+                                    context,
+                                    nbtSyntax
                                 )
                                 reminders.addAll(filterReminders)
                                 filteredSelector

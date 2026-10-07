@@ -810,10 +810,14 @@ class TellrawViewModel @Inject constructor(
                 // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
                 val allReminders = mutableListOf<String>()
 
+                // 版本策略要在选择器/文本组件转换**之前**定出来：混合模式与组件内嵌 selector 都要按它过滤。
+                val nbtSyntax = syntaxOverride
+                    ?: effectiveNbtSyntax(selector, _executePrefixInput.value)
+
                 // 检查是否启用了JAVA/基岩混合模式
                 val (javaSelector, bedrockSelector) = if (_javaBedrockMixedMode.value) {
                     val mixedReminders = mutableListOf<String>()
-                    val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(selector, applicationContext, mixedReminders)
+                    val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(selector, applicationContext, mixedReminders, nbtSyntax)
                     allReminders.addAll(mixedReminders)
                     javaOut to bedrockOut
                 } else {
@@ -824,7 +828,7 @@ class TellrawViewModel @Inject constructor(
                 val javaWarnings = mutableListOf<String>()
                 val javaJson = TextFormatter.convertToJavaJson(
                     messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
-                    _separatorAsTextComponent.value
+                    _separatorAsTextComponent.value, nbtSyntax
                 )
                 allReminders.addAll(javaWarnings)
 
@@ -835,8 +839,6 @@ class TellrawViewModel @Inject constructor(
                     applicationContext.getString(R.string.selector_type_java),
                     allReminders
                 )
-                val nbtSyntax = syntaxOverride
-                    ?: effectiveNbtSyntax(selector, _executePrefixInput.value)
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
                 )
@@ -886,7 +888,7 @@ class TellrawViewModel @Inject constructor(
                 val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
                 allReminders.addAll(bedrockReminders)
                 val bedrockWarnings = mutableListOf<String>()
-                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings)
+                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings, nbtSyntax)
                 allReminders.addAll(bedrockWarnings)
                 val bedrockUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.JAVA_TO_BEDROCK,
