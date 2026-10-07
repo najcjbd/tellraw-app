@@ -541,6 +541,7 @@ fun SettingsDialog(
     defaultUseText: Boolean,
     executePrefixEnabled: Boolean,
     separatorAsTextComponent: Boolean,
+    bedrockColorToRgb: Boolean,
     nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
@@ -550,6 +551,7 @@ fun SettingsDialog(
     onDefaultUseTextChanged: (Boolean) -> Unit,
     onExecutePrefixEnabledChanged: (Boolean) -> Unit,
     onSeparatorAsTextComponentChanged: (Boolean) -> Unit,
+    onBedrockColorToRgbChanged: (Boolean) -> Unit,
     onNbtSyntaxChanged: (String) -> Unit
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -815,6 +817,21 @@ fun SettingsDialog(
                         )
                     }
 
+                    // 基岩独有 § 颜色码 -> Java 精确 RGB
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = bedrockColorToRgb,
+                            onCheckedChange = onBedrockColorToRgbChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.bedrock_color_to_rgb),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
                 }
                 
@@ -1049,6 +1066,21 @@ fun SettingsDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.separator_as_text_component),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // 基岩独有 § 颜色码 -> Java 精确 RGB
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = bedrockColorToRgb,
+                            onCheckedChange = onBedrockColorToRgbChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.bedrock_color_to_rgb),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }

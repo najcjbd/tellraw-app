@@ -185,6 +185,36 @@ object VersionDiff {
         "color" to "dyed_color",
     )
 
+    // ==================================================================
+    //  § 颜色码：基岩版"独有颜色"的精确 RGB（见 ttellraw/§.txt）
+    // ==================================================================
+
+    /**
+     * 基岩版独有颜色码（小写字母）-> 精确 RGB Hex。
+     * Java 版没有这些**具名**颜色，但文本组件支持 `color:"#RRGGBB"`，所以可直接写精确值
+     * （而不是近似到 16 具名色）。数据来源：`ttellraw/§.txt`（§g–§v 的 Hex 列）。
+     * 注：§m/§n 是"双关"（基岩=颜色 material_redstone/copper、Java=删除线/下划线），
+     * 由本项目的 §m/§n 模式单独处理，这里**不含**它们。
+     */
+    val BEDROCK_ONLY_COLOR_RGB: Map<Char, String> = linkedMapOf(
+        'g' to "#DDD605", // minecoin_gold
+        'h' to "#E3D4D1", // material_quartz
+        'i' to "#CECACA", // material_iron
+        'j' to "#443A3B", // material_netherite
+        'p' to "#DEB12D", // material_gold
+        'q' to "#47A036", // material_emerald
+        's' to "#2CBAA8", // material_diamond
+        't' to "#21497B", // material_lapis
+        'u' to "#9A5CC6", // material_amethyst
+        'v' to "#EB7114", // material_resin
+    )
+
+    /** 基岩版独有颜色（§m=material_redstone、§n=material_copper）的精确 RGB，用于 §m/§n 的"颜色方式"。 */
+    val BEDROCK_MN_COLOR_RGB: Map<Char, String> = linkedMapOf(
+        'm' to "#971607", // material_redstone
+        'n' to "#B4684D", // material_copper
+    )
+
     /** 新组件 ID -> 旧键名（反向用；同名冲突时取先注册的那个）。 */
     val MODERN_TO_LEGACY_KEY: Map<String, String> = buildMap {
         for ((legacy, modern) in KEY_RENAMES) putIfAbsent(modern, legacy)

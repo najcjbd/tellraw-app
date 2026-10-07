@@ -1894,4 +1894,22 @@ class TextFormatterTest {
         assertTrue("Java版命令应包含JSON格式", javaJson.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", bedrockJson.contains("\"rawtext\""))
     }
+
+    // ---- D3：基岩独有 § 颜色码 -> Java 精确 RGB（bedrockColorToRgb） ----
+
+    @Test
+    fun testBedrockOnlyColorToRgbOnByDefault() {
+        // 默认开：§g -> 精确 RGB #DDD605（不再近似到 yellow）
+        val json = TextFormatter.convertToJavaJson("§gX", "font", false)
+        assertTrue("应包含 #DDD605，实际：$json", json.contains("#DDD605"))
+        assertFalse("不应近似成 yellow", json.contains("\"yellow\""))
+    }
+
+    @Test
+    fun testBedrockOnlyColorToRgbOffUsesApproximation() {
+        // 关：回退到"近似 §"（§g -> yellow）
+        val json = TextFormatter.convertToJavaJson("§gX", "font", false, null, null, false, com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN, false)
+        assertTrue("应近似成 yellow，实际：$json", json.contains("yellow"))
+        assertFalse("不应出现 #DDD605", json.contains("#DDD605"))
+    }
 }

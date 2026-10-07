@@ -197,14 +197,14 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, bedrockColorToRgb: Boolean = true): String {
         // 检查是否包含文本组件标记
         var plainText = text
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
             if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
-                return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings, separatorAsTextComponent, nbtSyntax)
+                return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings, separatorAsTextComponent, nbtSyntax, bedrockColorToRgb)
             }
             // 全是 TEXT 组件：说明这两个字符只是用户手打的普通字符（不是合法组件标记）。
             // 必须继续走下面的纯文本逻辑，而且**不能原样再分派** ——
@@ -230,16 +230,19 @@ object TextFormatter {
         // §u material_amethyst (154,92,198) -> §d light_purple [紫色，RGB值接近亮紫色]
         // §v material_resin (235,114,20) -> §c red [橙红色，RGB值接近红色]
         // 注意：§m/§n不在此处转换，保持其独特的处理逻辑
-        jsonText = jsonText.replace("§g", "§e")
-        jsonText = jsonText.replace("§h", "§f")
-        jsonText = jsonText.replace("§i", "§f")
-        jsonText = jsonText.replace("§j", "§8")
-        jsonText = jsonText.replace("§p", "§6")
-        jsonText = jsonText.replace("§q", "§a")
-        jsonText = jsonText.replace("§s", "§b")
-        jsonText = jsonText.replace("§t", "§1")
-        jsonText = jsonText.replace("§u", "§d")
-        jsonText = jsonText.replace("§v", "§c")
+        // bedrockColorToRgb=true（默认）时**不做**近似替换：保留 §g..§v，后面按精确 RGB 处理。
+        if (!bedrockColorToRgb) {
+            jsonText = jsonText.replace("§g", "§e")
+            jsonText = jsonText.replace("§h", "§f")
+            jsonText = jsonText.replace("§i", "§f")
+            jsonText = jsonText.replace("§j", "§8")
+            jsonText = jsonText.replace("§p", "§6")
+            jsonText = jsonText.replace("§q", "§a")
+            jsonText = jsonText.replace("§s", "§b")
+            jsonText = jsonText.replace("§t", "§1")
+            jsonText = jsonText.replace("§u", "§d")
+            jsonText = jsonText.replace("§v", "§c")
+        }
 
         // 已知的§组合
         val knownCodes = setOf(
@@ -344,6 +347,10 @@ object TextFormatter {
                         "§f" -> currentFormat["color"] = "white"
                     }
                 }
+                // 基岩版独有颜色（§g..§v）：bedrockColorToRgb 时写**精确 RGB**（Java 支持 color:"#RRGGBB"）
+                else if (bedrockColorToRgb && code.length == 2 && code[1] in VersionDiff.BEDROCK_ONLY_COLOR_RGB) {
+                    currentFormat["color"] = VersionDiff.BEDROCK_ONLY_COLOR_RGB.getValue(code[1])
+                }
                 // §m_f/§m_c/§n_f/§n_c格式（优先处理，因为它们是4字符代码）
                 else if (code.startsWith("§m_") || code.startsWith("§n_")) {
                     when (code) {
@@ -375,7 +382,7 @@ object TextFormatter {
                                 // 在Java版中，§m作为格式化代码是删除线
                                 currentFormat["strikethrough"] = true
                             } else {
-                                // 在Java版中，§m作为颜色代码是深红色（material_redstone）
+                                // 颜色方式：基岩 material_redstone。bedrockColorToRgb 时用精确 RGB
                                 currentFormat["color"] = "dark_red"
                             }
                         }
@@ -384,7 +391,7 @@ object TextFormatter {
                                 // 在Java版中，§n作为格式化代码是下划线
                                 currentFormat["underlined"] = true
                             } else {
-                                // 在Java版中，§n作为颜色代码是铜色（material_copper），映射到最接近的红色
+                                // 颜色方式：基岩 material_copper。bedrockColorToRgb 时用精确 RGB
                                 currentFormat["color"] = "red"
                             }
                         }

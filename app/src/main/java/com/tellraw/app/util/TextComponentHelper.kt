@@ -186,16 +186,19 @@ object TextComponentHelper {
     /**
      * 将组件内容中的§代码转换为Java版JSON属性
      */
-    private fun processSectionCodesToJson(content: String, mNHandling: String, mnCFEnabled: Boolean): Map<String, Any> {
+    private fun processSectionCodesToJson(content: String, mNHandling: String, mnCFEnabled: Boolean, bedrockColorToRgb: Boolean = true): Map<String, Any> {
         val result = mutableMapOf<String, Any>()
-        val tokens = tokenizeText(content)
+        val tokens = tokenizeText(content, bedrockColorToRgb)
         
         for (token in tokens) {
             val (tokenType, tokenValue) = token
             
             when (tokenType) {
                 "color" -> {
-                    if (tokenValue in JAVA_COLORS) {
+                    // 基岩独有颜色（§g..§v）-> 精确 RGB
+                    if (bedrockColorToRgb && tokenValue.length == 1 && tokenValue[0] in VersionDiff.BEDROCK_ONLY_COLOR_RGB) {
+                        result["color"] = VersionDiff.BEDROCK_ONLY_COLOR_RGB.getValue(tokenValue[0])
+                    } else if (tokenValue in JAVA_COLORS) {
                         result["color"] = JAVA_COLORS[tokenValue]!!
                     }
                 }
@@ -246,9 +249,12 @@ object TextComponentHelper {
     /**
      * 简单的文本分词（提取颜色和格式代码）
      */
-    private fun tokenizeText(text: String): List<Pair<String, String>> {
+    private fun tokenizeText(text: String, bedrockColorToRgb: Boolean = true): List<Pair<String, String>> {
         val tokens = mutableListOf<Pair<String, String>>()
-        val knownColorCodes = setOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")
+        // bedrockColorToRgb 时把基岩独有颜色码（§g..§v）也当"颜色"对待，供后面写精确 RGB；
+        // 否则维持原样（当普通文本）。
+        val knownColorCodes = setOf("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f") +
+            if (bedrockColorToRgb) VersionDiff.BEDROCK_ONLY_COLOR_RGB.keys.map { it.toString() } else emptyList()
         val knownFormatCodes = setOf("k", "l", "m", "n", "o", "r")
         
         var i = 0
@@ -540,7 +546,8 @@ object TextComponentHelper {
     context: Context? = null,
     warnings: MutableList<String>? = null,
     separatorAsTextComponent: Boolean = false,
-    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+    bedrockColorToRgb: Boolean = true
 ): String {
         if (components.isEmpty()) return "{}"
 
@@ -556,13 +563,13 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax)
+            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb)
         }
 
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
             // 单个纯文本组件（这个分支现在不会被触发，因为上面已经处理了所有TEXT组件的情况）
             val plainText = expandedComponents[0].content
-            val formatMap = processSectionCodesToJson(plainText, mNHandling, mnCFEnabled)
+            val formatMap = processSectionCodesToJson(plainText, mNHandling, mnCFEnabled, bedrockColorToRgb)
             if (formatMap.isEmpty()) {
                 return """{"text":"$plainText"}"""
             } else {
@@ -579,7 +586,7 @@ object TextComponentHelper {
             ComponentType.TEXT -> {
                 result["text"] = mainComponent.content
                 // 处理文本中的§代码
-                val formatMap = processSectionCodesToJson(mainComponent.content, mNHandling, mnCFEnabled)
+                val formatMap = processSectionCodesToJson(mainComponent.content, mNHandling, mnCFEnabled, bedrockColorToRgb)
                 result.putAll(formatMap)
             }
             ComponentType.TRANSLATE -> {
@@ -591,7 +598,7 @@ object TextComponentHelper {
                         val withParams = parseTranslateWithContent(withSubComponent.content)
                         // 过滤空参数并处理§代码
                         val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
-                            val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled)
+                            val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
                             if (subFormatMap.isEmpty()) {
                                 param
                             } else {
@@ -685,7 +692,7 @@ object TextComponentHelper {
                 when (sub.type) {
                     ComponentType.TEXT -> {
                         subMap["text"] = sub.content
-                        val formatMap = processSectionCodesToJson(sub.content, mNHandling, mnCFEnabled)
+                        val formatMap = processSectionCodesToJson(sub.content, mNHandling, mnCFEnabled, bedrockColorToRgb)
                         subMap.putAll(formatMap)
                     }
                     ComponentType.TRANSLATE -> {
@@ -697,7 +704,7 @@ object TextComponentHelper {
                                 val withParams = parseTranslateWithContent(withSubComponent.content)
                                 // 过滤空参数并处理§代码
                                 val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
-                                    val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled)
+                                    val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
                                     if (subFormatMap.isEmpty()) {
                                         param
                                     } else {

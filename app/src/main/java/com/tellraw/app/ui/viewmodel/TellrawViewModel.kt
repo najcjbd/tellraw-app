@@ -100,6 +100,10 @@ class TellrawViewModel @Inject constructor(
     
     private val _separatorAsTextComponent = MutableStateFlow(false)
     val separatorAsTextComponent: StateFlow<Boolean> = _separatorAsTextComponent.asStateFlow()
+
+    /** 基岩独有 § 颜色码 -> Java 精确 RGB（默认开）。 */
+    private val _bedrockColorToRgb = MutableStateFlow(true)
+    val bedrockColorToRgb: StateFlow<Boolean> = _bedrockColorToRgb.asStateFlow()
     
     // 文本组件选择相关状态
     private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
@@ -200,6 +204,7 @@ class TellrawViewModel @Inject constructor(
             
             // 加载separator使用文本组件设置
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
+            _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
             
             // 加载历史记录文件名
             _historyStorageFilename.value = loadedSettings.historyStorageFilename
@@ -770,6 +775,15 @@ class TellrawViewModel @Inject constructor(
         }
         generateCommands()
     }
+
+    /** 基岩独有 § 颜色码 -> Java 精确 RGB。 */
+    fun setBedrockColorToRgb(enabled: Boolean) {
+        _bedrockColorToRgb.value = enabled
+        viewModelScope.launch {
+            settingsRepository.setBedrockColorToRgb(enabled)
+        }
+        generateCommands()
+    }
     
     fun dismissMNDialog() {
         _showMNDialog.value = null
@@ -838,7 +852,7 @@ class TellrawViewModel @Inject constructor(
                 val javaWarnings = mutableListOf<String>()
                 val javaJson = TextFormatter.convertToJavaJson(
                     messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
-                    _separatorAsTextComponent.value, nbtSyntax
+                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value
                 )
                 allReminders.addAll(javaWarnings)
 
