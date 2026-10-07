@@ -247,8 +247,8 @@ class TextFormatterTest {
         // 颜色方式：两版都用颜色
         val text = "§m删除线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "color", false)
-        // 验证Java版将§m作为颜色方式处理（dark_red）
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
+        // 颜色方式：material_redstone 的精确 RGB
+        assertTrue("Java版应包含 #971607", javaJson.contains("#971607"))
         assertFalse("Java版不应包含strikethrough", javaJson.contains("strikethrough"))
     }
 
@@ -276,8 +276,8 @@ class TextFormatterTest {
         // §n颜色方式：两版都用颜色
         val text = "§n下划线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "color", false)
-        // 验证Java版将§n作为颜色方式处理（red）
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        // 颜色方式：material_copper 的精确 RGB
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("#B4684D"))
         assertFalse("Java版不应包含underlined", javaJson.contains("underlined"))
     }
 
@@ -295,8 +295,8 @@ class TextFormatterTest {
         // §m_c在混合模式下的Java版转换
         val text = "§m_c删除线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "font", false)
-        // 验证Java版将§m_c转换为dark_red颜色
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
+        // §m_c -> material_redstone 精确 RGB
+        assertTrue("Java版应包含 #971607", javaJson.contains("#971607"))
         assertFalse("Java版不应包含strikethrough", javaJson.contains("strikethrough"))
     }
 
@@ -314,8 +314,8 @@ class TextFormatterTest {
         // §n_c在混合模式下的Java版转换
         val text = "§n_c下划线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "font", false)
-        // 验证Java版将§n_c转换为red颜色
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        // §n_c -> material_copper 精确 RGB
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("#B4684D"))
         assertFalse("Java版不应包含underlined", javaJson.contains("underlined"))
     }
 

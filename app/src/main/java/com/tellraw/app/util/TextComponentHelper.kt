@@ -210,14 +210,14 @@ object TextComponentHelper {
                             if (mNHandling == "font") {
                                 result["strikethrough"] = true
                             } else {
-                                result["color"] = "dark_red"
+                                result["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('m') else "dark_red"
                             }
                         }
                         "n" -> {
                             if (mNHandling == "font") {
                                 result["underlined"] = true
                             } else {
-                                result["color"] = "red"
+                                result["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('n') else "red"
                             }
                         }
                         "o" -> result["italic"] = true

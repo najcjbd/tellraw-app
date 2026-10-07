@@ -359,16 +359,16 @@ object TextFormatter {
                             currentFormat["strikethrough"] = true
                         }
                         "§m_c" -> {
-                            // 深红色（颜色方式）：添加 color
-                            currentFormat["color"] = "dark_red"
+                            // 颜色方式：material_redstone（bedrockColorToRgb 时用精确 RGB）
+                            currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('m') else "dark_red"
                         }
                         "§n_f" -> {
                             // 下划线（字体方式）：添加 underlined
                             currentFormat["underlined"] = true
                         }
                         "§n_c" -> {
-                            // 红色（颜色方式）：添加 color
-                            currentFormat["color"] = "red"
+                            // 颜色方式：material_copper（bedrockColorToRgb 时用精确 RGB）
+                            currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('n') else "red"
                         }
                     }
                 }
@@ -383,7 +383,7 @@ object TextFormatter {
                                 currentFormat["strikethrough"] = true
                             } else {
                                 // 颜色方式：基岩 material_redstone。bedrockColorToRgb 时用精确 RGB
-                                currentFormat["color"] = "dark_red"
+                                currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('m') else "dark_red"
                             }
                         }
                         "§n" -> {
@@ -392,7 +392,7 @@ object TextFormatter {
                                 currentFormat["underlined"] = true
                             } else {
                                 // 颜色方式：基岩 material_copper。bedrockColorToRgb 时用精确 RGB
-                                currentFormat["color"] = "red"
+                                currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('n') else "red"
                             }
                         }
                         "§o" -> currentFormat["italic"] = true  // 斜体
