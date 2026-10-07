@@ -1,10 +1,7 @@
 package com.tellraw.app.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,7 +20,10 @@ import com.tellraw.app.util.TextComponentHelper
 
 /**
  * 文本组件选择器
- * 用于选择文本组件类型（text, translate等）
+ *
+ * 布局：**横排**（与 § 颜色/格式快捷列表一致的 FilterChip 风格，配色也一致）。
+ * 每个组件类型一个 chip；带副组件的（translate / selector）在 chip 尾部有一个展开图标，
+ * 展开后把副组件（with / separator）作为相邻 chip 追加在其后；末尾是"纯文本单引号"chip。
  */
 @Composable
 fun TextComponentSelector(
@@ -48,189 +47,112 @@ fun TextComponentSelector(
                 text = stringResource(R.string.text_component_title),
                 style = MaterialTheme.typography.titleSmall
             )
-            
-            // 组件列表（独立滚动）
-            LazyColumn(
+
+            // 横排（可左右滚动），配色沿用 FilterChip 默认（与 § 快捷列表一致）
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(TextComponentHelper.ComponentType.values()) { component ->
-                    ComponentItem(
+                TextComponentHelper.ComponentType.values().forEach { component ->
+                    val isSelected = selectedComponent == component
+                    val isExpanded = expandedSubComponents.contains(component.key)
+                    ComponentChip(
                         component = component,
-                        isSelected = selectedComponent == component,
-                        isExpanded = expandedSubComponents.contains(component.key),
-                        selectedSubComponent = selectedSubComponent,
+                        isSelected = isSelected,
+                        isExpanded = isExpanded,
                         onSelected = { onComponentSelected(component) },
-                        onSubComponentToggle = { onSubComponentToggle(component) },
-                        onSubComponentSelected = onSubComponentSelected
+                        onSubComponentToggle = { onSubComponentToggle(component) }
                     )
+                    // 展开时：副组件紧跟其后（同一横排）
+                    if (component.hasSubComponent && isExpanded) {
+                        subComponentOf(component)?.let { sub ->
+                            SubComponentChip(
+                                subComponent = sub,
+                                isSelected = selectedSubComponent == sub,
+                                onSelected = { onSubComponentSelected(sub) }
+                            )
+                        }
+                    }
                 }
                 // 纯文本单引号：点一下往输入框插一个 '
-                item {
-                    PlainQuoteItem(onInsert = onInsertPlainQuote)
-                }
+                FilterChip(
+                    selected = false,
+                    onClick = onInsertPlainQuote,
+                    label = {
+                        Text(
+                            text = "'  " + stringResource(R.string.component_quote_hint),
+                            maxLines = 1
+                        )
+                    }
+                )
             }
         }
     }
 }
 
-/**
- * 纯文本单引号项
- * 点一下往输入框插入一个 '，它的含义是"纯文本"，只在 ,'sep': 的值里生效：
- * ,'sep':'''' 表示分隔符就是一个字面单引号
- */
-@Composable
-private fun PlainQuoteItem(onInsert: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onInsert() }
-            .background(
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(4.dp)
-            )
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "'  " + stringResource(R.string.component_quote_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+/** 组件对应的副组件（没有则返回 null）。 */
+private fun subComponentOf(
+    component: TextComponentHelper.ComponentType
+): TextComponentHelper.SubComponentType? = when (component) {
+    TextComponentHelper.ComponentType.TRANSLATE -> TextComponentHelper.SubComponentType.WITH
+    TextComponentHelper.ComponentType.SELECTOR -> TextComponentHelper.SubComponentType.SEPARATOR
+    else -> null
 }
 
-/**
- * 单个组件项
- */
+/** 主组件 chip（带副组件的尾部带展开/收起图标）。 */
 @Composable
-private fun ComponentItem(
+private fun ComponentChip(
     component: TextComponentHelper.ComponentType,
     isSelected: Boolean,
     isExpanded: Boolean,
-    selectedSubComponent: TextComponentHelper.SubComponentType?,
     onSelected: () -> Unit,
-    onSubComponentToggle: () -> Unit,
-    onSubComponentSelected: (TextComponentHelper.SubComponentType) -> Unit
+    onSubComponentToggle: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // 主组件
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onSelected() }
-                .background(
-                    color = if (isSelected) 
-                        MaterialTheme.colorScheme.primaryContainer 
-                    else 
-                        MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(4.dp)
-                )
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(component.displayNameResId),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                ),
-                color = if (isSelected) 
-                    MaterialTheme.colorScheme.primary 
-                else 
-                    MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            
-            // 展开副组件的图标（如果有副组件）
-            if (component.hasSubComponent) {
+    FilterChip(
+        selected = isSelected,
+        onClick = onSelected,
+        label = {
+            Text(stringResource(component.displayNameResId), maxLines = 1)
+        },
+        trailingIcon = if (component.hasSubComponent) {
+            {
                 IconButton(
-                    onClick = {
-                        onSubComponentToggle()
-                    },
-                    modifier = Modifier.size(24.dp)
+                    onClick = onSubComponentToggle,
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
-                        if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) stringResource(R.string.component_collapse) else stringResource(R.string.component_expand),
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = stringResource(
+                            if (isExpanded) R.string.component_collapse else R.string.component_expand
+                        ),
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
-        }
-        
-        // 副组件（已展开时显示）
-        if (component.hasSubComponent && isExpanded) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp)
-            ) {
-                component.key?.let { componentKey ->
-                    when (component) {
-                        TextComponentHelper.ComponentType.TRANSLATE -> {
-                            // with参数
-                            SubComponentItem(
-                                subComponent = TextComponentHelper.SubComponentType.WITH,
-                                isSelected = selectedSubComponent == TextComponentHelper.SubComponentType.WITH,
-                                parentComponent = component,
-                                onSelected = { onSubComponentSelected(TextComponentHelper.SubComponentType.WITH) }
-                            )
-                        }
-                        TextComponentHelper.ComponentType.SELECTOR -> {
-                            // separator（分隔符）参数
-                            SubComponentItem(
-                                subComponent = TextComponentHelper.SubComponentType.SEPARATOR,
-                                isSelected = selectedSubComponent == TextComponentHelper.SubComponentType.SEPARATOR,
-                                parentComponent = component,
-                                onSelected = { onSubComponentSelected(TextComponentHelper.SubComponentType.SEPARATOR) }
-                            )
-                        }
-                        else -> {}
-                    }
-                }
-            }
-        }
-    }
+        } else null
+    )
 }
 
-/**
- * 副组件项
- */
+/** 副组件 chip（with / separator）。 */
 @Composable
-private fun SubComponentItem(
+private fun SubComponentChip(
     subComponent: TextComponentHelper.SubComponentType,
     isSelected: Boolean,
-    parentComponent: TextComponentHelper.ComponentType,
     onSelected: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onSelected() }
-            .background(
-                color = if (isSelected) 
-                    MaterialTheme.colorScheme.secondaryContainer 
-                else 
-                    MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(4.dp)
+    FilterChip(
+        selected = isSelected,
+        onClick = onSelected,
+        label = {
+            Text(
+                text = "${stringResource(R.string.component_arrow)}${stringResource(subComponent.displayNameResId)}",
+                maxLines = 1
             )
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "${stringResource(R.string.component_arrow)}${stringResource(subComponent.displayNameResId)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isSelected) 
-                MaterialTheme.colorScheme.secondary 
-            else 
-                MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+        }
+    )
 }
 
 /**
