@@ -387,6 +387,8 @@
     <string name="nbt_syntax_modern">Modern (components)</string>
     <string name="nbt_syntax_legacy">Legacy (old NBT)</string>
     <string name="nbt_syntax_follow">Follow input</string>
+    <string name="nbt_syntax_modern_pre_1_21_5">1.20.5–1.21.4 (items for armor)</string>
+    <string name="equipment_nbt_needs_1_21_5">Policy 1.20.5-1.21.4: Java nbt equipment predicate needs 1.21.5+; on 1.20.5-1.21.4 it silently never matches. Use: execute if items entity &lt;target&gt; &lt;slot&gt; &lt;item&gt;</string>
     <string name="modern_components_downgraded">Downgraded data components to legacy NBT per the "legacy" policy; please verify these keys (no legacy equivalent or a different value shape): %1$s</string>
     <string name="syntax_mixed_treated_as_modern">Mixed old/new item syntax detected (both tag: and components:): please choose in the dialog; until you choose it is treated as “modern”</string>
     <string name="syntax_mixed_title">Mixed old/new item syntax detected</string>

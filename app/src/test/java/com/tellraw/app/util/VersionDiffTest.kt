@@ -15,9 +15,61 @@ class VersionDiffTest {
         assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.NbtSyntax.from("modern"))
         assertEquals(VersionDiff.NbtSyntax.LEGACY, VersionDiff.NbtSyntax.from("legacy"))
         assertEquals(VersionDiff.NbtSyntax.FOLLOW_INPUT, VersionDiff.NbtSyntax.from("follow"))
+        // 1.20.5–1.21.4：配置串 + 别名
+        assertEquals(VersionDiff.NbtSyntax.MODERN_PRE_1_21_5, VersionDiff.NbtSyntax.from("modern-pre-1.21.5"))
+        assertEquals(VersionDiff.NbtSyntax.MODERN_PRE_1_21_5, VersionDiff.NbtSyntax.from("1.20.5-1.21.4"))
         // 默认新版；非法值也回落成新版
         assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.NbtSyntax.from(null))
         assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.NbtSyntax.from("随便什么"))
+    }
+
+    @Test
+    fun testRangeStateMatchesModernOnTagAxisAndRoutesEquipmentViaItems() {
+        val onlyLegacy = "{id:\"minecraft:diamond\",tag:{foo:1}}"
+        val onlyModern = "{id:\"minecraft:diamond\",components:{\"minecraft:custom_data\":{foo:1}}}"
+        val mixed = "{id:\"minecraft:diamond\",tag:{foo:1},components:{\"minecraft:damage\":2}}"
+        val neither = "{id:\"minecraft:diamond\"}"
+        // 1.20.5–1.21.4 在 tag/components 轴上与 MODERN 完全一致
+        for (t in listOf(onlyLegacy, onlyModern, mixed, neither)) {
+            assertEquals(
+                VersionDiff.decide(VersionDiff.NbtSyntax.MODERN, t),
+                VersionDiff.decide(VersionDiff.NbtSyntax.MODERN_PRE_1_21_5, t)
+            )
+        }
+        // 只有这个状态把 armor/副手改走 items
+        assertTrue(VersionDiff.routesEquipmentViaItems(VersionDiff.NbtSyntax.MODERN_PRE_1_21_5))
+        assertFalse(VersionDiff.routesEquipmentViaItems(VersionDiff.NbtSyntax.MODERN))
+        assertFalse(VersionDiff.routesEquipmentViaItems(VersionDiff.NbtSyntax.LEGACY))
+        assertFalse(VersionDiff.routesEquipmentViaItems(VersionDiff.NbtSyntax.FOLLOW_INPUT))
+    }
+
+    @Test
+    fun testInferConcreteSyntaxFromInputMarkers() {
+        // ① 出现 equipment 标记 -> 玩家在 1.21.5+，保留 equipment 谓词
+        assertEquals(
+            VersionDiff.NbtSyntax.MODERN,
+            VersionDiff.inferConcreteSyntax("@a[nbt={equipment:{head:{id:\"minecraft:diamond_helmet\"}}}]")
+        )
+        assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.inferConcreteSyntax("data entity @s equipment.head.id"))
+        // ② 混用 -> 原样交回 FOLLOW_INPUT（保住"混用弹窗"）
+        assertEquals(
+            VersionDiff.NbtSyntax.FOLLOW_INPUT,
+            VersionDiff.inferConcreteSyntax("{id:\"x\",tag:{foo:1},components:{\"minecraft:damage\":2}}")
+        )
+        // ③ 只有旧写法 -> LEGACY
+        assertEquals(
+            VersionDiff.NbtSyntax.LEGACY,
+            VersionDiff.inferConcreteSyntax("{id:\"minecraft:diamond\",tag:{foo:1}}")
+        )
+        // ④ 只有现代写法 / 无标记 -> 安全侧（armor 走 items）
+        assertEquals(
+            VersionDiff.NbtSyntax.MODERN_PRE_1_21_5,
+            VersionDiff.inferConcreteSyntax("@a[hasitem={item=diamond,location=slot.hotbar,slot=0}]")
+        )
+        assertEquals(
+            VersionDiff.NbtSyntax.MODERN_PRE_1_21_5,
+            VersionDiff.inferConcreteSyntax("")
+        )
     }
 
     @Test

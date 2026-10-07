@@ -25,9 +25,10 @@ class SettingsRepository @Inject constructor(
         private const val KEY_DEFAULT_USE_TEXT = "default_use_text"
         private const val KEY_EXECUTE_PREFIX_ENABLED = "execute_prefix_enabled"
         private const val KEY_SEPARATOR_AS_TEXT_COMPONENT = "separator_as_text_component"
-        // 新旧版本差异的统一策略（见 need/新旧版本差异规范.txt）：modern / legacy / follow
+        // 新旧版本差异的统一策略（见 need/新旧版本差异规范.txt）：modern / modern-pre-1.21.5 / legacy / follow
         private const val KEY_NBT_SYNTAX = "nbt_syntax"
         const val NBT_SYNTAX_MODERN = "modern"
+        const val NBT_SYNTAX_MODERN_PRE_1_21_5 = "modern-pre-1.21.5"
         const val NBT_SYNTAX_LEGACY = "legacy"
         const val NBT_SYNTAX_FOLLOW = "follow"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
@@ -189,7 +190,7 @@ class SettingsRepository @Inject constructor(
                 val separatorAsTextComponent = extractJsonValue(jsonString, KEY_SEPARATOR_AS_TEXT_COMPONENT) == "true"
                 // 默认"新版"；非法值一律回落成"新版"
                 val nbtSyntax = extractJsonValue(jsonString, KEY_NBT_SYNTAX)
-                    ?.takeIf { it in listOf(NBT_SYNTAX_MODERN, NBT_SYNTAX_LEGACY, NBT_SYNTAX_FOLLOW) }
+                    ?.takeIf { it in listOf(NBT_SYNTAX_MODERN, NBT_SYNTAX_MODERN_PRE_1_21_5, NBT_SYNTAX_LEGACY, NBT_SYNTAX_FOLLOW) }
                     ?: NBT_SYNTAX_MODERN
                 val historyStorageUri = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_URI) ?: ""
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME

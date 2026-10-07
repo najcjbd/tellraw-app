@@ -251,9 +251,19 @@ object ExecuteConverter {
                     // 开关关着（preferExecute=false）：正向"有某物品"留在选择器里走原有的 nbt= 路径
                     // （避免无谓地改动既有输出）；开关打开时按你的规则一律用 execute。
                     // "选择器写不出的"（item=air / quantity=0 / 0..）无论开关都要拆出来。
-                    if (!preferExecute && objects.none { isNegationLikeHasitem(it) }) {
+                    // 1.20.5–1.21.4：armor/副手的选择器写法 nbt={equipment:…} 要 1.21.5 才生效
+                    // （1.20.5–1.21.4 上语法合法但永不匹配，实测）-> 一并拆进 execute items。
+                    val equipmentRerouted = VersionDiff.routesEquipmentViaItems(nbtSyntax) &&
+                        objects.any { ExecCondSupport.isEquipmentLikeHasitem(it) }
+                    if (!preferExecute && !equipmentRerouted && objects.none { isNegationLikeHasitem(it) }) {
                         kept.add(p)
                         continue
+                    }
+                    if (equipmentRerouted) {
+                        reminders.add(
+                            "版本策略 1.20.5–1.21.4：armor/副手的选择器写法 nbt={equipment:…} 要 1.21.5 才生效" +
+                                "（1.20.5–1.21.4 上它语法合法但永不匹配，实测），已把该条件改走 execute `items`"
+                        )
                     }
                     changed = true
                     for (obj in objects) {
@@ -1018,6 +1028,15 @@ object ExecuteConverter {
                     (if (h.quantity != null && !meansNone)
                         "（quantity=${h.quantity} 是\"该栏总量\"，nbt 表达不了，请自行核对）" else "")
             )
+            // armor/副手：nbt 里用的是 equipment 字段，而它在 <1.21.5 根本不存在
+            // （pre-1.20.5 更不成立）-> 明确提醒，别让这条沉寂（正确写法待 1.20.4 实测后再定）。
+            if (nbt.contains("equipment")) {
+                reminders.add(
+                    "按\"旧版\"策略：这条装备条件写成 `$nbt`，但 Java 的 equipment 字段 **1.21.5 才生效**" +
+                        "（pre-1.20.5 该字段不存在），旧版上不能用它测装备；正确写法待真机核对" +
+                        "（候选：Inventory 数字槽 100-103/-106，或 ArmorItems/HandItems），请自行核对"
+                )
+            }
             return listOf(kw, "data", "entity", target, nbt)
         }
 

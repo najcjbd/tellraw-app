@@ -499,9 +499,11 @@ fun SyntaxMixedDialog(
 /**
  * 新旧版本差异策略选择（见 need/新旧版本差异规范.txt）：
  *  - 新版：一律按 1.20.5+ 的数据组件写法
+ *  - 1.20.5–1.21.4：数据组件可用，但 `{equipment:…}` 谓词要 1.21.5 才生效 -> armor/副手改走 execute items
  *  - 旧版：一律按 1.20.4- 的旧 NBT 写法
  *  - 跟随输入：全是新版就新版、全是旧版就旧版、新旧混用会问一嘴
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NbtSyntaxSelector(value: String, onChange: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -510,9 +512,13 @@ private fun NbtSyntaxSelector(value: String, onChange: (String) -> Unit) {
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             listOf(
                 "modern" to R.string.nbt_syntax_modern,
+                "modern-pre-1.21.5" to R.string.nbt_syntax_modern_pre_1_21_5,
                 "legacy" to R.string.nbt_syntax_legacy,
                 "follow" to R.string.nbt_syntax_follow
             ).forEach { (v, labelRes) ->

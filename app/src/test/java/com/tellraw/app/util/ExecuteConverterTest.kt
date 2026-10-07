@@ -368,6 +368,57 @@ class ExecuteConverterTest {
     }
 
     @Test
+    fun testEquipmentHasitemMovesToItemsUnderRangeState() {
+        // 1.20.5–1.21.4：nbt={equipment:…} 要 1.21.5 才生效 -> armor/副手改走 execute items
+        val reminders = mutableListOf<String>()
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond_helmet,location=slot.armor.head}]",
+            reminders, nbtSyntax = VersionDiff.NbtSyntax.MODERN_PRE_1_21_5
+        )
+        assertNotNull(neg)
+        assertEquals(
+            listOf("if", "items", "entity", "@s", "armor.head", "minecraft:diamond_helmet"),
+            neg!!.second
+        )
+        assertTrue(reminders.any { it.contains("1.21.5") })
+    }
+
+    @Test
+    fun testEquipmentOffhandAlsoMovesUnderRangeState() {
+        val neg = ExecuteConverter.bedrockSelectorNegation(
+            "@a[hasitem={item=diamond_sword,location=slot.weapon.offhand}]",
+            mutableListOf(), nbtSyntax = VersionDiff.NbtSyntax.MODERN_PRE_1_21_5
+        )
+        assertNotNull(neg)
+        assertEquals(
+            listOf("if", "items", "entity", "@s", "weapon.offhand", "minecraft:diamond_sword"),
+            neg!!.second
+        )
+    }
+
+    @Test
+    fun testNonEquipmentHasitemStaysUnderRangeState() {
+        // 1.20.5–1.21.4 只改 armor/副手；物品栏不受影响（仍走既有 nbt= 路径）
+        assertNull(
+            ExecuteConverter.bedrockSelectorNegation(
+                "@a[hasitem={item=diamond,location=slot.hotbar,slot=5}]",
+                mutableListOf(), nbtSyntax = VersionDiff.NbtSyntax.MODERN_PRE_1_21_5
+            )
+        )
+    }
+
+    @Test
+    fun testLegacyKeepsArmorHasitemInSelector() {
+        // LEGACY（pre-1.20.5）没有 execute items -> 不走 items 改道
+        assertNull(
+            ExecuteConverter.bedrockSelectorNegation(
+                "@a[hasitem={item=diamond_helmet,location=slot.armor.head}]",
+                mutableListOf(), nbtSyntax = VersionDiff.NbtSyntax.LEGACY
+            )
+        )
+    }
+
+    @Test
     fun testSelectorWithoutNegationReturnsNull() {
         assertNull(ExecuteConverter.bedrockSelectorNegation("@a[tag=x,scores={n=5}]", mutableListOf()))
         assertNull(ExecuteConverter.bedrockSelectorNegation("@a", mutableListOf()))

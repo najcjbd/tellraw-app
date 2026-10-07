@@ -601,6 +601,16 @@ internal object ExecCondSupport {
         location != null && location.trim() in SINGLE_SLOT_ITEM_LOCATIONS
 
     /**
+     * 这个 hasitem 对象的落点是否属于"Java 侧只有 1.21.5+ 的 `{equipment:…}` 谓词"那一类
+     * （armor.* 与副手）。1.20.5–1.21.4 上该谓词永不匹配 -> 必须改走 `execute if items`。
+     * （主手走 SelectedItem、物品栏/末影箱走 Inventory/EnderItems，都不在此列。）
+     */
+    fun isEquipmentLikeHasitem(obj: String): Boolean {
+        val loc = parseHasitemObject(obj).location?.trim() ?: return false
+        return loc.startsWith("slot.armor.") || loc == "slot.weapon.offhand"
+    }
+
+    /**
      * location 形如 `container.N` / `hotbar.N` / `inventory.N`（编号内嵌在 location 里）时，
      * 返回 (前缀, N)；否则返回 null。
      */
