@@ -836,7 +836,7 @@ class TellrawViewModel @Inject constructor(
                     allReminders
                 )
                 val nbtSyntax = syntaxOverride
-                    ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+                    ?: effectiveNbtSyntax(selector, _executePrefixInput.value)
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
                 )
@@ -939,6 +939,17 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
+     * 当前生效的版本策略：配置项是"跟随输入"时，按输入里的版本特有写法推断成一个具体策略
+     * （见 VersionDiff.inferConcreteSyntax）；其余情况直接用配置项。
+     */
+    private fun effectiveNbtSyntax(vararg texts: String?): com.tellraw.app.util.VersionDiff.NbtSyntax {
+        val configured = com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        return if (configured == com.tellraw.app.util.VersionDiff.NbtSyntax.FOLLOW_INPUT) {
+            com.tellraw.app.util.VersionDiff.inferConcreteSyntax(*texts)
+        } else configured
+    }
+
+    /**
      * 把用户在"前置命令框"写的 execute 前缀转换成目标版本（需求七.1 / 七.3）。
      *
      * 开关关闭、前置框为空时返回 null（现状行为）；前缀不是合法 execute 前缀时给出提醒并返回 null
@@ -958,7 +969,7 @@ class TellrawViewModel @Inject constructor(
 
         val converted = ExecuteConverter.convertExecutePrefix(
             prefix, direction, warnings,
-            com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+            effectiveNbtSyntax(_executePrefixInput.value)
         )
         if (converted == null) {
             warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))

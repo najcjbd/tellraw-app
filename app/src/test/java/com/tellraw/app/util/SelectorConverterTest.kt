@@ -58,6 +58,32 @@ class SelectorConverterTest {
         assertFalse("老式 count:2b 在新版失效", q2.first.contains("count:2b"))
     }
 
+    /** 1.20.5–1.21.4：nbt={equipment:…} 谓词要 1.21.5 才生效 -> 必须提醒（绝不静默） */
+    @Test
+    fun testEquipmentNbtWarnsOnRangeState() {
+        // (a) 基岩 hasitem=armor 仍走到选择器发射器（这条路径产不出 execute token，只能提醒）
+        val armor = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=0}]",
+            SelectorType.JAVA, context, VersionDiff.NbtSyntax.MODERN_PRE_1_21_5
+        )
+        assertTrue("该状态下仍会写出 equipment 谓词", armor.first.contains("equipment"))
+        assertTrue("必须提醒 1.21.5+", armor.third.any { it.contains("1.21.5") })
+
+        // (b) Java 输入本来就带 nbt={equipment:…} 的透传
+        val javaIn = SelectorConverter.filterSelectorParameters(
+            "@a[nbt={equipment:{head:{id:\"minecraft:diamond_helmet\"}}}]",
+            SelectorType.JAVA, context, VersionDiff.NbtSyntax.MODERN_PRE_1_21_5
+        )
+        assertTrue(javaIn.third.any { it.contains("1.21.5") })
+
+        // 默认 MODERN 不提醒（26.2 输出不变）
+        val modern = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=0}]",
+            SelectorType.JAVA, context
+        )
+        assertFalse(modern.third.any { it.contains("1.21.5") })
+    }
+
     /** 老式 tag:{…} 在 Java 输出里应改写成数据组件写法（1.20.5 起 tag 失效，实测 tag:{} 不匹配） */
     @Test
     fun testLegacyTagRewrittenInJavaSelector() {

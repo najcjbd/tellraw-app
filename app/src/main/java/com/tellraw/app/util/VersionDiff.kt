@@ -22,6 +22,11 @@ object VersionDiff {
     enum class NbtSyntax {
         /** 一律按 1.20.5+ 的数据组件写法输出。 */
         MODERN,
+        /**
+         * 1.20.5–1.21.4：数据组件可用（与 [MODERN] 同），但 `{equipment:…}` 谓词 **1.21.5 才生效**
+         * （实测：1.20.5–1.21.4 上语法合法却永不匹配）-> armor/副手改走 `execute if items`。
+         */
+        MODERN_PRE_1_21_5,
         /** 一律按 1.20.4- 的旧 NBT 写法输出。 */
         LEGACY,
         /** 全是新版就新版、全是旧版就旧版、新旧混用问一嘴。 */
@@ -32,6 +37,7 @@ object VersionDiff {
             fun from(value: String?): NbtSyntax = when (value) {
                 "legacy" -> LEGACY
                 "follow" -> FOLLOW_INPUT
+                "modern-pre-1.21.5", "1.20.5-1.21.4" -> MODERN_PRE_1_21_5
                 else -> MODERN
             }
         }
@@ -53,6 +59,26 @@ object VersionDiff {
             modern -> InputShape.ONLY_MODERN
             else -> InputShape.NEITHER
         }
+    }
+
+    /** 输入里"1.21.5+ 的装备谓词"标记：`{equipment:…}` / `equipment.head` / `"equipment"`。 */
+    private val EQUIPMENT_MARKER = Regex("\\bequipment\\s*[:.{\"']")
+
+    fun hasEquipmentMarker(text: String): Boolean = EQUIPMENT_MARKER.containsMatchIn(text)
+
+    /**
+     * FOLLOW_INPUT（或未指定）时，按输入里的"版本特有"标记推断出一个**具体**策略：
+     *  ① 出现 `equipment` 标记      -> MODERN（玩家在 1.21.5+，保留 equipment 谓词）
+     *  ② 形态是混用（tag:+components:）-> FOLLOW_INPUT（**原样交回**，保住既有的"混用弹窗"逻辑）
+     *  ③ 形态只有旧写法（tag:）      -> LEGACY（那是 pre-1.20.5 的信号）
+     *  ④ 其余（只有现代写法/无标记） -> MODERN_PRE_1_21_5（安全侧：armor/副手走 items，覆盖 1.20.5–26.2）
+     */
+    fun inferConcreteSyntax(vararg texts: String?): NbtSyntax {
+        val all = texts.filterNotNull().filter { it.isNotBlank() }
+        if (all.any { hasEquipmentMarker(it) }) return NbtSyntax.MODERN
+        if (all.any { shapeOf(it) == InputShape.MIXED }) return NbtSyntax.FOLLOW_INPUT
+        if (all.any { shapeOf(it) == InputShape.ONLY_LEGACY }) return NbtSyntax.LEGACY
+        return NbtSyntax.MODERN_PRE_1_21_5
     }
 
     /** 按策略决定怎么处理。 */
@@ -77,7 +103,9 @@ object VersionDiff {
     fun decide(syntax: NbtSyntax, text: String): Decision {
         val shape = shapeOf(text)
         return when (syntax) {
-            NbtSyntax.MODERN -> when (shape) {
+            // MODERN_PRE_1_21_5 在"tag/components 轴"上与 MODERN 完全一致（1.20.5+ 已有数据组件）；
+            // 它的唯一差别是 armor/副手的谓词改写（见 [routesEquipmentViaItems]）。
+            NbtSyntax.MODERN, NbtSyntax.MODERN_PRE_1_21_5 -> when (shape) {
                 InputShape.ONLY_LEGACY, InputShape.MIXED -> Decision.TO_MODERN
                 else -> Decision.KEEP
             }
@@ -91,6 +119,13 @@ object VersionDiff {
             }
         }
     }
+
+    /**
+     * 这个策略下 armor/副手**必须改走** `execute if items`：
+     * 选择器谓词 `nbt={equipment:…}` 只有 1.21.5+ 才匹配，1.20.5–1.21.4 上会静默失效。
+     * （LEGACY 不在此列：pre-1.20.5 没有 `execute items`，那另有一套写法。）
+     */
+    fun routesEquipmentViaItems(syntax: NbtSyntax): Boolean = syntax == NbtSyntax.MODERN_PRE_1_21_5
 
     /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */
     const val LEGACY_CUSTOM_DATA_TAG = "tag:"

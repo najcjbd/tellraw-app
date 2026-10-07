@@ -390,6 +390,8 @@
     <string name="nbt_syntax_modern">新版（数据组件）</string>
     <string name="nbt_syntax_legacy">旧版（旧 NBT）</string>
     <string name="nbt_syntax_follow">跟随输入</string>
+    <string name="nbt_syntax_modern_pre_1_21_5">1.20.5–1.21.4（装备用 items）</string>
+    <string name="equipment_nbt_needs_1_21_5">版本策略 1.20.5-1.21.4：Java 的 nbt={equipment:...} 谓词要 1.21.5 才生效；在 1.20.5-1.21.4 上它会静默不匹配（永不命中）。请改用 execute if items entity &lt;目标&gt; &lt;槽位&gt; &lt;物品&gt;</string>
     <string name="modern_components_downgraded">按"旧版"策略把数据组件降级回旧 NBT；这些键需要你自己核对（旧版没有对应写法或值形状不同）：%1$s</string>
     <string name="syntax_mixed_treated_as_modern">检测到新旧写法混用（tag: 与 components: 同时出现）：请在弹出的对话框里选择；在你选定之前，已暂按“新版”处理</string>
     <string name="syntax_mixed_title">检测到新旧写法混用</string>

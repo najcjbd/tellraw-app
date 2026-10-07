@@ -185,6 +185,7 @@ object SelectorConverter {
         R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
         R.string.hasitem_slot_range to "注意：slot=%1\$s..%2\$s 已转换为 %3\$s（中间值）",
         R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除",
+        R.string.equipment_nbt_needs_1_21_5 to "版本策略 1.20.5–1.21.4：Java 的 nbt={equipment:…} 谓词要 1.21.5 才生效；在 1.20.5–1.21.4 上它会静默不匹配（永不命中）。请改用 execute if items entity <目标> <槽位> <物品>",
         // TextFormatter 中使用的资源
         R.string.java_font_bedrock_color to "Java版用字体，基岩版用颜色代码",
         R.string.both_color_mode to "两版都用颜色代码",
@@ -528,6 +529,15 @@ object SelectorConverter {
             val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
+        }
+
+        // 1.20.5–1.21.4：nbt={equipment:…} 谓词永不匹配（1.21.5 才生效，实测）-> 绝不能静默。
+        // 兜住两种情况：(a) 仍走到选择器发射器的 armor/副手 hasitem；(b) Java 输入本来就带该谓词的透传。
+        if (targetVersion == SelectorType.JAVA &&
+            nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN_PRE_1_21_5 &&
+            "nbt={equipment:" in paramsPart
+        ) {
+            conversionReminders.add(getStringSafely(context, R.string.equipment_nbt_needs_1_21_5))
         }
 
         // 处理nbt到hasitem的转换（Java版到基岩版）
