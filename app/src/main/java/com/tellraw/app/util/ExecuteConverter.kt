@@ -100,7 +100,7 @@ object ExecuteConverter {
                     val extra = mutableListOf<String>()
                     seg.tokens.forEachIndexed { i, t ->
                         if (i == 1 && t.startsWith("@")) {
-                            val (conv, cond) = convertModifierSelector(t, direction, reminders)
+                            val (conv, cond) = convertModifierSelector(t, direction, reminders, nbtSyntax)
                             toks.add(conv)
                             extra.addAll(cond)
                         } else {
@@ -1013,7 +1013,7 @@ object ExecuteConverter {
                     .filterNot { it.trim().startsWith("quantity=") }
                     .joinToString(",")
             } else obj
-            val nbt = ExecCondSupport.hasitemObjectToJavaNbt(objForNbt, legacyCount = true)
+            val nbt = ExecCondSupport.hasitemObjectToJavaNbt(objForNbt, legacyCount = true, legacySlots = true)
             if (nbt == null) {
                 reminders.add(
                     "按\"旧版\"策略：你的版本没有 execute items（1.20.5 才加入），" +
@@ -1028,13 +1028,16 @@ object ExecuteConverter {
                     (if (h.quantity != null && !meansNone)
                         "（quantity=${h.quantity} 是\"该栏总量\"，nbt 表达不了，请自行核对）" else "")
             )
-            // armor/副手：nbt 里用的是 equipment 字段，而它在 <1.21.5 根本不存在
-            // （pre-1.20.5 更不成立）-> 明确提醒，别让这条沉寂（正确写法待 1.20.4 实测后再定）。
-            if (nbt.contains("equipment")) {
+            // armor/副手：旧版（pre-1.20.5）没有 equipment 字段，改用玩家 Inventory 数字槽
+            // （头盔 103b/胸甲 102b/护腿 101b/靴子 100b/副手 -106b；2026-10-07 在 1.20.4 真机实测）。
+            if (nbt.contains("Slot:103b") || nbt.contains("Slot:102b") ||
+                nbt.contains("Slot:101b") || nbt.contains("Slot:100b") ||
+                nbt.contains("Slot:-106b")
+            ) {
                 reminders.add(
-                    "按\"旧版\"策略：这条装备条件写成 `$nbt`，但 Java 的 equipment 字段 **1.21.5 才生效**" +
-                        "（pre-1.20.5 该字段不存在），旧版上不能用它测装备；正确写法待真机核对" +
-                        "（候选：Inventory 数字槽 100-103/-106，或 ArmorItems/HandItems），请自行核对"
+                    "按\"旧版\"策略：旧版（pre-1.20.5）没有 equipment 字段，装备/副手已改用玩家 " +
+                        "Inventory 数字槽（头盔 103b / 胸甲 102b / 护腿 101b / 靴子 100b / 副手 -106b；" +
+                        "2026-10-07 在 1.20.4 真机实测）"
                 )
             }
             return listOf(kw, "data", "entity", target, nbt)
@@ -1279,7 +1282,8 @@ object ExecuteConverter {
     private fun convertModifierSelector(
         token: String,
         direction: Direction,
-        reminders: MutableList<String>
+        reminders: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
     ): Pair<String, List<String>> {
         val unchanged = token to emptyList<String>()
         if (!token.startsWith("@") || !token.contains('[') || !token.endsWith("]")) return unchanged
@@ -1330,7 +1334,10 @@ object ExecuteConverter {
                 }
                 objs.addAll(mapping.items)
             } else {
-                val nbt = ExecCondSupport.hasitemObjectToJavaNbt(value.removeSurrounding("{", "}"))
+                val legacy = nbtSyntax == VersionDiff.NbtSyntax.LEGACY
+                val nbt = ExecCondSupport.hasitemObjectToJavaNbt(
+                    value.removeSurrounding("{", "}"), legacyCount = legacy, legacySlots = legacy
+                )
                 if (nbt == null) {
                     reminders.add("hasitem（$value）无法映射到 Java nbt，已原样保留该参数（Java 可能不支持）")
                     kept.add(p)
