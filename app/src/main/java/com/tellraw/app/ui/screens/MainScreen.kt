@@ -55,6 +55,11 @@ fun MainScreen(
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
+    val showRawConvertDialog by viewModel.showRawConvertDialog.collectAsState()
+    val rawConvertInput by viewModel.rawConvertInput.collectAsState()
+    val rawConvertJava by viewModel.rawConvertJava.collectAsState()
+    val rawConvertBedrock by viewModel.rawConvertBedrock.collectAsState()
+    val rawConvertWarnings by viewModel.rawConvertWarnings.collectAsState()
     val nbtSyntax by viewModel.nbtSyntax.collectAsState()
     val showSyntaxMixedDialog by viewModel.showSyntaxMixedDialog.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
@@ -239,7 +244,8 @@ fun MainScreen(
             },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)
-            }
+            },
+            onOpenRawConvert = { viewModel.openRawConvertDialog() }
         )
     }
     
@@ -268,6 +274,18 @@ fun MainScreen(
         )
     }
     
+    // D4：整条命令 / 裸 JSON 转换对话框
+    if (showRawConvertDialog) {
+        RawCommandConvertDialog(
+            input = rawConvertInput,
+            javaCommand = rawConvertJava,
+            bedrockCommand = rawConvertBedrock,
+            warnings = rawConvertWarnings,
+            onInputChange = { viewModel.updateRawConvertInput(it) },
+            onDismiss = { viewModel.closeRawConvertDialog() }
+        )
+    }
+
     // 历史记录存储设置对话框
     if (showStorageSettingsDialog) {
         HistoryStorageSettingsDialog(

@@ -104,6 +104,18 @@ class TellrawViewModel @Inject constructor(
     /** 基岩独有 § 颜色码 -> Java 精确 RGB（默认开）。 */
     private val _bedrockColorToRgb = MutableStateFlow(true)
     val bedrockColorToRgb: StateFlow<Boolean> = _bedrockColorToRgb.asStateFlow()
+
+    // D4：整条命令 / 裸 JSON 转换
+    private val _showRawConvertDialog = MutableStateFlow(false)
+    val showRawConvertDialog: StateFlow<Boolean> = _showRawConvertDialog.asStateFlow()
+    private val _rawConvertInput = MutableStateFlow("")
+    val rawConvertInput: StateFlow<String> = _rawConvertInput.asStateFlow()
+    private val _rawConvertJava = MutableStateFlow("")
+    val rawConvertJava: StateFlow<String> = _rawConvertJava.asStateFlow()
+    private val _rawConvertBedrock = MutableStateFlow("")
+    val rawConvertBedrock: StateFlow<String> = _rawConvertBedrock.asStateFlow()
+    private val _rawConvertWarnings = MutableStateFlow<List<String>>(emptyList())
+    val rawConvertWarnings: StateFlow<List<String>> = _rawConvertWarnings.asStateFlow()
     
     // 文本组件选择相关状态
     private val _selectedTextComponent = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
@@ -783,6 +795,49 @@ class TellrawViewModel @Inject constructor(
             settingsRepository.setBedrockColorToRgb(enabled)
         }
         generateCommands()
+    }
+
+    // ---- D4：整条命令 / 裸 JSON 转换 ----
+
+    fun openRawConvertDialog() {
+        _showRawConvertDialog.value = true
+        runRawConvert()
+    }
+
+    fun closeRawConvertDialog() {
+        _showRawConvertDialog.value = false
+    }
+
+    fun updateRawConvertInput(text: String) {
+        _rawConvertInput.value = text
+        runRawConvert()
+    }
+
+    /** 识别输入（rawtext / Java 组件 / tellraw / execute+tellraw）并产出双版本命令。 */
+    private fun runRawConvert() {
+        val input = _rawConvertInput.value
+        if (input.isBlank()) {
+            _rawConvertJava.value = ""
+            _rawConvertBedrock.value = ""
+            _rawConvertWarnings.value = emptyList()
+            return
+        }
+        val nbtSyntax = syntaxOverride
+            ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        val r = com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+        if (r == null) {
+            _rawConvertJava.value = ""
+            _rawConvertBedrock.value = ""
+            _rawConvertWarnings.value = listOf(applicationContext.getString(R.string.raw_convert_unrecognized))
+            return
+        }
+        val jTellraw = "tellraw ${r.javaSelector ?: "@a"} ${r.javaJson}"
+        val bTellraw = "tellraw ${r.bedrockSelector ?: "@a"} ${r.bedrockJson}"
+        _rawConvertJava.value =
+            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, jTellraw) else jTellraw
+        _rawConvertBedrock.value =
+            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, bTellraw) else bTellraw
+        _rawConvertWarnings.value = r.warnings
     }
     
     fun dismissMNDialog() {

@@ -63,6 +63,10 @@
     <string name="execute_prefix_invalid_ignored">%1$s：前置 execute 指令不是合法的 execute 前置詞，已忽略該前置指令，只輸出 tellraw</string>
     <string name="execute_prefix_applied">%1$s：已把前置 execute 指令接到 tellraw 前面 -> %2$s run tellraw …</string>
     <string name="separator_as_text_component">separator 用文本組件</string>
+    <string name="raw_convert_title">整條命令 / 裸 JSON 轉換</string>
+    <string name="raw_convert_hint">貼上 rawtext / Java 組件 JSON / tellraw / execute+tellraw</string>
+    <string name="raw_convert_open">輸入整條命令轉換…</string>
+    <string name="raw_convert_unrecognized">無法識別：請輸入 rawtext、Java 文本組件 JSON、tellraw 或 execute+tellraw</string>
     <string name="bedrock_color_to_rgb">基岩版獨有 § 顏色碼 → Java 精確 RGB color</string>
     
     <!-- 顏色代碼 -->

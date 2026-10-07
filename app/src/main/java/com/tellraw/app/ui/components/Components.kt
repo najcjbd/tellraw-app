@@ -454,6 +454,79 @@ fun MNCodeDialog(
 }
 
 /**
+ * D4：整条命令 / 裸 JSON 转换入口。
+ * 输入 rawtext / Java 组件 / tellraw / execute+tellraw，识别后给出双版本命令。
+ */
+@Composable
+fun RawCommandConvertDialog(
+    input: String,
+    javaCommand: String,
+    bedrockCommand: String,
+    warnings: List<String>,
+    onInputChange: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.raw_convert_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.raw_convert_hint)) },
+                    minLines = 3
+                )
+                Spacer(Modifier.height(8.dp))
+                RawOutputBlock(stringResource(R.string.selector_type_java), javaCommand)
+                Spacer(Modifier.height(6.dp))
+                RawOutputBlock(stringResource(R.string.selector_type_bedrock), bedrockCommand)
+                if (warnings.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    warnings.forEach { w ->
+                        Text(
+                            text = "• $w",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        }
+    )
+}
+
+@Composable
+private fun RawOutputBlock(label: String, command: String) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(2.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+        ) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    text = command.ifEmpty { "—" },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
  * 新旧写法混用（同一条里既有 `tag:{…}` 又有 `components:{…}`）时的"问一嘴"对话框。
  * 参照 §m/§n 混合模式的做法：选定之后**整条都按那一个处理**（need/新旧版本差异规范.txt 2.4）。
  */
@@ -552,7 +625,8 @@ fun SettingsDialog(
     onExecutePrefixEnabledChanged: (Boolean) -> Unit,
     onSeparatorAsTextComponentChanged: (Boolean) -> Unit,
     onBedrockColorToRgbChanged: (Boolean) -> Unit,
-    onNbtSyntaxChanged: (String) -> Unit
+    onNbtSyntaxChanged: (String) -> Unit,
+    onOpenRawConvert: () -> Unit = {}
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -833,6 +907,14 @@ fun SettingsDialog(
                     }
 
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
+
+                    // D4：整条命令 / 裸 JSON 转换入口
+                    OutlinedButton(
+                        onClick = onOpenRawConvert,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.raw_convert_open))
+                    }
                 }
                 
                 // 底部操作栏
@@ -1086,6 +1168,14 @@ fun SettingsDialog(
                     }
 
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
+
+                    // D4：整条命令 / 裸 JSON 转换入口
+                    OutlinedButton(
+                        onClick = onOpenRawConvert,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.raw_convert_open))
+                    }
                 }
             },
             confirmButton = {
