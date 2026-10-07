@@ -835,7 +835,7 @@ class SelectorConverterTest {
         val javaSelector = "@e[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("@r[type=!player,c=114514]", conversion.bedrockSelector)
-        assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
+        assertTrue("应有提醒", conversion.bedrockReminders.isNotEmpty())
     }
 
     @Test
@@ -844,7 +844,7 @@ class SelectorConverterTest {
         val javaSelector = "@e[limit=5,sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
         assertEquals("@r[type=!player,c=5]", conversion.bedrockSelector)
-        assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
+        assertTrue("应有提醒", conversion.bedrockReminders.isNotEmpty())
     }
 
     @Test
@@ -861,7 +861,7 @@ class SelectorConverterTest {
         // 其他大选择器（@s 等）[sort=random]：保留原选择器 + 删 sort（无 limit 不补 c）+ 提醒
         val noLimit = SelectorConverter.convertJavaToBedrock("@s[sort=random]", context)
         assertEquals("@s", noLimit.bedrockSelector)
-        assertTrue(noLimit.javaReminders.isNotEmpty())
+        assertTrue(noLimit.bedrockReminders.isNotEmpty())
         val withLimit = SelectorConverter.convertJavaToBedrock("@s[limit=2,sort=random]", context)
         assertEquals("@s[c=2]", withLimit.bedrockSelector)
     }
