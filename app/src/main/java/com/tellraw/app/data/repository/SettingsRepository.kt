@@ -32,6 +32,7 @@ class SettingsRepository @Inject constructor(
         const val NBT_SYNTAX_LEGACY = "legacy"
         const val NBT_SYNTAX_FOLLOW = "follow"
         private const val KEY_EXECUTE_PREFIX_INPUT = "execute_prefix_input"
+        private const val KEY_BEDROCK_COLOR_TO_RGB = "bedrock_color_to_rgb"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
         private const val VALUE_MODE_FONT = "font"
@@ -71,6 +72,10 @@ class SettingsRepository @Inject constructor(
     private val _executePrefixInput = MutableStateFlow("")
     val executePrefixInput: Flow<String> = _executePrefixInput.asStateFlow()
 
+    /** 基岩版独有 § 颜色码是否转成 Java 的精确 RGB color（默认开）。 */
+    private val _bedrockColorToRgb = MutableStateFlow(true)
+    val bedrockColorToRgb: Flow<Boolean> = _bedrockColorToRgb.asStateFlow()
+
     /** 新旧版本差异策略：默认"新版"（数据组件）。 */
     private val _nbtSyntax = MutableStateFlow(NBT_SYNTAX_MODERN)
     val nbtSyntax: Flow<String> = _nbtSyntax.asStateFlow()
@@ -109,6 +114,7 @@ class SettingsRepository @Inject constructor(
                         separatorAsTextComponent = _separatorAsTextComponent.value,
                         nbtSyntax = _nbtSyntax.value,
                         executePrefixInput = _executePrefixInput.value,
+                        bedrockColorToRgb = _bedrockColorToRgb.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
                     )
@@ -128,6 +134,7 @@ class SettingsRepository @Inject constructor(
                     separatorAsTextComponent = _separatorAsTextComponent.value,
                     nbtSyntax = _nbtSyntax.value,
                     executePrefixInput = _executePrefixInput.value,
+                    bedrockColorToRgb = _bedrockColorToRgb.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -143,6 +150,7 @@ class SettingsRepository @Inject constructor(
                     separatorAsTextComponent = _separatorAsTextComponent.value,
                     nbtSyntax = _nbtSyntax.value,
                     executePrefixInput = _executePrefixInput.value,
+                    bedrockColorToRgb = _bedrockColorToRgb.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
                 )
@@ -163,6 +171,7 @@ class SettingsRepository @Inject constructor(
         val separatorAsTextComponent: Boolean,
         val nbtSyntax: String,
         val executePrefixInput: String,
+        val bedrockColorToRgb: Boolean,
         val historyStorageUri: String?,
         val historyStorageFilename: String
     )
@@ -205,6 +214,7 @@ class SettingsRepository @Inject constructor(
                 val rawFilename = extractJsonValue(jsonString, KEY_HISTORY_STORAGE_FILENAME) ?: DEFAULT_HISTORY_FILENAME
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
                 val executePrefixInput = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_INPUT) ?: ""
+                val bedrockColorToRgb = extractJsonValue(jsonString, KEY_BEDROCK_COLOR_TO_RGB) != "false"
                 
                 _mnHandlingMode.value = mnHandlingMode == VALUE_MODE_FONT
                 _mnMixedMode.value = mnMixedMode
@@ -215,6 +225,7 @@ class SettingsRepository @Inject constructor(
                 _separatorAsTextComponent.value = separatorAsTextComponent
                 _nbtSyntax.value = nbtSyntax
                 _executePrefixInput.value = executePrefixInput
+                _bedrockColorToRgb.value = bedrockColorToRgb
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
                 
@@ -238,6 +249,7 @@ class SettingsRepository @Inject constructor(
         val separatorAsTextComponent = _separatorAsTextComponent.value
         val nbtSyntax = _nbtSyntax.value
         val executePrefixInput = _executePrefixInput.value
+        val bedrockColorToRgb = _bedrockColorToRgb.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
         
@@ -252,6 +264,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_SEPARATOR_AS_TEXT_COMPONENT": $separatorAsTextComponent,
               "$KEY_NBT_SYNTAX": "$nbtSyntax",
               "$KEY_EXECUTE_PREFIX_INPUT": "$executePrefixInput",
+              "$KEY_BEDROCK_COLOR_TO_RGB": $bedrockColorToRgb,
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
             }
@@ -407,6 +420,14 @@ class SettingsRepository @Inject constructor(
     /** 保存 execute 前置框的文本内容。 */
     suspend fun setExecutePrefixInput(value: String) {
         _executePrefixInput.value = value
+        saveConfig()
+    }
+
+    /** 基岩版独有 § 颜色码 -> Java 精确 RGB（默认开）。 */
+    fun getBedrockColorToRgb(): Boolean = _bedrockColorToRgb.value
+
+    suspend fun setBedrockColorToRgb(enabled: Boolean) {
+        _bedrockColorToRgb.value = enabled
         saveConfig()
     }
     

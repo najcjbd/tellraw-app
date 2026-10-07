@@ -20,7 +20,7 @@ class MixedModeTest {
 
         // 验证Java版输出包含strikethrough
         assertTrue("Java版应包含strikethrough", javaJson.contains("strikethrough"))
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
+        assertTrue("Java版应包含 material_redstone 精确 RGB #971607", javaJson.contains("#971607"))
     }
 
     /**
@@ -34,7 +34,7 @@ class MixedModeTest {
 
         // 验证Java版输出包含underlined
         assertTrue("Java版应包含underlined", javaJson.contains("underlined"))
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        assertTrue("Java版应包含 material_copper 精确 RGB #B4684D", javaJson.contains("#B4684D"))
     }
 
     /**
@@ -101,7 +101,7 @@ class MixedModeTest {
         val message = "§m_c测试文字"
         val javaJson = TextFormatter.convertToJavaJson(message, "font", false)
 
-        assertTrue("§m_c应转换为dark_red颜色", javaJson.contains("dark_red"))
+        assertTrue("§m_c应转换为 material_redstone 精确 RGB", javaJson.contains("#971607"))
         assertFalse("§m_c不应包含strikethrough", javaJson.contains("strikethrough"))
     }
 
@@ -124,7 +124,7 @@ class MixedModeTest {
         val message = "§n_c测试文字"
         val javaJson = TextFormatter.convertToJavaJson(message, "font", false)
 
-        assertTrue("§n_c应转换为red颜色", javaJson.contains("red"))
+        assertTrue("§n_c应转换为 material_copper 精确 RGB", javaJson.contains("#B4684D"))
         assertFalse("§n_c不应包含underlined", javaJson.contains("underlined"))
     }
 
@@ -213,7 +213,7 @@ class MixedModeTest {
 
         // 验证颜色代码和格式代码正确组合
         assertTrue("应包含green颜色", javaJson.contains("green"))
-        assertTrue("应包含red颜色", javaJson.contains("red"))
+        assertTrue("应包含 material_copper 精确 RGB #B4684D", javaJson.contains("#B4684D"))
         assertTrue("应包含strikethrough", javaJson.contains("strikethrough"))
         // §n_c是颜色代码，不是格式代码，不应该有underlined
     }
@@ -262,7 +262,7 @@ class MixedModeTest {
         // Java版应该包含所有相关的格式代码和颜色
         assertTrue("Java版应包含strikethrough", javaJson.contains("strikethrough"))
         assertTrue("Java版应包含underlined", javaJson.contains("underlined"))
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        assertTrue("Java版应包含 material_redstone 精确 RGB #971607", javaJson.contains("#971607"))
+        assertTrue("Java版应包含 material_copper 精确 RGB #B4684D", javaJson.contains("#B4684D"))
     }
 }

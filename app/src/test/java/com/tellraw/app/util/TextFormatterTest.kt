@@ -247,8 +247,8 @@ class TextFormatterTest {
         // 颜色方式：两版都用颜色
         val text = "§m删除线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "color", false)
-        // 验证Java版将§m作为颜色方式处理（dark_red）
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
+        // 颜色方式：material_redstone 的精确 RGB
+        assertTrue("Java版应包含 #971607", javaJson.contains("#971607"))
         assertFalse("Java版不应包含strikethrough", javaJson.contains("strikethrough"))
     }
 
@@ -276,8 +276,8 @@ class TextFormatterTest {
         // §n颜色方式：两版都用颜色
         val text = "§n下划线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "color", false)
-        // 验证Java版将§n作为颜色方式处理（red）
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        // 颜色方式：material_copper 的精确 RGB
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("#B4684D"))
         assertFalse("Java版不应包含underlined", javaJson.contains("underlined"))
     }
 
@@ -295,8 +295,8 @@ class TextFormatterTest {
         // §m_c在混合模式下的Java版转换
         val text = "§m_c删除线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "font", false)
-        // 验证Java版将§m_c转换为dark_red颜色
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("dark_red"))
+        // §m_c -> material_redstone 精确 RGB
+        assertTrue("Java版应包含 #971607", javaJson.contains("#971607"))
         assertFalse("Java版不应包含strikethrough", javaJson.contains("strikethrough"))
     }
 
@@ -314,8 +314,8 @@ class TextFormatterTest {
         // §n_c在混合模式下的Java版转换
         val text = "§n_c下划线文本"
         val javaJson = TextFormatter.convertToJavaJson(text, "font", false)
-        // 验证Java版将§n_c转换为red颜色
-        assertTrue("Java版应包含red颜色", javaJson.contains("red"))
+        // §n_c -> material_copper 精确 RGB
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("#B4684D"))
         assertFalse("Java版不应包含underlined", javaJson.contains("underlined"))
     }
 
@@ -1046,7 +1046,7 @@ class TextFormatterTest {
         // §m代码（颜色方式）转换为JSON
         val json = TextFormatter.convertToJavaJson("§m删除线文本", mNHandling = "color")
         assertTrue("应包含color字段", json.contains("\"color\""))
-        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"#971607\""))
         assertTrue("应包含删除线文本", json.contains("删除线文本"))
     }
 
@@ -1063,7 +1063,7 @@ class TextFormatterTest {
         // §n代码（颜色方式）转换为JSON
         val json = TextFormatter.convertToJavaJson("§n下划线文本", mNHandling = "color")
         assertTrue("应包含color字段", json.contains("\"color\""))
-        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"#B4684D\""))
         assertTrue("应包含下划线文本", json.contains("下划线文本"))
     }
 
@@ -1080,7 +1080,7 @@ class TextFormatterTest {
         // §m_c代码转换为JSON
         val json = TextFormatter.convertToJavaJson("§m_c删除线文本", mnCFEnabled = true)
         assertTrue("应包含color字段", json.contains("\"color\""))
-        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"#971607\""))
         assertTrue("应包含删除线文本", json.contains("删除线文本"))
     }
 
@@ -1097,7 +1097,7 @@ class TextFormatterTest {
         // §n_c代码转换为JSON
         val json = TextFormatter.convertToJavaJson("§n_c下划线文本", mnCFEnabled = true)
         assertTrue("应包含color字段", json.contains("\"color\""))
-        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"#B4684D\""))
         assertTrue("应包含下划线文本", json.contains("下划线文本"))
     }
 
@@ -1107,9 +1107,9 @@ class TextFormatterTest {
         // §m_f和§n_f有文本，§m_c和§n_c后面有文本
         val json = TextFormatter.convertToJavaJson("§m_f删除线§m_c红色和§n_f下划线§n_c蓝色", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\""))
-        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"#971607\""))
         assertTrue("应包含underlined字段", json.contains("\"underlined\""))
-        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"#B4684D\""))
         assertTrue("应包含删除线文本", json.contains("删除线"))
         assertTrue("应包含下划线文本", json.contains("下划线"))
         assertTrue("应包含红色文本", json.contains("红色"))
@@ -1144,8 +1144,8 @@ class TextFormatterTest {
     fun testConvertToJavaJson_15() {
         // 基岩版颜色代码转换（基岩版颜色代码应按颜色代码处理，不受mNHandling影响）
         val json = TextFormatter.convertToJavaJson("§g金色§h白色")
-        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
-        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
+        assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
         assertTrue("应包含金色文本", json.contains("金色"))
         assertTrue("应包含白色文本", json.contains("白色"))
     }
@@ -1154,21 +1154,21 @@ class TextFormatterTest {
     fun testConvertToJavaJson_15a() {
         // 第三个基岩颜色代码 - 验证文本合并逻辑
         val json = TextFormatter.convertToJavaJson("§gh§hi§ig")
-        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
-        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
+        assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
         assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("g"))
-        assertTrue("应包含合并的文本ig", json.contains("\"ig\""))
+        assertTrue("应包含 #CECACA", json.contains("\"#CECACA\""))
     }
 
     @Test
     fun testConvertToJavaJson_15b() {
         // 多个基岩颜色代码 - 验证连续相同颜色合并
         val json = TextFormatter.convertToJavaJson("§gh§hi§ik§qp")
-        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
-        assertTrue("应包含white颜色", json.contains("\"white\""))
-        assertTrue("应包含green颜色", json.contains("\"green\""))
+        assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
+        assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
+        assertTrue("应包含 #47A036", json.contains("\"#47A036\""))
         assertTrue("应包含所有文本字符", json.contains("h") && json.contains("i") && json.contains("k") && json.contains("p"))
-        assertTrue("应包含合并的文本ik", json.contains("\"ik\""))
+        assertTrue("应包含 #CECACA", json.contains("\"#CECACA\""))
     }
 
     @Test
@@ -1176,8 +1176,8 @@ class TextFormatterTest {
         // 连续基岩颜色代码带文本 - 验证多段相同颜色合并
         val json = TextFormatter.convertToJavaJson("§g金§h白§i浅§j深§p橙§q绿")
         assertTrue("应包含多个extra部分", json.contains("\"extra\""))
-        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
-        assertTrue("应包含white颜色", json.contains("\"white\""))
+        assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
+        assertTrue("应包含 #E3D4D1", json.contains("\"#E3D4D1\""))
         assertTrue("应包含所有文本字符", json.contains("金") && json.contains("白") && json.contains("浅") && json.contains("深") && json.contains("橙") && json.contains("绿"))
     }
 
@@ -1186,7 +1186,7 @@ class TextFormatterTest {
         // 混合通用颜色和基岩颜色代码
         val json = TextFormatter.convertToJavaJson("§a绿色§g金色§b青色")
         assertTrue("应包含green颜色", json.contains("\"green\""))
-        assertTrue("应包含yellow颜色", json.contains("\"yellow\""))
+        assertTrue("应包含 #DDD605", json.contains("\"#DDD605\""))
         assertTrue("应包含aqua颜色", json.contains("\"aqua\""))
         assertTrue("应包含所有文本字符", json.contains("绿色") && json.contains("金色") && json.contains("青色"))
     }
@@ -1585,7 +1585,7 @@ class TextFormatterTest {
         val javaJson = TextFormatter.convertToJavaJson("§m删除线", mNHandling = "color")
         val bedrockJson = TextFormatter.convertToBedrockJson("§m删除线", mNHandling = "color")
         
-        assertTrue("Java版应包含dark_red颜色", javaJson.contains("\"color\":\"dark_red\""))
+        assertTrue("Java版应包含 #971607", javaJson.contains("\"color\":\"#971607\""))
         assertTrue("基岩版应包含§m颜色代码", bedrockJson.contains("§m"))
     }
 
@@ -1598,9 +1598,9 @@ class TextFormatterTest {
         assertTrue("Java版应包含多个部分", javaJson.contains("\"extra\""))
         assertTrue("基岩版应包含rawtext", bedrockJson.contains("\"rawtext\""))
         assertTrue("Java版应包含strikethrough", javaJson.contains("\"strikethrough\""))
-        assertTrue("Java版应包含dark_red", javaJson.contains("\"dark_red\""))
+        assertTrue("Java版应包含 #971607", javaJson.contains("\"#971607\""))
         assertTrue("Java版应包含underlined", javaJson.contains("\"underlined\""))
-        assertTrue("Java版应包含red", javaJson.contains("\"red\""))
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("\"#B4684D\""))
         assertTrue("基岩版应包含§m", bedrockJson.contains("§m"))
         assertTrue("基岩版应包含§n", bedrockJson.contains("§n"))
     }
@@ -1627,9 +1627,9 @@ class TextFormatterTest {
         val bedrockJson = TextFormatter.convertToBedrockJson(bedrockText)
 
         // Java版应该转换基岩版颜色代码（基于RGB值对比）
-        assertTrue("Java版应包含yellow", javaJson.contains("\"yellow\""))
-        assertTrue("Java版应包含white", javaJson.contains("\"white\""))
-        assertTrue("Java版应包含white", javaJson.contains("\"white\""))  // §i也转换为white
+        assertTrue("Java版应包含 #DDD605", javaJson.contains("\"#DDD605\""))
+        assertTrue("Java版应包含 #E3D4D1", javaJson.contains("\"#E3D4D1\""))
+        assertTrue("Java版应包含 #CECACA", javaJson.contains("\"#CECACA\""))
 
         // 基岩版保留颜色代码
         assertTrue("基岩版应包含金色", bedrockJson.contains("金色"))
@@ -1652,7 +1652,7 @@ class TextFormatterTest {
     fun testMNCFMode_2() {
         // §m_c在Java版中作为颜色方式
         val json = TextFormatter.convertToJavaJson("§m_c删除线", mnCFEnabled = true)
-        assertTrue("应包含dark_red颜色", json.contains("\"color\":\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"color\":\"#971607\""))
         assertTrue("应包含删除线文本", json.contains("删除线"))
     }
 
@@ -1668,7 +1668,7 @@ class TextFormatterTest {
     fun testMNCFMode_4() {
         // §n_c在Java版中作为颜色方式
         val json = TextFormatter.convertToJavaJson("§n_c下划线", mnCFEnabled = true)
-        assertTrue("应包含red颜色", json.contains("\"color\":\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"color\":\"#B4684D\""))
         assertTrue("应包含下划线文本", json.contains("下划线"))
     }
 
@@ -1697,7 +1697,7 @@ class TextFormatterTest {
         // §m_f和§m_c同时使用
         val json = TextFormatter.convertToJavaJson("§m_f删除线字体§m_c删除线颜色", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
-        assertTrue("应包含dark_red颜色", json.contains("\"color\":\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"color\":\"#971607\""))
         assertTrue("应包含删除线字体", json.contains("删除线字体"))
         assertTrue("应包含删除线颜色", json.contains("删除线颜色"))
     }
@@ -1707,7 +1707,7 @@ class TextFormatterTest {
         // §n_f和§n_c同时使用
         val json = TextFormatter.convertToJavaJson("§n_f下划线字体§n_c下划线颜色", mnCFEnabled = true)
         assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
-        assertTrue("应包含red颜色", json.contains("\"color\":\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"color\":\"#B4684D\""))
         assertTrue("应包含下划线字体", json.contains("下划线字体"))
         assertTrue("应包含下划线颜色", json.contains("下划线颜色"))
     }
@@ -1717,10 +1717,10 @@ class TextFormatterTest {
         // 所有§m/§n_c/f代码组合（带文本）
         val json = TextFormatter.convertToJavaJson("§m_f§m_caa§n_f§n_cbb", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
-        assertTrue("应包含dark_red颜色", json.contains("\"dark_red\""))
+        assertTrue("应包含 #971607", json.contains("\"#971607\""))
         assertTrue("应包含aa文本", json.contains("aa"))
         assertTrue("应包含underlined字段", json.contains("\"underlined\":true"))
-        assertTrue("应包含red颜色", json.contains("\"red\""))
+        assertTrue("应包含 #B4684D", json.contains("\"#B4684D\""))
         assertTrue("应包含bb文本", json.contains("bb"))
     }
 
@@ -1860,9 +1860,9 @@ class TextFormatterTest {
         val bedrockJson = TextFormatter.convertToBedrockJson(text, mnCFEnabled = true)
         
         assertTrue("Java版应包含strikethrough", javaJson.contains("\"strikethrough\""))
-        assertTrue("Java版应包含dark_red", javaJson.contains("\"dark_red\""))
+        assertTrue("Java版应包含 #971607", javaJson.contains("\"#971607\""))
         assertTrue("Java版应包含underlined", javaJson.contains("\"underlined\""))
-        assertTrue("Java版应包含red", javaJson.contains("\"red\""))
+        assertTrue("Java版应包含 #B4684D", javaJson.contains("\"#B4684D\""))
         assertTrue("基岩版应包含§m", bedrockJson.contains("§m"))
         assertTrue("基岩版应包含§n", bedrockJson.contains("§n"))
     }
@@ -1875,9 +1875,9 @@ class TextFormatterTest {
         val bedrockJson = TextFormatter.convertToBedrockJson(text)
 
         // Java版应该转换基岩版颜色代码（基于RGB值对比）
-        assertTrue("Java版应包含yellow", javaJson.contains("\"yellow\""))
-        assertTrue("Java版应包含white", javaJson.contains("\"white\""))
-        assertTrue("Java版应包含white", javaJson.contains("\"white\""))  // §i也转换为white
+        assertTrue("Java版应包含 #DDD605", javaJson.contains("\"#DDD605\""))
+        assertTrue("Java版应包含 #E3D4D1", javaJson.contains("\"#E3D4D1\""))
+        assertTrue("Java版应包含 #CECACA", javaJson.contains("\"#CECACA\""))
         assertTrue("Java版应包含dark_red或red", javaJson.contains("\"dark_red\"") || javaJson.contains("\"red\""))
         assertTrue("Java版应包含green", javaJson.contains("\"green\""))
         assertTrue("Java版应包含aqua", javaJson.contains("\"aqua\""))
@@ -1893,5 +1893,23 @@ class TextFormatterTest {
 
         assertTrue("Java版命令应包含JSON格式", javaJson.contains("{"))
         assertTrue("基岩版命令应包含rawtext格式", bedrockJson.contains("\"rawtext\""))
+    }
+
+    // ---- D3：基岩独有 § 颜色码 -> Java 精确 RGB（bedrockColorToRgb） ----
+
+    @Test
+    fun testBedrockOnlyColorToRgbOnByDefault() {
+        // 默认开：§g -> 精确 RGB #DDD605（不再近似到 yellow）
+        val json = TextFormatter.convertToJavaJson("§gX", "font", false)
+        assertTrue("应包含 #DDD605，实际：$json", json.contains("#DDD605"))
+        assertFalse("不应近似成 yellow", json.contains("\"yellow\""))
+    }
+
+    @Test
+    fun testBedrockOnlyColorToRgbOffUsesApproximation() {
+        // 关：回退到"近似 §"（§g -> yellow）
+        val json = TextFormatter.convertToJavaJson("§gX", "font", false, null, null, false, com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN, false)
+        assertTrue("应近似成 yellow，实际：$json", json.contains("yellow"))
+        assertFalse("不应出现 #DDD605", json.contains("#DDD605"))
     }
 }
