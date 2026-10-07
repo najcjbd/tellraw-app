@@ -98,34 +98,51 @@ class HistoryRepository @Inject constructor(
     }
     
     /**
-     * 保存配置
+     * 保存配置。
+     *
+     * 注意：本仓库与 [SettingsRepository] 共用 `tellraw_config.json`（历史存储位置本来就是设置的一部分）。
+     * 旧实现**整份重写**、只写这两个键 -> 一旦调用就会把别的设置全清掉（"清空全部历史"会触发它，
+     * 导致其余设置在下次启动悄悄回默认）。现在改为**只增改这两个键、保留文件里其它键**。
      */
     suspend fun saveConfig() {
         withContext(Dispatchers.IO) {
             try {
-                val json = buildConfigJson()
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
-                configFile.writeText(json)
+                val existing = if (configFile.exists()) configFile.readText() else ""
+                configFile.writeText(mergeConfigJson(existing))
             } catch (e: Exception) {
                 // 保存失败
             }
         }
     }
-    
-    /**
-     * 构建配置JSON
-     */
-    private fun buildConfigJson(): String {
-        val uri = _storageUri.value ?: ""
-        val filename = _storageFilename.value
-        return """
-            {
-              "history_storage_uri": "$uri",
-              "history_storage_filename": "$filename"
+
+    /** 把历史存储两个键并入现有 JSON（不动其它键）。文件为空/损坏时按新文件生成。 */
+    private fun mergeConfigJson(existing: String): String {
+        val keys = listOf(
+            "history_storage_uri" to (_storageUri.value ?: ""),
+            "history_storage_filename" to _storageFilename.value
+        )
+        fun freshJson(): String =
+            "{\n" + keys.joinToString(",\n") { "  \"${it.first}\": \"${it.second}\"" } + "\n}"
+
+        if (existing.isBlank()) return freshJson()
+        var out = existing
+        for ((k, v) in keys) {
+            val re = Regex("\"${Regex.escape(k)}\"\\s*:\\s*\"[^\"]*\"")
+            out = when {
+                re.containsMatchIn(out) -> re.replace(out) { "\"$k\": \"$v\"" }
+                else -> {
+                    val close = out.lastIndexOf('}')
+                    if (close < 0) return freshJson()
+                    val head = out.substring(0, close).trimEnd()
+                    val sep = if (head.endsWith("{")) "\n" else ",\n"
+                    head + sep + "  \"$k\": \"$v\"\n" + out.substring(close)
+                }
             }
-        """.trimIndent()
+        }
+        return out
     }
-    
+
     /**
      * 从JSON中提取值
      */

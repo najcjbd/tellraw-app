@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -94,6 +96,7 @@ class TellrawViewModel @Inject constructor(
     // execute 前置命令输入框的内容（需求七.1：与消息文本框分开，避免"玩家文本本身就是 execute"的歧义）
     private val _executePrefixInput = MutableStateFlow("")
     val executePrefixInput: StateFlow<String> = _executePrefixInput.asStateFlow()
+    private var executePrefixSaveJob: Job? = null
     
     private val _separatorAsTextComponent = MutableStateFlow(false)
     val separatorAsTextComponent: StateFlow<Boolean> = _separatorAsTextComponent.asStateFlow()
@@ -192,6 +195,7 @@ class TellrawViewModel @Inject constructor(
             
             // 加载execute前置命令设置
             _executePrefixEnabled.value = loadedSettings.executePrefixEnabled
+            _executePrefixInput.value = loadedSettings.executePrefixInput
             _nbtSyntax.value = loadedSettings.nbtSyntax
             
             // 加载separator使用文本组件设置
@@ -746,10 +750,15 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
 
-    /** 更新 execute 前置命令框的内容（需求七.1）。 */
+    /** 更新 execute 前置命令框的内容（需求七.1）。文本内容会持久化（防抖 400ms，避免逐字写盘）。 */
     fun updateExecutePrefix(prefix: String) {
         syntaxOverride = null
         _executePrefixInput.value = prefix
+        executePrefixSaveJob?.cancel()
+        executePrefixSaveJob = viewModelScope.launch {
+            delay(400)
+            settingsRepository.setExecutePrefixInput(prefix)
+        }
         generateCommands()
     }
     
@@ -759,6 +768,7 @@ class TellrawViewModel @Inject constructor(
             settingsRepository.setSeparatorAsTextComponent(enabled)
             settingsRepository.saveConfig()
         }
+        generateCommands()
     }
     
     fun dismissMNDialog() {
