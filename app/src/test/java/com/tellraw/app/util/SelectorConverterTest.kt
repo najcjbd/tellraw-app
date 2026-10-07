@@ -830,39 +830,49 @@ class SelectorConverterTest {
 
     @Test
     fun testSelectorConversion_11() {
-        // Java版到基岩版：sort=random（无 limit）且大选择器不是 @a/@r -> 只删 sort，**保留原选择器**，并提醒
-        // （sort.txt 原文；不再改写成 @r[type=!player]，那会改变语义）
+        // @e/@n[sort=random]（无 limit）-> @r[type=!player,c=114514] + 提醒
+        // （基岩版没有"全部实体随机"，只能用 @r+type=!player 近似：排除玩家 + 数量上界 114514）
         val javaSelector = "@e[sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
-        assertEquals("基岩版选择器应保留 @e、只删 sort（不补 c）", "@e", conversion.bedrockSelector)
+        assertEquals("@r[type=!player,c=114514]", conversion.bedrockSelector)
         assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
     fun testSelectorConversion_11b() {
-        // sort=random + limit，非 @a/@r -> 保留原选择器 + [c=N] + 提醒（只保留数量限制）
+        // @e[limit=5,sort=random] -> @r[type=!player,c=5] + 提醒
         val javaSelector = "@e[limit=5,sort=random]"
         val conversion = SelectorConverter.convertJavaToBedrock(javaSelector, context)
-        assertEquals("基岩版选择器应为@e[c=5]", "@e[c=5]", conversion.bedrockSelector)
+        assertEquals("@r[type=!player,c=5]", conversion.bedrockSelector)
         assertTrue("应有提醒", conversion.javaReminders.isNotEmpty())
     }
 
     @Test
     fun testSelectorConversion_11c() {
-        // @p 不在 sort.txt 的"转 @r"之列 -> 保留 @p（正/负两种情形）
+        // @p[sort=random] -> @r[c=1]；@p[limit=3,sort=random] -> @r[c=3]
         val noLimit = SelectorConverter.convertJavaToBedrock("@p[sort=random]", context)
-        assertEquals("无 limit 时保留 @p", "@p", noLimit.bedrockSelector)
+        assertEquals("@r[c=1]", noLimit.bedrockSelector)
         val withLimit = SelectorConverter.convertJavaToBedrock("@p[limit=3,sort=random]", context)
-        assertEquals("有 limit 时保留 @p + c", "@p[c=3]", withLimit.bedrockSelector)
+        assertEquals("@r[c=3]", withLimit.bedrockSelector)
     }
 
     @Test
-    fun testSelectorConversion_arbitraryDropsLimitToo() {
-        // sort=arbitrary（@a/@e 静默删；连 limit 一起删，因为基岩版不认 limit）
+    fun testSelectorConversion_11d() {
+        // 其他大选择器（@s 等）[sort=random]：保留原选择器 + 删 sort（无 limit 不补 c）+ 提醒
+        val noLimit = SelectorConverter.convertJavaToBedrock("@s[sort=random]", context)
+        assertEquals("@s", noLimit.bedrockSelector)
+        assertTrue(noLimit.javaReminders.isNotEmpty())
+        val withLimit = SelectorConverter.convertJavaToBedrock("@s[limit=2,sort=random]", context)
+        assertEquals("@s[c=2]", withLimit.bedrockSelector)
+    }
+
+    @Test
+    fun testSelectorConversion_arbitraryWithLimitConvertsLimitToC() {
+        // sort=arbitrary + limit：删 sort，剩下的 limit 走"limit→c"
         val a = SelectorConverter.convertJavaToBedrock("@a[limit=5,sort=arbitrary]", context)
-        assertEquals("@a", a.bedrockSelector)
+        assertEquals("@a[c=5]", a.bedrockSelector)
         val e = SelectorConverter.convertJavaToBedrock("@e[limit=5,sort=arbitrary,type=zombie]", context)
-        assertEquals("@e[type=zombie]", e.bedrockSelector)
+        assertEquals("@e[type=zombie,c=5]", e.bedrockSelector)
     }
 
     @Test

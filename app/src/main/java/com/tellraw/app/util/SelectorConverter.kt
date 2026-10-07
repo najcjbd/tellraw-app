@@ -122,7 +122,7 @@ object SelectorConverter {
         R.string.java_sort_arbitrary_not_supported to "Java版sort=arbitrary在基岩版不支持，已移除",
         R.string.java_sort_random_converted to "Java版%1\$s[sort=random]已转换为基岩版@r[c=%2\$s]",
         R.string.java_sort_random_to_c to "Java版sort=random在基岩版无法保留随机选择，已改为只保留数量限制 c=%s",
-        R.string.java_sort_random_entities_converted to "Java版%s[sort=random]已转换为基岩版@r[type=!player,c=%s]。注意：type=!player 不会选到玩家",
+        R.string.java_sort_random_entities_converted to "Java版%1\$s[sort=random]已转换为基岩版@r[type=!player,c=%2\$s]（近似）。注意：① 实体数量超过 %2\$s 时结果不完整；② 该写法排除了玩家，而原 %1\$s 没排除",
         R.string.java_sort_not_supported to "Java版sort=%s在基岩版不支持，已移除",
         R.string.java_limit_converted to "Java版limit=%s已转换为基岩版c=%s",
         R.string.limit_description to "limit限制数量，c由近到远",
@@ -617,11 +617,10 @@ object SelectorConverter {
                                 if (paramsPart.isEmpty()) "c=$cValue" else "$paramsPart,c=$cValue"
                             }
                         }
-                        // 只有在转换为 c=-9999 时才显示说明
+                        // 只有"无 limit -> c=-9999"才提醒（那是近似：只取最近/最远 9999 个）；
+                        // 有 limit 时 c=-limit 是精确对应，不提醒。
                         if (cValue == "-9999") {
                             conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted_all))
-                        } else {
-                            conversionReminders.add(getStringSafely(context, R.string.java_sort_furthest_converted, cValue))
                         }
                     }
                     "arbitrary" -> {
@@ -629,12 +628,16 @@ object SelectorConverter {
                             val prefix = match.groupValues[1]  // 前缀 (^或,)
                             "$prefix"
                         }
-                        // sort=arbitrary 基岩版无对应；连同 limit 一并删掉（基岩版不认 limit）
+                        // sort=arbitrary 基岩版无对应；删掉 sort 后，剩下的 limit 继续走"limit→c"规则
+                        // （不能留下非法 `limit=`，也不该连数量一起丢）
                         if (limitValue != null) {
                             paramsPart = paramsPart.replace(limitPattern) { match ->
                                 val prefix = match.groupValues[1]  // 前缀 (^或,)
                                 "$prefix"
                             }
+                            paramsPart = appendCParam(paramsPart, limitValue)
+                            conversionReminders.add(getStringSafely(context, R.string.java_limit_converted, limitValue, limitValue))
+                            conversionReminders.add(getStringSafely(context, R.string.limit_description))
                         }
                         // 当大选择器为 @a 或 @e 时，直接删除（不提醒）
                         // 当为其他大选择器时，删除并提醒用户
@@ -643,54 +646,55 @@ object SelectorConverter {
                         }
                     }
                     "random" -> {
-                        // 规则（严格按 sort.txt）：
-                        //   @a / @r [sort=random]  -> @r[c=9999]（有 limit=N 时 c=N）
-                        //   其他大选择器            -> **保留原大选择器**：有 limit 就 [c=N] + 提醒（只保留数量限制，
-                        //                             没保留随机选择）；没有 limit 就只删 sort + 提醒（基岩版没有"全部随机"）
+                        // 中心思想：基岩版没有 sort，只能"尽力还原 + 提醒"。
+                        //   c=n 是"最近 n 个"、c=-n 是"最远 n 个"；只有 @r 的 c=n 才是"随机 n 个"。
+                        //   @a / @r -> @r[c=9999]（有 limit=N 时 c=N）
+                        //   @e / @n -> @r[type=!player,c=(limit?:114514)] + 提醒（数量可能>c、且排除了玩家）
+                        //   @p      -> @r[c=(limit?:1)] + 提醒
+                        //   其他    -> 保留原选择器：有 limit 就 [c=N]+提醒，没有 limit 就只删 sort+提醒
                         val sourceSelectorForRandom = selectorVar
-                        if (selectorVar == "@a" || selectorVar == "@r") {
-                            val cValue = limitValue ?: "9999"
-                            paramsPart = paramsPart.replace(sortPattern) { match ->
-                                val prefix = match.groupValues[1]  // 前缀 (^或,)
-                                "$prefix"
-                            }
+                        val keepOriginal = selectorVar != "@a" && selectorVar != "@r" &&
+                            selectorVar != "@e" && selectorVar != "@n" && selectorVar != "@p"
+                        // 先删掉 sort（两种情况都要删）
+                        paramsPart = paramsPart.replace(sortPattern) { match ->
+                            val prefix = match.groupValues[1]  // 前缀 (^或,)
+                            "$prefix"
+                        }
+                        if (keepOriginal) {
                             if (limitValue != null) {
                                 paramsPart = paramsPart.replace(limitPattern) { match ->
                                     val prefix = match.groupValues[1]  // 前缀 (^或,)
                                     "$prefix"
                                 }
-                            }
-                            // 添加c参数
-                            paramsPart = if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
-                                paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
-                            } else if (paramsPart.isEmpty()) {
-                                "c=$cValue"
-                            } else {
-                                "$paramsPart,c=$cValue"
-                            }
-                            selectorVar = "@r"
-                            conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, sourceSelectorForRandom, cValue))
-                        } else {
-                            // 其他大选择器：保留选择器本体，不换成 @r、也不补 c=9999
-                            paramsPart = paramsPart.replace(sortPattern) { match ->
-                                val prefix = match.groupValues[1]  // 前缀 (^或,)
-                                "$prefix"
-                            }
-                            if (limitValue != null) {
-                                paramsPart = paramsPart.replace(limitPattern) { match ->
-                                    val prefix = match.groupValues[1]  // 前缀 (^或,)
-                                    "$prefix"
-                                }
-                                paramsPart = if (Regex("c=[+-]?\\d+").containsMatchIn(paramsPart)) {
-                                    paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$limitValue")
-                                } else if (paramsPart.isEmpty()) {
-                                    "c=$limitValue"
-                                } else {
-                                    "$paramsPart,c=$limitValue"
-                                }
+                                paramsPart = appendCParam(paramsPart, limitValue)
                                 conversionReminders.add(getStringSafely(context, R.string.java_sort_random_to_c, limitValue))
                             } else {
                                 conversionReminders.add(getStringSafely(context, R.string.java_sort_not_supported, sortValue))
+                            }
+                        } else {
+                            val cValue = when (selectorVar) {
+                                "@a", "@r" -> limitValue ?: "9999"
+                                "@e", "@n" -> limitValue ?: "114514"
+                                else -> limitValue ?: "1"   // @p
+                            }
+                            if (limitValue != null) {
+                                paramsPart = paramsPart.replace(limitPattern) { match ->
+                                    val prefix = match.groupValues[1]  // 前缀 (^或,)
+                                    "$prefix"
+                                }
+                            }
+                            paramsPart = appendCParam(paramsPart, cValue)
+                            if (selectorVar == "@e" || selectorVar == "@n") {
+                                // 基岩版没有"全部实体随机"：@r + type=!player 近似（排除玩家 + 数量上界）
+                                if (!Regex("(^|,)type=").containsMatchIn(paramsPart)) {
+                                    paramsPart = "type=!player,$paramsPart"
+                                }
+                                selectorVar = "@r"
+                                conversionReminders.add(getStringSafely(context, R.string.java_sort_random_entities_converted, sourceSelectorForRandom, cValue))
+                            } else {
+                                // @a/@r/@p
+                                selectorVar = "@r"
+                                conversionReminders.add(getStringSafely(context, R.string.java_sort_random_converted, sourceSelectorForRandom, cValue))
                             }
                         }
                     }
@@ -1849,6 +1853,14 @@ object SelectorConverter {
         return result
     }
     
+    /** 把 `c=值` 写进 paramsPart（已有 `c=` 就替换，否则追加）。paramsPart 是不含外层 `[]` 的参数字符串。 */
+    private fun appendCParam(paramsPart: String, cValue: String): String = when {
+        Regex("c=[+-]?\\d+").containsMatchIn(paramsPart) ->
+            paramsPart.replace(Regex("c=[+-]?\\d+"), "c=$cValue")
+        paramsPart.isEmpty() -> "c=$cValue"
+        else -> "$paramsPart,c=$cValue"
+    }
+
     private fun addParameterToResult(paramsPart: String, newParam: String): String {
         if (paramsPart.isEmpty()) {
             return newParam
