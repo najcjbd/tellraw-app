@@ -61,7 +61,8 @@ class VersionDiffTest {
         val (c3, _) = VersionDiff.legacyTagBodyToComponentMap(
             "Enchantments:[{id:\"minecraft:sharpness\",lvl:3}]"
         )!!
-        assertEquals(listOf("\"enchantments\":{levels:{\"minecraft:sharpness\":3}}"), c3)
+        // z7 实测纠正：**没有** levels 外壳（wiki 原例 [enchantments={sharpness:3}]）
+        assertEquals(listOf("\"enchantments\":{\"minecraft:sharpness\":3}"), c3)
 
         // 混合：附魔 + 自定义 + 损耗值 -> 三个组件
         val (c4, _) = VersionDiff.legacyTagBodyToComponentMap(
@@ -100,12 +101,12 @@ class VersionDiffTest {
     @Test
     fun testEnchantmentsAndPotionBothWays() {
         assertEquals(
-            "{levels:{\"minecraft:sharpness\":3}}",
+            "{\"minecraft:sharpness\":3}",
             VersionDiff.legacyValueToModern("Enchantments", "[{id:\"minecraft:sharpness\",lvl:3}]")
         )
         assertEquals(
             "[{id:\"minecraft:sharpness\",lvl:3}]",
-            VersionDiff.modernValueToLegacy("enchantments", "{levels:{\"minecraft:sharpness\":3}}")
+            VersionDiff.modernValueToLegacy("enchantments", "{\"minecraft:sharpness\":3}")
         )
         assertEquals(
             "{potion:\"minecraft:water\"}",
@@ -133,7 +134,7 @@ class VersionDiffTest {
         assertEquals(
             "Enchantments:[{id:\"minecraft:sharpness\",lvl:3}]",
             VersionDiff.modernComponentsToLegacyTag(
-                "minecraft:enchantments:{levels:{\"minecraft:sharpness\":3}}"
+                "minecraft:enchantments:{\"minecraft:sharpness\":3}"
             )!!.first
         )
         // display 三件套 -> 合并成一个 display 复合（旧格式只有一个 display）
@@ -180,6 +181,20 @@ class VersionDiffTest {
         assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, onlyLegacy))
         assertEquals(VersionDiff.Decision.KEEP, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, onlyModern))
         assertEquals(VersionDiff.Decision.ASK, VersionDiff.decide(VersionDiff.NbtSyntax.FOLLOW_INPUT, mixed))
+    }
+
+    @Test
+    fun testCanBreakUsesBlockPredicateObject() {
+        // z12 实测：直接给列表 `can_break=["minecraft:stone"]` 是**语法错误**（整个文件不加载）；
+        // z13 实测：`can_break={blocks:["minecraft:stone"]}` 才对 -> 必须包一层 blocks
+        assertEquals(
+            "{blocks:[\"minecraft:stone\",\"minecraft:dirt\"]}",
+            VersionDiff.legacyValueToModern("CanDestroy", "[\"minecraft:stone\",\"minecraft:dirt\"]")
+        )
+        assertEquals(
+            "[\"minecraft:stone\",\"minecraft:dirt\"]",
+            VersionDiff.modernValueToLegacy("can_break", "{blocks:[\"minecraft:stone\",\"minecraft:dirt\"]}")
+        )
     }
 
     @Test
