@@ -164,21 +164,28 @@ object VersionDiff {
     fun legacyValueToModern(legacyKey: String, legacyValue: String): String? = when (legacyKey) {
         "Count", "Damage", "RepairCost" ->
             stripByteSuffix(legacyValue)?.takeIf { it.toIntOrNull() != null }
-        // 附魔：旧的 [{id:"x",lvl:N}] -> 新的 {levels:{"x":N}}
+        // 附魔：旧的 [{id:"x",lvl:N}] -> 新的**直接** {id:N}
+        // （minecraft.wiki 原例 `/give @s wooden_sword[enchantments={sharpness:3,knockback:2}]`
+        //   —— **没有** levels 外壳；这一点是自检包 z7 实测纠正的）
         "Enchantments" -> legacyEnchantmentsToModern(legacyValue)
         // 药水：旧的字符串 id -> 新的 {potion:"…"}
         "Potion" -> legacyValue.trim().removeSurrounding("\"")
             .takeIf { it.isNotBlank() }?.let { "{potion:\"$it\"}" }
+        // 可破坏/可放置方块：旧的是一个**列表**，新要**块谓词对象** {blocks:…}
+        // （z12 实测：直接给列表会被拒、整个文件都不加载；z13 实测 {blocks:[…]} 才对）
+        "CanDestroy", "CanPlaceOn" ->
+            legacyValue.trim().takeIf { it.startsWith("[") || it.startsWith("\"") }
+                ?.let { "{blocks:$it}" }
         else -> null
     }
 
     private fun stripByteSuffix(v: String): String? =
         v.trim().removeSuffix("b").removeSuffix("B").trim().takeIf { it.isNotBlank() }
 
-    /** `[{id:"minecraft:x",lvl:2},{…}]` -> `{levels:{"minecraft:x":2,…}}`。解析不了返回 null。 */
+    /** `[{id:"minecraft:x",lvl:2},{…}]` -> `{"minecraft:x":2,…}`（**没有 levels 外壳**）。解析不了返回 null。 */
     private fun legacyEnchantmentsToModern(value: String): String? {
         val body = value.trim().removeSurrounding("[", "]")
-        if (value.trim() == "[]") return "{levels:{}}"
+        if (value.trim() == "[]") return "{}"
         val entries = ExecCondSupport.splitTopLevel(body, ',')
         if (entries.isEmpty()) return null
         val pairs = mutableListOf<String>()
@@ -187,7 +194,7 @@ object VersionDiff {
             val lvl = Regex("lvl\\s*:\\s*(-?\\d+)").find(e)?.groupValues?.get(1) ?: return null
             pairs.add("\"$id\":$lvl")
         }
-        return "{levels:{${pairs.joinToString(",")}}}"
+        return "{${pairs.joinToString(",")}}"
     }
 
     /**
@@ -197,22 +204,28 @@ object VersionDiff {
     fun modernValueToLegacy(modernKey: String, modernValue: String): String? = when (modernKey.removePrefix("minecraft:")) {
         "count" -> modernValue.trim().takeIf { it.toIntOrNull() != null }?.let { "${it}b" }
         "damage", "repair_cost" -> modernValue.trim().takeIf { it.toIntOrNull() != null }
-        // 附魔：新的 {levels:{"x":N}} -> 旧的 [{id:"x",lvl:N}]
+        // 附魔：新的 {id:N} -> 旧的 [{id:"id",lvl:N}]（没有 levels 外壳，见 legacyEnchantmentsToModern）
         "enchantments" -> modernEnchantmentsToLegacy(modernValue)
         // 药水：新的 {potion:"…"} -> 旧的字符串 id
         "potion_contents" -> Regex("potion\\s*:\\s*\"([^\"]+)\"").find(modernValue)?.groupValues?.get(1)
+        // 块谓词 {blocks:…} -> 旧的列表/字符串
+        "can_break", "can_place_on" -> {
+            val body = modernValue.trim()
+            if (!body.startsWith("{")) null
+            else Regex("blocks\\s*:\\s*(.+?)\\s*$", RegexOption.DOT_MATCHES_ALL)
+                .find(body.removeSurrounding("{", "}"))?.groupValues?.get(1)?.trim()
+        }
         else -> null
     }
 
-    /** `{levels:{"minecraft:x":2}}` -> `[{id:"minecraft:x",lvl:2}]`。解析不了返回 null。 */
+    /** `{"minecraft:x":2,…}` -> `[{id:"minecraft:x",lvl:2},…]`。解析不了返回 null。 */
     private fun modernEnchantmentsToLegacy(value: String): String? {
-        val m = Regex("levels\\s*:\\s*\\{").find(value) ?: return null
-        val open = m.range.last
-        val end = matchBrace(value, open) ?: return null
-        val body = value.substring(open + 1, end)
-        if (body.isBlank()) return "[]"
+        val body = value.trim()
+        if (!body.startsWith("{")) return null
+        val inner = body.removeSurrounding("{", "}")
+        if (inner.isBlank()) return "[]"
         val out = mutableListOf<String>()
-        for (e in ExecCondSupport.splitTopLevel(body, ',')) {
+        for (e in ExecCondSupport.splitTopLevel(inner, ',')) {
             val i = e.lastIndexOf(':')
             if (i < 0) return null
             val id = e.substring(0, i).trim().removeSurrounding("\"")
