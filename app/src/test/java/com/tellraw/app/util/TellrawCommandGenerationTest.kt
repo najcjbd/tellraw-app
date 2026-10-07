@@ -474,6 +474,28 @@ class TellrawCommandGenerationTest {
         assertTrue("Java版命令应包含选择器", javaCommand.contains(selector))
         assertTrue("基岩版命令应包含选择器", bedrockCommand.contains(selector))
     }
+
+    /**
+     * 文本组件里内嵌的 selector 也要按"版本策略"过滤（2026-10-07）：
+     * LEGACY 下装备写 Inventory 数字槽 103b（1.20.4 实测），MODERN 下仍用 equipment。
+     * 组件标记格式：content + MARKER_START + "selector" + MARKER_END。
+     */
+    @Test
+    fun testEmbeddedSelectorHonorsVersionPolicy() {
+        val marker = "\u0FC8selector\u0F34"
+        val msg = "@a[hasitem={item=diamond_helmet,location=slot.armor.head}]$marker"
+
+        val legacy = TextFormatter.convertToJavaJson(
+            msg, "none", false, context, mutableListOf(), false, VersionDiff.NbtSyntax.LEGACY
+        )
+        assertTrue("LEGACY 下内嵌选择器应写 Slot:103b，实际：$legacy", legacy.contains("Slot:103b"))
+        assertFalse("LEGACY 下不该出现 equipment：$legacy", legacy.contains("equipment"))
+
+        val modern = TextFormatter.convertToJavaJson(
+            msg, "none", false, context, mutableListOf(), false, VersionDiff.NbtSyntax.MODERN
+        )
+        assertTrue("MODERN 下仍用 equipment：$modern", modern.contains("equipment"))
+    }
 }
 
 /**
