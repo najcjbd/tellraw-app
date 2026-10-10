@@ -35,3 +35,11 @@ python3 run_cases.py 1.21.5 --cases cases.example.json --java /path/to/java21/bi
 用例格式见 `cases.example.json`：`{name, edition, java, bedrock, expectChat}`。
 其中 `java`/`bedrock` 通常就是**程序生成**的双版本命令；后续加一个生成器把 app 的输出写进 cases.json，即可实现"用程序生成的命令在各版本验证"。
 退出码：有失败则非 0（可直接当 CI 断言）。
+
+## 生成器（C 第 2 步闭环）
+`app/src/test/java/com/tellraw/app/mctest/McCaseGeneratorTest.kt` 会把**程序真实生成**的双版本命令写到 `app/build/mctest/cases.json`（纯 JVM，本地/CI 都能跑）：
+```bash
+./gradlew :app:testDebugUnitTest --tests "*McCaseGeneratorTest"
+python3 run_cases.py 1.21.5 --cases ../../app/build/mctest/cases.json --java /path/to/java21/bin/java
+```
+CI（`mctest.yml`）已接好：先跑生成器产出 cases.json，再在各版本用 `run_cases.py` 真机验证。
