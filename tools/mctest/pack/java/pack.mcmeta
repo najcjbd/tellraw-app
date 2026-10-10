@@ -1,0 +1,14 @@
+{
+    "pack": {
+        "description": "tellraw 转换自动检查（Java 26.2 / 数据包版本 107.1）",
+        "pack_format": 107,
+        "min_format": [
+            107,
+            0
+        ],
+        "max_format": [
+            107,
+            2147483647
+        ]
+    }
+}

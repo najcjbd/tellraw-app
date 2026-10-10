@@ -24,7 +24,7 @@ jobs:
           java-version: '17'
 
       - name: Generate cases (real app output)
-        run: ./gradlew :app:testDebugUnitTest --tests "*McCase*GeneratorTest"
+        run: ./gradlew :app:testDebugUnitTest --tests "*GeneratorTest"
 
       - uses: actions/setup-java@v4
         with:
