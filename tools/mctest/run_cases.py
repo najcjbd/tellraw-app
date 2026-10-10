@@ -42,7 +42,7 @@ def _version_ok(version, spec):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("version")
-    ap.add_argument("--cases", required=True)
+    ap.add_argument("--cases", required=True, action="append")
     ap.add_argument("--java", default=os.environ.get("MCTEST_JAVA", "java"))
     ap.add_argument("--servers", default=os.environ.get("MC_SERVERS", os.path.join(HERE, "servers")))
     ap.add_argument("--work", default=os.environ.get("MCTEST_WORK", os.path.join(HERE, "work")))
@@ -53,7 +53,9 @@ def main():
     jar = os.path.join(a.servers, a.version, "server.jar")
     if not os.path.exists(jar):
         print("!! 缺 server.jar:", jar); sys.exit(2)
-    cases = json.load(open(a.cases, encoding="utf-8"))
+    cases = []
+    for f in a.cases:
+        cases.extend(json.load(open(f, encoding="utf-8")))
 
     base = os.path.join(a.work, "cases-" + a.version)
     if os.path.isdir(base):
