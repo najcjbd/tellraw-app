@@ -397,6 +397,7 @@
     <string name="nbt_syntax_legacy">舊版（舊 NBT）</string>
     <string name="nbt_syntax_follow">跟隨輸入</string>
     <string name="nbt_syntax_modern_pre_1_21_5">1.20.5–1.21.4（裝備用 items）</string>
+    <string name="equipment_mainhand_ambiguous">目標選擇器無法確定會選到玩家還是非玩家：玩家主手要寫 {SelectedItem:{...}}、非玩家主手要寫 {equipment:{mainhand:{...}}}。這裡按玩家（SelectedItem）處理，請自行核對</string>
     <string name="equipment_nbt_needs_1_21_5">版本策略 1.20.5-1.21.4：Java 的 nbt={equipment:...} 謂詞要 1.21.5 才生效；在 1.20.5-1.21.4 上它會靜默不匹配（永不命中）。請改用 execute if items entity &lt;目標&gt; &lt;槽位&gt; &lt;物品&gt;</string>
     <string name="modern_components_downgraded">按"舊版"策略把資料組件降級回舊 NBT；這些鍵需要你自己核對（舊版沒有對應寫法或值形狀不同）：%1$s</string>
     <string name="syntax_mixed_treated_as_modern">偵測到新舊寫法混用（tag: 與 components: 同時出現）：請在彈出的對話框裡選擇；在你選定之前，已暫按“新版”處理</string>
