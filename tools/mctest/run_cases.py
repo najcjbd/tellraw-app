@@ -44,7 +44,7 @@ def main():
     ap.add_argument("version")
     ap.add_argument("--cases", required=True, action="append")
     ap.add_argument("--java", default=os.environ.get("MCTEST_JAVA", "java"))
-    ap.add_argument("--servers", default=os.environ.get("MC_SERVERS", os.path.join(HERE, "servers")))
+    ap.add_argument("--servers", default=os.environ.get("MC_SERVERS", os.path.join(HERE, ".servers")))
     ap.add_argument("--work", default=os.environ.get("MCTEST_WORK", os.path.join(HERE, "work")))
     ap.add_argument("--mf", default=os.environ.get("MF_PATH", "mineflayer"))
     ap.add_argument("--name", default=os.environ.get("BOT_NAME", "ttcheck_test"))
