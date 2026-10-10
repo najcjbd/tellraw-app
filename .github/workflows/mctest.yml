@@ -1,0 +1,49 @@
+# 服务器 + bot 多版本测试层（C）。
+# 默认**手动触发**（workflow_dispatch），避免每个 PR 都下几十 MB 的服务端 jar。
+# 本地用同一套脚本：见 tools/mctest/README.md
+name: MC matrix (server + bot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: '空格分隔的版本号（这些版本都能被同一个 JDK 跑）'
+        default: '1.20.5 1.21.5'
+        required: false
+
+jobs:
+  mctest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install mineflayer
+        working-directory: tools/mctest
+        run: |
+          npm init -y >/dev/null
+          npm i --no-audit --no-fund mineflayer@4.37.1
+
+      - name: Download server jars
+        working-directory: tools/mctest
+        run: python3 download_servers.py ${{ github.event.inputs.versions }}
+
+      - name: Run matrix
+        working-directory: tools/mctest
+        env:
+          MF_PATH: ${{ github.workspace }}/tools/mctest/node_modules/mineflayer
+        run: |
+          set -e
+          for v in ${{ github.event.inputs.versions }}; do
+            echo "########## $v ##########"
+            python3 run_one.py "$v" --java "$JAVA_HOME/bin/java" 2>&1 | tail -25
+          done
