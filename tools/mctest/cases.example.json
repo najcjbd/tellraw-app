@@ -1,0 +1,12 @@
+[
+  {"name": "java-tellraw-text",
+   "edition": "both",
+   "java": "tellraw @a {\"text\":\"hi\"}",
+   "bedrock": "tellraw @a {\"rawtext\":[{\"text\":\"hi\"}]}",
+   "expectChat": "hi"},
+  {"name": "java-tellraw-color",
+   "edition": "both",
+   "java": "tellraw @a {\"text\":\"colored\",\"color\":\"red\"}",
+   "bedrock": "tellraw @a {\"rawtext\":[{\"text\":\"§ccolored\"}]}",
+   "expectChat": "colored"}
+]
