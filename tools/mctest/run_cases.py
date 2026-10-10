@@ -18,6 +18,27 @@ import os, sys, json, time, argparse, subprocess, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+
+def _ver_tuple(v):
+    return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+def _version_ok(version, spec):
+    """spec: None=全版本；list[str] 混合精确/比较（如 "1.20.5"、"<=1.20.4"、">=1.20.5"）。"""
+    if not spec:
+        return True
+    for s in spec:
+        if s.startswith(">="):
+            if _ver_tuple(version) >= _ver_tuple(s[2:]): return True
+        elif s.startswith("<="):
+            if _ver_tuple(version) <= _ver_tuple(s[2:]): return True
+        elif s.startswith(">"):
+            if _ver_tuple(version) > _ver_tuple(s[1:]): return True
+        elif s.startswith("<"):
+            if _ver_tuple(version) < _ver_tuple(s[1:]): return True
+        elif version == s:
+            return True
+    return False
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("version")
@@ -73,23 +94,32 @@ def main():
         time.sleep(1)
 
     is_java = a.version not in ("bedrock",)   # 这里版本都是 Java 版；bedrock 走另一套 harness
-    passed = failed = 0
+    passed = failed = skipped = 0
     for c in cases:
+        # 版本过滤：可选 "versions": ["1.20.5","1.21.5"] 或 ["<=1.20.4"] / [">=1.20.5"]（不写=所有版本）
+        if not _version_ok(a.version, c.get("versions")):
+            print("[SKIP] " + c.get("name", "?") + "  (versions=" + str(c.get("versions")) + ")"); skipped += 1; continue
         cmd = c.get("java") if is_java else c.get("bedrock")
         if not cmd:
             continue
+        # 可选用例前置（摆物品等）；<bot> 占位替换成 bot 用户名
+        for sc in c.get("setup", []) or []:
+            send(sc.replace("<bot>", a.name))
+            time.sleep(1)
         before = open(botlog, errors="ignore").read()
         send(cmd)
         time.sleep(3)
         after = open(botlog, errors="ignore").read()[len(before):]
         got = "\n".join(l for l in after.splitlines() if l.startswith("CHAT:"))
         exp = c.get("expectChat", "")
-        ok = (exp == "") or (exp in got)
-        print(("[PASS] " if ok else "[FAIL] ") + c.get("name", "?") + "  got=" + got[:120].replace("\n", " | "))
+        present = (exp != "") and (exp in got)
+        mode = c.get("expect", "present")
+        ok = (present if mode == "present" else (not present)) if exp != "" else True
+        print(("[PASS] " if ok else "[FAIL] ") + c.get("name", "?") + "  expect=" + mode + "  got=" + got[:120].replace("\n", " | "))
         passed += 1 if ok else 0
         failed += 0 if ok else 1
 
-    print("=== cases: %d passed, %d failed ===" % (passed, failed))
+    print("=== cases: %d passed, %d failed, %d skipped ===" % (passed, failed, skipped))
     send("stop")
     try:
         srv.wait(timeout=60)
