@@ -84,6 +84,27 @@ class SelectorConverterTest {
         assertFalse(modern.third.any { it.contains("1.21.5") })
     }
 
+    /** 主手：玩家 -> SelectedItem；非玩家 -> equipment.mainhand；不确定 -> SelectedItem + 提醒 */
+    @Test
+    fun testMainhandDependsOnSelectorEntityKind() {
+        // 玩家（@a）
+        val player = SelectorConverter.filterSelectorParameters(
+            "@a[hasitem={item=diamond_sword,location=slot.weapon.mainhand,slot=0}]", SelectorType.JAVA, context
+        )
+        assertTrue("玩家主手应为 SelectedItem：${player.first}", player.first.contains("SelectedItem"))
+        // 非玩家（@e[type=zombie]）
+        val mob = SelectorConverter.filterSelectorParameters(
+            "@e[type=zombie,hasitem={item=diamond_sword,location=slot.weapon.mainhand,slot=0}]", SelectorType.JAVA, context
+        )
+        assertTrue("非玩家主手应为 equipment.mainhand：${mob.first}", mob.first.contains("equipment") && mob.first.contains("mainhand"))
+        // 不确定（@e 无 type）-> SelectedItem + 提醒
+        val amb = SelectorConverter.filterSelectorParameters(
+            "@e[hasitem={item=diamond_sword,location=slot.weapon.mainhand,slot=0}]", SelectorType.JAVA, context
+        )
+        assertTrue("不确定时应保守用 SelectedItem：${amb.first}", amb.first.contains("SelectedItem"))
+        assertTrue("不确定时应有提醒", amb.third.any { it.contains("SelectedItem") || it.contains("非玩家") })
+    }
+
     /** LEGACY（pre-1.20.5）：装备走 Inventory 数字槽（1.20.4 实测），不再写 equipment */
     @Test
     fun testLegacyArmorUsesInventoryNumericSlotsInSelector() {

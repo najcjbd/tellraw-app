@@ -185,6 +185,7 @@ object SelectorConverter {
         R.string.hasitem_slot_max_only to "注意：slot=..%s 已转换为 %s",
         R.string.hasitem_slot_range to "注意：slot=%1\$s..%2\$s 已转换为 %3\$s（中间值）",
         R.string.hasitem_slot_negation_not_supported to "警告：slot反选（!）在Java版不支持，已移除",
+        R.string.equipment_mainhand_ambiguous to "目标选择器无法确定会选到玩家还是非玩家：玩家主手要写 {SelectedItem:{...}}、非玩家主手要写 {equipment:{mainhand:{...}}}。这里按玩家（SelectedItem）处理，请自行核对",
         R.string.equipment_nbt_needs_1_21_5 to "版本策略 1.20.5–1.21.4：Java 的 nbt={equipment:…} 谓词要 1.21.5 才生效；在 1.20.5–1.21.4 上它会静默不匹配（永不命中）。请改用 execute if items entity <目标> <槽位> <物品>",
         // TextFormatter 中使用的资源
         R.string.java_font_bedrock_color to "Java版用字体，基岩版用颜色代码",
@@ -524,7 +525,9 @@ object SelectorConverter {
         // 处理hasitem到nbt的转换（基岩版到Java版）
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
             val legacy = nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
-            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy)
+            // 主手写法取决于目标是玩家还是非玩家（玩家 SelectedItem / 非玩家 equipment.mainhand）
+            val entityKind = SelectorEntityKind.analyze(selector)
+            val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy, entityKind)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
         }
@@ -2397,7 +2400,7 @@ object SelectorConverter {
      * 处理 hasitem 参数转换为 nbt 参数（基岩版到Java版）
      * 支持完整的转换逻辑，包括装备槽位和物品栏槽位
      */
-    private fun convertHasitemToNbt(paramsPart: String, context: Context, legacy: Boolean = false): Pair<String, List<String>> {
+    private fun convertHasitemToNbt(paramsPart: String, context: Context, legacy: Boolean = false, entityKind: SelectorEntityKind.Kind = SelectorEntityKind.Kind.AMBIGUOUS): Pair<String, List<String>> {
         val reminders = mutableListOf<String>()
         var result = paramsPart
 
@@ -2433,7 +2436,7 @@ object SelectorConverter {
                 if (arrayContent != null) {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     val fullMatch = result.substring(startIndex, bracketIndex + arrayContent.length + 1)
-                    val nbtResult = parseHasitemArray(arrayContent, reminders, context, legacy)
+                    val nbtResult = parseHasitemArray(arrayContent, reminders, context, legacy, entityKind)
 
                 if (nbtResult.isNotEmpty()) {
                         // 添加提醒信息：hasitem 已转换为 nbt 格式
@@ -2478,7 +2481,7 @@ object SelectorConverter {
                     // 直接使用原始字符串中的完整匹配，而不是重新构建
                     // +2 是为了包含 objectContent 后面的 '}' 字符
                     val fullMatch = result.substring(startIndex, braceIndex + objectContent.length + 2)
-                    val nbtResult = parseHasitemSingle(objectContent, reminders, context, legacy)
+                    val nbtResult = parseHasitemSingle(objectContent, reminders, context, legacy, entityKind)
 
                 if (nbtResult.isNotEmpty()) {
                         // 精确替换
@@ -2603,7 +2606,7 @@ object SelectorConverter {
     /**
      * 解析单个 hasitem 条目
      */
-    private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false): String {
+    private fun parseHasitemSingle(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false, entityKind: SelectorEntityKind.Kind = SelectorEntityKind.Kind.AMBIGUOUS): String {
         val params = mutableMapOf<String, String>()
         val parts = parseHasitemObjectParams(content)
 
@@ -2663,8 +2666,17 @@ object SelectorConverter {
 
         // 根据位置类型转换
         return when (location) {
-            // 主手两版都用 SelectedItem（1.20.4 实测 =1）
-            "slot.weapon.mainhand" -> "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
+            // 主手：玩家用 SelectedItem、非玩家用 equipment.mainhand（能确定才区分；不确定保留 SelectedItem 并提醒）
+            "slot.weapon.mainhand" -> when (entityKind) {
+                SelectorEntityKind.Kind.NON_PLAYER_ONLY ->
+                    "nbt={equipment:{mainhand:{id:\"$itemId\"$countPart}}}"
+                SelectorEntityKind.Kind.PLAYER_ONLY ->
+                    "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
+                else -> {
+                    reminders.add(getStringSafely(context, R.string.equipment_mainhand_ambiguous))
+                    "nbt={SelectedItem:{id:\"$itemId\"$countPart}}"
+                }
+            }
             "slot.weapon.offhand" ->
                 if (legacy) legacyInv(-106) else "nbt={equipment:{offhand:{id:\"$itemId\"$countPart}}}"
             "slot.armor.head" ->
@@ -2721,7 +2733,7 @@ object SelectorConverter {
      * 根据特别提醒.txt的要求:SelectedItem, Inventory, equipment这三大nbt参数不能放在同一个nbt大括里面
      * 需要返回多个独立的nbt参数
      */
-    private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false): String {
+    private fun parseHasitemArray(content: String, reminders: MutableList<String>, context: Context, legacy: Boolean = false, entityKind: SelectorEntityKind.Kind = SelectorEntityKind.Kind.AMBIGUOUS): String {
         // 如果内容为空，返回空字符串（表示移除该参数）
         if (content.trim().isEmpty()) {
             return ""
@@ -2818,9 +2830,15 @@ object SelectorConverter {
 
             // 根据位置类型分类
             when (location) {
-                "slot.weapon.mainhand" -> {
-                    // 主手 → SelectedItem（两版相同，1.20.4 实测 =1）
-                    selectedItem.add("{id:\"$itemId\"$countPart}")
+                "slot.weapon.mainhand" -> when (entityKind) {
+                    SelectorEntityKind.Kind.NON_PLAYER_ONLY ->
+                        equipmentItems["mainhand"] = "{id:\"$itemId\"$countPart}"
+                    SelectorEntityKind.Kind.PLAYER_ONLY ->
+                        selectedItem.add("{id:\"$itemId\"$countPart}")
+                    else -> {
+                        reminders.add(getStringSafely(context, R.string.equipment_mainhand_ambiguous))
+                        selectedItem.add("{id:\"$itemId\"$countPart}")
+                    }
                 }
                 "slot.weapon.offhand" -> if (legacy) legacyInv(-106)
                     else equipmentItems["offhand"] = "{id:\"$itemId\"$countPart}"
