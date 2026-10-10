@@ -26,3 +26,12 @@ done
 ## 说明
 - 本层**不改任何 app 代码**，只把它当"真机"跑。
 - 目前跑的是 `autocheck` 自检包；后续会扩展成"**用程序生成的命令**在各版本上验证"。
+
+## 用例驱动模式（C 第 2 步的接入口）
+`run_cases.py` 读一个 cases.json，把每条命令在指定版本上真机跑，并断言 bot 收到的聊天：
+```bash
+python3 run_cases.py 1.21.5 --cases cases.example.json --java /path/to/java21/bin/java
+```
+用例格式见 `cases.example.json`：`{name, edition, java, bedrock, expectChat}`。
+其中 `java`/`bedrock` 通常就是**程序生成**的双版本命令；后续加一个生成器把 app 的输出写进 cases.json，即可实现"用程序生成的命令在各版本验证"。
+退出码：有失败则非 0（可直接当 CI 断言）。
