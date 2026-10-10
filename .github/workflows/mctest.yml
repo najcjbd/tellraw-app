@@ -24,7 +24,7 @@ jobs:
           java-version: '17'
 
       - name: Generate cases (real app output)
-        run: ./gradlew :app:testDebugUnitTest --tests "*McCaseGeneratorTest"
+        run: ./gradlew :app:testDebugUnitTest --tests "*McCase*GeneratorTest"
 
       - uses: actions/setup-java@v4
         with:
@@ -55,5 +55,5 @@ jobs:
             echo "########## $v ##########"
             python3 run_one.py "$v" --java "$JAVA_HOME/bin/java" 2>&1 | tail -25
             echo "--- app-generated cases ---"
-            python3 run_cases.py "$v" --cases ../../app/build/mctest/cases.json --java "$JAVA_HOME/bin/java"
+            python3 run_cases.py "$v" --cases ../../app/build/mctest/cases.json --cases ../../app/build/mctest/cases_sel.json --java "$JAVA_HOME/bin/java"
           done
