@@ -67,4 +67,24 @@ object FeatureGate {
         } ?: return false
         return version >= need
     }
+    // ---------------- 被移除/改名的特性（"输入不被最新版支持"的判定） ----------------
+
+    /** 在某个版本被移除（>= 该版本即不可用）。 */
+    enum class RemovedFeature { MAP_COLOR, HURT_BY_TIMESTAMP, SWING_ANIMATION, PREDICATE_CONDITION_KEY }
+
+    private val REMOVED_AT: Map<RemovedFeature, VersionSpec> = mapOf(
+        RemovedFeature.MAP_COLOR to spec(J, 26, 3),               // 26.3 移除 map_color
+        RemovedFeature.HURT_BY_TIMESTAMP to spec(J, 26, 2),        // 26.2 起改用 ticks_since_last_hurt_by_mob
+        RemovedFeature.SWING_ANIMATION to spec(J, 26, 3),          // 26.3 改名 attack_animation
+        RemovedFeature.PREDICATE_CONDITION_KEY to spec(J, 26, 3),  // 26.3 谓词 condition -> type
+    )
+
+    /** 该特性在目标版本上是否已被移除（version=null 视为最新 -> 已移除）。 */
+    fun isRemovedIn(feature: RemovedFeature, version: VersionSpec?): Boolean {
+        val at = REMOVED_AT[feature] ?: return false
+        if (version == null) return true
+        if (version == VersionSpec.LATEST) return true
+        return version.edition == VersionSpec.Edition.JAVA && version >= at
+    }
+
 }
