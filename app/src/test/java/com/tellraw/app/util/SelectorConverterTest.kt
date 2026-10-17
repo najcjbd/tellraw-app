@@ -3866,6 +3866,27 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testBedrockDropsTypeTagsAndAttributes() {
+        val (tagSel, _, tagReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[type=#minecraft:skeletons]", SelectorType.BEDROCK, context
+        )
+        assertEquals("@e", tagSel)
+        assertTrue(tagReminders.any { it.contains("type") })
+
+        val (attrSel, _, attrReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[attributes={generic.max_health=20..}]", SelectorType.BEDROCK, context
+        )
+        assertEquals("@e", attrSel)
+        assertTrue(attrReminders.any { it.contains("attributes") })
+
+        // Java 侧保留
+        val (javaTag, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[type=#minecraft:skeletons]", SelectorType.JAVA, context
+        )
+        assertTrue(javaTag.contains("type=#"))
+    }
+
+    @Test
     fun testComponentSelectorHonorsTargetVersion() {
         // 文本组件里的 selector 也要按目标版本改写（标记格式：content + ྈ + type + ༴）
         val componentText = "@n\u0FC8selector\u0F34"

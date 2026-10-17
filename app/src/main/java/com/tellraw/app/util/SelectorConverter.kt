@@ -136,6 +136,7 @@ object SelectorConverter {
         R.string.bedrock_param_not_supported to "警告：基岩版%s参数在Java版不支持，已移除",
         R.string.at_n_converted_for_target_version to "目标版本 %s 没有 @n，已改写为 @e 的等效 limit/sort 写法",
         R.string.param_removed_for_target_version to "目标版本 %1\$s 不支持 %2\$s=，已移除（无等效写法）",
+        R.string.bedrock_type_tag_not_supported to "基岩版不支持 type=#类型标签，已移除该条件",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
         R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",
@@ -475,7 +476,7 @@ object SelectorConverter {
 
         // Java版特有参数（完全不支持，无法转换）
         val javaSpecificParams = listOf(
-            "predicate", "advancements", "team"
+            "predicate", "advancements", "team", "attributes"
         )
 
         // 基岩版特有参数（完全不支持，无法转换）
@@ -907,6 +908,16 @@ object SelectorConverter {
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
+                }
+                // 基岩版不支持实体类型标签（type=#...）；types 列表也没有对应写法 -> 丢弃并提醒
+                else if (targetVersion == SelectorType.BEDROCK && paramName == "type" &&
+                    param.substringAfter('=').trim().removeSurrounding("\"").startsWith("#")
+                ) {
+                    removedParams.add(paramName)
+                    conversionReminders.add(
+                        getStringSafely(context, R.string.bedrock_type_tag_not_supported, paramName)
+                    )
+                    continue
                 }
                 else if (targetVersion == SelectorType.BEDROCK && paramName in javaSpecificParams) {
                     removedParams.add(paramName)
