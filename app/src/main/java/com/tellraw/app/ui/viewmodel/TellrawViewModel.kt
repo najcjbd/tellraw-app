@@ -105,6 +105,10 @@ class TellrawViewModel @Inject constructor(
     private val _bedrockColorToRgb = MutableStateFlow(true)
     val bedrockColorToRgb: StateFlow<Boolean> = _bedrockColorToRgb.asStateFlow()
 
+    /** 目标版本（配置文件输入；-1 = 最新）。 */
+    private val _targetVersion = MutableStateFlow("-1")
+    val targetVersion: StateFlow<String> = _targetVersion.asStateFlow()
+
     // D4：整条命令 / 裸 JSON 转换
     private val _showRawConvertDialog = MutableStateFlow(false)
     val showRawConvertDialog: StateFlow<Boolean> = _showRawConvertDialog.asStateFlow()
@@ -217,6 +221,7 @@ class TellrawViewModel @Inject constructor(
             // 加载separator使用文本组件设置
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
             _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
+            _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
             _historyStorageFilename.value = loadedSettings.historyStorageFilename
@@ -787,6 +792,18 @@ class TellrawViewModel @Inject constructor(
         }
         generateCommands()
     }
+
+    /** 目标版本（-1 = 最新）。 */
+    fun setTargetVersion(value: String) {
+        _targetVersion.value = value.trim().ifEmpty { "-1" }
+        viewModelScope.launch { settingsRepository.setTargetVersion(_targetVersion.value) }
+        generateCommands()
+    }
+
+    /** 解析后的目标版本；-1 返回 [com.tellraw.app.model.VersionSpec.LATEST]。 */
+    fun targetVersionSpec(): com.tellraw.app.model.VersionSpec =
+        com.tellraw.app.model.VersionSpec.parse(_targetVersion.value)
+            ?: com.tellraw.app.model.VersionSpec.LATEST
 
     /** 基岩独有 § 颜色码 -> Java 精确 RGB。 */
     fun setBedrockColorToRgb(enabled: Boolean) {
