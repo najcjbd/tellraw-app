@@ -43,7 +43,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: entities-${{ matrix.v }}
-          path: tools/mctest/work/probe-${{ matrix.v }}/entities.json
+          path: |
+            tools/mctest/work/probe-${{ matrix.v }}/entities.json
+            tools/mctest/work/probe-${{ matrix.v }}/console.log
 
   analyze:
     needs: probe
