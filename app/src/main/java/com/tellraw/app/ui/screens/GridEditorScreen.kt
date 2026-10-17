@@ -58,6 +58,7 @@ import com.tellraw.app.model.CustomEntity
 import com.tellraw.app.model.CustomEntityStore
 import com.tellraw.app.model.EditableGridEntity
 import com.tellraw.app.model.EntityAvatars
+import com.tellraw.app.model.EntityIdAliases
 import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.GridEntityStore

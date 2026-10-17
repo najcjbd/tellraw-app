@@ -173,6 +173,14 @@ class SelectorEvaluatorTest {
         )
     }
 
+    @Test fun mixedEditionIdsAreNoted() {
+        val r = SelectorEvaluator.evaluate(
+            "@e[type=minecraft:zombified_piglin,type=minecraft:zombie_pigman]",
+            listOf(zombie)
+        )
+        assertTrue(r.notes.any { it.contains("同时") })
+    }
+
     @Test fun implicitLimitForPAndNAndR() {
         val two = listOf(
             steve.copy(uid = "p1", x = 0.0),

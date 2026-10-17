@@ -1,5 +1,7 @@
 package com.tellraw.app.util
 
+import com.tellraw.app.model.EntityIdAliases
+
 /**
  * execute 前置命令解析 / 条件子命令互转。
  *
@@ -593,7 +595,7 @@ object ExecuteConverter {
             }
         }
         return when (out) {
-            is CondOut.Out -> out.tokens
+            is CondOut.Out -> convertTypeIdsInTokens(out.tokens, direction, reminders)
             CondOut.Drop -> emptyList()
         }
     }
@@ -1279,6 +1281,48 @@ object ExecuteConverter {
      *  - 基岩 -> Java：`hasitem=` -> `nbt=`（Java 选择器不支持 hasitem=；转不了的原样保留 + 提醒）
      * 例：`as @a[nbt={Inventory:[{id:"minecraft:diamond"}]}]` -> `as @a[hasitem={item=diamond}]`
      */
+    /** 只改写选择器里的 type= 实体 ID（两版别名），其他参数原样。 */
+    private fun convertTypeParam(
+        param: String,
+        direction: Direction,
+        reminders: MutableList<String>
+    ): String {
+        if (!param.startsWith("type=")) return param
+        val raw = param.substringAfter('=').trim().removeSurrounding("\"")
+        if (raw.startsWith("#") || raw.isBlank()) return param
+        val neg = raw.startsWith("!")
+        val id = if (neg) raw.substring(1) else raw
+        val converted = when (direction) {
+            Direction.JAVA_TO_BEDROCK -> EntityIdAliases.toBedrock(id)
+            Direction.BEDROCK_TO_JAVA -> EntityIdAliases.toJava(id)
+        }
+        if (converted == null) {
+            reminders.add("实体 ID $id 无法用单一目标版本 ID 表达，已移除该 type 条件")
+            return ""
+        }
+        if (converted != id) {
+            reminders.add("实体 ID $id 已按目标版本改写为 $converted")
+            return "type=" + (if (neg) "!" else "") + converted
+        }
+        return param
+    }
+
+    /** 条件里的选择器 token（`@e[...]` 等）也做 type= 实体 ID 改写。 */
+    private fun convertTypeIdsInTokens(
+        tokens: List<String>,
+        direction: Direction,
+        reminders: MutableList<String>
+    ): List<String> = tokens.map { t ->
+        if (!t.startsWith("@") || '[' !in t || !t.endsWith("]")) t
+        else {
+            val v = t.substringBefore('[')
+            val body = t.substringAfter('[').dropLast(1)
+            val parts = ExecCondSupport.splitTopLevel(body, ',')
+                .mapNotNull { p -> convertTypeParam(p, direction, reminders).takeIf { it.isNotBlank() } }
+            if (parts.isEmpty()) v else "$v[${parts.joinToString(",")}]"
+        }
+    }
+
     private fun convertModifierSelector(
         token: String,
         direction: Direction,
@@ -1292,7 +1336,7 @@ object ExecuteConverter {
         val from = if (direction == Direction.JAVA_TO_BEDROCK) "nbt=" else "hasitem="
         // 基岩->Java 时还要看 scores 里的 `=!`（Java 的选择器不支持）
         val needScores = direction == Direction.BEDROCK_TO_JAVA && "!" in paramsPart
-        if (from !in paramsPart && !needScores) return unchanged
+        if (from !in paramsPart && !needScores && "type=" !in paramsPart) return unchanged
 
         val kept = mutableListOf<String>()
         val objs = mutableListOf<String>()
@@ -1355,7 +1399,11 @@ object ExecuteConverter {
         } else {
             objs.map { "nbt=$it" }
         }
-        val all = kept + merged
+        val keptOut = kept.mapNotNull { p ->
+            val c = convertTypeParam(p, direction, reminders)
+            c.takeIf { it.isNotBlank() }
+        }
+        val all = keptOut + merged
         val newToken = if (all.isEmpty()) varName else "$varName[${all.joinToString(",")}]"
         return newToken to extra
     }

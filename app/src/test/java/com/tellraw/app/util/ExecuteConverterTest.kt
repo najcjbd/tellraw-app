@@ -863,4 +863,21 @@ class ExecuteConverterTest {
         val (out, _) = conv("execute positioned over world_surface", Direction.BEDROCK_TO_JAVA)
         assertEquals("execute positioned over world_surface", out)
     }
+
+    @Test
+    fun entityIdsConvertedInModifierAndConditionSelectors() {
+        val mod = conv(
+            "execute as @e[type=minecraft:zombified_piglin]",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        assertNotNull(mod)
+        assertTrue(mod!!.contains("type=minecraft:zombie_pigman"))
+
+        val cond = conv(
+            "execute if entity @e[type=minecraft:zombie_pigman]",
+            Direction.BEDROCK_TO_JAVA
+        ).first
+        assertNotNull(cond)
+        assertTrue(cond!!.contains("type=minecraft:zombified_piglin"))
+    }
 }
