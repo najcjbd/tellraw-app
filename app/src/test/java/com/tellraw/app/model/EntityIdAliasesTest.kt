@@ -21,6 +21,12 @@ class EntityIdAliasesTest {
         assertEquals("minecraft:evoker", EntityIdAliases.toJava("minecraft:evocation_illager"))
         assertEquals("minecraft:evocation_illager", EntityIdAliases.toBedrock("minecraft:evoker"))
         assertEquals("minecraft:villager", EntityIdAliases.toJava("minecraft:villager_v2"))
+        // 基岩当前写法优先；旧 ID 也能识别并升级
+        assertEquals("minecraft:vindicator", EntityIdAliases.toBedrock("minecraft:vindication_illager"))
+        assertEquals(
+            "minecraft:eye_of_ender_signal",
+            EntityIdAliases.toBedrock("minecraft:eye_of_ender")
+        )
         // 基岩统一的 boat 无法用单一 Java ID 表达
         assertNull(EntityIdAliases.toJava("minecraft:boat"))
         assertEquals("minecraft:boat", EntityIdAliases.toBedrock("minecraft:spruce_boat"))

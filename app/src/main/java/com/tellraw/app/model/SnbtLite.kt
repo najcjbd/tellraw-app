@@ -76,6 +76,10 @@ object SnbtLite {
     /** 物品/实体 ID：`diamond_sword` 与 `minecraft:diamond_sword` 等价。 */
     private fun matchesId(a: Value, b: Value): Boolean {
         if (a !is Value.Str || b !is Value.Str) return matches(a, b)
+        // 同一实体的 Java/基岩 ID 视为相同（如 zombified_piglin / zombie_pigman）
+        if (EntityIdAliases.isKnown(a.v) || EntityIdAliases.isKnown(b.v)) {
+            return EntityIdAliases.canonical(a.v) == EntityIdAliases.canonical(b.v)
+        }
         fun norm(x: String) = if (x.contains(':')) x else "minecraft:$x"
         return norm(a.v) == norm(b.v)
     }
