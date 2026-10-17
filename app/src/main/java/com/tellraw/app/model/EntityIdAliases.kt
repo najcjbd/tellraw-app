@@ -41,7 +41,10 @@ object EntityIdAliases {
     private val GROUPS: List<Alias> = listOf(
         Alias(setOf("minecraft:zombified_piglin"), setOf("minecraft:zombie_pigman"), "基岩旧 ID"),
         Alias(setOf("minecraft:evoker"), setOf("minecraft:evocation_illager"), "基岩旧 ID"),
-        Alias(setOf("minecraft:vindicator"), setOf("minecraft:vindication_illager"), "基岩旧 ID"),
+        Alias(
+            setOf("minecraft:vindicator"),
+            setOf("minecraft:vindicator", "minecraft:vindication_illager"), "基岩旧 ID"
+        ),
         Alias(setOf("minecraft:villager"), setOf("minecraft:villager_v2", "minecraft:villager"), null),
         Alias(
             setOf("minecraft:zombie_villager"),
@@ -54,7 +57,7 @@ object EntityIdAliases {
         Alias(setOf("minecraft:fishing_bobber"), setOf("minecraft:fishing_hook"), null),
         Alias(
             setOf("minecraft:eye_of_ender"),
-            setOf("minecraft:ender_eye", "minecraft:eye_of_ender_signal"), null
+            setOf("minecraft:eye_of_ender_signal"), null
         ),
         Alias(setOf("minecraft:evoker_fangs"), setOf("minecraft:evocation_fang"), null),
         Alias(setOf("minecraft:end_crystal"), setOf("minecraft:ender_crystal"), null),
@@ -105,7 +108,7 @@ object EntityIdAliases {
         val raw = id.trim().removeSurrounding("\"").lowercase()
         val t = n(raw)
         val g = ID_TO_GROUP[t] ?: return raw
-        if (t in g.bedrock) return raw
+        // 有多个基岩写法时优先用当前版本的那个（如 villager_v2 / vindicator）
         return g.bedrock.firstOrNull()
     }
 
