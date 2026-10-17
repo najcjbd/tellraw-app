@@ -236,6 +236,8 @@
     <string name="bedrock_param_not_supported">警告：基岩版%s参数在Java版不支持，已移除</string>
     <string name="bedrock_param_no_equivalent">警告：基岩版%s参数Java版没对应功能，已移除</string>
     <string name="bedrock_type_tag_not_supported">基岩版不支持 type=#类型标签，已移除该条件</string>
+    <string name="entity_id_converted">实体 ID %1$s 已按目标版本改写为 %2$s</string>
+    <string name="entity_id_no_single_target_form">实体 ID %1$s 无法用单一 %2$s ID 表达，已移除该 type 条件</string>
     <string name="at_n_converted_for_target_version">目标版本 %1$s 没有 @n，已改写为 @e 的等效 limit/sort 写法</string>
     <string name="target_version_forces_syntax">已按目标版本 %1$s 使用「%2$s」物品写法</string>
     <string name="execute_prefix_unsupported_for_target">目标版本 %1$s 不支持 execute 的 %2$s 写法，已忽略整个前置命令</string>

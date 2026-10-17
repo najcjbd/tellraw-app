@@ -29,7 +29,21 @@ data class GridEntity(
     /** 垂直视角（-90 上 .. 90 下）。 */
     val rotationX: Double? = null,
     /** 水平视角（-180..180，正南 0、顺时针增）。 */
-    val rotationY: Double? = null
+    val rotationY: Double? = null,
+    /** 判定箱宽度（XZ 平面），用于 dx/dy/dz 的"相交"判定。 */
+    val hitboxWidth: Double = 0.6,
+    /** 判定箱高度（从脚部 y 往上）。 */
+    val hitboxHeight: Double = 1.8,
+    /** 额外 SNBT（用户手填，参与 nbt= 求值；会覆盖同名派生值）。 */
+    val extraNbt: String = "",
+    /** Bedrock has_property：属性名 -> 值（"true" 表示存在即可）。 */
+    val properties: Map<String, String> = emptyMap(),
+    /** Bedrock haspermission：camera/movement -> enabled/disabled。 */
+    val permissions: Map<String, String> = emptyMap(),
+    /** Java predicate：该实体匹配的谓词 ID 集合。 */
+    val predicates: Set<String> = emptySet(),
+    /** Java advancements：已完成的 `id` 或 `id|criterion`。 */
+    val advancements: Set<String> = emptySet()
 ) {
     val isPlayer: Boolean get() = id == "minecraft:player"
 }
@@ -194,10 +208,45 @@ object SelectorEvaluator {
                             return@filter false
                         }
                     }
-                    "nbt" -> if (!matchNbtItems(e, value, notes)) return@filter false
-                    // 网格未建模的维度：明确提示
-                    "has_property", "haspermission", "predicate", "advancements" ->
-                        notes.add("参数 \"$key\" 在网格里尚未建模，已忽略（请自行核对）")
+                    "nbt" -> {
+                        val javaOk = if (target != null) target.edition == VersionSpec.Edition.JAVA
+                        else edition == "java"
+                        if (!javaOk) {
+                            notes.add("nbt= 仅 Java 版支持；目标版本不是 Java，**没有按它筛选**")
+                        } else if (!matchNbt(e, value, notes)) {
+                            return@filter false
+                        }
+                    }
+                    "has_property" -> {
+                        val ok = if (target != null) {
+                            FeatureGate.isAvailable(FeatureGate.Feature.HAS_PROPERTY_PARAM, target)
+                        } else {
+                            edition == "bedrock" && (version == null || version >= 1_20_70L)
+                        }
+                        if (!ok) notes.add("has_property 仅基岩版 ≥1.20.70 支持，**没有按它筛选**")
+                        else if (!matchHasProperty(e, value, notes)) return@filter false
+                    }
+                    "haspermission" -> {
+                        val ok = if (target != null) {
+                            FeatureGate.isAvailable(FeatureGate.Feature.HASPERMISSION_PARAM, target)
+                        } else {
+                            edition == "bedrock" && (version == null || version >= 1_19_80L)
+                        }
+                        if (!ok) notes.add("haspermission 仅基岩版 ≥1.19.80 支持，**没有按它筛选**")
+                        else if (!matchPermission(e, value, notes)) return@filter false
+                    }
+                    "predicate" -> {
+                        val javaOk = if (target != null) target.edition == VersionSpec.Edition.JAVA
+                        else edition == "java"
+                        if (!javaOk) notes.add("predicate 仅 Java 版支持，**没有按它筛选**")
+                        else if (!matchPredicate(e, value)) return@filter false
+                    }
+                    "advancements" -> {
+                        val javaOk = if (target != null) target.edition == VersionSpec.Edition.JAVA
+                        else edition == "java"
+                        if (!javaOk) notes.add("advancements 仅 Java 版支持，**没有按它筛选**")
+                        else if (!matchAdvancements(e, value, notes)) return@filter false
+                    }
                     else -> notes.add("参数 \"$key\" 未支持，已忽略")
                 }
             }
@@ -226,7 +275,11 @@ object SelectorEvaluator {
             "random", "arbitrary" -> candidates
             else -> candidates
         }
-        val n = limit
+        // @p/@r/@n 本身就是"一个目标"，没写 limit 时按 1 处理（@a/@e 不设默认上限）。
+        val n = limit ?: when (base) {
+            "@p", "@r", "@n" -> 1
+            else -> null
+        }
         val limited = when {
             n == null -> sorted
             cNegative -> sorted.takeLast(n)   // c=-N：取最远 N 个
@@ -246,11 +299,19 @@ object SelectorEvaluator {
 
     private fun val0(v: Double) = v * v
 
+    /**
+     * dx/dy/dz 的区域：从 (x,y,z) 起、边长 |d|+1（wiki：未指定默认 0）。
+     * 选取的是"判定箱与区域相交"的实体，而不是只有中心点在区域内的实体。
+     * 判定箱按 [GridEntity.hitboxWidth]/[hitboxHeight] 近似（脚部在 y）。
+     */
     private fun inBox(e: GridEntity, x: Double, y: Double, z: Double, dx: Double, dy: Double, dz: Double): Boolean {
-        val x1 = minOf(x, x + dx); val x2 = maxOf(x, x + dx)
-        val y1 = minOf(y, y + dy); val y2 = maxOf(y, y + dy)
-        val z1 = minOf(z, z + dz); val z2 = maxOf(z, z + dz)
-        return e.x in x1..x2 && e.y in y1..y2 && e.z in z1..z2
+        val x1 = minOf(x, x + dx); val x2 = maxOf(x, x + dx) + 1.0
+        val y1 = minOf(y, y + dy); val y2 = maxOf(y, y + dy) + 1.0
+        val z1 = minOf(z, z + dz); val z2 = maxOf(z, z + dz) + 1.0
+        val ex1 = e.x - e.hitboxWidth / 2.0; val ex2 = e.x + e.hitboxWidth / 2.0
+        val ey1 = e.y; val ey2 = e.y + e.hitboxHeight
+        val ez1 = e.z - e.hitboxWidth / 2.0; val ez2 = e.z + e.hitboxWidth / 2.0
+        return ex2 >= x1 && ex1 <= x2 && ey2 >= y1 && ey1 <= y2 && ez2 >= z1 && ez1 <= z2
     }
 
     private fun matchType(e: GridEntity, value: String, notes: MutableList<String>): Boolean {
@@ -259,8 +320,9 @@ object SelectorEvaluator {
             return true
         }
         val neg = value.startsWith("!")
-        val want = (if (neg) value.substring(1) else value).let { if (it.contains(':')) it else "minecraft:$it" }
-        val hit = e.id == want
+        val raw = if (neg) value.substring(1) else value
+        val want = EntityIdAliases.canonical(raw)
+        val hit = EntityIdAliases.canonical(e.id) == want
         return if (neg) !hit else hit
     }
 
@@ -336,93 +398,199 @@ object SelectorEvaluator {
     }
 
     /**
-     * nbt 的物品相关子集（网格已建模的部分）：
-     *  - `SelectedItem:{id:"…"}` -> weapon.mainhand
-     *  - `equipment:{mainhand:{id:"…"},…}` -> weapon.mainhand / armor.*
-     *  - `Inventory:[{id:"…",Slot:0b},…]` -> inventory.0 / hotbar.N（0-8）
-     * 其余键（Health/Tags/…）不参与判定，并明确提示。
+     * nbt= 求值：把网格字段派生为 NBT（Tags/CustomName/Inventory/SelectedItem/equipment/playerGameType/XpLevel），
+     * 再叠加用户手填的额外 SNBT；按"查询是实际值子集"匹配。
+     * 缺失的键会明确提示（通常是实体没填对应字段）。
      */
-    private fun matchNbtItems(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
-        val text = raw.trim()
-        var matchedAnyRule = false
-
-        val selected = Regex("SelectedItem:\\{[^}]*?id:\\s*\"([^\"]+)\"").find(text)
-        if (selected != null) {
-            matchedAnyRule = true
-            val id = normId(selected.groupValues[1])
-            if (e.items["weapon.mainhand"]?.id != id) return false
+    private fun matchNbt(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val query = SnbtLite.parseCompound(raw)
+        if (query == null) {
+            notes.add("nbt 结构无法解析，已忽略该条件：$raw")
+            return true
         }
-        val equipBody = extractBalanced(text, "equipment", '{', '}')
-        if (equipBody != null) {
-            matchedAnyRule = true
-            for (m in Regex("(head|chest|legs|feet|mainhand|offhand):\\{[^}]*?id:\\s*\"([^\"]+)\"").findAll(equipBody)) {
-                val slot = when (m.groupValues[1]) {
-                    "head" -> "armor.head"
-                    "chest" -> "armor.chest"
-                    "legs" -> "armor.legs"
-                    "feet" -> "armor.feet"
-                    "mainhand" -> "weapon.mainhand"
-                    else -> "weapon.offhand"
-                }
-                val id = normId(m.groupValues[2])
-                if (e.items[slot]?.id != id) return false
+        val actual = effectiveNbt(e)
+        val ok = SnbtLite.matches(SnbtLite.Value.Compound(query), SnbtLite.Value.Compound(actual))
+        if (!ok) {
+            val missing = query.keys.filter { it !in actual }
+            if (missing.isNotEmpty()) {
+                notes.add("nbt 条件里的 ${missing.joinToString("、")} 在该实体上未设置（可在实体的 NBT/相关字段里补充），按不匹配处理")
             }
         }
-        val invBody = extractBalanced(text, "Inventory", '[', ']')
-        if (invBody != null) {
-            matchedAnyRule = true
-            for (obj in Regex("\\{[^{}]*}").findAll(invBody)) {
-                val body = obj.value
-                val idM = Regex("id:\\s*\"([^\"]+)\"").find(body) ?: continue
-                val id = normId(idM.groupValues[1])
-                val slotM = Regex("Slot:\\s*(-?\\d+)b").find(body)
-                if (slotM == null) {
-                    // 不写 Slot = 物品栏任意格（NBT 复合按子集匹配）
-                    if (e.items.none { (k, v) ->
-                            (k.startsWith("inventory.") || k.startsWith("hotbar.")) && v.id == id
-                        }
-                    ) return false
-                    continue
-                }
-                val n = slotM.groupValues[1].toInt()
-                if (n in 0..8) {
-                    if (e.items["hotbar.$n"]?.id != id && e.items["inventory.$n"]?.id != id) return false
-                } else if (n == 100 || n == 103 || n == 102 || n == 101 || n == -106) {
-                    val slot = when (n) {
-                        103 -> "armor.head"
-                        102 -> "armor.chest"
-                        101 -> "armor.legs"
-                        100 -> "armor.feet"
-                        else -> "weapon.offhand"
-                    }
-                    if (e.items[slot]?.id != id) return false
-                } else if (e.items["inventory.$n"]?.id != id) {
-                    return false
-                }
-            }
-        }
+        return ok
+    }
 
-        if (!matchedAnyRule) {
-            notes.add("nbt= 目前只建模了物品相关子集（SelectedItem/equipment/Inventory）；该条件未参与筛选")
+    private fun effectiveNbt(e: GridEntity): Map<String, SnbtLite.Value> {
+        val m = linkedMapOf<String, SnbtLite.Value>()
+        if (e.tags.isNotEmpty()) {
+            m["Tags"] = SnbtLite.Value.ListV(e.tags.map { SnbtLite.Value.Str(it) })
+        }
+        e.name?.takeIf { it.isNotBlank() }?.let { m["CustomName"] = SnbtLite.Value.Str(it) }
+        e.gamemode?.lowercase()?.let { g ->
+            m["playerGameType"] = SnbtLite.Value.Num(
+                when (g) {
+                    "survival" -> 0.0
+                    "creative" -> 1.0
+                    "adventure" -> 2.0
+                    "spectator" -> 3.0
+                    else -> 0.0
+                }
+            )
+        }
+        e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
+
+        val inv = mutableListOf<SnbtLite.Value>()
+        for ((slot, item) in e.items) {
+            val n = inventorySlotNumber(slot) ?: continue
+            inv.add(
+                SnbtLite.Value.Compound(
+                    mapOf(
+                        "id" to SnbtLite.Value.Str(item.id),
+                        "count" to SnbtLite.Value.Num(item.count.toDouble()),
+                        "Slot" to SnbtLite.Value.Num(n.toDouble())
+                    )
+                )
+            )
+        }
+        if (inv.isNotEmpty()) m["Inventory"] = SnbtLite.Value.ListV(inv)
+
+        e.items["weapon.mainhand"]?.let { item ->
+            m["SelectedItem"] = SnbtLite.Value.Compound(
+                mapOf(
+                    "id" to SnbtLite.Value.Str(item.id),
+                    "count" to SnbtLite.Value.Num(item.count.toDouble())
+                )
+            )
+        }
+        val eq = linkedMapOf<String, SnbtLite.Value>()
+        for ((slot, item) in e.items) {
+            val key = when (slot) {
+                "weapon.mainhand" -> "mainhand"
+                "weapon.offhand" -> "offhand"
+                "armor.head" -> "head"
+                "armor.chest" -> "chest"
+                "armor.legs" -> "legs"
+                "armor.feet" -> "feet"
+                else -> null
+            } ?: continue
+            eq[key] = SnbtLite.Value.Compound(
+                mapOf(
+                    "id" to SnbtLite.Value.Str(item.id),
+                    "count" to SnbtLite.Value.Num(item.count.toDouble())
+                )
+            )
+        }
+        if (eq.isNotEmpty()) m["equipment"] = SnbtLite.Value.Compound(eq)
+
+        SnbtLite.parseCompoundBody(e.extraNbt)?.let { m.putAll(it) }
+        return m
+    }
+
+    /** 槽位名 -> NBT 数字槽（装备沿用旧版 100..103 / -106；hotbar/inventory 用数字）。 */
+    private fun inventorySlotNumber(slot: String): Int? = when (slot) {
+        "armor.head" -> 103
+        "armor.chest" -> 102
+        "armor.legs" -> 101
+        "armor.feet" -> 100
+        "weapon.offhand" -> -106
+        else -> when {
+            slot.startsWith("hotbar.") || slot.startsWith("inventory.") ->
+                slot.substringAfterLast('.').toIntOrNull()
+            else -> null
+        }
+    }
+
+    private fun matchHasProperty(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val q = SnbtLite.parseCompound(raw)
+        if (q == null) {
+            notes.add("has_property 结构无法解析，已忽略：$raw")
+            return true
+        }
+        for ((k, v) in q) {
+            if (k == "property") {
+                val name = SnbtLite.plainText(
+                    (v as? SnbtLite.Value.Str)?.v ?: v.toString()
+                )
+                val neg = name.startsWith("!")
+                val actualName = if (neg) name.substring(1) else name
+                val exists = e.properties.containsKey(actualName)
+                if (neg == exists) return false
+            } else {
+                val actual = e.properties[k] ?: return false
+                if (!propertyValueMatches(v, actual)) return false
+            }
         }
         return true
     }
 
-    /** 从 `key{...}` / `key[...]` 中取出配对括号内的内容（NBT 可能嵌套）。 */
-    private fun extractBalanced(text: String, key: String, open: Char, close: Char): String? {
-        val start = text.indexOf("$key:$open")
-        if (start < 0) return null
-        var depth = 0
-        for (j in start + key.length + 1 until text.length) {
-            when (text[j]) {
-                open -> depth++
-                close -> {
-                    depth--
-                    if (depth == 0) return text.substring(start + key.length + 2, j)
-                }
+    private fun propertyValueMatches(query: SnbtLite.Value, actual: String): Boolean = when (query) {
+        is SnbtLite.Value.Num -> {
+            val a = actual.toDoubleOrNull()
+            a != null && kotlin.math.abs(a - query.v) < 1e-9
+        }
+        is SnbtLite.Value.Bool -> actual.equals(query.v.toString(), true) ||
+            (actual.toDoubleOrNull()?.let { (it != 0.0) == query.v } == true)
+        is SnbtLite.Value.Str -> {
+            val t = query.v
+            if (".." in t) {
+                val lo = t.substringBefore("..").toDoubleOrNull() ?: Double.NEGATIVE_INFINITY
+                val hi = t.substringAfter("..").toDoubleOrNull() ?: Double.POSITIVE_INFINITY
+                actual.toDoubleOrNull()?.let { it in lo..hi } == true
+            } else {
+                actual == t
             }
         }
-        return null
+        else -> false
+    }
+
+    private fun matchPermission(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val q = SnbtLite.parseCompound(raw)
+        if (q == null) {
+            notes.add("haspermission 结构无法解析，已忽略：$raw")
+            return true
+        }
+        for ((k, v) in q) {
+            val want = when (v) {
+                is SnbtLite.Value.Str -> v.v
+                is SnbtLite.Value.Bool -> if (v.v) "enabled" else "disabled"
+                else -> notes.add("haspermission.$k 的值无法识别，已忽略").let { return true }
+            }
+            if (!e.permissions[k].equals(want, true)) return false
+        }
+        return true
+    }
+
+    private fun matchPredicate(e: GridEntity, raw: String): Boolean {
+        val neg = raw.startsWith("!")
+        val id = if (neg) raw.substring(1) else raw
+        val hit = e.predicates.any { it == id || it == normId(id) }
+        return if (neg) !hit else hit
+    }
+
+    private fun matchAdvancements(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val q = SnbtLite.parseCompound(raw)
+        if (q == null) {
+            notes.add("advancements 结构无法解析，已忽略：$raw")
+            return true
+        }
+        for ((id, v) in q) {
+            when (v) {
+                is SnbtLite.Value.Bool -> {
+                    val hit = e.advancements.contains(id)
+                    if (hit != v.v) return false
+                }
+                is SnbtLite.Value.Compound -> {
+                    for ((crit, cv) in v.map) {
+                        val want = (cv as? SnbtLite.Value.Bool)?.v
+                            ?: notes.add("advancements 准则 $id/$crit 的值不是布尔，已忽略").let { null }
+                            ?: continue
+                        val hit = e.advancements.contains("$id|$crit")
+                        if (hit != want) return false
+                    }
+                }
+                else -> notes.add("advancements.$id 的值无法识别，已忽略")
+            }
+        }
+        return true
     }
 
     private fun normId(id: String): String =

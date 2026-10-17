@@ -159,7 +159,7 @@ object EntityFamilies {
     }
 
     fun familiesOf(id: String): Set<String> {
-        val n = if (id.contains(':')) id else "minecraft:$id"
+        val n = EntityIdAliases.canonical(id)
         return ID_TO_FAMILIES[n] ?: emptySet()
     }
 }

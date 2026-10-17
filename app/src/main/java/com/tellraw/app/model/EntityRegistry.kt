@@ -175,9 +175,9 @@ object EntityRegistry {
 
     private val BY_ID: Map<String, Entity> = ALL.associateBy { it.id }
 
-    fun byId(id: String): Entity? = BY_ID[id] ?: BY_ID.let {
-        val n = if (id.startsWith("minecraft:")) id else "minecraft:$id"
-        it[n]
+    fun byId(id: String): Entity? {
+        val n = if (id.contains(':')) id.lowercase() else "minecraft:${id.lowercase()}"
+        return BY_ID[n] ?: BY_ID[EntityIdAliases.canonical(n)]
     }
 
     /** 显示名：有中文键用中文键，否则用去命名空间的 id。 */
@@ -334,7 +334,7 @@ object EntityRegistry {
     )
 
     fun categoryOf(id: String): Category {
-        val n = if (id.startsWith("minecraft:")) id else "minecraft:$id"
+        val n = EntityIdAliases.canonical(id)
         return when {
             n == "minecraft:player" -> Category.PLAYER
             n in HOSTILE_IDS -> Category.HOSTILE

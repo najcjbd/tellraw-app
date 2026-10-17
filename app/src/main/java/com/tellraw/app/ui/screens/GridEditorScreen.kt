@@ -57,6 +57,7 @@ import androidx.compose.ui.window.Dialog
 import com.tellraw.app.model.CustomEntity
 import com.tellraw.app.model.CustomEntityStore
 import com.tellraw.app.model.EditableGridEntity
+import com.tellraw.app.model.EntityAvatars
 import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.GridEntityStore
@@ -142,6 +143,14 @@ fun GridEditorScreen(
     var jumpX by rememberSaveable { mutableStateOf("0") }
     var jumpZ by rememberSaveable { mutableStateOf("0") }
 
+    // 执行者 / 原点（对应 execute 的 as / at / positioned）
+    var executorUid by rememberSaveable { mutableStateOf<String?>(null) }
+    var useExecutorOrigin by rememberSaveable { mutableStateOf(true) }
+    var manualOX by rememberSaveable { mutableStateOf("0") }
+    var manualOY by rememberSaveable { mutableStateOf("-60") }
+    var manualOZ by rememberSaveable { mutableStateOf("0") }
+    var showExecutorPicker by remember { mutableStateOf(false) }
+
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<EditableGridEntity?>(null) }
     var editingIsNew by remember { mutableStateOf(false) }
@@ -178,17 +187,37 @@ fun GridEditorScreen(
         }
     }
 
-    val evaluation = remember(selectorText, entities.toList(), targetSpec) {
+    val executorEntity = entities.firstOrNull { it.uid == executorUid }?.toGridEntity()
+    val evaluationOrigin: Triple<Double, Double, Double> = when {
+        useExecutorOrigin && executorEntity != null ->
+            Triple(executorEntity.x, executorEntity.y, executorEntity.z)
+        useExecutorOrigin -> Triple(0.0, -60.0, 0.0)
+        else -> Triple(
+            manualOX.toDoubleOrNull() ?: 0.0,
+            manualOY.toDoubleOrNull() ?: -60.0,
+            manualOZ.toDoubleOrNull() ?: 0.0
+        )
+    }
+    val evaluation = remember(
+        selectorText, entities.toList(), targetSpec,
+        executorUid, useExecutorOrigin, manualOX, manualOY, manualOZ
+    ) {
         SelectorEvaluator.evaluate(
             selector = selectorText,
             entities = entities.map { it.toGridEntity() },
+            executor = entities.firstOrNull { it.uid == executorUid }?.toGridEntity(),
             edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
+            origin = evaluationOrigin,
             target = targetSpec
         )
     }
     val matchedUids = remember(evaluation) { evaluation.matched.map { it.uid }.toSet() }
 
     // 自定义头像：只在用户填了本地头像路径时加载（不联网）
+    // 内置实体头像（wiki EntitySprite），自定义头像优先
+    val builtinAvatarMap = remember(entities.map { it.uid to it.id }) {
+        entities.associate { e -> e.uid to EntityAvatars.load(context, e.id) }
+    }
     val avatarMap = remember(customs.toList()) {
         customs.mapNotNull { c ->
             val path = c.avatarPath ?: return@mapNotNull null
@@ -279,6 +308,48 @@ fun GridEditorScreen(
                     style = MaterialTheme.typography.labelSmall
                 )
             }
+
+            // ---- 执行者 / 原点（as / at / positioned）----
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { showExecutorPicker = true }) {
+                    Text(
+                        "执行者：" + (
+                            entities.firstOrNull { it.uid == executorUid }
+                                ?.let { displayNameOf(it, customs) } ?: "无"
+                        )
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Checkbox(
+                    checked = useExecutorOrigin,
+                    onCheckedChange = { useExecutorOrigin = it }
+                )
+                Text("at 执行者位置", style = MaterialTheme.typography.labelMedium)
+            }
+            if (!useExecutorOrigin) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(manualOX, { manualOX = it }, label = { Text("原点 x") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedTextField(manualOY, { manualOY = it }, label = { Text("y") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedTextField(manualOZ, { manualOZ = it }, label = { Text("z") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f))
+                }
+            }
+            Text(
+                "原点：(${"%.1f".format(evaluationOrigin.first)}, " +
+                    "${"%.1f".format(evaluationOrigin.second)}, ${"%.1f".format(evaluationOrigin.third)})" +
+                    (if (selectorText.contains(Regex("(^|[,[])x="))) "；选择器自带 x/y/z 会覆盖原点" else ""),
+                style = MaterialTheme.typography.labelSmall
+            )
 
             // ---- 画布 ----
             Box(
@@ -432,7 +503,7 @@ fun GridEditorScreen(
                         if (e.uid in matchedUids) {
                             drawCircle(Color(0xFFFFD54F), radius + 4.dp.toPx(), c, style = Stroke(3.dp.toPx()))
                         }
-                        val avatar = e.customKey?.let { avatarMap[it] }
+                        val avatar = e.customKey?.let { avatarMap[it] } ?: builtinAvatarMap[e.uid]
                         if (avatar != null) {
                             val r = radius.roundToInt()
                             clipPath(Path().apply {
@@ -538,6 +609,37 @@ fun GridEditorScreen(
         }
     }
 
+    if (showExecutorPicker) {
+        Dialog(onDismissRequest = { showExecutorPicker = false }) {
+            Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("选择执行者（@s / 默认原点）", style = MaterialTheme.typography.titleSmall)
+                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        item {
+                            ListItem(
+                                headlineContent = { Text("无（原点 0,-60,0）") },
+                                modifier = Modifier.clickable {
+                                    executorUid = null
+                                    showExecutorPicker = false
+                                }
+                            )
+                        }
+                        items(entities, key = { it.uid }) { e ->
+                            ListItem(
+                                headlineContent = { Text(displayNameOf(e, customs)) },
+                                supportingContent = { Text("(${fmt(e.x)}, ${fmt(e.y)}, ${fmt(e.z)})") },
+                                modifier = Modifier.clickable {
+                                    executorUid = e.uid
+                                    showExecutorPicker = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ---- 完整配置对话框 ----
     if (showEditor) {
         val current = editing
@@ -632,7 +734,9 @@ private fun EntityAvatar(
     customs: List<CustomEntity>,
     avatarMap: Map<String, androidx.compose.ui.graphics.ImageBitmap>
 ) {
-    val avatar = entity.customKey?.let { avatarMap[it] }
+    val ctx = LocalContext.current
+    val builtin = remember(entity.id) { EntityAvatars.load(ctx, entity.id) }
+    val avatar = entity.customKey?.let { avatarMap[it] } ?: builtin
     if (avatar != null) {
         Image(
             bitmap = avatar,
@@ -725,6 +829,11 @@ private fun EntityEditorDialog(
     var level by remember(initial.uid) { mutableStateOf(initial.level) }
     var rotationX by remember(initial.uid) { mutableStateOf(initial.rotationX) }
     var rotationY by remember(initial.uid) { mutableStateOf(initial.rotationY) }
+    var nbt by remember(initial.uid) { mutableStateOf(initial.nbt) }
+    var properties by remember(initial.uid) { mutableStateOf(initial.properties) }
+    var permissions by remember(initial.uid) { mutableStateOf(initial.permissions) }
+    var predicates by remember(initial.uid) { mutableStateOf(initial.predicates) }
+    var advancements by remember(initial.uid) { mutableStateOf(initial.advancements) }
     var customKey by remember(initial.uid) { mutableStateOf(initial.customKey) }
     var showPicker by remember { mutableStateOf(false) }
 
@@ -794,6 +903,21 @@ private fun EntityEditorDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true, modifier = Modifier.weight(1f))
                 }
+                OutlinedTextField(nbt, { nbt = it },
+                    label = { Text("额外 NBT（Health:20.0f, NoAI:1b）") },
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(properties, { properties = it },
+                    label = { Text("基岩属性（is_baby=1, fire）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(permissions, { permissions = it },
+                    label = { Text("基岩权限（camera=enabled）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(predicates, { predicates = it },
+                    label = { Text("Java 谓词 ID（逗号分隔）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(advancements, { advancements = it },
+                    label = { Text("Java 已完成进度（id 或 id|criterion）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row {
                     OutlinedTextField(rotationX, { rotationX = it },
                         label = { Text("垂直视角 -90..90") },
@@ -838,6 +962,11 @@ private fun EntityEditorDialog(
                                 level = level,
                                 rotationX = rotationX,
                                 rotationY = rotationY,
+                                nbt = nbt,
+                                properties = properties,
+                                permissions = permissions,
+                                predicates = predicates,
+                                advancements = advancements,
                                 customKey = customKey
                             )
                         )
