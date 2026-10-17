@@ -1,6 +1,11 @@
 package com.tellraw.app.ui.components
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,14 +71,21 @@ fun TextComponentSelector(
                         onSelected = { onComponentSelected(component) },
                         onSubComponentToggle = { onSubComponentToggle(component) }
                     )
-                    // 展开时：副组件紧跟其后（同一横排）
-                    if (component.hasSubComponent && isExpanded) {
-                        subComponentOf(component)?.let { sub ->
-                            SubComponentChip(
-                                subComponent = sub,
-                                isSelected = selectedSubComponent == sub,
-                                onSelected = { onSubComponentSelected(sub) }
-                            )
+                    // 展开时：副组件紧跟其后（同一横排），横向展开/收拢
+                    if (component.hasSubComponent) {
+                        val sub = subComponentOf(component)
+                        AnimatedVisibility(
+                            visible = isExpanded && sub != null,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally()
+                        ) {
+                            if (sub != null) {
+                                SubComponentChip(
+                                    subComponent = sub,
+                                    isSelected = selectedSubComponent == sub,
+                                    onSelected = { onSubComponentSelected(sub) }
+                                )
+                            }
                         }
                     }
                 }

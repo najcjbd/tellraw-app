@@ -1133,8 +1133,15 @@ class TellrawViewModel @Inject constructor(
                 val finalJava: String
                 val finalBedrock: String
                 if (plan.kind == com.tellraw.app.model.TargetVersionPlanner.OutputKind.SAY) {
-                    finalJava = "say ${actualMessage}"
-                    finalBedrock = "say ${actualMessage}"
+                    // say 不支持文本组件：带标记符的文本要先还原成纯文本再交给 say。
+                    val hasMarkers = messageToUse.contains(com.tellraw.app.util.TextComponentHelper.MARKER_START)
+                    val sayText = if (hasMarkers) {
+                        allReminders.add(applicationContext.getString(R.string.say_component_flattened))
+                        com.tellraw.app.util.TextComponentHelper.parseTextComponents(messageToUse)
+                            .joinToString("") { it.content }
+                    } else messageToUse
+                    finalJava = "say $sayText"
+                    finalBedrock = "say $sayText"
                 } else {
                     finalJava = javaCommand
                     finalBedrock = bedrockCommand
