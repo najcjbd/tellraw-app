@@ -23,6 +23,14 @@ data class EditableGridEntity(
     val equipment: String = "",
     /** 物品栏：`0=stone x64,hotbar.1=bread` 等（数字键按 inventory.<n> 处理）。 */
     val inventory: String = "",
+    /** 游戏模式：survival/creative/adventure/spectator（空 = 未设置）。 */
+    val gamemode: String = "",
+    /** 经验等级（空 = 未设置）。 */
+    val level: String = "",
+    /** 垂直视角 -90..90（空 = 未设置）。 */
+    val rotationX: String = "",
+    /** 水平视角 -180..180（空 = 未设置）。 */
+    val rotationY: String = "",
     /** 自定义实体条目的唯一键（CustomEntity.id）；非空时显示名/头像取自它。 */
     val customKey: String? = null
 ) {
@@ -85,7 +93,11 @@ data class EditableGridEntity(
         z = z,
         scores = scoreMap(),
         families = EntityFamilies.familiesOf(id),
-        items = itemMap()
+        items = itemMap(),
+        gamemode = gamemode.ifBlank { null },
+        level = level.trim().toIntOrNull(),
+        rotationX = rotationX.trim().toDoubleOrNull(),
+        rotationY = rotationY.trim().toDoubleOrNull()
     )
 }
 

@@ -21,7 +21,15 @@ data class GridEntity(
     /** 由实体类型派生的族（见 [EntityFamilies]）。 */
     val families: Set<String> = emptySet(),
     /** 已建模的物品栏/装备：槽位名（如 armor.head / weapon.mainhand / hotbar.0）-> 物品。 */
-    val items: Map<String, GridItem> = emptyMap()
+    val items: Map<String, GridItem> = emptyMap(),
+    /** 游戏模式（survival/creative/adventure/spectator）。 */
+    val gamemode: String? = null,
+    /** 经验等级（仅玩家）。 */
+    val level: Int? = null,
+    /** 垂直视角（-90 上 .. 90 下）。 */
+    val rotationX: Double? = null,
+    /** 水平视角（-180..180，正南 0、顺时针增）。 */
+    val rotationY: Double? = null
 ) {
     val isPlayer: Boolean get() = id == "minecraft:player"
 }
@@ -148,11 +156,47 @@ object SelectorEvaluator {
                             notes.add("hasitem= 仅基岩版 ≥1.18.20 支持；目标版本不满足，**没有按它筛选**")
                         } else if (!matchHasitem(e, value, notes)) return@filter false
                     }
+                    "gamemode", "m" ->
+                        if (!matchGamemode(e, value, notes)) return@filter false
+                    "level" -> {
+                        val (lo, hi) = parseRange(value)
+                        val lv = e.level
+                        if (lv == null) {
+                            notes.add("level= 需要实体设置经验等级；该实体未设置，未按它筛选")
+                        } else if (lv < (lo ?: 0.0) || lv > (hi ?: Double.MAX_VALUE)) {
+                            return@filter false
+                        }
+                    }
+                    "l", "lm" -> {
+                        val num = value.toDoubleOrNull()
+                        val lv = e.level
+                        if (lv == null) {
+                            notes.add("$key= 需要实体设置经验等级；该实体未设置，未按它筛选")
+                        } else if (num == null) {
+                            notes.add("$key=$value 无法解析，已忽略")
+                        } else if (key == "l" && lv > num) {
+                            return@filter false
+                        } else if (key == "lm" && lv < num) {
+                            return@filter false
+                        }
+                    }
+                    "x_rotation", "y_rotation", "rx", "rxm", "ry", "rym" -> {
+                        val (lo, hi) = parseRange(value)
+                        val actual = when (key) {
+                            "x_rotation", "rx", "rxm" -> e.rotationX
+                            else -> e.rotationY
+                        }
+                        if (actual == null) {
+                            notes.add("$key= 需要实体设置视角；该实体未设置，未按它筛选")
+                        } else if (actual < (lo ?: Double.NEGATIVE_INFINITY) ||
+                            actual > (hi ?: Double.MAX_VALUE)
+                        ) {
+                            return@filter false
+                        }
+                    }
+                    "nbt" -> if (!matchNbtItems(e, value, notes)) return@filter false
                     // 网格未建模的维度：明确提示
-                    "gamemode", "m", "level", "l", "lm",
-                    "x_rotation", "rx", "rxm", "y_rotation", "ry", "rym",
-                    "nbt", "has_property", "haspermission",
-                    "predicate", "advancements" ->
+                    "has_property", "haspermission", "predicate", "advancements" ->
                         notes.add("参数 \"$key\" 在网格里尚未建模，已忽略（请自行核对）")
                     else -> notes.add("参数 \"$key\" 未支持，已忽略")
                 }
@@ -267,6 +311,122 @@ object SelectorEvaluator {
         }
         return true
     }
+
+    /** 游戏模式：支持 Java 全称、基岩缩写 s/c/a/d 与数字 0/1/2/5、以及 `!` 反选。 */
+    private fun matchGamemode(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val neg = raw.startsWith("!")
+        val value = (if (neg) raw.substring(1) else raw).lowercase()
+        val want = when (value) {
+            "s", "0", "survival" -> "survival"
+            "c", "1", "creative" -> "creative"
+            "a", "2", "adventure" -> "adventure"
+            "d", "5", "spectator" -> "spectator"
+            else -> {
+                notes.add("gamemode=$raw 无法识别，已忽略")
+                return true
+            }
+        }
+        val actual = e.gamemode
+        if (actual == null) {
+            notes.add("gamemode= 需要实体设置游戏模式；该实体未设置，未按它筛选")
+            return true
+        }
+        val hit = actual.lowercase() == want
+        return if (neg) !hit else hit
+    }
+
+    /**
+     * nbt 的物品相关子集（网格已建模的部分）：
+     *  - `SelectedItem:{id:"…"}` -> weapon.mainhand
+     *  - `equipment:{mainhand:{id:"…"},…}` -> weapon.mainhand / armor.*
+     *  - `Inventory:[{id:"…",Slot:0b},…]` -> inventory.0 / hotbar.N（0-8）
+     * 其余键（Health/Tags/…）不参与判定，并明确提示。
+     */
+    private fun matchNbtItems(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val text = raw.trim()
+        var matchedAnyRule = false
+
+        val selected = Regex("SelectedItem:\\{[^}]*?id:\\s*\"([^\"]+)\"").find(text)
+        if (selected != null) {
+            matchedAnyRule = true
+            val id = normId(selected.groupValues[1])
+            if (e.items["weapon.mainhand"]?.id != id) return false
+        }
+        val equipBody = extractBalanced(text, "equipment", '{', '}')
+        if (equipBody != null) {
+            matchedAnyRule = true
+            for (m in Regex("(head|chest|legs|feet|mainhand|offhand):\\{[^}]*?id:\\s*\"([^\"]+)\"").findAll(equipBody)) {
+                val slot = when (m.groupValues[1]) {
+                    "head" -> "armor.head"
+                    "chest" -> "armor.chest"
+                    "legs" -> "armor.legs"
+                    "feet" -> "armor.feet"
+                    "mainhand" -> "weapon.mainhand"
+                    else -> "weapon.offhand"
+                }
+                val id = normId(m.groupValues[2])
+                if (e.items[slot]?.id != id) return false
+            }
+        }
+        val invBody = extractBalanced(text, "Inventory", '[', ']')
+        if (invBody != null) {
+            matchedAnyRule = true
+            for (obj in Regex("\\{[^{}]*}").findAll(invBody)) {
+                val body = obj.value
+                val idM = Regex("id:\\s*\"([^\"]+)\"").find(body) ?: continue
+                val id = normId(idM.groupValues[1])
+                val slotM = Regex("Slot:\\s*(-?\\d+)b").find(body)
+                if (slotM == null) {
+                    // 不写 Slot = 物品栏任意格（NBT 复合按子集匹配）
+                    if (e.items.none { (k, v) ->
+                            (k.startsWith("inventory.") || k.startsWith("hotbar.")) && v.id == id
+                        }
+                    ) return false
+                    continue
+                }
+                val n = slotM.groupValues[1].toInt()
+                if (n in 0..8) {
+                    if (e.items["hotbar.$n"]?.id != id && e.items["inventory.$n"]?.id != id) return false
+                } else if (n == 100 || n == 103 || n == 102 || n == 101 || n == -106) {
+                    val slot = when (n) {
+                        103 -> "armor.head"
+                        102 -> "armor.chest"
+                        101 -> "armor.legs"
+                        100 -> "armor.feet"
+                        else -> "weapon.offhand"
+                    }
+                    if (e.items[slot]?.id != id) return false
+                } else if (e.items["inventory.$n"]?.id != id) {
+                    return false
+                }
+            }
+        }
+
+        if (!matchedAnyRule) {
+            notes.add("nbt= 目前只建模了物品相关子集（SelectedItem/equipment/Inventory）；该条件未参与筛选")
+        }
+        return true
+    }
+
+    /** 从 `key{...}` / `key[...]` 中取出配对括号内的内容（NBT 可能嵌套）。 */
+    private fun extractBalanced(text: String, key: String, open: Char, close: Char): String? {
+        val start = text.indexOf("$key:$open")
+        if (start < 0) return null
+        var depth = 0
+        for (j in start + key.length + 1 until text.length) {
+            when (text[j]) {
+                open -> depth++
+                close -> {
+                    depth--
+                    if (depth == 0) return text.substring(start + key.length + 2, j)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun normId(id: String): String =
+        if (id.contains(':')) id else "minecraft:$id"
 
     /**
      * hasitem 求值（网格已建模的部分）：
