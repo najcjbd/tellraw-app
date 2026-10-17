@@ -84,6 +84,8 @@ def main():
 
     send("gamerule sendCommandFeedback true")
     send("gamerule logAdminCommands true")
+    # 强制加载 0,0 区块：新版 spawn-chunk 半径变小后，召唤到未加载区块的实体会被 @e 忽略
+    send("forceload add 0 0")
     send("kill @e[type=!player]")
     time.sleep(1)
 
@@ -124,9 +126,9 @@ def main():
         m = re.search(r"has the following entity data:\s*(.+)$", delta, re.M)
         if m:
             results[eid] = {"status": "ok", "raw": m.group(1).strip()}
-        elif "of type 'minecraft:entity_type'" in delta:
+        elif "of type 'minecraft:entity_type'" in delta or "Unknown entity:" in delta:
             # 该版本还没有这个实体（新版本才加的）——正是要记录的版本差异
-            results[eid] = {"status": "unknown_in_version", "raw": first("entity_type")}
+            results[eid] = {"status": "unknown_in_version", "raw": first("entity_type") or first("Unknown entity:")}
         elif "Can't summon entity of type" in delta:
             results[eid] = {"status": "cannot_summon", "raw": first("Can't summon entity of type")}
         elif "No entity was found" in delta:
@@ -138,6 +140,7 @@ def main():
     send("kill @e[type=!player]")
     time.sleep(0.5)
     send("tp @e[type=!player] ~ -78 ~")
+    send("forceload remove all")
     time.sleep(0.5)
 
     out = os.path.join(base, "entities.json")
