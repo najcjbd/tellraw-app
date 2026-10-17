@@ -730,6 +730,30 @@ private fun previewMessage(
 }
 
 @Composable
+private fun SmallAvatar(id: String, path: String?, sizeDp: Int = 24) {
+    val ctx = LocalContext.current
+    val bmp = remember(id, path) {
+        path?.let { p -> runCatching { BitmapFactory.decodeFile(p)?.asImageBitmap() }.getOrNull() }
+            ?: EntityAvatars.load(ctx, id)
+    }
+    if (bmp != null) {
+        Image(
+            bitmap = bmp,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(sizeDp.dp).clip(CircleShape)
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(sizeDp.dp)
+                .clip(CircleShape)
+                .background(entityColor(EntityRegistry.categoryOf(id)))
+        )
+    }
+}
+
+@Composable
 private fun EntityAvatar(
     entity: EditableGridEntity,
     customs: List<CustomEntity>,
@@ -1018,6 +1042,9 @@ private fun EntityPickerDialog(
                         item { Text("自定义", style = MaterialTheme.typography.labelMedium) }
                         items(customs, key = { "c_" + it.id }) { c ->
                             ListItem(
+                                leadingContent = {
+                                    SmallAvatar(c.builtinId ?: "minecraft:player", c.avatarPath)
+                                },
                                 headlineContent = {
                                     Text(c.displayName ?: c.officialId ?: c.id)
                                 },
@@ -1035,6 +1062,7 @@ private fun EntityPickerDialog(
                     item { Text("内置实体（${filtered.size}）", style = MaterialTheme.typography.labelMedium) }
                     items(filtered, key = { it.id }) { e ->
                         ListItem(
+                            leadingContent = { SmallAvatar(e.id, null) },
                             headlineContent = { Text(e.zhName) },
                             supportingContent = { Text(e.id) },
                             modifier = Modifier.clickable { onPickBuiltin(e) }
