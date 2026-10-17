@@ -109,6 +109,15 @@ class TellrawViewModel @Inject constructor(
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: StateFlow<String> = _targetVersion.asStateFlow()
 
+    // V2：输入不被最新版支持时的"同版本 vs 最新版"弹窗
+    private val _showVersionChoiceDialog = MutableStateFlow(false)
+    val showVersionChoiceDialog: StateFlow<Boolean> = _showVersionChoiceDialog.asStateFlow()
+    private val _versionChoiceReason = MutableStateFlow("")
+    val versionChoiceReason: StateFlow<String> = _versionChoiceReason.asStateFlow()
+    private var versionOverride: com.tellraw.app.model.VersionSpec? = null
+    private var versionChoiceAsked = false
+    private var pendingRemovedSuggestion: com.tellraw.app.model.VersionSpec? = null
+
     // D4：整条命令 / 裸 JSON 转换
     private val _showRawConvertDialog = MutableStateFlow(false)
     val showRawConvertDialog: StateFlow<Boolean> = _showRawConvertDialog.asStateFlow()
@@ -339,12 +348,14 @@ class TellrawViewModel @Inject constructor(
     
     fun updateSelector(selector: String) {
         syntaxOverride = null
+        versionOverride = null
         _selectorInput.value = selector
         detectSelectorType()
         generateCommands()
     }
     
     fun updateMessage(message: String) {
+        versionOverride = null
         _messageInput.value = message
         
         // 如果关闭了"默认使用text"，需要在后台同步处理带标记符的文本
@@ -775,6 +786,7 @@ class TellrawViewModel @Inject constructor(
     /** 更新 execute 前置命令框的内容（需求七.1）。文本内容会持久化（防抖 400ms，避免逐字写盘）。 */
     fun updateExecutePrefix(prefix: String) {
         syntaxOverride = null
+        versionOverride = null
         _executePrefixInput.value = prefix
         executePrefixSaveJob?.cancel()
         executePrefixSaveJob = viewModelScope.launch {
@@ -804,6 +816,16 @@ class TellrawViewModel @Inject constructor(
     fun targetVersionSpec(): com.tellraw.app.model.VersionSpec =
         com.tellraw.app.model.VersionSpec.parse(_targetVersion.value)
             ?: com.tellraw.app.model.VersionSpec.LATEST
+
+    /** V2 弹窗：同版本对应（用被移除写法仍可用的最后版本）或最新版。 */
+    fun handleVersionChoice(sameVersion: Boolean) {
+        versionOverride = if (sameVersion) pendingRemovedSuggestion
+            else com.tellraw.app.model.VersionSpec.LATEST
+        _showVersionChoiceDialog.value = false
+        generateCommands()
+    }
+
+    fun dismissVersionChoiceDialog() { _showVersionChoiceDialog.value = false }
 
     /** 基岩独有 § 颜色码 -> Java 精确 RGB。 */
     fun setBedrockColorToRgb(enabled: Boolean) {
@@ -1050,7 +1072,22 @@ class TellrawViewModel @Inject constructor(
                 }
 
                 // V2：按目标版本规划（tellraw 不可用 -> say；越界特性 -> 提醒）
-                val target = targetVersionSpec()
+                // 输入用到"最新版已移除"的写法时，问一次：同版本对应 / 最新版。
+                val combinedInput = "$selector ${_messageInput.value} ${_executePrefixInput.value}"
+                val removedHit = com.tellraw.app.model.RemovedFeatureDetector.detect(combinedInput)
+                if (versionOverride == null && _targetVersion.value == "-1" && removedHit != null) {
+                    if (!versionChoiceAsked) {
+                        versionChoiceAsked = true
+                        pendingRemovedSuggestion = removedHit.suggested
+                        _versionChoiceReason.value =
+                            "${removedHit.marker} 在最新版已不支持；可改用同版本（" +
+                                "${removedHit.suggested.edition} ${removedHit.suggested.parts.joinToString(".")}）或最新版"
+                        _showVersionChoiceDialog.value = true
+                    }
+                } else if (removedHit == null) {
+                    versionChoiceAsked = false
+                }
+                val target = versionOverride ?: targetVersionSpec()
                 val used = mutableSetOf<com.tellraw.app.model.FeatureGate.Feature>()
                 val combined = "$javaCommand $bedrockCommand"
                 fun mark(cond: Boolean, f: com.tellraw.app.model.FeatureGate.Feature) { if (cond) used.add(f) }

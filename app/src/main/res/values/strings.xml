@@ -65,6 +65,9 @@
     <string name="separator_as_text_component">separator 用文本组件</string>
     <string name="raw_convert_title">整条命令 / 裸 JSON 转换</string>
     <string name="raw_convert_hint">粘贴 rawtext / Java 组件 JSON / tellraw / execute+tellraw</string>
+    <string name="version_choice_title">版本写法不被最新版支持</string>
+    <string name="version_choice_same">用同版本对应</string>
+    <string name="version_choice_latest">用最新版</string>
     <string name="raw_convert_apply">填回生成器</string>
     <string name="raw_convert_open">输入整条命令转换…</string>
     <string name="raw_convert_unrecognized">无法识别：请输入 rawtext、Java 文本组件 JSON、tellraw 或 execute+tellraw</string>

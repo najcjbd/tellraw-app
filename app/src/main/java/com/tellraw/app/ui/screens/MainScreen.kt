@@ -60,6 +60,8 @@ fun MainScreen(
     val rawConvertJava by viewModel.rawConvertJava.collectAsState()
     val rawConvertBedrock by viewModel.rawConvertBedrock.collectAsState()
     val rawConvertWarnings by viewModel.rawConvertWarnings.collectAsState()
+    val showVersionChoiceDialog by viewModel.showVersionChoiceDialog.collectAsState()
+    val versionChoiceReason by viewModel.versionChoiceReason.collectAsState()
     val nbtSyntax by viewModel.nbtSyntax.collectAsState()
     val showSyntaxMixedDialog by viewModel.showSyntaxMixedDialog.collectAsState()
     val showMNDialog by viewModel.showMNDialog.collectAsState()
@@ -274,6 +276,16 @@ fun MainScreen(
         )
     }
     
+    // V2：输入不被最新版支持 -> 同版本 / 最新版
+    if (showVersionChoiceDialog) {
+        VersionChoiceDialog(
+            reason = versionChoiceReason,
+            onSameVersion = { viewModel.handleVersionChoice(true) },
+            onLatest = { viewModel.handleVersionChoice(false) },
+            onDismiss = { viewModel.dismissVersionChoiceDialog() }
+        )
+    }
+
     // D4：整条命令 / 裸 JSON 转换对话框
     if (showRawConvertDialog) {
         RawCommandConvertDialog(

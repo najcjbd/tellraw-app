@@ -540,6 +540,33 @@ private fun RawOutputBlock(label: String, command: String) {
 }
 
 /**
+ * V2：输入用到"最新版已不支持"的写法时，问一下：同版本对应 / 最新版。
+ */
+@Composable
+fun VersionChoiceDialog(
+    reason: String,
+    onSameVersion: () -> Unit,
+    onLatest: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.version_choice_title)) },
+        text = { Text(reason, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            TextButton(onClick = onSameVersion) {
+                Text(stringResource(R.string.version_choice_same))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onLatest) {
+                Text(stringResource(R.string.version_choice_latest))
+            }
+        }
+    )
+}
+
+/**
  * 新旧写法混用（同一条里既有 `tag:{…}` 又有 `components:{…}`）时的"问一嘴"对话框。
  * 参照 §m/§n 混合模式的做法：选定之后**整条都按那一个处理**（need/新旧版本差异规范.txt 2.4）。
  */
