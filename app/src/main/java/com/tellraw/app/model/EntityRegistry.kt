@@ -182,4 +182,173 @@ object EntityRegistry {
 
     /** 显示名：有中文键用中文键，否则用去命名空间的 id。 */
     fun displayName(id: String): String = byId(id)?.zhName ?: id.removePrefix("minecraft:")
+
+    // ---------------- 分类（D5 网格：玩家/怪物区分） ----------------
+
+    enum class Category { PLAYER, HOSTILE, PASSIVE, PROJECTILE, VEHICLE, OTHER }
+
+    private val HOSTILE_IDS = setOf(
+            "minecraft:blaze",
+            "minecraft:bogged",
+            "minecraft:breeze",
+            "minecraft:camel_husk",
+            "minecraft:cave_spider",
+            "minecraft:creaking",
+            "minecraft:creeper",
+            "minecraft:drowned",
+            "minecraft:elder_guardian",
+            "minecraft:ender_dragon",
+            "minecraft:enderman",
+            "minecraft:endermite",
+            "minecraft:evoker",
+            "minecraft:ghast",
+            "minecraft:giant",
+            "minecraft:guardian",
+            "minecraft:hoglin",
+            "minecraft:husk",
+            "minecraft:illusioner",
+            "minecraft:magma_cube",
+            "minecraft:parched",
+            "minecraft:phantom",
+            "minecraft:piglin",
+            "minecraft:piglin_brute",
+            "minecraft:pillager",
+            "minecraft:ravager",
+            "minecraft:shulker",
+            "minecraft:silverfish",
+            "minecraft:skeleton",
+            "minecraft:slime",
+            "minecraft:stray",
+            "minecraft:vex",
+            "minecraft:vindicator",
+            "minecraft:warden",
+            "minecraft:witch",
+            "minecraft:wither",
+            "minecraft:wither_skeleton",
+            "minecraft:zoglin",
+            "minecraft:zombie",
+            "minecraft:zombie_nautilus",
+            "minecraft:zombie_villager",
+            "minecraft:zombified_piglin",
+    )
+    private val PASSIVE_IDS = setOf(
+            "minecraft:allay",
+            "minecraft:armadillo",
+            "minecraft:axolotl",
+            "minecraft:bat",
+            "minecraft:bee",
+            "minecraft:camel",
+            "minecraft:cat",
+            "minecraft:chicken",
+            "minecraft:cod",
+            "minecraft:copper_golem",
+            "minecraft:cow",
+            "minecraft:dolphin",
+            "minecraft:donkey",
+            "minecraft:fox",
+            "minecraft:frog",
+            "minecraft:glow_squid",
+            "minecraft:goat",
+            "minecraft:happy_ghast",
+            "minecraft:horse",
+            "minecraft:iron_golem",
+            "minecraft:llama",
+            "minecraft:mooshroom",
+            "minecraft:mule",
+            "minecraft:nautilus",
+            "minecraft:ocelot",
+            "minecraft:panda",
+            "minecraft:parrot",
+            "minecraft:pig",
+            "minecraft:polar_bear",
+            "minecraft:pufferfish",
+            "minecraft:rabbit",
+            "minecraft:salmon",
+            "minecraft:sheep",
+            "minecraft:skeleton_horse",
+            "minecraft:sniffer",
+            "minecraft:snow_golem",
+            "minecraft:squid",
+            "minecraft:strider",
+            "minecraft:sulfur_cube",
+            "minecraft:tadpole",
+            "minecraft:trader_llama",
+            "minecraft:tropical_fish",
+            "minecraft:turtle",
+            "minecraft:villager",
+            "minecraft:wandering_trader",
+            "minecraft:wolf",
+            "minecraft:zombie_horse",
+    )
+    private val PROJECTILE_IDS = setOf(
+            "minecraft:arrow",
+            "minecraft:breeze_wind_charge",
+            "minecraft:dragon_fireball",
+            "minecraft:egg",
+            "minecraft:ender_pearl",
+            "minecraft:experience_bottle",
+            "minecraft:fireball",
+            "minecraft:firework_rocket",
+            "minecraft:fishing_bobber",
+            "minecraft:lingering_potion",
+            "minecraft:llama_spit",
+            "minecraft:shulker_bullet",
+            "minecraft:small_fireball",
+            "minecraft:snowball",
+            "minecraft:spectral_arrow",
+            "minecraft:splash_potion",
+            "minecraft:trident",
+            "minecraft:wind_charge",
+            "minecraft:wither_skull",
+    )
+    private val VEHICLE_IDS = setOf(
+            "minecraft:acacia_boat",
+            "minecraft:acacia_chest_boat",
+            "minecraft:bamboo_chest_raft",
+            "minecraft:bamboo_raft",
+            "minecraft:birch_boat",
+            "minecraft:birch_chest_boat",
+            "minecraft:cherry_boat",
+            "minecraft:cherry_chest_boat",
+            "minecraft:chest_minecart",
+            "minecraft:command_block_minecart",
+            "minecraft:dark_oak_boat",
+            "minecraft:dark_oak_chest_boat",
+            "minecraft:furnace_minecart",
+            "minecraft:hopper_minecart",
+            "minecraft:jungle_boat",
+            "minecraft:jungle_chest_boat",
+            "minecraft:mangrove_boat",
+            "minecraft:mangrove_chest_boat",
+            "minecraft:minecart",
+            "minecraft:oak_boat",
+            "minecraft:oak_chest_boat",
+            "minecraft:pale_oak_boat",
+            "minecraft:pale_oak_chest_boat",
+            "minecraft:poplar_boat",
+            "minecraft:poplar_chest_boat",
+            "minecraft:spawner_minecart",
+            "minecraft:spruce_boat",
+            "minecraft:spruce_chest_boat",
+            "minecraft:tnt_minecart",
+    )
+
+    fun categoryOf(id: String): Category {
+        val n = if (id.startsWith("minecraft:")) id else "minecraft:$id"
+        return when {
+            n == "minecraft:player" -> Category.PLAYER
+            n in HOSTILE_IDS -> Category.HOSTILE
+            n in PASSIVE_IDS -> Category.PASSIVE
+            n in PROJECTILE_IDS -> Category.PROJECTILE
+            n in VEHICLE_IDS -> Category.VEHICLE
+            else -> Category.OTHER
+        }
+    }
+
+    /** 是否有"物品栏/装备栏"概念（网格里区分玩家与怪物用）。 */
+    fun hasInventory(id: String): Boolean = when (categoryOf(id)) {
+        Category.PLAYER, Category.HOSTILE, Category.PASSIVE -> true
+        else -> false
+    }
+
 }
