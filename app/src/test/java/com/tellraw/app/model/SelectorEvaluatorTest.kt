@@ -123,6 +123,12 @@ class SelectorEvaluatorTest {
         // name 字段与 CustomName 是同一份数据（普通字符串/JSON 文本都认）
         assertEquals(listOf("p1"), sel("@a[nbt={CustomName:\"Steve\"}]"))
         assertEquals(listOf("p1"), sel("""@a[nbt={CustomName:'{"text":"Steve"}'}]"""))
+        // team 字段与 NBT Team 是同一份数据
+        assertEquals(
+            listOf("p1"),
+            SelectorEvaluator.evaluate("@a[nbt={Team:\"red\"}]", listOf(steve.copy(team = "red")))
+                .matched.map { it.uid }
+        )
         // gamemode/level 派生
         val c = steve.copy(gamemode = "creative", level = 30)
         assertEquals(listOf("p1"), SelectorEvaluator.evaluate(

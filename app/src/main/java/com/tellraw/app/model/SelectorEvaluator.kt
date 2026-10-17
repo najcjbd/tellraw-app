@@ -425,6 +425,7 @@ object SelectorEvaluator {
             m["Tags"] = SnbtLite.Value.ListV(e.tags.map { SnbtLite.Value.Str(it) })
         }
         e.name?.takeIf { it.isNotBlank() }?.let { m["CustomName"] = SnbtLite.Value.Str(it) }
+        e.team?.takeIf { it.isNotBlank() }?.let { m["Team"] = SnbtLite.Value.Str(it) }
         e.gamemode?.lowercase()?.let { g ->
             m["playerGameType"] = SnbtLite.Value.Num(
                 when (g) {
