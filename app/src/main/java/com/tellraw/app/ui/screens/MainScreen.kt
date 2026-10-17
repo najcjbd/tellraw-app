@@ -282,6 +282,7 @@ fun MainScreen(
             bedrockCommand = rawConvertBedrock,
             warnings = rawConvertWarnings,
             onInputChange = { viewModel.updateRawConvertInput(it) },
+            onApply = { viewModel.applyRawConvertToGenerator() },
             onDismiss = { viewModel.closeRawConvertDialog() }
         )
     }

@@ -65,6 +65,7 @@
     <string name="separator_as_text_component">separator 用文本組件</string>
     <string name="raw_convert_title">整條命令 / 裸 JSON 轉換</string>
     <string name="raw_convert_hint">貼上 rawtext / Java 組件 JSON / tellraw / execute+tellraw</string>
+    <string name="raw_convert_apply">填回生成器</string>
     <string name="raw_convert_open">輸入整條命令轉換…</string>
     <string name="raw_convert_unrecognized">無法識別：請輸入 rawtext、Java 文本組件 JSON、tellraw 或 execute+tellraw</string>
     <string name="bedrock_color_to_rgb">基岩版獨有 § 顏色碼 → Java 精確 RGB color</string>

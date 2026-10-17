@@ -464,6 +464,7 @@ fun RawCommandConvertDialog(
     bedrockCommand: String,
     warnings: List<String>,
     onInputChange: (String) -> Unit,
+    onApply: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -482,7 +483,19 @@ fun RawCommandConvertDialog(
                     label = { Text(stringResource(R.string.raw_convert_hint)) },
                     minLines = 3
                 )
-                Spacer(Modifier.height(8.dp))
+                // 填回生成器（低调：右对齐的文本按钮）
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onApply,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(stringResource(R.string.raw_convert_apply), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
                 RawOutputBlock(stringResource(R.string.selector_type_java), javaCommand)
                 Spacer(Modifier.height(6.dp))
                 RawOutputBlock(stringResource(R.string.selector_type_bedrock), bedrockCommand)

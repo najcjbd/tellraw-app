@@ -36,6 +36,7 @@ object CommandInputParser {
         val bedrockSelector: String?,
         val javaJson: String,
         val bedrockJson: String,
+        val components: List<TextComponent>,
         val sourceEdition: SourceEdition,
         val warnings: List<String>
     )
@@ -108,6 +109,7 @@ object CommandInputParser {
             bedrockSelector = bedrockSel,
             javaJson = javaJson,
             bedrockJson = bedrockJson,
+            components = components,
             sourceEdition = edition,
             warnings = warnings
         )
