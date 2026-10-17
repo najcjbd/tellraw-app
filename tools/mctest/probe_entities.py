@@ -24,14 +24,14 @@ SKIP = {"player"}          # 不能 summon
 # （召唤失败会在结果里记为 summon_fail，并带出报错原文）
 
 
-def add_tag(nbt: str) -> str:
+def add_tag(nbt: str, tag: str) -> str:
     body = nbt.strip()
     if not body.startswith("{"):
-        return '{Tags:["%s"]}' % TAG
+        return '{Tags:["%s"]}' % tag
     inner = body[1:-1].strip()
     if not inner:
-        return '{Tags:["%s"]}' % TAG
-    return "{%s,Tags:[\"%s\"]}" % (inner, TAG)
+        return '{Tags:["%s"]}' % tag
+    return "{%s,Tags:[\"%s\"]}" % (inner, tag)
 
 
 def main():
@@ -87,21 +87,33 @@ def main():
     send("kill @e[type=!player]")
     time.sleep(1)
 
+    def wait_for(before_len, needles, timeout=6.0):
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            txt = readlog()[before_len:]
+            if any(n in txt for n in needles):
+                return txt
+            time.sleep(0.1)
+        return readlog()[before_len:]
+
     results = {}
-    for eid in ids:
+    for i, eid in enumerate(ids):
         if eid in SKIP:
             results[eid] = {"status": "skipped", "raw": ""}
             continue
         special = SPECIAL.get(eid)
-        nbt = add_tag(special) if special else ('{Tags:["%s"]}' % TAG)
-        send("kill @e[tag=%s]" % TAG)
-        before = readlog()
+        tag = "probe_" + re.sub(r"[^a-z0-9_]", "_", eid)
+        nbt = add_tag(special, tag) if special else ('{Tags:["%s"]}' % tag)
+        send("kill @e[tag=%s]" % tag)
+        before_len = len(readlog())
+        sentinel = "MCTESTSENT%d" % i
         send("summon minecraft:%s 0 -60 0 %s" % (eid, nbt))
-        time.sleep(0.35)
-        send("data get entity @e[tag=%s,limit=1]" % TAG)
-        time.sleep(0.5)
-        delta = readlog()[len(before):]
-        send("kill @e[tag=%s]" % TAG)
+        send("data get entity @e[tag=%s,limit=1]" % tag)
+        send("say %s" % sentinel)
+        raw = wait_for(before_len, [sentinel], timeout=8.0)
+        # 命令按序处理：哨兵之前的输出一定属于当前实体
+        delta = raw.split(sentinel)[0] if sentinel in raw else raw
+        send("kill @e[tag=%s]" % tag)
 
         def first(sub):
             for ln in delta.splitlines():
