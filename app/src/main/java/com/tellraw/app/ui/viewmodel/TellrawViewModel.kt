@@ -839,6 +839,40 @@ class TellrawViewModel @Inject constructor(
             if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, bTellraw) else bTellraw
         _rawConvertWarnings.value = r.warnings
     }
+
+    /** 把解析结果填回生成器：选择器 / 消息（组件）/ execute 前缀；转换时生成的 if/unless 由生成器既有逻辑重算。 */
+    fun applyRawConvertToGenerator() {
+        val nbtSyntax = syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        val r = com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax) ?: return
+        syntaxOverride = null
+
+        if (r.selector != null) {
+            _selectorInput.value = r.selector
+            detectSelectorType()
+        }
+
+        val markers = TextComponentHelper.componentsToText(r.components)
+        _messageInputWithMarkers.value = markers
+        _messageInput.value = visibleTextOf(r.components)
+        lastMessageInput = _messageInput.value
+
+        _executePrefixInput.value = r.executePrefix ?: ""
+
+        _showRawConvertDialog.value = false
+        generateCommands()
+    }
+
+    /** 组件序列里"可见文字"（TEXT 去 §），用于显示在消息框。 */
+    private fun visibleTextOf(components: List<TextComponentHelper.TextComponent>): String {
+        val sb = StringBuilder()
+        for (c in components) {
+            if (c.type != TextComponentHelper.ComponentType.TEXT) continue
+            val s = c.content
+            var i = 0
+            while (i < s.length) { if (s[i] == '§' && i + 1 < s.length) i += 2 else sb.append(s[i++]) }
+        }
+        return sb.toString()
+    }
     
     fun dismissMNDialog() {
         _showMNDialog.value = null
