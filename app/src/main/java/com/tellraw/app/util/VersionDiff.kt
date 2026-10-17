@@ -1,5 +1,7 @@
 package com.tellraw.app.util
 
+import com.tellraw.app.model.VersionSpec
+
 /**
  * 新旧版本差异的**统一表**（见 `ttellraw/need/新旧版本差异规范.txt`）。
  *
@@ -81,9 +83,23 @@ object VersionDiff {
         return NbtSyntax.MODERN_PRE_1_21_5
     }
 
+    /**
+     * 具体目标版本 -> 物品 NBT 语法（目标版本是硬约束）。
+     * 只有 Java 目标有约束；基岩目标返回 null（Java 输出仍面向最新版）。
+     * Java ≥1.21.5 -> MODERN；1.20.5–1.21.4 -> MODERN_PRE_1_21_5；<1.20.5 -> LEGACY。
+     */
+    fun syntaxForTarget(version: VersionSpec?): NbtSyntax? {
+        if (version == null || version == VersionSpec.LATEST) return null
+        if (version.edition != VersionSpec.Edition.JAVA) return null
+        return when {
+            version.atLeast(1, 21, 5) -> NbtSyntax.MODERN
+            version.atLeast(1, 20, 5) -> NbtSyntax.MODERN_PRE_1_21_5
+            else -> NbtSyntax.LEGACY
+        }
+    }
+
     /** 按策略决定怎么处理。 */
-    enum class Decision {
-        /** 原样（不改写）。 */
+    enum class Decision {        /** 原样（不改写）。 */
         KEEP,
         /** 改写成新版（数据组件）。 */
         TO_MODERN,

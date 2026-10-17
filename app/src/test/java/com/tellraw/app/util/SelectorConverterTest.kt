@@ -3767,4 +3767,118 @@ class SelectorConverterTest {
         val type = SelectorConverter.detectSelectorType(javaSelector)
         assertEquals(SelectorType.JAVA, type)
     }
+
+    // ---------------- V3：具体目标版本（能转则转，不能转则丢弃 + 提醒） ----------------
+
+    @Test
+    fun testAtNConvertedWhenTargetVersionPredatesIt() {
+        val oldJava = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 20, 4)
+        )
+        val (sel, _, reminders) = SelectorConverter.filterSelectorParameters(
+            "@n", SelectorType.JAVA, context, target = oldJava
+        )
+        assertEquals("@e[limit=1,sort=nearest]", sel)
+        assertTrue("必须提醒 @n 被改写", reminders.any { it.contains("@n") })
+
+        // 目标版本够新 -> 原样保留
+        val newJava = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 21, 4)
+        )
+        val (kept, _, _) = SelectorConverter.filterSelectorParameters(
+            "@n", SelectorType.JAVA, context, target = newJava
+        )
+        assertEquals("@n", kept)
+    }
+
+    @Test
+    fun testAtNOnOldBedrockBecomesNearestCount() {
+        val oldBedrock = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 20, 80)
+        )
+        val (sel, _, _) = SelectorConverter.filterSelectorParameters(
+            "@n", SelectorType.BEDROCK, context, target = oldBedrock
+        )
+        // Bedrock 的 c=1 就是"最近 1 个"，与 @n 等价。
+        assertEquals("@e[c=1]", sel)
+    }
+
+    @Test
+    fun testUnsupportedBedrockParamsDroppedForTargetVersion() {
+        val old = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 16, 0)
+        )
+        val (family, _, familyReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[family=monster]", SelectorType.BEDROCK, context, target = old
+        )
+        assertEquals("@e", family)
+        assertTrue(familyReminders.any { it.contains("family") })
+
+        val hasitem = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 17, 0)
+        )
+        val (hi, _, hiReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[hasitem={item=diamond}]", SelectorType.BEDROCK, context, target = hasitem
+        )
+        assertEquals("@e", hi)
+        assertTrue(hiReminders.any { it.contains("hasitem") })
+
+        // 达到门槛后保留
+        val ok = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 18, 20)
+        )
+        val (kept, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[hasitem={item=diamond}]", SelectorType.BEDROCK, context, target = ok
+        )
+        assertTrue(kept.contains("hasitem="))
+    }
+
+    @Test
+    fun testUnsupportedJavaParamsDroppedForTargetVersion() {
+        val pre = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 14)
+        )
+        val (pred, _, reminders) = SelectorConverter.filterSelectorParameters(
+            "@e[predicate=test]", SelectorType.JAVA, context, target = pre
+        )
+        assertEquals("@e", pred)
+        assertTrue(reminders.any { it.contains("predicate") })
+
+        val ok = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 15)
+        )
+        val (kept, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[predicate=test]", SelectorType.JAVA, context, target = ok
+        )
+        assertTrue(kept.contains("predicate="))
+    }
+
+    @Test
+    fun testTargetVersionOnlyConstrainsItsOwnEdition() {
+        // Java 目标不应改写基岩输出里的 @n
+        val javaTarget = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 20, 4)
+        )
+        val (bedrockOut, _, _) = SelectorConverter.filterSelectorParameters(
+            "@n", SelectorType.BEDROCK, context, target = javaTarget
+        )
+        assertEquals("@n", bedrockOut)
+    }
+
+    @Test
+    fun testComponentSelectorHonorsTargetVersion() {
+        // 文本组件里的 selector 也要按目标版本改写（标记格式：content + ྈ + type + ༴）
+        val componentText = "@n\u0FC8selector\u0F34"
+        val oldJava = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 20, 4)
+        )
+        val javaJson = TextFormatter.convertToJavaJson(componentText, context = context, target = oldJava)
+        assertTrue("组件内 @n 应被改写：$javaJson", javaJson.contains("@e[limit=1,sort=nearest]"))
+
+        val oldBedrock = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 20, 80)
+        )
+        val bedrockJson = TextFormatter.convertToBedrockJson(componentText, context = context, target = oldBedrock)
+        assertTrue("组件内 @n 应被改写：$bedrockJson", bedrockJson.contains("@e[c=1]"))
+    }
 }

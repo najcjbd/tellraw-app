@@ -963,7 +963,35 @@ class TellrawViewModel @Inject constructor(
                 val allReminders = mutableListOf<String>()
 
                 // 版本策略要在选择器/文本组件转换**之前**定出来：混合模式与组件内嵌 selector 都要按它过滤。
-                val nbtSyntax = syntaxOverride
+                // 具体目标版本是硬约束：Java 目标决定物品 NBT 语法（旧 NBT / 数据组件 / 装备走 items）。
+                val target = versionOverride ?: targetVersionSpec()
+                val targetSyntax = com.tellraw.app.util.VersionDiff.syntaxForTarget(target)
+                val configuredSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+                if (targetSyntax != null &&
+                    configuredSyntax != com.tellraw.app.util.VersionDiff.NbtSyntax.FOLLOW_INPUT &&
+                    configuredSyntax != targetSyntax
+                ) {
+                    val syntaxLabel = applicationContext.getString(
+                        when (targetSyntax) {
+                            com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY -> R.string.nbt_syntax_legacy
+                            com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN_PRE_1_21_5 -> R.string.nbt_syntax_modern_pre_1_21_5
+                            else -> R.string.nbt_syntax_modern
+                        }
+                    )
+                    val platform = applicationContext.getString(
+                        if (target!!.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA)
+                            R.string.selector_type_java else R.string.selector_type_bedrock
+                    )
+                    allReminders.add(
+                        applicationContext.getString(
+                            R.string.target_version_forces_syntax,
+                            "$platform ${target.parts.joinToString(".")}",
+                            syntaxLabel
+                        )
+                    )
+                }
+                val nbtSyntax = targetSyntax
+                    ?: syntaxOverride
                     ?: effectiveNbtSyntax(selector, _executePrefixInput.value)
 
                 // 检查是否启用了JAVA/基岩混合模式
@@ -980,7 +1008,7 @@ class TellrawViewModel @Inject constructor(
                 val javaWarnings = mutableListOf<String>()
                 val javaJson = TextFormatter.convertToJavaJson(
                     messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
-                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value
+                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value, target
                 )
                 allReminders.addAll(javaWarnings)
 
@@ -989,7 +1017,8 @@ class TellrawViewModel @Inject constructor(
                 val javaUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.BEDROCK_TO_JAVA,
                     applicationContext.getString(R.string.selector_type_java),
-                    allReminders
+                    allReminders,
+                    target
                 )
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
@@ -1004,7 +1033,7 @@ class TellrawViewModel @Inject constructor(
                     // 选择器本体也要过一遍 Java 侧参数过滤（family/predicate 这类基岩参数要转或去掉）
                     val (asSelector, _, asReminders) =
                         SelectorConverter.filterSelectorParameters(
-                            asSelectorRaw, SelectorType.JAVA, applicationContext, nbtSyntax
+                            asSelectorRaw, SelectorType.JAVA, applicationContext, nbtSyntax, target
                         )
                     allReminders.addAll(asReminders)
                     if (condTokens.isEmpty()) {
@@ -1017,7 +1046,7 @@ class TellrawViewModel @Inject constructor(
                 } else {
                     val (javaFilteredSelector, _, javaReminders) =
                         SelectorConverter.filterSelectorParameters(
-                            javaSelector, SelectorType.JAVA, applicationContext, nbtSyntax
+                            javaSelector, SelectorType.JAVA, applicationContext, nbtSyntax, target
                         )
                     allReminders.addAll(javaReminders)
                     javaTarget = javaFilteredSelector
@@ -1037,15 +1066,16 @@ class TellrawViewModel @Inject constructor(
                 }
                 
                 // 生成基岩版命令（基岩原生支持 `=!`，不需要靠 execute 承载否定）
-                val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext)
+                val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext, nbtSyntax, target)
                 allReminders.addAll(bedrockReminders)
                 val bedrockWarnings = mutableListOf<String>()
-                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings, nbtSyntax)
+                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings, nbtSyntax, target)
                 allReminders.addAll(bedrockWarnings)
                 val bedrockUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.JAVA_TO_BEDROCK,
                     applicationContext.getString(R.string.selector_type_bedrock),
-                    allReminders
+                    allReminders,
+                    target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
                 val bedrockCommand =
@@ -1087,7 +1117,6 @@ class TellrawViewModel @Inject constructor(
                 } else if (removedHit == null) {
                     versionChoiceAsked = false
                 }
-                val target = versionOverride ?: targetVersionSpec()
                 val used = mutableSetOf<com.tellraw.app.model.FeatureGate.Feature>()
                 val combined = "$javaCommand $bedrockCommand"
                 fun mark(cond: Boolean, f: com.tellraw.app.model.FeatureGate.Feature) { if (cond) used.add(f) }
@@ -1154,7 +1183,8 @@ class TellrawViewModel @Inject constructor(
     private fun convertedUserPrefix(
         direction: ExecuteConverter.Direction,
         versionName: String,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        target: com.tellraw.app.model.VersionSpec? = null
     ): String? {
         if (!_executePrefixEnabled.value) return null
         val prefix = _executePrefixInput.value.trim()
@@ -1168,7 +1198,42 @@ class TellrawViewModel @Inject constructor(
             warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))
             return null
         }
-        warnings.add(applicationContext.getString(R.string.execute_prefix_applied, versionName, converted))
+        val gated = gateExecuteForTargetVersion(converted, direction, target, warnings)
+            ?: return null
+        warnings.add(applicationContext.getString(R.string.execute_prefix_applied, versionName, gated))
+        return gated
+    }
+
+    /**
+     * 目标版本硬约束：前置 execute 里用了该版本没有的子命令 -> 无法等效改写，
+     * 整个前缀丢弃并提醒（"不能转的舍弃 + 提醒"）。
+     */
+    private fun gateExecuteForTargetVersion(
+        converted: String,
+        direction: ExecuteConverter.Direction,
+        target: com.tellraw.app.model.VersionSpec?,
+        warnings: MutableList<String>
+    ): String? {
+        if (target == null || target == com.tellraw.app.model.VersionSpec.LATEST) return converted
+        val applies = when (direction) {
+            ExecuteConverter.Direction.BEDROCK_TO_JAVA ->
+                target.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA
+            ExecuteConverter.Direction.JAVA_TO_BEDROCK ->
+                target.edition == com.tellraw.app.model.VersionSpec.Edition.BEDROCK
+        }
+        if (!applies) return converted
+        val platform = applicationContext.getString(
+            if (target.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA)
+                R.string.selector_type_java else R.string.selector_type_bedrock
+        )
+        val label = "$platform ${target.parts.joinToString(".")}"
+        fun drop(reason: String): String? {
+            warnings.add(applicationContext.getString(R.string.execute_prefix_unsupported_for_target, label, reason))
+            return null
+        }
+        val unsupported =
+            com.tellraw.app.model.TargetVersionPlanner.unsupportedExecuteToken(converted, target)
+        if (unsupported != null) return drop(unsupported)
         return converted
     }
 

@@ -255,4 +255,28 @@ class VersionDiffTest {
         assertTrue(VersionDiff.legacyTagBodyToComponents("Damage:5b").contains("minecraft:damage"))
         assertTrue(VersionDiff.legacyTagBodyToComponents("foo:1").contains("minecraft:custom_data"))
     }
+
+    @Test
+    fun testSyntaxForTargetVersion() {
+        fun v(edition: com.tellraw.app.model.VersionSpec.Edition, vararg parts: Int) =
+            com.tellraw.app.model.VersionSpec(edition, parts.toList())
+        val java = com.tellraw.app.model.VersionSpec.Edition.JAVA
+        val bedrock = com.tellraw.app.model.VersionSpec.Edition.BEDROCK
+
+        assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.syntaxForTarget(v(java, 1, 21, 5)))
+        assertEquals(VersionDiff.NbtSyntax.MODERN, VersionDiff.syntaxForTarget(v(java, 26, 3)))
+        assertEquals(
+            VersionDiff.NbtSyntax.MODERN_PRE_1_21_5,
+            VersionDiff.syntaxForTarget(v(java, 1, 20, 5))
+        )
+        assertEquals(
+            VersionDiff.NbtSyntax.MODERN_PRE_1_21_5,
+            VersionDiff.syntaxForTarget(v(java, 1, 21, 4))
+        )
+        assertEquals(VersionDiff.NbtSyntax.LEGACY, VersionDiff.syntaxForTarget(v(java, 1, 20, 4)))
+        // 基岩目标 / 最新版不约束 Java 物品写法
+        assertNull(VersionDiff.syntaxForTarget(v(bedrock, 1, 21, 131)))
+        assertNull(VersionDiff.syntaxForTarget(null))
+        assertNull(VersionDiff.syntaxForTarget(com.tellraw.app.model.VersionSpec.LATEST))
+    }
 }
