@@ -1049,8 +1049,32 @@ class TellrawViewModel @Inject constructor(
                     }
                 }
 
-                _javaCommand.value = javaCommand
-                _bedrockCommand.value = bedrockCommand
+                // V2：按目标版本规划（tellraw 不可用 -> say；越界特性 -> 提醒）
+                val target = targetVersionSpec()
+                val used = mutableSetOf<com.tellraw.app.model.FeatureGate.Feature>()
+                val combined = "$javaCommand $bedrockCommand"
+                fun mark(cond: Boolean, f: com.tellraw.app.model.FeatureGate.Feature) { if (cond) used.add(f) }
+                mark("items entity" in combined || " items " in combined, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_ITEMS)
+                mark("stopwatch" in combined, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_STOPWATCH)
+                mark(Regex("\\bslots\\b").containsMatchIn(combined), com.tellraw.app.model.FeatureGate.Feature.EXECUTE_SLOTS)
+                mark("family=" in combined, com.tellraw.app.model.FeatureGate.Feature.FAMILY_PARAM)
+                mark("@n" in combined, com.tellraw.app.model.FeatureGate.Feature.AT_N)
+                mark("hasitem=" in combined, com.tellraw.app.model.FeatureGate.Feature.HASITEM_PARAM)
+                mark("has_property=" in combined, com.tellraw.app.model.FeatureGate.Feature.HAS_PROPERTY_PARAM)
+                mark("haspermission=" in combined, com.tellraw.app.model.FeatureGate.Feature.HASPERMISSION_PARAM)
+                val plan = com.tellraw.app.model.TargetVersionPlanner.plan(target, used)
+                allReminders.addAll(plan.notes)
+                val finalJava: String
+                val finalBedrock: String
+                if (plan.kind == com.tellraw.app.model.TargetVersionPlanner.OutputKind.SAY) {
+                    finalJava = "say ${actualMessage}"
+                    finalBedrock = "say ${actualMessage}"
+                } else {
+                    finalJava = javaCommand
+                    finalBedrock = bedrockCommand
+                }
+                _javaCommand.value = finalJava
+                _bedrockCommand.value = finalBedrock
                 
                 // 显示提醒（去重后）
                 _warnings.value = allReminders.distinct()
