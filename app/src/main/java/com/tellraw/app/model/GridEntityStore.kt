@@ -71,7 +71,12 @@ data class EditableGridEntity(
                 "offhand" -> "weapon.offhand"
                 else -> {
                     val n = key0.toIntOrNull()
-                    if (n != null) "$numericPrefix.$n" else key0
+                    when {
+                        n == null -> key0
+                        // 数字槽按玩家物品栏习惯：0-8 是快捷栏，9+ 是主物品栏
+                        numericPrefix == "inventory" && n in 0..8 -> "hotbar.$n"
+                        else -> "$numericPrefix.$n"
+                    }
                 }
             }
             val m = Regex("^([^\\s*\\[]+)\\s*(?:[x*]\\s*(\\d+))?\\s*(?:d(?:amage)?\\s*=\\s*(\\d+))?$")
