@@ -134,6 +134,8 @@ object SelectorConverter {
         R.string.java_param_not_supported to "警告：Java版%s参数在基岩版不支持，已移除",
         R.string.param_unparsable_removed to "警告：无法解析的参数 %s 已移除",
         R.string.bedrock_param_not_supported to "警告：基岩版%s参数在Java版不支持，已移除",
+        R.string.at_n_converted_for_target_version to "目标版本 %s 没有 @n，已改写为 @e 的等效 limit/sort 写法",
+        R.string.param_removed_for_target_version to "目标版本 %1\$s 不支持 %2\$s=，已移除（无等效写法）",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
         R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",

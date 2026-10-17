@@ -3867,8 +3867,8 @@ class SelectorConverterTest {
 
     @Test
     fun testComponentSelectorHonorsTargetVersion() {
-        // 文本组件里的 selector 也要按目标版本改写
-        val componentText = "\u0FC8@n\u0F34"
+        // 文本组件里的 selector 也要按目标版本改写（标记格式：content + ྈ + type + ༴）
+        val componentText = "@n\u0FC8selector\u0F34"
         val oldJava = com.tellraw.app.model.VersionSpec(
             com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 20, 4)
         )
