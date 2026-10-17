@@ -18,7 +18,14 @@ SPECIAL = {
     "falling_block": '{BlockState:{Name:"minecraft:stone"}}',
     "experience_orb": '{Value:1}',
     "painting": '{variant:"minecraft:kebab"}',
+    # 飞行投射物：给 0 速度让它们停在原地，否则可能下一 tick 就消失/飞走
+    "fireball": '{Motion:[0.0,0.0,0.0]}',
+    "small_fireball": '{Motion:[0.0,0.0,0.0]}',
+    "dragon_fireball": '{Motion:[0.0,0.0,0.0]}',
+    "wither_skull": '{Motion:[0.0,0.0,0.0]}',
 }
+# 天生短命、无法稳定 data get 的实体（记录为 transient）
+TRANSIENT = {"lightning_bolt"}
 SKIP = {"player"}          # 不能 summon
 # 无需特殊 NBT 也能召唤的其余实体：直接 summon
 # （召唤失败会在结果里记为 summon_fail，并带出报错原文）
@@ -102,6 +109,9 @@ def main():
     for i, eid in enumerate(ids):
         if eid in SKIP:
             results[eid] = {"status": "skipped", "raw": ""}
+            continue
+        if eid in TRANSIENT:
+            results[eid] = {"status": "transient", "raw": "实体存在时间极短，无法稳定 data get"}
             continue
         special = SPECIAL.get(eid)
         tag = "probe_" + re.sub(r"[^a-z0-9_]", "_", eid)
