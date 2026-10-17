@@ -425,13 +425,51 @@ object SelectorConverter {
      * 与Python版本的filter_selector_parameters函数逻辑一致
      * 返回: Triple<完整的选择器字符串(包括变量和参数), 移除的参数列表, 转换提醒>
      */
+    /** 目标版本的展示名（用于提醒文案），例如 `Java版 1.20.4`。 */
+    private fun describeVersion(context: Context, v: VersionSpec): String {
+        val platform = getStringSafely(
+            context,
+            if (v.edition == VersionSpec.Edition.JAVA) R.string.selector_type_java
+            else R.string.selector_type_bedrock
+        )
+        return "$platform ${v.parts.joinToString(".")}"
+    }
+
     fun filterSelectorParameters(
         selector: String,
         targetVersion: SelectorType,
         context: android.content.Context,
-        nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN
+        nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN,
+        target: VersionSpec? = null
     ): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
+
+        // 具体版本只约束"它所属的那个平台"：Java 目标不影响基岩输出，反之亦然。
+        val versionTarget = target
+            ?.takeIf { it != VersionSpec.LATEST }
+            ?.takeIf {
+                (targetVersion == SelectorType.JAVA && it.edition == VersionSpec.Edition.JAVA) ||
+                    (targetVersion == SelectorType.BEDROCK && it.edition == VersionSpec.Edition.BEDROCK)
+            }
+
+        // @n 在旧版本不存在 -> 改写成等效的 @e[limit=1,sort=nearest]（保留用户已写的 limit/sort）。
+        var effectiveSelector = selector
+        if (versionTarget != null &&
+            selector.substringBefore('[') == "@n" &&
+            !FeatureGate.isAvailable(FeatureGate.Feature.AT_N, versionTarget)
+        ) {
+            val oldParams = if ('[' in selector && ']' in selector) {
+                selector.substringAfter('[').substringBeforeLast(']')
+            } else ""
+            val extras = mutableListOf<String>()
+            if (!Regex("(^|,)limit=").containsMatchIn(oldParams)) extras.add("limit=1")
+            if (!Regex("(^|,)sort=").containsMatchIn(oldParams)) extras.add("sort=nearest")
+            val body = (if (oldParams.isEmpty()) "" else "$oldParams,") + extras.joinToString(",")
+            effectiveSelector = if (body.isEmpty()) "@e" else "@e[$body]"
+            conversionReminders.add(
+                getStringSafely(context, R.string.at_n_converted_for_target_version, describeVersion(context, versionTarget))
+            )
+        }
 
         // Java版特有参数（完全不支持，无法转换）
         val javaSpecificParams = listOf(
@@ -444,13 +482,13 @@ object SelectorConverter {
         )
 
         // 如果没有参数部分，直接返回
-        if ('[' !in selector || ']' !in selector) {
-            return Triple(selector, emptyList(), conversionReminders)
+        if ('[' !in effectiveSelector || ']' !in effectiveSelector) {
+            return Triple(effectiveSelector, emptyList(), conversionReminders)
         }
 
         // 提取参数部分
-        var selectorVar = selector.split('[')[0]
-        var paramsPart = selector.substringAfter('[').substringBeforeLast(']')
+        var selectorVar = effectiveSelector.split('[')[0]
+        var paramsPart = effectiveSelector.substringAfter('[').substringBeforeLast(']')
 
         // 注意：scores 参数内部的记分项不应该被当作选择器参数处理
         // 例如：[scores={level=6}] 中的 level 是记分项名字，不是经验等级参数
@@ -539,7 +577,7 @@ object SelectorConverter {
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
             val legacy = nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
             // 主手写法取决于目标是玩家还是非玩家（玩家 SelectedItem / 非玩家 equipment.mainhand）
-            val entityKind = SelectorEntityKind.analyze(selector)
+            val entityKind = SelectorEntityKind.analyze(effectiveSelector)
             val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy, entityKind)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
@@ -815,6 +853,39 @@ object SelectorConverter {
         for (param in params) {
             if ('=' in param) {
                 val paramName = param.split('=')[0].trim()
+
+                // 具体目标版本不支持该参数 -> Java 侧写不出等效条件，明确丢弃 + 提醒
+                // （不能静默留下一个目标版本会报错的参数，也不能当成"没选中"）。
+                if (versionTarget != null) {
+                    val gate = when (targetVersion) {
+                        SelectorType.JAVA -> when (paramName) {
+                            "predicate" -> FeatureGate.Feature.PREDICATE_PARAM
+                            "advancements" -> FeatureGate.Feature.ADVANCEMENTS_PARAM
+                            "team" -> FeatureGate.Feature.TEAM_PARAM
+                            "nbt" -> FeatureGate.Feature.NBT_PREDICATE
+                            else -> null
+                        }
+                        SelectorType.BEDROCK -> when (paramName) {
+                            "family" -> FeatureGate.Feature.FAMILY_PARAM
+                            "hasitem" -> FeatureGate.Feature.HASITEM_PARAM
+                            "haspermission" -> FeatureGate.Feature.HASPERMISSION_PARAM
+                            "has_property" -> FeatureGate.Feature.HAS_PROPERTY_PARAM
+                            else -> null
+                        }
+                        else -> null
+                    }
+                    if (gate != null && !FeatureGate.isAvailable(gate, versionTarget)) {
+                        removedParams.add(paramName)
+                        conversionReminders.add(
+                            getStringSafely(
+                                context,
+                                R.string.param_removed_for_target_version,
+                                describeVersion(context, versionTarget), paramName
+                            )
+                        )
+                        continue
+                    }
+                }
                 
                 // 特殊处理haspermission参数，它包含大括号
                 if (paramName == "haspermission" && targetVersion == SelectorType.JAVA) {
