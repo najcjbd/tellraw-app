@@ -84,6 +84,17 @@ class SelectorConverterTest {
         assertFalse(modern.third.any { it.contains("1.21.5") })
     }
 
+    /** V3：基岩 @n（最近实体）-> Java @e[limit=1,sort=nearest]（不丢"最近"） */
+    @Test
+    fun testBedrockNearestAtNConvertedToEquivalent() {
+        val r = SelectorConverter.convertBedrockToJava("@n", context)
+        assertEquals("@e[limit=1,sort=nearest]", r.javaSelector)
+        assertTrue(r.javaReminders.any { it.contains("@n") })
+        // 已有 limit/sort 时不重复加
+        val r2 = SelectorConverter.convertBedrockToJava("@n[limit=3]", context)
+        assertEquals("@e[limit=3,sort=nearest]", r2.javaSelector)
+    }
+
     /** 主手：玩家 -> SelectedItem；非玩家 -> equipment.mainhand；不确定 -> SelectedItem + 提醒 */
     @Test
     fun testMainhandDependsOnSelectorEntityKind() {
