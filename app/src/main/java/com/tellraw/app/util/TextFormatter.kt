@@ -197,14 +197,14 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, bedrockColorToRgb: Boolean = true): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, bedrockColorToRgb: Boolean = true, target: com.tellraw.app.model.VersionSpec? = null): String {
         // 检查是否包含文本组件标记
         var plainText = text
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
             if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
-                return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings, separatorAsTextComponent, nbtSyntax, bedrockColorToRgb)
+                return TextComponentHelper.convertToJavaJson(components, mNHandling, mnCFEnabled, context, warnings, separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target)
             }
             // 全是 TEXT 组件：说明这两个字符只是用户手打的普通字符（不是合法组件标记）。
             // 必须继续走下面的纯文本逻辑，而且**不能原样再分派** ——
@@ -477,14 +477,14 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, target: com.tellraw.app.model.VersionSpec? = null): String {
         // 检查是否包含文本组件标记
         var plainText = text
         if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
             if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
-                return TextComponentHelper.convertToBedrockJson(components, mNHandling, mnCFEnabled, context, warnings, nbtSyntax)
+                return TextComponentHelper.convertToBedrockJson(components, mNHandling, mnCFEnabled, context, warnings, nbtSyntax, target)
             }
             // 理由同 convertToJavaJson：全是 TEXT 时这两个字符只是普通字符，
             // 必须继续走纯文本逻辑，否则与 TextComponentHelper 互递归崩溃

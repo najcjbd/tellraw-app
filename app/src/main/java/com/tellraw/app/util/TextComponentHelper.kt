@@ -547,7 +547,8 @@ object TextComponentHelper {
     warnings: MutableList<String>? = null,
     separatorAsTextComponent: Boolean = false,
     nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
-    bedrockColorToRgb: Boolean = true
+    bedrockColorToRgb: Boolean = true,
+    target: com.tellraw.app.model.VersionSpec? = null
 ): String {
         if (components.isEmpty()) return "{}"
 
@@ -563,7 +564,7 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb)
+            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb, target = target)
         }
 
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
@@ -645,27 +646,21 @@ object TextComponentHelper {
                     val convertedSelector = if (context != null) {
                         // 使用convertForMixedMode获取Java版和基岩版结果
                         val reminders = mutableListOf<String>()
-                        val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
-                        
-                        // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
-                        // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                        val converted = if (javaSelector == selectorEntries[0]) {
-                            // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
-                            val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
-                                selectorEntries[0],
-                                SelectorType.JAVA,
-                                context,
-                                nbtSyntax
-                            )
-                            reminders.addAll(filterReminders)
-                            filteredSelector
-                        } else {
-                            // 已经进行了转换，使用convertForMixedMode的结果
-                            javaSelector
-                        }
+                        val (javaSelector, _) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
+                        // 混合模式没转换时用原选择器；无论哪条路都再按目标版本过滤一次
+                        // （越界参数丢弃 + 提醒、@n 改写）。
+                        val baseSelector = if (javaSelector == selectorEntries[0]) selectorEntries[0] else javaSelector
+                        val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
+                            baseSelector,
+                            SelectorType.JAVA,
+                            context,
+                            nbtSyntax,
+                            target
+                        )
+                        reminders.addAll(filterReminders)
                         // 组件内选择器产生的提醒交给调用方（原来直接丢弃，导致"提醒用户"全都提醒不了）
                         warnings?.addAll(reminders)
-                        converted
+                        filteredSelector
                     } else {
                         // 没有Context，保持原样
                         selectorEntries[0]
@@ -750,27 +745,20 @@ object TextComponentHelper {
                             val convertedSelector = if (context != null) {
                                 // 使用convertForMixedMode获取Java版和基岩版结果
                                 val reminders = mutableListOf<String>()
-                                val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
-
-                                // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
-                                // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                                val converted = if (javaSelector == selectorEntries[0]) {
-                                    // 没有进行转换，调用filterSelectorParameters来处理基岩版到Java版的参数转换
-                                    val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
-                                        selectorEntries[0],
-                                        SelectorType.JAVA,
-                                        context,
-                                        nbtSyntax
-                                    )
-                                    reminders.addAll(filterReminders)
-                                    filteredSelector
-                                } else {
-                                    // 已经进行了转换，使用convertForMixedMode的结果
-                                    javaSelector
-                                }
+                                val (javaSelector, _) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
+                                // 无论混合模式是否转换，都再按目标版本过滤一次（越界参数丢弃 + 提醒）。
+                                val baseSelector = if (javaSelector == selectorEntries[0]) selectorEntries[0] else javaSelector
+                                val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
+                                    baseSelector,
+                                    SelectorType.JAVA,
+                                    context,
+                                    nbtSyntax,
+                                    target
+                                )
+                                reminders.addAll(filterReminders)
                                 // 组件内选择器产生的提醒交给调用方（原来直接丢弃）
                                 warnings?.addAll(reminders)
-                                converted
+                                filteredSelector
                             } else {
                                 // 没有Context，保持原样
                                 selectorEntries[0]
@@ -806,7 +794,8 @@ object TextComponentHelper {
     mnCFEnabled: Boolean = false,
     context: Context? = null,
     warnings: MutableList<String>? = null,
-    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+    nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+    target: com.tellraw.app.model.VersionSpec? = null
 ): String {
         if (components.isEmpty()) return """{"rawtext":[]}"""
 
@@ -818,7 +807,7 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax)
+            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax, target = target)
         }
 
         val rawtext = expandedComponents.map { component ->
@@ -886,27 +875,20 @@ object TextComponentHelper {
                         val convertedSelector = if (context != null) {
                             // 使用convertForMixedMode获取Java版和基岩版结果
                             val reminders = mutableListOf<String>()
-                            val (javaSelector, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
-
-                            // 如果convertForMixedMode没有进行任何转换（返回的selector和输入的selector相同），
-                            // 说明selector只包含一种版本的特有参数，需要调用filterSelectorParameters来处理转换
-                            val converted = if (bedrockSelector == selectorEntries[0]) {
-                                // 没有进行任何转换，调用filterSelectorParameters来处理Java版到基岩版的参数转换
-                                val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
-                                    selectorEntries[0],
-                                    SelectorType.BEDROCK,
-                                    context,
-                                    nbtSyntax
-                                )
-                                reminders.addAll(filterReminders)
-                                filteredSelector
-                            } else {
-                                // 已经进行了转换，使用convertForMixedMode的结果
-                                bedrockSelector
-                            }
+                            val (_, bedrockSelector) = SelectorConverter.convertForMixedMode(selectorEntries[0], context, reminders, nbtSyntax)
+                            // 无论混合模式是否转换，都再按目标版本过滤一次（越界参数丢弃 + 提醒、@n 改写）。
+                            val baseSelector = if (bedrockSelector == selectorEntries[0]) selectorEntries[0] else bedrockSelector
+                            val (filteredSelector, _, filterReminders) = SelectorConverter.filterSelectorParameters(
+                                baseSelector,
+                                SelectorType.BEDROCK,
+                                context,
+                                nbtSyntax,
+                                target
+                            )
+                            reminders.addAll(filterReminders)
                             // 组件内选择器产生的提醒交给调用方（原来直接丢弃，导致"删除并提醒"全都提醒不了）
                             warnings?.addAll(reminders)
-                            converted
+                            filteredSelector
                         } else {
                             // 没有Context，保持原样
                             selectorEntries[0]

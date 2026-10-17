@@ -1008,7 +1008,7 @@ class TellrawViewModel @Inject constructor(
                 val javaWarnings = mutableListOf<String>()
                 val javaJson = TextFormatter.convertToJavaJson(
                     messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
-                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value
+                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value, target
                 )
                 allReminders.addAll(javaWarnings)
 
@@ -1068,7 +1068,7 @@ class TellrawViewModel @Inject constructor(
                 val (bedrockFilteredSelector, _, bedrockReminders) = SelectorConverter.filterSelectorParameters(bedrockSelector, SelectorType.BEDROCK, applicationContext, nbtSyntax, target)
                 allReminders.addAll(bedrockReminders)
                 val bedrockWarnings = mutableListOf<String>()
-                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings, nbtSyntax)
+                val bedrockJson = TextFormatter.convertToBedrockJson(messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, bedrockWarnings, nbtSyntax, target)
                 allReminders.addAll(bedrockWarnings)
                 val bedrockUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.JAVA_TO_BEDROCK,

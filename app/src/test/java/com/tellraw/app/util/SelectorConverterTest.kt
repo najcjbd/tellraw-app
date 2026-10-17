@@ -3864,4 +3864,21 @@ class SelectorConverterTest {
         )
         assertEquals("@n", bedrockOut)
     }
+
+    @Test
+    fun testComponentSelectorHonorsTargetVersion() {
+        // 文本组件里的 selector 也要按目标版本改写
+        val componentText = "\u0FC8@n\u0F34"
+        val oldJava = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 20, 4)
+        )
+        val javaJson = TextFormatter.convertToJavaJson(componentText, context = context, target = oldJava)
+        assertTrue("组件内 @n 应被改写：$javaJson", javaJson.contains("@e[limit=1,sort=nearest]"))
+
+        val oldBedrock = com.tellraw.app.model.VersionSpec(
+            com.tellraw.app.model.VersionSpec.Edition.BEDROCK, listOf(1, 20, 80)
+        )
+        val bedrockJson = TextFormatter.convertToBedrockJson(componentText, context = context, target = oldBedrock)
+        assertTrue("组件内 @n 应被改写：$bedrockJson", bedrockJson.contains("@e[c=1]"))
+    }
 }
