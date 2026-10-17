@@ -5,6 +5,7 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -893,7 +894,7 @@ private fun EntityPickerDialog(
                                 supportingContent = {
                                     Text("${c.builtinId ?: "minecraft:player"} · 自定义")
                                 },
-                                modifier = Modifier.clickableRow { onPickCustom(c) }
+                                modifier = Modifier.clickable { onPickCustom(c) }
                             )
                         }
                     }
@@ -906,7 +907,7 @@ private fun EntityPickerDialog(
                         ListItem(
                             headlineContent = { Text(e.zhName) },
                             supportingContent = { Text(e.id) },
-                            modifier = Modifier.clickableRow { onPickBuiltin(e) }
+                            modifier = Modifier.clickable { onPickBuiltin(e) }
                         )
                     }
                 }
@@ -985,20 +986,3 @@ private fun CustomEntityManagerDialog(
     }
 }
 
-private fun Modifier.clickableRow(onClick: () -> Unit): Modifier =
-    this.then(Modifier.padding(0.dp)).let { base ->
-        base.then(
-            Modifier.pointerInput(onClick) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
-                    var up = false
-                    while (!up) {
-                        val ev = awaitPointerEvent()
-                        up = ev.changes.none { it.pressed }
-                    }
-                    onClick()
-                }
-            }
-        )
-    }
