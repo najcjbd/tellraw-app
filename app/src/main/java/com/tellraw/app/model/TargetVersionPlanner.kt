@@ -28,4 +28,31 @@ object TargetVersionPlanner {
         }
         return Plan(OutputKind.TELLRAW, notes)
     }
+
+    /**
+     * 前置 execute 前缀里用了目标版本没有的子命令 -> 返回该写法的名字（如 `items`）；
+     * 都可用 / 目标是最新版 -> null。无法等效改写的整段丢弃并提醒。
+     */
+    fun unsupportedExecuteToken(prefix: String, target: VersionSpec?): String? {
+        if (target == null || target == VersionSpec.LATEST) return null
+        if (!FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_MODERN, target) &&
+            prefix.trimStart().startsWith("execute")
+        ) {
+            return "execute"
+        }
+        val checks = listOf(
+            "items" to FeatureGate.Feature.EXECUTE_ITEMS,
+            "stopwatch" to FeatureGate.Feature.EXECUTE_STOPWATCH,
+            "slots" to FeatureGate.Feature.EXECUTE_SLOTS,
+            "function" to FeatureGate.Feature.EXECUTE_IF_FUNCTION
+        )
+        for ((token, feature) in checks) {
+            if (Regex("\\b$token\\b").containsMatchIn(prefix) &&
+                !FeatureGate.isAvailable(feature, target)
+            ) {
+                return token
+            }
+        }
+        return null
+    }
 }

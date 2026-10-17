@@ -32,4 +32,34 @@ class TargetVersionPlannerTest {
         assertTrue(TargetVersionPlanner.plan(v("26.2"), setOf(Feature.EXECUTE_SLOTS)).notes.isNotEmpty())
         assertTrue(TargetVersionPlanner.plan(v("26.3"), setOf(Feature.EXECUTE_SLOTS)).notes.isEmpty())
     }
+
+    @Test fun unsupportedExecuteTokens() {
+        // items 需要 1.20.5（24w10a）
+        assertEquals(
+            "items",
+            TargetVersionPlanner.unsupportedExecuteToken(
+                "execute if items entity @s armor.head *", v("1.20.4")
+            )
+        )
+        assertNull(
+            TargetVersionPlanner.unsupportedExecuteToken(
+                "execute if items entity @s armor.head *", v("1.20.5")
+            )
+        )
+        // stopwatch 需要 1.21.11(25w41a)
+        assertEquals(
+            "stopwatch",
+            TargetVersionPlanner.unsupportedExecuteToken("execute if stopwatch 5", v("1.21.4"))
+        )
+        // slots 只有 26.3+
+        assertEquals(
+            "slots",
+            TargetVersionPlanner.unsupportedExecuteToken("execute if slots block ~ ~ ~", v("26.2"))
+        )
+        assertNull(
+            TargetVersionPlanner.unsupportedExecuteToken("execute if slots block ~ ~ ~", v("26.3"))
+        )
+        // 目标最新版不门控
+        assertNull(TargetVersionPlanner.unsupportedExecuteToken("execute if items entity @s armor.head *", null))
+    }
 }

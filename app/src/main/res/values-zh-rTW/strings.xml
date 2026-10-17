@@ -237,6 +237,7 @@
     <string name="bedrock_param_no_equivalent">警告：基岩版%s參數Java版沒對應功能，已移除</string>
     <string name="at_n_converted_for_target_version">目標版本 %1$s 沒有 @n，已改寫為 @e 的等效 limit/sort 寫法</string>
     <string name="target_version_forces_syntax">已按目標版本 %1$s 使用「%2$s」物品寫法</string>
+    <string name="execute_prefix_unsupported_for_target">目標版本 %1$s 不支援 execute 的 %2$s 寫法，已忽略整個前置命令</string>
     <string name="param_removed_for_target_version">目標版本 %1$s 不支援 %2$s=，已移除（無等效寫法）</string>
     <string name="bedrock_family_param_not_supported">警告：基岩版%s參數Java版沒對應功能，已移除。建議用type參數指定實體類型</string>
     <string name="java_team_param_not_supported">警告：Java版%s參數在基岩版不支援，已移除。基岩版無隊伍系統</string>

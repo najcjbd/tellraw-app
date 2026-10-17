@@ -1017,7 +1017,8 @@ class TellrawViewModel @Inject constructor(
                 val javaUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.BEDROCK_TO_JAVA,
                     applicationContext.getString(R.string.selector_type_java),
-                    allReminders
+                    allReminders,
+                    target
                 )
                 val javaNegation = ExecuteConverter.bedrockSelectorNegation(
                     javaSelector, allReminders, preferExecute = _executePrefixEnabled.value, nbtSyntax = nbtSyntax
@@ -1073,7 +1074,8 @@ class TellrawViewModel @Inject constructor(
                 val bedrockUserPrefix = convertedUserPrefix(
                     ExecuteConverter.Direction.JAVA_TO_BEDROCK,
                     applicationContext.getString(R.string.selector_type_bedrock),
-                    allReminders
+                    allReminders,
+                    target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
                 val bedrockCommand =
@@ -1181,7 +1183,8 @@ class TellrawViewModel @Inject constructor(
     private fun convertedUserPrefix(
         direction: ExecuteConverter.Direction,
         versionName: String,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        target: com.tellraw.app.model.VersionSpec? = null
     ): String? {
         if (!_executePrefixEnabled.value) return null
         val prefix = _executePrefixInput.value.trim()
@@ -1195,7 +1198,42 @@ class TellrawViewModel @Inject constructor(
             warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))
             return null
         }
-        warnings.add(applicationContext.getString(R.string.execute_prefix_applied, versionName, converted))
+        val gated = gateExecuteForTargetVersion(converted, direction, target, warnings)
+            ?: return null
+        warnings.add(applicationContext.getString(R.string.execute_prefix_applied, versionName, gated))
+        return gated
+    }
+
+    /**
+     * 目标版本硬约束：前置 execute 里用了该版本没有的子命令 -> 无法等效改写，
+     * 整个前缀丢弃并提醒（"不能转的舍弃 + 提醒"）。
+     */
+    private fun gateExecuteForTargetVersion(
+        converted: String,
+        direction: ExecuteConverter.Direction,
+        target: com.tellraw.app.model.VersionSpec?,
+        warnings: MutableList<String>
+    ): String? {
+        if (target == null || target == com.tellraw.app.model.VersionSpec.LATEST) return converted
+        val applies = when (direction) {
+            ExecuteConverter.Direction.BEDROCK_TO_JAVA ->
+                target.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA
+            ExecuteConverter.Direction.JAVA_TO_BEDROCK ->
+                target.edition == com.tellraw.app.model.VersionSpec.Edition.BEDROCK
+        }
+        if (!applies) return converted
+        val platform = applicationContext.getString(
+            if (target.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA)
+                R.string.selector_type_java else R.string.selector_type_bedrock
+        )
+        val label = "$platform ${target.parts.joinToString(".")}"
+        fun drop(reason: String): String? {
+            warnings.add(applicationContext.getString(R.string.execute_prefix_unsupported_for_target, label, reason))
+            return null
+        }
+        val unsupported =
+            com.tellraw.app.model.TargetVersionPlanner.unsupportedExecuteToken(converted, target)
+        if (unsupported != null) return drop(unsupported)
         return converted
     }
 
