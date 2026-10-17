@@ -443,7 +443,8 @@ object SelectorConverter {
         targetVersion: SelectorType,
         context: android.content.Context,
         nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN,
-        target: VersionSpec? = null
+        target: VersionSpec? = null,
+        entityKindOverride: SelectorEntityKind.Kind? = null
     ): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
 
@@ -580,7 +581,7 @@ object SelectorConverter {
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
             val legacy = nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
             // 主手写法取决于目标是玩家还是非玩家（玩家 SelectedItem / 非玩家 equipment.mainhand）
-            val entityKind = SelectorEntityKind.analyze(effectiveSelector)
+            val entityKind = entityKindOverride ?: SelectorEntityKind.analyze(effectiveSelector)
             val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy, entityKind)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
@@ -3907,13 +3908,18 @@ object SelectorConverter {
         // 构建Java版输出：保留Java版特有参数，转换基岩版参数，合并通用参数
         val javaConvertedParams = javaParams.toMutableList()
         
-        // 转换基岩版参数到Java版
+        // 转换基岩版参数到Java版。
+        // 合成选择器的变量名不能丢实体种类：hasitem 主手要看"玩家 SelectedItem / 非玩家 equipment"，
+        // 因此把真实选择器分析出的种类显式传进去（反例：@e[type=zombie,…,hasitem=…]）。
+        val realEntityKind = SelectorEntityKind.analyze(selector)
         val tempBedrockParamsPart = bedrockParams.joinToString(",")
         val (javaConvertedBedrock, _, _) = filterSelectorParameters(
             "a[$tempBedrockParamsPart]",
             SelectorType.JAVA,
             context,
-            nbtSyntax
+            nbtSyntax,
+            null,
+            realEntityKind
         )
         // 提取转换后的参数
         if ('[' in javaConvertedBedrock && ']' in javaConvertedBedrock) {
@@ -3956,7 +3962,9 @@ object SelectorConverter {
             "a[$tempJavaParamsPart]",
             SelectorType.BEDROCK,
             context,
-            nbtSyntax
+            nbtSyntax,
+            null,
+            realEntityKind
         )
         // 提取转换后的参数
         if ('[' in bedrockConvertedJava && ']' in bedrockConvertedJava) {

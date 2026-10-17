@@ -3866,6 +3866,21 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testMixedModePreservesEntityKindForMainhandHasitem() {
+        // 反例：混合模式内部用合成选择器 "a[...]" 时，不能丢掉"这个选择器只选非玩家"这一信息，
+        // 否则主手会误写成玩家的 SelectedItem。
+        val selector = "@e[type=minecraft:zombie,team=red," +
+            "hasitem={item=diamond_sword,location=slot.weapon.mainhand}]"
+        val reminders = mutableListOf<String>()
+        val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(
+            selector, context, reminders
+        )
+        assertTrue("非玩家主手应写 equipment：$javaOut", javaOut.contains("equipment"))
+        assertFalse("不应误用 SelectedItem：$javaOut", javaOut.contains("SelectedItem"))
+        assertTrue("基岩输出应保留 hasitem：$bedrockOut", bedrockOut.contains("hasitem="))
+    }
+
+    @Test
     fun testBedrockDropsTypeTagsAndAttributes() {
         val (tagSel, _, tagReminders) = SelectorConverter.filterSelectorParameters(
             "@e[type=#minecraft:skeletons]", SelectorType.BEDROCK, context
