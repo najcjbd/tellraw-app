@@ -193,6 +193,28 @@ class SelectorEvaluatorTest {
         assertEquals(listOf("a"), sel("@e[x=1,dx=-1]").matched.map { it.uid })
     }
 
+    @Test fun bedrockRotationBoundsAndRelativeCoords() {
+        val z = zombie.copy(rotationX = 45.0, rotationY = 90.0)
+        fun sel(s: String, origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0)) =
+            SelectorEvaluator.evaluate(s, listOf(z), origin = origin).matched.map { it.uid }
+
+        // 基岩 rx/ry = 上限，rxm/rym = 下限
+        assertEquals(listOf("z1"), sel("@e[rx=90]"))
+        assertTrue(sel("@e[rx=30]").isEmpty())
+        assertEquals(listOf("z1"), sel("@e[rxm=40]"))
+        assertTrue(sel("@e[rxm=50]").isEmpty())
+        assertEquals(listOf("z1"), sel("@e[ry=90,rym=80]"))
+        // Java 区间写法仍有效
+        assertEquals(listOf("z1"), sel("@e[x_rotation=0..90]"))
+
+        // ~ 相对原点
+        val e = zombie.copy(x = 11.0, y = -60.0, z = 0.0)
+        val rel = SelectorEvaluator.evaluate(
+            "@e[x=~0,y=~,z=~,distance=..2]", listOf(e), origin = Triple(10.0, -60.0, 0.0)
+        )
+        assertEquals(listOf("z1"), rel.matched.map { it.uid })
+    }
+
     @Test fun mixedEditionIdsAreNoted() {
         val r = SelectorEvaluator.evaluate(
             "@e[type=minecraft:zombified_piglin,type=minecraft:zombie_pigman]",
@@ -218,6 +240,13 @@ class SelectorEvaluatorTest {
         assertEquals(
             listOf("z1"),
             SelectorEvaluator.evaluate("@e[nbt={Rotation:[-90.0f,45.0f]}]", listOf(rot))
+                .matched.map { it.uid }
+        )
+        // NBT id 也认两版实体 ID
+        val pig = GridEntity("pig", "minecraft:zombified_piglin")
+        assertEquals(
+            listOf("pig"),
+            SelectorEvaluator.evaluate("@e[nbt={id:\"minecraft:zombie_pigman\"}]", listOf(pig))
                 .matched.map { it.uid }
         )
         // hasitem data= 与物品 damage / NBT damage 组件统一

@@ -145,9 +145,9 @@ object SelectorEvaluator {
                         } else if (!matchFamily(e, value)) return@filter false
                     }
                     "scores" -> if (!matchScores(e, value, notes)) return@filter false
-                    "x" -> ox = value.toDoubleOrNull() ?: ox
-                    "y" -> oy = value.toDoubleOrNull() ?: oy
-                    "z" -> oz = value.toDoubleOrNull() ?: oz
+                    "x" -> ox = coord(value, ox)
+                    "y" -> oy = coord(value, oy)
+                    "z" -> oz = coord(value, oz)
                     "dx" -> dx = value.toDoubleOrNull()
                     "dy" -> dy = value.toDoubleOrNull()
                     "dz" -> dz = value.toDoubleOrNull()
@@ -196,18 +196,35 @@ object SelectorEvaluator {
                             return@filter false
                         }
                     }
-                    "x_rotation", "y_rotation", "rx", "rxm", "ry", "rym" -> {
+                    "x_rotation", "y_rotation" -> {
                         val (lo, hi) = parseRange(value)
-                        val actual = when (key) {
-                            "x_rotation", "rx", "rxm" -> e.rotationX
-                            else -> e.rotationY
-                        }
+                        val actual = if (key == "x_rotation") e.rotationX else e.rotationY
                         if (actual == null) {
                             notes.add("$key= 需要实体设置视角；该实体未设置，未按它筛选")
                         } else if (actual < (lo ?: Double.NEGATIVE_INFINITY) ||
                             actual > (hi ?: Double.MAX_VALUE)
                         ) {
                             return@filter false
+                        }
+                    }
+                    "rx", "ry", "rxm", "rym" -> {
+                        // 基岩：rx/ry 是上限、rxm/rym 是下限（单值），不是"必须相等"
+                        val actual = if (key.startsWith("rx")) e.rotationX else e.rotationY
+                        if (actual == null) {
+                            notes.add("$key= 需要实体设置视角；该实体未设置，未按它筛选")
+                        } else if (".." in value) {
+                            val (lo, hi) = parseRange(value)
+                            if (actual < (lo ?: Double.NEGATIVE_INFINITY) ||
+                                actual > (hi ?: Double.MAX_VALUE)
+                            ) return@filter false
+                        } else {
+                            val n = value.toDoubleOrNull()
+                            if (n == null) {
+                                notes.add("$key=$value 无法解析，已忽略")
+                            } else {
+                                val ok = if (key.endsWith("m")) actual >= n else actual <= n
+                                if (!ok) return@filter false
+                            }
                         }
                     }
                     "nbt" -> {
@@ -696,6 +713,14 @@ object SelectorEvaluator {
                 stack.count.toDouble() >= lo && stack.count.toDouble() <= hi &&
                 (data == null || (stack.damage ?: 0) == data)
         }
+    }
+
+    /** 选择器坐标：支持 `~` / `~1.5`（相对执行/已设置的原点）。 */
+    private fun coord(value: String, base: Double): Double {
+        val v = value.trim()
+        if (v == "~") return base
+        if (v.startsWith("~")) return base + (v.substring(1).toDoubleOrNull() ?: 0.0)
+        return v.toDoubleOrNull() ?: base
     }
 
     private fun parseRange(v: String): Pair<Double?, Double?> {
