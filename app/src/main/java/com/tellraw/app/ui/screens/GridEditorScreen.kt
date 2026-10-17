@@ -913,10 +913,10 @@ private fun EntityEditorDialog(
                     label = { Text("分数（kills=3,deaths=1）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(equipment, { equipment = it },
-                    label = { Text("装备（head=...,chest=...,mainhand=...,offhand=...）") },
+                    label = { Text("装备（head=...,mainhand=sword d=5）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(inventory, { inventory = it },
-                    label = { Text("物品栏（0=stone x64,hotbar.1=bread）") },
+                    label = { Text("物品栏（0=stone x64, 1=sword d=5）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row {
                     OutlinedTextField(gamemode, { gamemode = it },
