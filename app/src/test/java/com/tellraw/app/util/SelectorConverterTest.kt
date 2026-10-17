@@ -3866,6 +3866,42 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testMixedModePreservesEntityKindForMainhandHasitem() {
+        // 反例：混合模式内部用合成选择器 "a[...]" 时，不能丢掉"这个选择器只选非玩家"这一信息，
+        // 否则主手会误写成玩家的 SelectedItem。
+        val selector = "@e[type=minecraft:zombie,team=red," +
+            "hasitem={item=diamond_sword,location=slot.weapon.mainhand}]"
+        val reminders = mutableListOf<String>()
+        val (javaOut, bedrockOut) = SelectorConverter.convertForMixedMode(
+            selector, context, reminders
+        )
+        assertTrue("非玩家主手应写 equipment：$javaOut", javaOut.contains("equipment"))
+        assertFalse("不应误用 SelectedItem：$javaOut", javaOut.contains("SelectedItem"))
+        assertTrue("基岩输出应保留 hasitem：$bedrockOut", bedrockOut.contains("hasitem="))
+    }
+
+    @Test
+    fun testBedrockDropsTypeTagsAndAttributes() {
+        val (tagSel, _, tagReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[type=#minecraft:skeletons]", SelectorType.BEDROCK, context
+        )
+        assertEquals("@e", tagSel)
+        assertTrue(tagReminders.any { it.contains("type") })
+
+        val (attrSel, _, attrReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[attributes={generic.max_health=20..}]", SelectorType.BEDROCK, context
+        )
+        assertEquals("@e", attrSel)
+        assertTrue(attrReminders.any { it.contains("attributes") })
+
+        // Java 侧保留
+        val (javaTag, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[type=#minecraft:skeletons]", SelectorType.JAVA, context
+        )
+        assertTrue(javaTag.contains("type=#"))
+    }
+
+    @Test
     fun testComponentSelectorHonorsTargetVersion() {
         // 文本组件里的 selector 也要按目标版本改写（标记格式：content + ྈ + type + ༴）
         val componentText = "@n\u0FC8selector\u0F34"

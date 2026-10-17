@@ -231,6 +231,7 @@
     <string name="limit_description">limit limits count, c sorts by distance</string>
     <string name="bedrock_param_not_supported">Warning: Bedrock %s not supported in Java, removed</string>
     <string name="bedrock_param_no_equivalent">Warning: Bedrock %s has no match in Java, removed</string>
+    <string name="bedrock_type_tag_not_supported">Bedrock does not support type=#entity_tag; removed</string>
     <string name="at_n_converted_for_target_version">Target version %1$s has no @n; rewritten to the equivalent @e limit/sort form</string>
     <string name="target_version_forces_syntax">Using the %2$s item syntax required by target version %1$s</string>
     <string name="execute_prefix_unsupported_for_target">Target version %1$s does not support execute %2$s; the whole prefix was ignored</string>

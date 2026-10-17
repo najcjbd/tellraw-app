@@ -136,6 +136,7 @@ object SelectorConverter {
         R.string.bedrock_param_not_supported to "警告：基岩版%s参数在Java版不支持，已移除",
         R.string.at_n_converted_for_target_version to "目标版本 %s 没有 @n，已改写为 @e 的等效 limit/sort 写法",
         R.string.param_removed_for_target_version to "目标版本 %1\$s 不支持 %2\$s=，已移除（无等效写法）",
+        R.string.bedrock_type_tag_not_supported to "基岩版不支持 type=#类型标签，已移除该条件",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
         R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",
@@ -442,7 +443,8 @@ object SelectorConverter {
         targetVersion: SelectorType,
         context: android.content.Context,
         nbtSyntax: com.tellraw.app.util.VersionDiff.NbtSyntax = com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN,
-        target: VersionSpec? = null
+        target: VersionSpec? = null,
+        entityKindOverride: SelectorEntityKind.Kind? = null
     ): Triple<String, List<String>, List<String>> {
         val conversionReminders = mutableListOf<String>()
 
@@ -475,7 +477,7 @@ object SelectorConverter {
 
         // Java版特有参数（完全不支持，无法转换）
         val javaSpecificParams = listOf(
-            "predicate", "advancements", "team"
+            "predicate", "advancements", "team", "attributes"
         )
 
         // 基岩版特有参数（完全不支持，无法转换）
@@ -579,7 +581,7 @@ object SelectorConverter {
         if (targetVersion == SelectorType.JAVA && "hasitem=" in paramsPart) {
             val legacy = nbtSyntax == com.tellraw.app.util.VersionDiff.NbtSyntax.LEGACY
             // 主手写法取决于目标是玩家还是非玩家（玩家 SelectedItem / 非玩家 equipment.mainhand）
-            val entityKind = SelectorEntityKind.analyze(effectiveSelector)
+            val entityKind = entityKindOverride ?: SelectorEntityKind.analyze(effectiveSelector)
             val (converted, hasitemToNbtReminders) = convertHasitemToNbt(paramsPart, context, legacy, entityKind)
             paramsPart = converted
             conversionReminders.addAll(hasitemToNbtReminders)
@@ -907,6 +909,16 @@ object SelectorConverter {
                     }
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
+                }
+                // 基岩版不支持实体类型标签（type=#...）；types 列表也没有对应写法 -> 丢弃并提醒
+                else if (targetVersion == SelectorType.BEDROCK && paramName == "type" &&
+                    param.substringAfter('=').trim().removeSurrounding("\"").startsWith("#")
+                ) {
+                    removedParams.add(paramName)
+                    conversionReminders.add(
+                        getStringSafely(context, R.string.bedrock_type_tag_not_supported, paramName)
+                    )
+                    continue
                 }
                 else if (targetVersion == SelectorType.BEDROCK && paramName in javaSpecificParams) {
                     removedParams.add(paramName)
@@ -3896,13 +3908,18 @@ object SelectorConverter {
         // 构建Java版输出：保留Java版特有参数，转换基岩版参数，合并通用参数
         val javaConvertedParams = javaParams.toMutableList()
         
-        // 转换基岩版参数到Java版
+        // 转换基岩版参数到Java版。
+        // 合成选择器的变量名不能丢实体种类：hasitem 主手要看"玩家 SelectedItem / 非玩家 equipment"，
+        // 因此把真实选择器分析出的种类显式传进去（反例：@e[type=zombie,…,hasitem=…]）。
+        val realEntityKind = SelectorEntityKind.analyze(selector)
         val tempBedrockParamsPart = bedrockParams.joinToString(",")
         val (javaConvertedBedrock, _, _) = filterSelectorParameters(
             "a[$tempBedrockParamsPart]",
             SelectorType.JAVA,
             context,
-            nbtSyntax
+            nbtSyntax,
+            null,
+            realEntityKind
         )
         // 提取转换后的参数
         if ('[' in javaConvertedBedrock && ']' in javaConvertedBedrock) {
@@ -3945,7 +3962,9 @@ object SelectorConverter {
             "a[$tempJavaParamsPart]",
             SelectorType.BEDROCK,
             context,
-            nbtSyntax
+            nbtSyntax,
+            null,
+            realEntityKind
         )
         // 提取转换后的参数
         if ('[' in bedrockConvertedJava && ']' in bedrockConvertedJava) {
