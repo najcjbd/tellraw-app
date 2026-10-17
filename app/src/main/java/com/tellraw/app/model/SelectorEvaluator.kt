@@ -19,10 +19,15 @@ data class GridEntity(
     val z: Double = 0.0,
     val scores: Map<String, Int> = emptyMap(),
     /** 由实体类型派生的族（见 [EntityFamilies]）。 */
-    val families: Set<String> = emptySet()
+    val families: Set<String> = emptySet(),
+    /** 已建模的物品栏/装备：槽位名（如 armor.head / weapon.mainhand / hotbar.0）-> 物品。 */
+    val items: Map<String, GridItem> = emptyMap()
 ) {
     val isPlayer: Boolean get() = id == "minecraft:player"
 }
+
+/** 网格实体某个槽位里的物品（count 用于 hasitem quantity 判定）。 */
+data class GridItem(val id: String, val count: Int = 1)
 
 /**
  * 在网格实体上求值一个目标选择器：返回"会被选中"的实体 + 无法求值/不支持的提醒。
@@ -46,7 +51,8 @@ object SelectorEvaluator {
         executor: GridEntity? = null,
         edition: String = "java",
         version: Long? = null,
-        origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0)
+        origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0),
+        target: VersionSpec? = null
     ): Result {
         val notes = mutableListOf<String>()
         val s = selector.trim()
@@ -71,6 +77,11 @@ object SelectorEvaluator {
         }
         if (base in setOf("@a", "@p", "@r") && params.any { it.startsWith("type=") }) {
             notes.add("\"$base\" 上 type= 无效（该选择器本身就限定了玩家）")
+        }
+        if (base == "@n" && target != null && target != VersionSpec.LATEST &&
+            !FeatureGate.isAvailable(FeatureGate.Feature.AT_N, target)
+        ) {
+            notes.add("@n 在目标版本不存在（Java 1.21+ / 基岩 1.21.100+ 才有）；网格仍按最近实体求值")
         }
 
         var ox = origin.first
@@ -98,8 +109,14 @@ object SelectorEvaluator {
                     "tag" -> if (!matchTag(e, value)) return@filter false
                     "team" -> if (!matchTeam(e, value)) return@filter false
                     "family" -> {
-                        val need = if (edition == "bedrock" && (version == null || version >= 1_16_100L)) true else false
-                        if (!need) {
+                        val editionOk = if (target != null) target.edition == VersionSpec.Edition.BEDROCK
+                        else edition == "bedrock"
+                        val versionOk = if (target != null) {
+                            FeatureGate.isAvailable(FeatureGate.Feature.FAMILY_PARAM, target)
+                        } else {
+                            version == null || version >= 1_16_100L
+                        }
+                        if (!editionOk || !versionOk) {
                             notes.add("family= 仅基岩版 ≥1.16.100 支持；目标版本不满足，**没有按它筛选**（不能当作已匹配）")
                         } else if (!matchFamily(e, value)) return@filter false
                     }
@@ -119,10 +136,22 @@ object SelectorEvaluator {
                         val n = value.toIntOrNull()
                         if (n != null && n < 0) { cNegative = true; limit = -n } else limit = n
                     }
+                    "hasitem" -> {
+                        val editionOk = if (target != null) target.edition == VersionSpec.Edition.BEDROCK
+                        else edition == "bedrock"
+                        val versionOk = if (target != null) {
+                            FeatureGate.isAvailable(FeatureGate.Feature.HASITEM_PARAM, target)
+                        } else {
+                            version == null || version >= 1_18_20L
+                        }
+                        if (!editionOk || !versionOk) {
+                            notes.add("hasitem= 仅基岩版 ≥1.18.20 支持；目标版本不满足，**没有按它筛选**")
+                        } else if (!matchHasitem(e, value, notes)) return@filter false
+                    }
                     // 网格未建模的维度：明确提示
                     "gamemode", "m", "level", "l", "lm",
                     "x_rotation", "rx", "rxm", "y_rotation", "ry", "rym",
-                    "nbt", "hasitem", "has_property", "haspermission",
+                    "nbt", "has_property", "haspermission",
                     "predicate", "advancements" ->
                         notes.add("参数 \"$key\" 在网格里尚未建模，已忽略（请自行核对）")
                     else -> notes.add("参数 \"$key\" 未支持，已忽略")
@@ -237,6 +266,85 @@ object SelectorEvaluator {
             }
         }
         return true
+    }
+
+    /**
+     * hasitem 求值（网格已建模的部分）：
+     *  - 单个对象或对象数组（数组 = 任一匹配）；
+     *  - item / quantity（区间，默认 1..）/ location + slot（数字、!数字）；
+     *  - item=air 表示"该槽为空"；
+     *  - data 不参与判定（会提示）。
+     */
+    private fun matchHasitem(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+        val v = raw.trim()
+        val objects = if (v.startsWith("[")) {
+            ExecCondSupport.splitTopLevel(v.removeSurrounding("[", "]"), ',')
+                .filter { it.trim().startsWith("{") }
+        } else listOf(v)
+        if (objects.isEmpty()) {
+            notes.add("hasitem 结构无法解析：$raw")
+            return true
+        }
+        return objects.any { obj ->
+            matchHasitemObject(e, obj.trim().removeSurrounding("{", "}"), notes)
+        }
+    }
+
+    private fun matchHasitemObject(e: GridEntity, body: String, notes: MutableList<String>): Boolean {
+        var item: String? = null
+        var rawQuantity: String? = null
+        var location: String? = null
+        var slot: String? = null
+        var hasData = false
+        for (part in ExecCondSupport.splitTopLevel(body, ',')) {
+            val i = ExecCondSupport.indexOfTopLevel(part, '=')
+            if (i < 0) continue
+            val k = part.substring(0, i).trim()
+            val value = part.substring(i + 1).trim().removeSurrounding("\"")
+            when (k) {
+                "item" -> item = value
+                "quantity" -> rawQuantity = value
+                "location" -> location = value
+                "slot" -> slot = value
+                "data" -> hasData = true
+            }
+        }
+        if (hasData) notes.add("hasitem 的 data= 在网格里未建模，已忽略该限制")
+        val want = item ?: run {
+            notes.add("hasitem 缺少 item=（必填），已忽略该条件")
+            return true
+        }
+        val loc = location?.removePrefix("slot.")
+        fun slotMatches(key: String): Boolean {
+            if (loc != null) {
+                val locOk = key == loc || key.startsWith("$loc.") ||
+                    (loc == "hotbar" && key == "hotbar")
+                if (!locOk) return false
+            }
+            if (slot != null) {
+                val idx = key.substringAfterLast('.', "")
+                if (slot!!.startsWith("!")) {
+                    val bad = slot!!.substring(1)
+                    if (idx == bad) return false
+                } else if (slot!!.toIntOrNull() != null && idx != slot) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        val isAir = ExecCondSupport.stripNs(want) == "air"
+        if (isAir) {
+            return e.items.none { (key, _) -> slotMatches(key) }
+        }
+        val wantId = if (want.contains(':')) want else "minecraft:$want"
+        val (qLo, qHi) = parseRange(rawQuantity ?: "1..")
+        val lo = qLo ?: 0.0
+        val hi = qHi ?: Double.MAX_VALUE
+        return e.items.any { (key, stack) ->
+            slotMatches(key) && stack.id == wantId &&
+                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi
+        }
     }
 
     private fun parseRange(v: String): Pair<Double?, Double?> {

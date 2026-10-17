@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(
     onNavigateToHelp: () -> Unit,
+    onNavigateToGrid: () -> Unit,
     viewModel: TellrawViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -121,6 +122,7 @@ fun MainScreen(
     if (isLandscape) {
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
+            onNavigateToGrid = onNavigateToGrid,
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -141,6 +143,7 @@ fun MainScreen(
     } else {
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
+            onNavigateToGrid = onNavigateToGrid,
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -373,6 +376,7 @@ fun MainScreen(
 @Composable
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
+    onNavigateToGrid: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
@@ -403,6 +407,9 @@ private fun PortraitLayout(
         TopAppBar(
             title = { Text(stringResource(R.string.app_title)) },
             actions = {
+                IconButton(onClick = onNavigateToGrid) {
+                    Icon(Icons.Default.Apps, contentDescription = "网格实体编辑器")
+                }
                 IconButton(onClick = { showHistoryDialog.value = true }) {
                     Icon(Icons.Default.History, contentDescription = stringResource(R.string.history))
                 }
@@ -655,6 +662,7 @@ private fun PortraitLayout(
 @Composable
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
+    onNavigateToGrid: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
@@ -694,6 +702,16 @@ private fun LandscapeLayout(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(end = 12.dp)
                 )
+                IconButton(
+                    onClick = onNavigateToGrid,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Apps,
+                        contentDescription = "网格实体编辑器",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 IconButton(
                     onClick = { showHistoryDialog.value = true },
                     modifier = Modifier.size(32.dp)
