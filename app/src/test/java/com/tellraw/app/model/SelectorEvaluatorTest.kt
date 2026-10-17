@@ -46,6 +46,35 @@ class SelectorEvaluatorTest {
         assertTrue(ids("@e[scores={hp=!4}]").matched.size == 2)
     }
 
+    @Test fun hasitemModeledSlots() {
+        val steveWith = steve.copy(
+            items = mapOf(
+                "armor.head" to GridItem("minecraft:diamond_helmet"),
+                "weapon.mainhand" to GridItem("minecraft:diamond_sword"),
+                "hotbar.0" to GridItem("minecraft:stone", 64)
+            )
+        )
+        val list = listOf(steveWith, zombie)
+        val target = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 20, 80))
+        fun sel(s: String) = SelectorEvaluator.evaluate(
+            s, list, edition = "bedrock", target = target
+        ).matched.map { it.uid }
+
+        assertEquals(listOf("p1"), sel("@a[hasitem={item=diamond_helmet,location=slot.armor.head}]"))
+        assertEquals(listOf("p1"), sel("@a[hasitem={item=stone,location=slot.hotbar,slot=0,quantity=64..}]"))
+        assertTrue(sel("@a[hasitem={item=stone,location=slot.hotbar,slot=0,quantity=65..}]").isEmpty())
+        // item=air = 该槽为空（胸甲槽确实为空）
+        assertEquals(listOf("p1"), sel("@a[hasitem={item=air,location=slot.armor.chest}]"))
+
+        // 目标版本不够 -> 不按它筛选 + 明确提醒
+        val old = SelectorEvaluator.evaluate(
+            "@a[hasitem={item=diamond_helmet}]", list,
+            edition = "bedrock", target = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 17, 0))
+        )
+        assertEquals(1, old.matched.size)
+        assertTrue(old.notes.any { it.contains("1.18.20") })
+    }
+
     @Test fun positionAndLimit() {
         assertEquals(listOf("c1"), ids("@e[x=9,y=-60,z=-1,dx=2,dy=1,dz=2]").matched.map { it.uid })
         assertEquals(listOf("p1"), ids("@p").matched.map { it.uid })  // 最近玩家
