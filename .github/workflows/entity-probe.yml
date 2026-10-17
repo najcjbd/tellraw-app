@@ -1,0 +1,51 @@
+# 实体 data 采样（D5/V4）：召唤所有实体 -> data get -> 记录 -> kill；多版本矩阵，只上传结果。
+name: Entity NBT probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { v: '1.20.4', java: '17' }
+          - { v: '1.20.5', java: '21' }
+          - { v: '1.21.4', java: '21' }
+          - { v: '1.21.5', java: '21' }
+          - { v: '1.21.11', java: '21' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - name: Download server jar
+        working-directory: tools/mctest
+        run: python3 download_servers.py ${{ matrix.v }}
+      - name: Probe entities
+        working-directory: tools/mctest
+        run: python3 probe_entities.py ${{ matrix.v }} --java "$JAVA_HOME/bin/java"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: entities-${{ matrix.v }}
+          path: tools/mctest/work/probe-${{ matrix.v }}/entities.json
+
+  analyze:
+    needs: probe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: entities-*
+      - name: Analyze across versions
+        run: python3 tools/mctest/analyze_entities.py artifacts > entity-report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: entity-report
+          path: entity-report.txt
