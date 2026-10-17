@@ -34,4 +34,12 @@ class FeatureGateTest {
         assertTrue(FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_SLOTS, null))
         assertTrue(FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_SLOTS, VersionSpec.LATEST))
     }
+
+    @Test fun removedFeatures() {
+        assertFalse(FeatureGate.isRemovedIn(FeatureGate.RemovedFeature.MAP_COLOR, v("26.2")))
+        assertTrue(FeatureGate.isRemovedIn(FeatureGate.RemovedFeature.MAP_COLOR, v("26.3")))
+        assertTrue(FeatureGate.isRemovedIn(FeatureGate.RemovedFeature.MAP_COLOR, null))          // 最新 -> 已移除
+        assertFalse(FeatureGate.isRemovedIn(FeatureGate.RemovedFeature.HURT_BY_TIMESTAMP, v("1.21.11")))
+        assertTrue(FeatureGate.isRemovedIn(FeatureGate.RemovedFeature.HURT_BY_TIMESTAMP, v("26.2")))
+    }
 }
