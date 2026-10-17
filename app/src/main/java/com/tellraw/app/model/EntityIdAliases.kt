@@ -109,6 +109,13 @@ object EntityIdAliases {
         return g.bedrock.firstOrNull()
     }
 
+    /** 另一版本的对应 ID（没有对照关系时 null）。 */
+    fun counterpart(id: String): String? {
+        val t = n(id)
+        val g = ID_TO_GROUP[t] ?: return null
+        return if (t in g.java) g.bedrock.firstOrNull() else g.java.firstOrNull()
+    }
+
     /** 该 ID 是否是"只在某一个版本里才这么写"的别名。 */
     fun isAliasOfOtherEdition(id: String): Boolean {
         val t = n(id)

@@ -48,6 +48,13 @@ class EntityIdAliasesTest {
     }
 
     @Test
+    fun counterpartForPicker() {
+        assertEquals("minecraft:zombie_pigman", EntityIdAliases.counterpart("minecraft:zombified_piglin"))
+        assertEquals("minecraft:zombified_piglin", EntityIdAliases.counterpart("minecraft:zombie_pigman"))
+        assertNull(EntityIdAliases.counterpart("minecraft:zombie"))
+    }
+
+    @Test
     fun registryAndFamiliesRecognizeAliases() {
         assertEquals("僵尸猪灵", EntityRegistry.displayName("minecraft:zombie_pigman"))
         assertEquals(EntityRegistry.Category.HOSTILE, EntityRegistry.categoryOf("minecraft:zombie_pigman"))

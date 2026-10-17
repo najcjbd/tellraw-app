@@ -77,6 +77,8 @@ object SelectorEvaluator {
         target: VersionSpec? = null
     ): Result {
         val notes = mutableListOf<String>()
+        // 同一条选择器里两版实体 ID 同时出现 -> 提醒（不改变求值，只提示可能写重/混用）
+        EntityIdAliases.detectMixedEditionIds(selector)?.let { notes.add(it) }
         val s = selector.trim()
         val base = s.substringBefore('[').trim()
         val paramsPart = if ('[' in s && s.endsWith("]")) s.substringAfter('[').dropLast(1) else ""
