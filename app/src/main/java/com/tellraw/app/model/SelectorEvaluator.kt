@@ -49,7 +49,7 @@ data class GridEntity(
 }
 
 /** 网格实体某个槽位里的物品（count 用于 hasitem quantity 判定）。 */
-data class GridItem(val id: String, val count: Int = 1)
+data class GridItem(val id: String, val count: Int = 1, val damage: Int? = null)
 
 /**
  * 在网格实体上求值一个目标选择器：返回"会被选中"的实体 + 无法求值/不支持的提醒。
@@ -421,8 +421,23 @@ object SelectorEvaluator {
         return ok
     }
 
+    /** 网格物品 -> NBT 物品堆栈（id/count + 可选的 damage 组件）。 */
+    private fun itemNbt(item: GridItem): Map<String, SnbtLite.Value> {
+        val m = linkedMapOf<String, SnbtLite.Value>(
+            "id" to SnbtLite.Value.Str(item.id),
+            "count" to SnbtLite.Value.Num(item.count.toDouble())
+        )
+        if (item.damage != null && item.damage > 0) {
+            m["components"] = SnbtLite.Value.Compound(
+                mapOf("minecraft:damage" to SnbtLite.Value.Num(item.damage.toDouble()))
+            )
+        }
+        return m
+    }
+
     private fun effectiveNbt(e: GridEntity): Map<String, SnbtLite.Value> {
         val m = linkedMapOf<String, SnbtLite.Value>()
+        m["id"] = SnbtLite.Value.Str(e.id)
         if (e.tags.isNotEmpty()) {
             m["Tags"] = SnbtLite.Value.ListV(e.tags.map { SnbtLite.Value.Str(it) })
         }
@@ -440,29 +455,36 @@ object SelectorEvaluator {
             )
         }
         e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
+        // 坐标 / 视角与 NBT 的 Pos / Rotation（Rotation 顺序是 [yaw, pitch]）统一
+        m["Pos"] = SnbtLite.Value.ListV(
+            listOf(
+                SnbtLite.Value.Num(e.x),
+                SnbtLite.Value.Num(e.y),
+                SnbtLite.Value.Num(e.z)
+            )
+        )
+        if (e.rotationX != null && e.rotationY != null) {
+            m["Rotation"] = SnbtLite.Value.ListV(
+                listOf(
+                    SnbtLite.Value.Num(e.rotationY),
+                    SnbtLite.Value.Num(e.rotationX)
+                )
+            )
+        }
 
         val inv = mutableListOf<SnbtLite.Value>()
         for ((slot, item) in e.items) {
             val n = inventorySlotNumber(slot) ?: continue
             inv.add(
                 SnbtLite.Value.Compound(
-                    mapOf(
-                        "id" to SnbtLite.Value.Str(item.id),
-                        "count" to SnbtLite.Value.Num(item.count.toDouble()),
-                        "Slot" to SnbtLite.Value.Num(n.toDouble())
-                    )
+                    itemNbt(item) + mapOf("Slot" to SnbtLite.Value.Num(n.toDouble()))
                 )
             )
         }
         if (inv.isNotEmpty()) m["Inventory"] = SnbtLite.Value.ListV(inv)
 
         e.items["weapon.mainhand"]?.let { item ->
-            m["SelectedItem"] = SnbtLite.Value.Compound(
-                mapOf(
-                    "id" to SnbtLite.Value.Str(item.id),
-                    "count" to SnbtLite.Value.Num(item.count.toDouble())
-                )
-            )
+            m["SelectedItem"] = SnbtLite.Value.Compound(itemNbt(item))
         }
         val eq = linkedMapOf<String, SnbtLite.Value>()
         for ((slot, item) in e.items) {
@@ -475,12 +497,7 @@ object SelectorEvaluator {
                 "armor.feet" -> "feet"
                 else -> null
             } ?: continue
-            eq[key] = SnbtLite.Value.Compound(
-                mapOf(
-                    "id" to SnbtLite.Value.Str(item.id),
-                    "count" to SnbtLite.Value.Num(item.count.toDouble())
-                )
-            )
+            eq[key] = SnbtLite.Value.Compound(itemNbt(item))
         }
         if (eq.isNotEmpty()) m["equipment"] = SnbtLite.Value.Compound(eq)
 
@@ -626,7 +643,7 @@ object SelectorEvaluator {
         var rawQuantity: String? = null
         var location: String? = null
         var slot: String? = null
-        var hasData = false
+        var data: Int? = null
         for (part in ExecCondSupport.splitTopLevel(body, ',')) {
             val i = ExecCondSupport.indexOfTopLevel(part, '=')
             if (i < 0) continue
@@ -637,10 +654,12 @@ object SelectorEvaluator {
                 "quantity" -> rawQuantity = value
                 "location" -> location = value
                 "slot" -> slot = value
-                "data" -> hasData = true
+                "data" -> data = value.toIntOrNull()
             }
         }
-        if (hasData) notes.add("hasitem 的 data= 在网格里未建模，已忽略该限制")
+        if (rawQuantity == null && data != null) {
+            notes.add("hasitem 的 data= 按物品损耗值（damage）处理")
+        }
         val want = item ?: run {
             notes.add("hasitem 缺少 item=（必填），已忽略该条件")
             return true
@@ -674,7 +693,8 @@ object SelectorEvaluator {
         val hi = qHi ?: Double.MAX_VALUE
         return e.items.any { (key, stack) ->
             slotMatches(key) && stack.id == wantId &&
-                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi
+                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi &&
+                (data == null || (stack.damage ?: 0) == data)
         }
     }
 

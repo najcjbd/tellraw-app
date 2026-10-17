@@ -35,6 +35,8 @@ class GridEntityStoreTest {
         assertEquals(GridItem("minecraft:shield"), items["weapon.offhand"])
         assertEquals(GridItem("minecraft:stone", 64), items["inventory.0"])
         assertEquals(GridItem("minecraft:bread", 3), items["hotbar.1"])
+        val dmg = EditableGridEntity(inventory = "0=diamond_sword x1 d=5").itemMap()
+        assertEquals(GridItem("minecraft:diamond_sword", 1, 5), dmg["inventory.0"])
     }
 
     @Test

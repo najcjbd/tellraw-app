@@ -201,6 +201,44 @@ class SelectorEvaluatorTest {
         assertTrue(r.notes.any { it.contains("同时") })
     }
 
+    @Test fun entityIdAndDamageAreUnifiedWithNbt() {
+        // type 字段与 NBT id 是同一份数据
+        assertEquals(
+            listOf("z1"),
+            SelectorEvaluator.evaluate("@e[nbt={id:\"minecraft:zombie\"}]", listOf(zombie))
+                .matched.map { it.uid }
+        )
+        // 坐标/视角与 NBT Pos / Rotation 统一
+        val rot = zombie.copy(rotationY = -90.0, rotationX = 45.0)
+        assertEquals(
+            listOf("z1"),
+            SelectorEvaluator.evaluate("@e[nbt={Pos:[0.0d,-60.0d,0.0d]}]", listOf(rot))
+                .matched.map { it.uid }
+        )
+        assertEquals(
+            listOf("z1"),
+            SelectorEvaluator.evaluate("@e[nbt={Rotation:[-90.0f,45.0f]}]", listOf(rot))
+                .matched.map { it.uid }
+        )
+        // hasitem data= 与物品 damage / NBT damage 组件统一
+        val p = steve.copy(items = mapOf("inventory.0" to GridItem("minecraft:diamond_sword", 1, 5)))
+        val bTarget = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 20, 80))
+        assertEquals(
+            listOf("p1"),
+            SelectorEvaluator.evaluate(
+                "@a[hasitem={item=diamond_sword,location=slot.inventory,slot=0,data=5}]",
+                listOf(p), edition = "bedrock", target = bTarget
+            ).matched.map { it.uid }
+        )
+        assertEquals(
+            listOf("p1"),
+            SelectorEvaluator.evaluate(
+                """@a[nbt={Inventory:[{Slot:0b,id:"minecraft:diamond_sword",components:{"minecraft:damage":5}}]}]""",
+                listOf(p)
+            ).matched.map { it.uid }
+        )
+    }
+
     @Test fun implicitLimitForPAndNAndR() {
         val two = listOf(
             steve.copy(uid = "p1", x = 0.0),
