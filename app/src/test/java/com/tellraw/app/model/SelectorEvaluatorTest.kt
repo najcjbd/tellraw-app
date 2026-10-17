@@ -173,6 +173,26 @@ class SelectorEvaluatorTest {
         )
     }
 
+    @Test fun originAndDistanceInterplay() {
+        val a = steve.copy(uid = "a", x = 0.0, y = -60.0, z = 0.0)
+        val b = steve.copy(uid = "b", x = 10.0, y = -60.0, z = 0.0)
+        val list = listOf(a, b)
+        fun sel(s: String, origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0)) =
+            SelectorEvaluator.evaluate(s, list, origin = origin)
+
+        // 选择器自带的 x/y/z 定义 distance 的原点
+        assertEquals(listOf("b"), sel("@e[x=10,y=-60,z=0,distance=..1]").matched.map { it.uid })
+        // 没有 x/y/z 时用传入原点（网格里的 at 执行者 / positioned）
+        assertEquals(listOf("b"), sel("@e[distance=..1]", Triple(10.0, -60.0, 0.0)).matched.map { it.uid })
+        // sort/limit 用同一原点
+        assertEquals(
+            listOf("b"),
+            sel("@e[sort=nearest,limit=1]", Triple(9.0, -60.0, 0.0)).matched.map { it.uid }
+        )
+        // dx 负方向：区域 [0,2]
+        assertEquals(listOf("a"), sel("@e[x=1,dx=-1]").matched.map { it.uid })
+    }
+
     @Test fun mixedEditionIdsAreNoted() {
         val r = SelectorEvaluator.evaluate(
             "@e[type=minecraft:zombified_piglin,type=minecraft:zombie_pigman]",
