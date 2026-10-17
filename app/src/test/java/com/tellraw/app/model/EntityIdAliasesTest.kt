@@ -24,8 +24,11 @@ class EntityIdAliasesTest {
         // 基岩统一的 boat 无法用单一 Java ID 表达
         assertNull(EntityIdAliases.toJava("minecraft:boat"))
         assertEquals("minecraft:boat", EntityIdAliases.toBedrock("minecraft:spruce_boat"))
-        // 未知 ID 原样
+        // 未知 ID / 无需改写时保留用户写法
         assertEquals("minecraft:unknown_mob", EntityIdAliases.toJava("minecraft:unknown_mob"))
+        assertEquals("player", EntityIdAliases.toJava("player"))
+        assertEquals("player", EntityIdAliases.toBedrock("player"))
+        assertEquals("zombie", EntityIdAliases.toJava("zombie"))
     }
 
     @Test

@@ -93,17 +93,19 @@ object EntityIdAliases {
      * 由调用方丢弃并提醒。
      */
     fun toJava(id: String): String? {
-        val t = n(id)
-        val g = ID_TO_GROUP[t] ?: return t
-        if (t in g.java) return t
-        return g.java.firstOrNull().takeIf { g.java.size == 1 }
+        val raw = id.trim().removeSurrounding("\"").lowercase()
+        val t = n(raw)
+        val g = ID_TO_GROUP[t] ?: return raw
+        if (t in g.java) return raw
+        return g.java.singleOrNull()
     }
 
     /** 转成基岩版可用的 ID（优先第一个基岩 ID）。 */
     fun toBedrock(id: String): String? {
-        val t = n(id)
-        val g = ID_TO_GROUP[t] ?: return t
-        if (t in g.bedrock) return t
+        val raw = id.trim().removeSurrounding("\"").lowercase()
+        val t = n(raw)
+        val g = ID_TO_GROUP[t] ?: return raw
+        if (t in g.bedrock) return raw
         return g.bedrock.firstOrNull()
     }
 
