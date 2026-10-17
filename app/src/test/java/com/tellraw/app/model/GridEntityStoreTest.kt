@@ -38,6 +38,22 @@ class GridEntityStoreTest {
     }
 
     @Test
+    fun gamemodeLevelRotationParsing() {
+        val g = EditableGridEntity(
+            gamemode = "creative", level = "30", rotationX = "-45.5", rotationY = "90"
+        ).toGridEntity()
+        assertEquals("creative", g.gamemode)
+        assertEquals(30, g.level)
+        assertEquals(-45.5, g.rotationX!!, 0.0)
+        assertEquals(90.0, g.rotationY!!, 0.0)
+        // 空值 = 未设置
+        val empty = EditableGridEntity().toGridEntity()
+        assertNull(empty.gamemode)
+        assertNull(empty.level)
+        assertNull(empty.rotationX)
+    }
+
+    @Test
     fun storeRoundTrip() {
         val dir = Files.createTempDirectory("grid").toFile()
         val file = File(dir, "grid_entities.json")

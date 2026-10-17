@@ -46,6 +46,64 @@ class SelectorEvaluatorTest {
         assertTrue(ids("@e[scores={hp=!4}]").matched.size == 2)
     }
 
+    @Test fun gamemodeLevelAndRotation() {
+        val creative = steve.copy(gamemode = "creative", level = 30)
+
+        fun sel(s: String, list: List<GridEntity> = listOf(creative, zombie)) =
+            SelectorEvaluator.evaluate(s, list)
+
+        assertEquals(listOf("p1"), sel("@a[gamemode=creative]").matched.map { it.uid })
+        assertTrue(sel("@a[gamemode=survival]").matched.isEmpty())
+        assertEquals(listOf("p1"), sel("@a[m=!survival]").matched.map { it.uid })
+        assertEquals(listOf("p1"), sel("@a[m=1]").matched.map { it.uid })
+        assertEquals(listOf("p1"), sel("@a[level=20..40]").matched.map { it.uid })
+        assertTrue(sel("@a[level=..20]").matched.isEmpty())
+        assertEquals(listOf("p1"), sel("@a[lm=10,l=50]").matched.map { it.uid })
+
+        val z = zombie.copy(rotationX = 45.0, rotationY = -90.0)
+        val list = listOf(z)
+        assertEquals(listOf("z1"), sel("@e[rx=0..90]", list).matched.map { it.uid })
+        assertTrue(sel("@e[rx=50..90]", list).matched.isEmpty())
+        assertEquals(listOf("z1"), sel("@e[y_rotation=-180..-45]", list).matched.map { it.uid })
+        // 未设置视角的实体不按它筛选，但要提醒
+        val noRot = sel("@e[rx=0..90]", listOf(zombie))
+        assertEquals(listOf("z1"), noRot.matched.map { it.uid })
+        assertTrue(noRot.notes.any { it.contains("rx=") })
+    }
+
+    @Test fun nbtItemSubset() {
+        val p = steve.copy(
+            items = mapOf(
+                "weapon.mainhand" to GridItem("minecraft:diamond_sword"),
+                "armor.head" to GridItem("minecraft:diamond_helmet"),
+                "inventory.0" to GridItem("minecraft:stone", 64)
+            )
+        )
+        val list = listOf(p)
+        fun sel(s: String) = SelectorEvaluator.evaluate(s, list)
+
+        assertEquals(
+            listOf("p1"),
+            sel("@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}}]").matched.map { it.uid }
+        )
+        assertTrue(
+            sel("@a[nbt={SelectedItem:{id:\"minecraft:wooden_sword\"}}]").matched.isEmpty()
+        )
+        assertEquals(
+            listOf("p1"),
+            sel("@a[nbt={equipment:{mainhand:{id:\"diamond_sword\"},head:{id:\"diamond_helmet\"}}}]")
+                .matched.map { it.uid }
+        )
+        assertEquals(
+            listOf("p1"),
+            sel("@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:stone\"}]}]").matched.map { it.uid }
+        )
+        // 未建模的键：不筛选，但明确提示
+        val unknown = sel("@a[nbt={Health:20.0f}]")
+        assertEquals(listOf("p1"), unknown.matched.map { it.uid })
+        assertTrue(unknown.notes.any { it.contains("物品相关子集") })
+    }
+
     @Test fun hasitemModeledSlots() {
         val steveWith = steve.copy(
             items = mapOf(
@@ -82,7 +140,8 @@ class SelectorEvaluatorTest {
     }
 
     @Test fun unmodelledParamsAreNotSilent() {
-        val r = ids("@e[nbt={Inventory:[{id:\"minecraft:diamond\"}]}]")
+        // nbt 现在只建模物品相关子集；其他键（Health 等）仍要明确提示，不能静默
+        val r = ids("@e[nbt={Health:20.0f}]")
         assertEquals(4, r.matched.size)
         assertTrue(r.notes.any { it.contains("nbt") })
     }

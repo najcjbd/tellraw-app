@@ -720,6 +720,10 @@ private fun EntityEditorDialog(
     var scores by remember(initial.uid) { mutableStateOf(initial.scores) }
     var equipment by remember(initial.uid) { mutableStateOf(initial.equipment) }
     var inventory by remember(initial.uid) { mutableStateOf(initial.inventory) }
+    var gamemode by remember(initial.uid) { mutableStateOf(initial.gamemode) }
+    var level by remember(initial.uid) { mutableStateOf(initial.level) }
+    var rotationX by remember(initial.uid) { mutableStateOf(initial.rotationX) }
+    var rotationY by remember(initial.uid) { mutableStateOf(initial.rotationY) }
     var customKey by remember(initial.uid) { mutableStateOf(initial.customKey) }
     var showPicker by remember { mutableStateOf(false) }
 
@@ -779,6 +783,27 @@ private fun EntityEditorDialog(
                 OutlinedTextField(inventory, { inventory = it },
                     label = { Text("物品栏（0=stone x64,hotbar.1=bread）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row {
+                    OutlinedTextField(gamemode, { gamemode = it },
+                        label = { Text("游戏模式") },
+                        singleLine = true, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(level, { level = it },
+                        label = { Text("等级") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true, modifier = Modifier.weight(1f))
+                }
+                Row {
+                    OutlinedTextField(rotationX, { rotationX = it },
+                        label = { Text("垂直视角 -90..90") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(rotationY, { rotationY = it },
+                        label = { Text("水平视角 -180..180") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true, modifier = Modifier.weight(1f))
+                }
                 if (customKey != null) {
                     Text("自定义条目：$customKey", style = MaterialTheme.typography.labelSmall)
                 }
@@ -808,6 +833,10 @@ private fun EntityEditorDialog(
                                 scores = scores,
                                 equipment = equipment,
                                 inventory = inventory,
+                                gamemode = gamemode,
+                                level = level,
+                                rotationX = rotationX,
+                                rotationY = rotationY,
                                 customKey = customKey
                             )
                         )
