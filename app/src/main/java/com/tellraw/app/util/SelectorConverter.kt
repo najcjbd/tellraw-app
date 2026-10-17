@@ -2056,7 +2056,7 @@ object SelectorConverter {
         return params
     }
 
-    private fun mergeDuplicateParameters(paramsPart: String): String {
+    private fun mergeDuplicateParameters(paramsPart: String, mixedMode: Boolean = useMixedModeMergeLogic): String {
         if (paramsPart.isEmpty()) {
             return paramsPart
         }
@@ -2180,7 +2180,7 @@ object SelectorConverter {
                 }
                 paramName in rangeParams -> {
                     // 范围类型：根据 useMixedModeMergeLogic 选择不同的合并逻辑
-                    if (useMixedModeMergeLogic) {
+                    if (mixedMode) {
                         // 使用源代码合并逻辑（取所有最小值的最小值和所有最大值的最大值）
                         // 这与 convertDistanceParameters、convertRotationParameters、convertLevelParameters 中的逻辑相同
                         val allMinValues = mutableListOf<Double>()
@@ -3837,12 +3837,10 @@ object SelectorConverter {
 
         // 合并Java版输出中的重复参数
         // 在JAVA/基岩混合模式下，使用混合模式合并逻辑（取所有最小值的最小值和所有最大值的最大值）
-        val originalMergeLogic = useMixedModeMergeLogic
-        useMixedModeMergeLogic = true
         val javaOutputWithMergedParams = if ('[' in javaOutput && ']' in javaOutput) {
             val javaSelectorVarPart = javaOutput.substringBefore('[')
             val javaParamsPart = javaOutput.substringAfter('[').substringBeforeLast(']')
-            val mergedJavaParams = mergeDuplicateParameters(javaParamsPart)
+            val mergedJavaParams = mergeDuplicateParameters(javaParamsPart, mixedMode = true)
             if (mergedJavaParams.isNotEmpty()) {
                 "$javaSelectorVarPart[$mergedJavaParams]"
             } else {
@@ -3884,7 +3882,7 @@ object SelectorConverter {
         val bedrockOutputWithMergedParams = if ('[' in bedrockOutput && ']' in bedrockOutput) {
             val bedrockSelectorVarPart = bedrockOutput.substringBefore('[')
             val bedrockParamsPart = bedrockOutput.substringAfter('[').substringBeforeLast(']')
-            val mergedBedrockParams = mergeDuplicateParameters(bedrockParamsPart)
+            val mergedBedrockParams = mergeDuplicateParameters(bedrockParamsPart, mixedMode = true)
             if (mergedBedrockParams.isNotEmpty()) {
                 "$bedrockSelectorVarPart[$mergedBedrockParams]"
             } else {
@@ -3894,9 +3892,6 @@ object SelectorConverter {
             bedrockOutput
         }
         
-        // 恢复原始合并逻辑
-        useMixedModeMergeLogic = originalMergeLogic
-
         // 添加提醒信息
         reminders.add(getStringSafely(context, R.string.java_bedrock_mixed_mode_active))
 
