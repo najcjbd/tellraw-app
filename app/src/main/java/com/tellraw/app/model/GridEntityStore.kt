@@ -31,6 +31,16 @@ data class EditableGridEntity(
     val rotationX: String = "",
     /** 水平视角 -180..180（空 = 未设置）。 */
     val rotationY: String = "",
+    /** 额外 SNBT（覆盖/补充派生 NBT），例如 `Health:20.0f, NoAI:1b`。 */
+    val nbt: String = "",
+    /** Bedrock has_property：`is_baby=1, fire` 等（bare = 存在即可）。 */
+    val properties: String = "",
+    /** Bedrock haspermission：`camera=enabled,movement=disabled`。 */
+    val permissions: String = "",
+    /** Java predicate：该实体匹配的谓词 ID（逗号分隔）。 */
+    val predicates: String = "",
+    /** Java advancements：已完成的 ID；`id|criterion` 表示该准则已完成。 */
+    val advancements: String = "",
     /** 自定义实体条目的唯一键（CustomEntity.id）；非空时显示名/头像取自它。 */
     val customKey: String? = null
 ) {
@@ -82,6 +92,27 @@ data class EditableGridEntity(
         return out
     }
 
+    fun propertyMap(): Map<String, String> =
+        properties.split(',', '，').mapNotNull { part ->
+            val t = part.trim()
+            if (t.isEmpty()) return@mapNotNull null
+            val i = t.indexOf('=')
+            if (i < 0) t to "true" else t.substring(0, i).trim() to t.substring(i + 1).trim()
+        }.toMap()
+
+    fun permissionMap(): Map<String, String> =
+        permissions.split(',', '，').mapNotNull { part ->
+            val i = part.indexOf('=')
+            if (i <= 0) null
+            else part.substring(0, i).trim().lowercase() to part.substring(i + 1).trim().lowercase()
+        }.toMap()
+
+    fun predicateSet(): Set<String> =
+        predicates.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    fun advancementSet(): Set<String> =
+        advancements.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
     fun toGridEntity(): GridEntity = GridEntity(
         uid = uid,
         id = if (id.contains(':')) id else "minecraft:$id",
@@ -97,7 +128,22 @@ data class EditableGridEntity(
         gamemode = gamemode.ifBlank { null },
         level = level.trim().toIntOrNull(),
         rotationX = rotationX.trim().toDoubleOrNull(),
-        rotationY = rotationY.trim().toDoubleOrNull()
+        rotationY = rotationY.trim().toDoubleOrNull(),
+        hitboxWidth = when (EntityRegistry.categoryOf(id)) {
+            EntityRegistry.Category.PROJECTILE -> 0.25
+            EntityRegistry.Category.VEHICLE -> 1.375
+            else -> 0.6
+        },
+        hitboxHeight = when (EntityRegistry.categoryOf(id)) {
+            EntityRegistry.Category.PROJECTILE -> 0.25
+            EntityRegistry.Category.VEHICLE -> 0.5625
+            else -> 1.8
+        },
+        extraNbt = nbt,
+        properties = propertyMap(),
+        permissions = permissionMap(),
+        predicates = predicateSet(),
+        advancements = advancementSet()
     )
 }
 

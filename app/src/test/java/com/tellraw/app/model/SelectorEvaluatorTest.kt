@@ -98,10 +98,105 @@ class SelectorEvaluatorTest {
             listOf("p1"),
             sel("@a[nbt={Inventory:[{Slot:0b,id:\"minecraft:stone\"}]}]").matched.map { it.uid }
         )
-        // 未建模的键：不筛选，但明确提示
+        // 未设置的键：按真实 NBT 语义不匹配，并提示缺哪个键
         val unknown = sel("@a[nbt={Health:20.0f}]")
-        assertEquals(listOf("p1"), unknown.matched.map { it.uid })
-        assertTrue(unknown.notes.any { it.contains("物品相关子集") })
+        assertTrue(unknown.matched.isEmpty())
+        assertTrue(unknown.notes.any { it.contains("Health") })
+        // 在实体上补了 NBT 就能匹配
+        val withHealth = steve.copy(extraNbt = "Health:20.0f")
+        assertEquals(
+            listOf("p1"),
+            SelectorEvaluator.evaluate("@a[nbt={Health:20.0f}]", listOf(withHealth))
+                .matched.map { it.uid }
+        )
+    }
+
+    @Test fun derivedNbtFromGridFields() {
+        val p = steve.copy(tags = setOf("vip", "staff"))
+        val list = listOf(p)
+        fun sel(s: String) = SelectorEvaluator.evaluate(s, list).matched.map { it.uid }
+
+        // tag 字段与 nbt Tags 是同一份数据
+        assertEquals(listOf("p1"), sel("@a[nbt={Tags:[\"vip\"]}]"))
+        assertEquals(listOf("p1"), sel("@a[nbt={Tags:[\"vip\",\"staff\"]}]"))
+        assertTrue(sel("@a[nbt={Tags:[\"vip\",\"other\"]}]").isEmpty())
+        // name 字段与 CustomName 是同一份数据（普通字符串/JSON 文本都认）
+        assertEquals(listOf("p1"), sel("@a[nbt={CustomName:\"Steve\"}]"))
+        assertEquals(listOf("p1"), sel("""@a[nbt={CustomName:'{"text":"Steve"}'}]"""))
+        // team 字段与 NBT Team 是同一份数据
+        assertEquals(
+            listOf("p1"),
+            SelectorEvaluator.evaluate("@a[nbt={Team:\"red\"}]", listOf(steve.copy(team = "red")))
+                .matched.map { it.uid }
+        )
+        // gamemode/level 派生
+        val c = steve.copy(gamemode = "creative", level = 30)
+        assertEquals(listOf("p1"), SelectorEvaluator.evaluate(
+            "@a[nbt={playerGameType:1}]", listOf(c)
+        ).matched.map { it.uid })
+        assertEquals(listOf("p1"), SelectorEvaluator.evaluate(
+            "@a[nbt={XpLevel:30}]", listOf(c)
+        ).matched.map { it.uid })
+    }
+
+    @Test fun externalConditions() {
+        val p = steve.copy(
+            properties = mapOf("is_baby" to "true", "fire" to "true", "scale" to "1.5"),
+            permissions = mapOf("camera" to "enabled", "movement" to "disabled"),
+            predicates = setOf("minecraft:is_sneaking"),
+            advancements = setOf(
+                "minecraft:story/mine_diamond",
+                "minecraft:story/smelt_iron|crit"
+            )
+        )
+        val list = listOf(p)
+        val bTarget = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 20, 80))
+        fun bedrock(s: String) = SelectorEvaluator.evaluate(
+            s, list, edition = "bedrock", target = bTarget
+        ).matched.map { it.uid }
+        fun java(s: String) = SelectorEvaluator.evaluate(s, list).matched.map { it.uid }
+
+        assertEquals(listOf("p1"), bedrock("@a[has_property={property=is_baby}]"))
+        assertTrue(bedrock("@a[has_property={property=!fire}]").isEmpty())
+        assertEquals(listOf("p1"), bedrock("@a[has_property={is_baby=true}]"))
+        assertEquals(listOf("p1"), bedrock("@a[has_property={scale=1..2}]"))
+        assertEquals(listOf("p1"), bedrock("@a[haspermission={camera=enabled}]"))
+        assertTrue(bedrock("@a[haspermission={movement=enabled}]").isEmpty())
+
+        assertEquals(listOf("p1"), java("@a[predicate=minecraft:is_sneaking]"))
+        assertTrue(java("@a[predicate=!minecraft:is_sneaking]").isEmpty())
+        assertEquals(listOf("p1"), java("""@a[advancements={"minecraft:story/mine_diamond"=true}]"""))
+        assertTrue(java("""@a[advancements={"minecraft:story/mine_diamond"=false}]""").isEmpty())
+        assertEquals(
+            listOf("p1"),
+            java("""@a[advancements={"minecraft:story/smelt_iron"={"crit"=true}}]""")
+        )
+    }
+
+    @Test fun implicitLimitForPAndNAndR() {
+        val two = listOf(
+            steve.copy(uid = "p1", x = 0.0),
+            steve.copy(uid = "p2", x = 5.0)
+        )
+        assertEquals(1, SelectorEvaluator.evaluate("@p", two).matched.size)
+        assertEquals(1, SelectorEvaluator.evaluate("@n", two).matched.size)
+        assertEquals(1, SelectorEvaluator.evaluate("@r", two).matched.size)
+        assertEquals(2, SelectorEvaluator.evaluate("@a", two).matched.size)
+        // 显式 limit 覆盖默认值
+        assertEquals(2, SelectorEvaluator.evaluate("@p[limit=2]", two).matched.size)
+    }
+
+    @Test fun dxBoxUsesHitboxIntersectionAndPlusOneSize() {
+        // 区域 x=9,dx=1 -> [9,11]；实体中心 11.2 在区域外，但 0.6 宽判定箱左缘 10.9 与区域相交
+        val e = GridEntity("z", "minecraft:zombie", x = 11.2)
+        assertEquals(listOf("z"), SelectorEvaluator.evaluate("@e[x=9,dx=1]", listOf(e)).matched.map { it.uid })
+        // dx=0 也是 1 格宽（边长 |0|+1）；中心 10.2 的判定箱左缘 9.9 与 [9,10] 相交
+        val near = GridEntity("z2", "minecraft:zombie", x = 10.2)
+        assertEquals(listOf("z2"), SelectorEvaluator.evaluate("@e[x=9,dx=0]", listOf(near)).matched.map { it.uid })
+        // 远离区域 -> 不匹配
+        assertTrue(
+            SelectorEvaluator.evaluate("@e[x=0,dx=1]", listOf(e)).matched.isEmpty()
+        )
     }
 
     @Test fun hasitemModeledSlots() {
@@ -140,9 +235,9 @@ class SelectorEvaluatorTest {
     }
 
     @Test fun unmodelledParamsAreNotSilent() {
-        // nbt 现在只建模物品相关子集；其他键（Health 等）仍要明确提示，不能静默
+        // 无法求值的 nbt 键也要明确提示（这里是"实体未设置该键"）
         val r = ids("@e[nbt={Health:20.0f}]")
-        assertEquals(4, r.matched.size)
-        assertTrue(r.notes.any { it.contains("nbt") })
+        assertTrue(r.matched.isEmpty())
+        assertTrue(r.notes.any { it.contains("Health") })
     }
 }

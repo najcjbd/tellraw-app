@@ -1,0 +1,5 @@
+Entity avatar sprites (app/src/main/res/drawable-nodpi/entity_*.png)
+Source: Minecraft Wiki (https://minecraft.wiki), EntitySprite files.
+The sprite images depict Minecraft entities; Minecraft is a trademark of Mojang Synergies AB.
+These small (16x16) sprites are used only to visually identify entities inside this fan-made tool.
+Downloaded on 2026-10-17. If a sprite is missing, the app falls back to a colored initial.

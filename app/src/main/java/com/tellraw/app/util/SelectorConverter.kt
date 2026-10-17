@@ -137,6 +137,8 @@ object SelectorConverter {
         R.string.at_n_converted_for_target_version to "目标版本 %s 没有 @n，已改写为 @e 的等效 limit/sort 写法",
         R.string.param_removed_for_target_version to "目标版本 %1\$s 不支持 %2\$s=，已移除（无等效写法）",
         R.string.bedrock_type_tag_not_supported to "基岩版不支持 type=#类型标签，已移除该条件",
+        R.string.entity_id_converted to "实体 ID %1\$s 已按目标版本改写为 %2\$s",
+        R.string.entity_id_no_single_target_form to "实体 ID %1\$s 无法用单一 %2\$s ID 表达，已移除该 type 条件",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
         R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",
@@ -514,6 +516,11 @@ object SelectorConverter {
         // 例如：x=8,x=9.5 合并为 x=9.5，后续只需要转换一次
         val mergedParamsPart = mergeDuplicateParameters(paramsPart)
         paramsPart = mergedParamsPart
+
+        // 双版本实体 ID：两版写法都识别；按目标版本改写成该版本认可的 ID。
+        // 同一条输入里同时出现同一实体的两版 ID -> 提醒（多半是写重了/混用了两版语法）。
+        EntityIdAliases.detectMixedEditionIds(effectiveSelector)?.let { conversionReminders.add(it) }
+        paramsPart = convertEntityTypeIds(paramsPart, targetVersion, context, conversionReminders)
 
         // 处理 scores 参数的反选（基岩版特有功能）
         // 注意：必须在 mergeDuplicateParameters 之后处理，因为mergeDuplicateParameters可能改变了参数格式
@@ -1008,6 +1015,47 @@ object SelectorConverter {
         return Triple(finalSelector, removedParams, conversionReminders)
     }
     
+    /**
+     * 把 type= 里的实体 ID 改写成目标版本认可的写法（两版 ID 都能被识别）。
+     * 无法用单一目标 ID 表达时（如基岩统一的 boat）移除该条件并提醒。
+     */
+    private fun convertEntityTypeIds(
+        paramsPart: String,
+        targetVersion: SelectorType,
+        context: Context,
+        reminders: MutableList<String>
+    ): String {
+        val pattern = Regex("(^|,)(type=)(!?)([^,\\]]+)")
+        var out = pattern.replace(paramsPart) { m ->
+            val prefix = m.groupValues[1]
+            val neg = m.groupValues[3]
+            val raw = m.groupValues[4].trim().removeSurrounding("\"")
+            if (raw.startsWith("#") || raw.isBlank()) return@replace m.value
+            val converted = when (targetVersion) {
+                SelectorType.JAVA -> EntityIdAliases.toJava(raw)
+                SelectorType.BEDROCK -> EntityIdAliases.toBedrock(raw)
+                else -> raw
+            }
+            if (converted == null) {
+                reminders.add(
+                    getStringSafely(
+                        context, R.string.entity_id_no_single_target_form,
+                        raw, if (targetVersion == SelectorType.JAVA) "Java版" else "基岩版"
+                    )
+                )
+                prefix
+            } else {
+                if (converted != raw) {
+                    reminders.add(getStringSafely(context, R.string.entity_id_converted, raw, converted))
+                }
+                "$prefix" + "type=" + neg + converted
+            }
+        }
+        while (",," in out) out = out.replace(",,", ",")
+        out = out.trimStart(',').trimEnd(',')
+        return out
+    }
+
     /**
      * 将Java版的distance参数转换为基岩版的r/rm参数
      */

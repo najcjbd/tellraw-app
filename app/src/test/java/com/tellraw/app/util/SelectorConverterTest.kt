@@ -3866,6 +3866,34 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testEntityIdsConvertedForTargetEdition() {
+        val (javaSel, _, javaReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[type=minecraft:zombie_pigman]", SelectorType.JAVA, context
+        )
+        assertEquals("@e[type=minecraft:zombified_piglin]", javaSel)
+        assertTrue(javaReminders.any { it.contains("zombie_pigman") })
+
+        val (bedrockSel, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[type=minecraft:zombified_piglin]", SelectorType.BEDROCK, context
+        )
+        assertEquals("@e[type=minecraft:zombie_pigman]", bedrockSel)
+
+        // 同一实体两版 ID 同时出现 -> 提醒（即使 type 被合并，也按原文检测）
+        val (_, _, mixedReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[type=minecraft:zombified_piglin,type=minecraft:zombie_pigman]",
+            SelectorType.JAVA, context
+        )
+        assertTrue(mixedReminders.any { it.contains("同时") })
+
+        // 基岩统一 boat 无法用单一 Java ID 表达 -> 丢弃条件 + 提醒
+        val (boat, _, boatReminders) = SelectorConverter.filterSelectorParameters(
+            "@e[type=minecraft:boat]", SelectorType.JAVA, context
+        )
+        assertEquals("@e", boat)
+        assertTrue(boatReminders.any { it.contains("boat") })
+    }
+
+    @Test
     fun testMixedModePreservesEntityKindForMainhandHasitem() {
         // 反例：混合模式内部用合成选择器 "a[...]" 时，不能丢掉"这个选择器只选非玩家"这一信息，
         // 否则主手会误写成玩家的 SelectedItem。
