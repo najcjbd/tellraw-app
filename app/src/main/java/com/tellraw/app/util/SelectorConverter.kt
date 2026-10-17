@@ -302,8 +302,7 @@ object SelectorConverter {
         val selectorMapping = mapOf(
             "@initiator" to "@a",
             "@c" to "@a",
-            "@v" to "@a",
-            "@n" to "@e"
+            "@v" to "@a"
         )
         
         val selectorVar = selector.split('[')[0]
@@ -314,8 +313,22 @@ object SelectorConverter {
         var newSelector = selector
         var wasConverted = false
         
-        // 转换选择器变量
-        if (selectorVar in selectorMapping) {
+        // @n（最近实体）：Java 用 @e[limit=1,sort=nearest] 等效（@n 本身要 Java 1.21+/基岩 1.21.100+）
+        if (selectorVar == "@n") {
+            val p0 = paramsPart
+            val hasLimit = Regex("(^|,)limit=").containsMatchIn(p0)
+            val hasSort = Regex("(^|,)sort=").containsMatchIn(p0)
+            val extra = mutableListOf<String>()
+            if (!hasLimit) extra.add("limit=1")
+            if (!hasSort) extra.add("sort=nearest")
+            val body = (if (p0.isEmpty()) "" else "$p0,") + extra.joinToString(",")
+            newSelector = if (body.isEmpty()) "@e" else "@e[$body]"
+            reminders.add(
+                "基岩 \"@n\"（最近实体）已转换为 Java 等效写法 " +
+                    "@e[limit=1,sort=nearest]（兼容所有 Java 版本；@n 本身仅 Java 1.21+/基岩 1.21.100+ 才有）"
+            )
+            wasConverted = true
+        } else if (selectorVar in selectorMapping) {
             newSelector = selectorMapping[selectorVar]!! + if (paramsPart.isNotEmpty()) "[$paramsPart]" else ""
             reminders.add(getStringSafely(context, R.string.bedrock_selector_converted, selectorVar, selectorMapping[selectorVar]!!))
             wasConverted = true
