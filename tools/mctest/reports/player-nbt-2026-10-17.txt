@@ -1,0 +1,25 @@
+玩家实体 NBT 跨版本实测（CI player-probe run 39020995573，2026-10-17）
+================================================================
+覆盖：1.16.5 / 1.17.1 / 1.18.2 / 1.19.4 / 1.20.1 / 1.20.4 / 1.20.5 / 1.21.1 /
+      1.21.4 / 1.21.5 / 1.21.8 / 1.21.11（bot 进服后 data get）
+状态：empty / hotbar0 / mainhand / offhand / head / enderchest0 / full
+
+【结论 1：物品 NBT 的分界 = 1.20.5（与既有规范一致）】
+  ≤1.20.4：Inventory 项 = {Slot:0b, id:"minecraft:diamond", Count:1b}
+           SelectedItem = {id:"minecraft:diamond_sword", Count:1b, tag:{Damage:0}}
+  ≥1.20.5：Inventory 项 = {count:1, Slot:0b, id:"minecraft:diamond"}
+           SelectedItem = {count:1, id:"minecraft:diamond_sword"}（无 tag）
+
+【结论 2：equipment 字段 = 1.21.5 起才有内容（进一步坐实）】
+  ≤1.21.4：data get entity <玩家> equipment -> 无该字段（Found no elements）
+  ≥1.21.5：equipment = {head:{count:1,id:"minecraft:diamond_helmet"}}
+  => 与实体矩阵结论一致：1.20.5–1.21.4 的 armor 只能用 Inventory 数字槽 / execute if items。
+
+【结论 3：26.2 / 26.3 无法自动采样玩家 NBT】
+  mineflayer/minecraft-data 不支持 26.x，bot 进不去 -> data get 报 No entity。
+  这两个版本的玩家 NBT 需真人进服手测（或换支持的 bot 库）。
+
+【用途】
+  - 网格里"玩家"实体：1.20.5 前用 Count/tag，之后用 count/组件；
+  - armor/副手：1.21.5 前不要用 equipment（用 Inventory 数字槽或 execute if items）；
+  - 26.2/26.3：先按 1.21.11 的玩家 NBT 处理，并标注"未经实测"。
