@@ -74,12 +74,13 @@ data class EditableGridEntity(
                     if (n != null) "$numericPrefix.$n" else key0
                 }
             }
-            val m = Regex("^([^\\s*]+)\\s*(?:[x*]\\s*(\\d+))?$").find(rawValue.trim())
-                ?: return
+            val m = Regex("^([^\\s*\\[]+)\\s*(?:[x*]\\s*(\\d+))?\\s*(?:d(?:amage)?\\s*=\\s*(\\d+))?$")
+                .find(rawValue.trim()) ?: return
             val id0 = m.groupValues[1]
             val id = if (id0.contains(':')) id0 else "minecraft:$id0"
             val count = m.groupValues[2].toIntOrNull() ?: 1
-            out[key] = GridItem(id, count)
+            val damage = m.groupValues[3].toIntOrNull()
+            out[key] = GridItem(id, count, damage)
         }
         for (part in equipment.split(',', '，')) {
             val i = part.indexOf('=')
