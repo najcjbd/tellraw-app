@@ -881,6 +881,14 @@ private fun EntityEditorDialog(
     var rotationY by remember(initial.uid) { mutableStateOf(initial.rotationY) }
     var nbt by remember(initial.uid) { mutableStateOf(initial.nbt) }
     var showQuickNbt by remember { mutableStateOf(false) }
+
+    // 手动 NBT 里若写了 Tags/CustomName/Team，同步到上方字段（与 NBT 同一份数据）
+    LaunchedEffect(nbt) {
+        val ext = KnownNbt.readExternal(nbt) ?: return@LaunchedEffect
+        ext.tags?.let { tags = it }
+        ext.name?.let { name = it }
+        ext.team?.let { team = it }
+    }
     var properties by remember(initial.uid) { mutableStateOf(initial.properties) }
     var permissions by remember(initial.uid) { mutableStateOf(initial.permissions) }
     var predicates by remember(initial.uid) { mutableStateOf(initial.predicates) }
@@ -916,11 +924,20 @@ private fun EntityEditorDialog(
                     }
                 )
 
-                OutlinedTextField(name, { name = it }, label = { Text("名称（同 NBT CustomName，可空）") },
+                OutlinedTextField(name, {
+                        name = it
+                        nbt = KnownNbt.stripExternal(nbt) ?: nbt
+                    }, label = { Text("名称（同 NBT CustomName，可空）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(tags, { tags = it }, label = { Text("tags（同 NBT Tags，逗号分隔）") },
+                OutlinedTextField(tags, {
+                        tags = it
+                        nbt = KnownNbt.stripExternal(nbt) ?: nbt
+                    }, label = { Text("tags（同 NBT Tags，逗号分隔）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(team, { team = it }, label = { Text("队伍（可空）") },
+                OutlinedTextField(team, {
+                        team = it
+                        nbt = KnownNbt.stripExternal(nbt) ?: nbt
+                    }, label = { Text("队伍（同 NBT Team，可空）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row {
                     OutlinedTextField(x, { x = it }, label = { Text("x") },

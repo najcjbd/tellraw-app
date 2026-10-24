@@ -36,6 +36,25 @@ class KnownNbtTest {
         assertTrue("未知键不能丢", merged.contains("SomeModData"))
     }
 
+    @Test fun externalFieldsReadAndStrip() {
+        val ext = KnownNbt.readExternal(
+            """{Tags:["a","b"],CustomName:'{"text":"Bob"}',Team:"red",Health:20.0f}"""
+        )
+        requireNotNull(ext)
+        assertEquals("a,b", ext.tags)
+        assertEquals("Bob", ext.name)
+        assertEquals("red", ext.team)
+
+        val stripped = KnownNbt.stripExternal(
+            """{Health:20.0f,Tags:["a"],CustomName:"Bob",Team:"red"}"""
+        )
+        requireNotNull(stripped)
+        assertFalse(stripped.contains("Tags"))
+        assertFalse(stripped.contains("CustomName"))
+        assertFalse(stripped.contains("Team"))
+        assertTrue(stripped.contains("Health"))
+    }
+
     @Test fun invalidManualNbtReturnsNull() {
         assertNull(KnownNbt.merge("Health:", mapOf("Health" to "20")))
     }

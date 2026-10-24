@@ -44,6 +44,28 @@ object KnownNbt {
         }
     }
 
+    /** 与上方字段同源的 NBT 键（Tags / CustomName / Team）。 */
+    data class External(val tags: String?, val name: String?, val team: String?)
+
+    fun readExternal(nbtText: String): External? {
+        val parsed = SnbtLite.parseCompoundBody(nbtText) ?: return null
+        val tags = (parsed["Tags"] as? SnbtLite.Value.ListV)?.items
+            ?.mapNotNull { (it as? SnbtLite.Value.Str)?.v }
+            ?.joinToString(",")
+        val name = (parsed["CustomName"] as? SnbtLite.Value.Str)?.v?.let { SnbtLite.plainText(it) }
+        val team = (parsed["Team"] as? SnbtLite.Value.Str)?.v
+        return External(tags, name, team)
+    }
+
+    /** 去掉与上方字段同源的键（避免手写 NBT 覆盖字段值）；无法解析返回 null。 */
+    fun stripExternal(nbtText: String): String? {
+        val base = SnbtLite.parseCompoundBody(nbtText)?.toMutableMap() ?: return null
+        base.remove("Tags")
+        base.remove("CustomName")
+        base.remove("Team")
+        return SnbtLite.serializeCompound(base)
+    }
+
     /** 从 NBT 文本回填已知快捷键（未知键忽略，但文本本身不会被丢）。 */
     fun fillQuick(text: String, out: MutableMap<String, String>) {
         val parsed = SnbtLite.parseCompoundBody(text) ?: return
