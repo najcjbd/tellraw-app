@@ -76,7 +76,7 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     val showJavaBedrockMixedModeWarningDialog by viewModel.showJavaBedrockMixedModeWarningDialog.collectAsState()
-    var showTranslateInsertDialog by remember { mutableStateOf(false) }
+    var showCommaChoiceDialog by remember { mutableStateOf(false) }
     
     // 文本组件相关状态
     val selectedTextComponent by viewModel.selectedTextComponent.collectAsState()
@@ -130,7 +130,25 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onTranslateSelected = { showTranslateInsertDialog = true },
+            onCommaSelected = {
+                if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
+                    if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
+                        viewModel.insertTextWithComponent(
+                            messageTextFieldValue.value.selection.start, ","
+                        )
+                    } else {
+                        showCommaChoiceDialog = true
+                    }
+                } else if (defaultUseText) {
+                    viewModel.insertPlainTextAt(
+                        messageTextFieldValue.value.selection.start, ","
+                    )
+                } else {
+                    viewModel.insertTextWithComponent(
+                        messageTextFieldValue.value.selection.start, ","
+                    )
+                }
+            },
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -152,7 +170,25 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onTranslateSelected = { showTranslateInsertDialog = true },
+            onCommaSelected = {
+                if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
+                    if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
+                        viewModel.insertTextWithComponent(
+                            messageTextFieldValue.value.selection.start, ","
+                        )
+                    } else {
+                        showCommaChoiceDialog = true
+                    }
+                } else if (defaultUseText) {
+                    viewModel.insertPlainTextAt(
+                        messageTextFieldValue.value.selection.start, ","
+                    )
+                } else {
+                    viewModel.insertTextWithComponent(
+                        messageTextFieldValue.value.selection.start, ","
+                    )
+                }
+            },
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -312,15 +348,33 @@ fun MainScreen(
         )
     }
 
-    if (showTranslateInsertDialog) {
-        TranslateInsertDialog(
-            defaultTextMode = defaultUseText,
-            onDismiss = { showTranslateInsertDialog = false },
-            onConfirm = { key, withText, fallback ->
-                viewModel.insertTranslateComponent(
-                    messageTextFieldValue.value.selection.start, key, withText, fallback
-                )
-                showTranslateInsertDialog = false
+    if (showCommaChoiceDialog) {
+        AlertDialog(
+            onDismissRequest = { showCommaChoiceDialog = false },
+            title = { Text("逗号插入到哪里？") },
+            text = {
+                Text("当前选中了 translate 组件。要把它作为 with 的参数分隔符，还是普通文本？")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                    viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH)
+                    viewModel.insertTextWithComponent(
+                        messageTextFieldValue.value.selection.start, ","
+                    )
+                    showCommaChoiceDialog = false
+                }) { Text("with 分隔符") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        viewModel.insertPlainTextAt(
+                            messageTextFieldValue.value.selection.start, ","
+                        )
+                        showCommaChoiceDialog = false
+                    }) { Text("普通文本") }
+                    TextButton(onClick = { showCommaChoiceDialog = false }) { Text("取消") }
+                }
             }
         )
     }
@@ -400,7 +454,7 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onTranslateSelected: () -> Unit,
+    onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
@@ -579,7 +633,7 @@ private fun PortraitLayout(
                 
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
-                    onTranslateSelected = onTranslateSelected,
+                    onCommaSelected = onCommaSelected,
                     onCodeSelected = { code ->
                         val currentValue = messageTextFieldValue.value
                         val cursorPosition = currentValue.selection.start
@@ -696,7 +750,7 @@ private fun PortraitLayout(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onTranslateSelected: () -> Unit,
+    onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,

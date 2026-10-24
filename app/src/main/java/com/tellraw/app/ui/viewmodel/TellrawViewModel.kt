@@ -2066,46 +2066,25 @@ class TellrawViewModel @Inject constructor(
         lastMessageInput = newText
     }
     
-    /** 快捷插入一个 translate 组件（必要时从默认 text 模式切到组件模式）。 */
-    fun insertTranslateComponent(
-        insertPosition: Int,
-        key: String,
-        withText: String,
-        fallback: String
-    ) {
+    /** 在纯文本位置插入一个普通 TEXT 组件（用于"逗号作为普通文本"等）。 */
+    fun insertPlainTextAt(insertPosition: Int, text: String) {
         if (_defaultUseText.value) {
-            _defaultUseText.value = false
-            viewModelScope.launch {
-                settingsRepository.setDefaultUseText(false)
-                settingsRepository.saveConfig()
-            }
+            // 默认 text 模式：直接改纯文本
             val plain = _messageInput.value
-            _messageInputWithMarkers.value = if (plain.isEmpty()) "" else
-                TextComponentHelper.componentsToText(
-                    listOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, plain))
-                )
+            val pos = insertPosition.coerceIn(0, plain.length)
+            _messageInput.value = plain.substring(0, pos) + text + plain.substring(pos)
+            _messageInputWithMarkers.value = _messageInput.value
+            lastMessageInput = _messageInput.value
+            generateCommands()
+            return
         }
-        val comp = TextComponentHelper.TextComponent(
-            TextComponentHelper.ComponentType.TRANSLATE, key
-        )
-        if (withText.isNotEmpty()) {
-            comp.subComponents.add(
-                TextComponentHelper.SubComponent(TextComponentHelper.SubComponentType.WITH, withText)
-            )
-        }
-        if (fallback.isNotEmpty()) {
-            comp.subComponents.add(
-                TextComponentHelper.SubComponent(TextComponentHelper.SubComponentType.FALLBACK, fallback)
-            )
-        }
+        val comp = TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, text)
         val newMarkers = TextComponentHelper.insertComponentAt(
             _messageInputWithMarkers.value, insertPosition, comp
         )
         _messageInputWithMarkers.value = newMarkers
         _messageInput.value = TextComponentHelper.stripComponentMarkers(newMarkers)
         lastMessageInput = _messageInput.value
-        _selectedTextComponent.value = TextComponentHelper.ComponentType.TRANSLATE
-        _selectedSubComponent.value = null
         generateCommands()
     }
 
