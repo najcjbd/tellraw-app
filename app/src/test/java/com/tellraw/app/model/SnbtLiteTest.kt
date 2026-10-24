@@ -54,6 +54,20 @@ class SnbtLiteTest {
         assertTrue(SnbtLite.matches(SnbtLite.Value.Compound(query), SnbtLite.Value.Compound(actual)))
     }
 
+    @Test fun serializeRoundTripAndMultipleKeys() {
+        val original = q("""{Health:20.0f,NoAI:1b,Tags:["a","b"],Pos:[1.0d,2.0d,3.0d],Data:{x:1}}""")
+        val text = SnbtLite.serializeCompound(original)
+        val again = SnbtLite.parseCompound("{$text}")
+        requireNotNull(again)
+        assertTrue(
+            SnbtLite.matches(
+                SnbtLite.Value.Compound(original),
+                SnbtLite.Value.Compound(again)
+            )
+        )
+        assertTrue(text.contains(","))
+    }
+
     @Test fun invalidSnbtReturnsNull() {
         assertNull(SnbtLite.parseCompound("{a:"))
     }

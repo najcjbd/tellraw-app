@@ -84,6 +84,24 @@ object SnbtLite {
         return norm(a.v) == norm(b.v)
     }
 
+    /** 把 compound 写回 SNBT 文本（多键用逗号分隔）。 */
+    fun serializeCompound(map: Map<String, Value>): String =
+        map.entries.joinToString(",") { (k, v) -> "${keyText(k)}:${serialize(v)}" }
+
+    fun serialize(v: Value): String = when (v) {
+        is Value.Num -> {
+            if (v.v == v.v.toLong().toDouble()) v.v.toLong().toString()
+            else v.v.toString()
+        }
+        is Value.Str -> "\"" + v.v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        is Value.Bool -> if (v.v) "1b" else "0b"
+        is Value.ListV -> "[" + v.items.joinToString(",") { serialize(it) } + "]"
+        is Value.Compound -> "{" + serializeCompound(v.map) + "}"
+    }
+
+    private fun keyText(k: String): String =
+        if (k.matches(Regex("[A-Za-z0-9_\\-]+"))) k else "\"" + k.replace("\"", "\\\"") + "\""
+
     /** 文本比较：兼容 CustomName 的 JSON 形式（{"text":"Bob"}）与普通字符串。 */
     private fun sameText(a: String, b: String): Boolean {
         if (a == b) return true

@@ -61,7 +61,10 @@ import com.tellraw.app.model.EntityAvatars
 import com.tellraw.app.model.EntityIdAliases
 import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
+import com.tellraw.app.model.GridConditionEvaluator
 import com.tellraw.app.model.GridEntityStore
+import com.tellraw.app.model.KnownNbt
+import com.tellraw.app.model.SnbtLite
 import com.tellraw.app.model.SelectorEvaluator
 import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
@@ -135,6 +138,7 @@ fun GridEditorScreen(
     }
 
     var selectorText by rememberSaveable { mutableStateOf(selectorFromMain) }
+    var conditions by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(selectorFromMain) {
         if (selectorText.isBlank()) selectorText = selectorFromMain
     }
@@ -212,7 +216,15 @@ fun GridEditorScreen(
             target = targetSpec
         )
     }
-    val matchedUids = remember(evaluation) { evaluation.matched.map { it.uid }.toSet() }
+    val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
+    val conditionResults = remember(evaluation, conditions, allGridEntities, targetSpec) {
+        evaluation.matched.map { ge ->
+            GridConditionEvaluator.evaluate(conditions, ge, allGridEntities, targetSpec) to ge
+        }
+    }
+    val filteredMatched = conditionResults.filter { it.first.ok }.map { it.second }
+    val conditionNotes = conditionResults.flatMap { it.first.notes }.distinct()
+    val matchedUids = remember(filteredMatched) { filteredMatched.map { it.uid }.toSet() }
 
     // 自定义头像：只在用户填了本地头像路径时加载（不联网）
     // 内置实体头像（wiki EntitySprite），自定义头像优先
@@ -552,10 +564,23 @@ fun GridEditorScreen(
                     }
                 }
             )
+            OutlinedTextField(
+                value = conditions,
+                onValueChange = { conditions = it },
+                label = { Text("附加条件（if/unless data entity @s {…} 或 if entity @s[…]）") },
+                modifier = Modifier.fillMaxWidth()
+            )
             Text(
-                "将选中 ${evaluation.matched.size} / ${entities.size} 个实体",
+                "将选中 ${filteredMatched.size} / ${entities.size} 个实体" +
+                    (if (conditions.isNotBlank()) "（已按附加条件筛选）" else ""),
                 style = MaterialTheme.typography.titleSmall
             )
+            if (conditionNotes.isNotEmpty()) {
+                conditionNotes.forEach { note ->
+                    Text("• $note", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error)
+                }
+            }
             if (evaluation.notes.isNotEmpty()) {
                 evaluation.notes.forEach { note ->
                     Text("• $note", style = MaterialTheme.typography.labelSmall,
@@ -563,7 +588,7 @@ fun GridEditorScreen(
                 }
             }
 
-            if (evaluation.matched.isEmpty()) {
+            if (filteredMatched.isEmpty()) {
                 Text("（没有实体会被选中）", style = MaterialTheme.typography.bodySmall)
             } else {
                 LazyColumn(
@@ -574,7 +599,7 @@ fun GridEditorScreen(
                             RoundedCornerShape(8.dp))
                         .padding(6.dp)
                 ) {
-                    items(evaluation.matched, key = { it.uid }) { ge ->
+                    items(filteredMatched, key = { it.uid }) { ge ->
                         val editable = entities.firstOrNull { it.uid == ge.uid }
                         if (editable != null) {
                             val name = displayNameOf(editable, customs)
@@ -855,6 +880,7 @@ private fun EntityEditorDialog(
     var rotationX by remember(initial.uid) { mutableStateOf(initial.rotationX) }
     var rotationY by remember(initial.uid) { mutableStateOf(initial.rotationY) }
     var nbt by remember(initial.uid) { mutableStateOf(initial.nbt) }
+    var showQuickNbt by remember { mutableStateOf(false) }
     var properties by remember(initial.uid) { mutableStateOf(initial.properties) }
     var permissions by remember(initial.uid) { mutableStateOf(initial.permissions) }
     var predicates by remember(initial.uid) { mutableStateOf(initial.predicates) }
@@ -890,9 +916,9 @@ private fun EntityEditorDialog(
                     }
                 )
 
-                OutlinedTextField(name, { name = it }, label = { Text("名称（可空）") },
+                OutlinedTextField(name, { name = it }, label = { Text("名称（同 NBT CustomName，可空）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(tags, { tags = it }, label = { Text("tags（逗号分隔）") },
+                OutlinedTextField(tags, { tags = it }, label = { Text("tags（同 NBT Tags，逗号分隔）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(team, { team = it }, label = { Text("队伍（可空）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -929,8 +955,13 @@ private fun EntityEditorDialog(
                         singleLine = true, modifier = Modifier.weight(1f))
                 }
                 OutlinedTextField(nbt, { nbt = it },
-                    label = { Text("额外 NBT（Health:20.0f, NoAI:1b）") },
+                    label = { Text("手动 NBT（可多键，逗号分隔：Health:20.0f, Tags:[\"a\"]）") },
                     modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { showQuickNbt = true }) {
+                        Text("快捷 NBT（血量 / 开关 / 标签…）")
+                    }
+                }
                 OutlinedTextField(properties, { properties = it },
                     label = { Text("基岩属性（is_baby=1, fire）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -1001,6 +1032,14 @@ private fun EntityEditorDialog(
         }
     }
 
+    if (showQuickNbt) {
+        QuickNbtDialog(
+            nbtText = nbt,
+            onDismiss = { showQuickNbt = false },
+            onApply = { nbt = it; showQuickNbt = false }
+        )
+    }
+
     if (showPicker) {
         EntityPickerDialog(
             customs = customs,
@@ -1019,6 +1058,121 @@ private fun EntityEditorDialog(
         )
     }
 }
+
+/**
+ * 快捷 NBT：与手动 NBT 双向同步。
+ * - 打开时从当前 NBT 文本回填已知键（Health/NoAI/…）；
+ * - 修改任一快捷键会把它合并回 NBT（未知键原样保留）；
+ * - 手动文本里改已知键，再打开时快捷字段就是新值。
+ */
+@Composable
+private fun QuickNbtDialog(
+    nbtText: String,
+    onDismiss: () -> Unit,
+    onApply: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(nbtText) }
+    var invalid by remember { mutableStateOf(false) }
+    val quick = remember {
+        mutableStateMapOf<String, String>().apply { KnownNbt.fillQuick(nbtText, this) }
+    }
+
+    fun rebuild() {
+        val merged = KnownNbt.merge(text, quick)
+        if (merged == null) {
+            invalid = true
+        } else {
+            text = merged
+            invalid = false
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(
+                Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("快捷 NBT", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "已知键会与手动 NBT 双向同步；未知键原样保留。" +
+                        "Tags / CustomName / Team 用上方的 tags / 名称 / 队伍字段（同样会同步到 NBT）。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (invalid) {
+                    Text("手动 NBT 无法解析，请先修正下面的文本。",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall)
+                }
+
+                KnownNbt.ALL.forEach { spec ->
+                    if (spec.kind == KnownNbt.Kind.BOOL) {
+                        val v = quick[spec.key].orEmpty()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(spec.label, modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall)
+                            FilterChip(
+                                selected = v == "true",
+                                onClick = {
+                                    quick[spec.key] = if (v == "true") "" else "true"
+                                    rebuild()
+                                },
+                                label = { Text("开") }
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            FilterChip(
+                                selected = v == "false",
+                                onClick = {
+                                    quick[spec.key] = if (v == "false") "" else "false"
+                                    rebuild()
+                                },
+                                label = { Text("关") }
+                            )
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = quick[spec.key].orEmpty(),
+                            onValueChange = {
+                                quick[spec.key] = it
+                                rebuild()
+                            },
+                            label = { Text(spec.label + if (spec.hint.isBlank()) "" else " · ${spec.hint}") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = if (spec.kind == KnownNbt.Kind.INT)
+                                    KeyboardType.Number else KeyboardType.Decimal
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {
+                        text = it
+                        val p = SnbtLite.parseCompoundBody(it)
+                        if (p == null) {
+                            invalid = true
+                        } else {
+                            invalid = false
+                            quick.clear()
+                            KnownNbt.fillQuick(it, quick)
+                        }
+                    },
+                    label = { Text("手动 NBT（多个键用逗号分隔）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Button(onClick = { onApply(text) }) { Text("应用") }
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun EntityPickerDialog(
