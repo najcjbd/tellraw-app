@@ -51,7 +51,8 @@ fun SelectorTypeBadge(type: com.tellraw.app.model.SelectorType) {
 
 @Composable
 fun ColorCodeQuickInput(
-    onCodeSelected: (String) -> Unit
+    onCodeSelected: (String) -> Unit,
+    onTranslateSelected: (() -> Unit)? = null
 ) {
     val colorCodes = listOf(
         "§0" to stringResource(R.string.color_code_black),
@@ -93,6 +94,15 @@ fun ColorCodeQuickInput(
                 },
                 selected = false
             )
+        }
+        if (onTranslateSelected != null) {
+            item {
+                FilterChip(
+                    onClick = onTranslateSelected,
+                    label = { Text("translate（翻译键）", maxLines = 1) },
+                    selected = false
+                )
+            }
         }
     }
 }
@@ -2681,6 +2691,60 @@ fun DirectoryPickerDialog(
         }
     }
 }
+/** 快捷插入 translate：询问语言键、with 参数、fallback。 */
+@Composable
+fun TranslateInsertDialog(
+    defaultTextMode: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (key: String, withText: String, fallback: String) -> Unit
+) {
+    var key by remember { mutableStateOf("") }
+    var withText by remember { mutableStateOf("") }
+    var fallback by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(
+                Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("插入 translate 组件", style = MaterialTheme.typography.titleMedium)
+                if (defaultTextMode) {
+                    Text(
+                        "当前是“默认使用 text”模式；确认后会切换到组件模式。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                OutlinedTextField(
+                    key, { key = it },
+                    label = { Text("语言键（如 chat.type.text）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    withText, { withText = it },
+                    label = { Text("with 参数（逗号分隔；逗号写成 \\,）") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    fallback, { fallback = it },
+                    label = { Text("fallback（可空；基岩不支持）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "with 里的每一项目前按纯文本处理；嵌套文本组件会在 Java 输出里被扁平化。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Button(onClick = { onConfirm(key, withText, fallback) }) { Text("插入") }
+                }
+            }
+        }
+    }
+}
+
 /**
  * 头像/图片选择器：沿用历史记录目录选择器的“直接浏览文件系统”思路，
  * 同时列出子目录与图片文件；点图片返回绝对路径。

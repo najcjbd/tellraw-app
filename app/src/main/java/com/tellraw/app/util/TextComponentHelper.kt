@@ -27,6 +27,7 @@ object TextComponentHelper {
     // 副组件类型
     enum class SubComponentType(val key: String, @StringRes val displayNameResId: Int, val parentComponent: ComponentType?) {
         WITH("with", R.string.component_with, ComponentType.TRANSLATE),
+        FALLBACK("fallback", R.string.component_fallback, ComponentType.TRANSLATE),
         SEPARATOR("separator", R.string.component_separator, ComponentType.SELECTOR)
     }
     
@@ -176,6 +177,39 @@ object TextComponentHelper {
         }
     }
     
+    /**
+     * 在"纯文本位置"插入一个完整组件；如果位置落在 TEXT 组件内部，会把它拆成前后两段。
+     * 位置按 content + 子组件内容的长度计算（标记符不参与）。
+     */
+    fun insertComponentAt(originalText: String, insertPosition: Int, component: TextComponent): String {
+        val components = parseTextComponents(originalText).toMutableList()
+        if (components.isEmpty()) return componentToText(component)
+        var pos = 0
+        for (i in components.indices) {
+            val c = components[i]
+            val len = c.content.length + c.subComponents.sumOf { it.content.length }
+            if (insertPosition in pos..(pos + len)) {
+                val offset = insertPosition - pos
+                if (c.type == ComponentType.TEXT && offset in 0..c.content.length) {
+                    val before = c.content.substring(0, offset)
+                    val after = c.content.substring(offset)
+                    val repl = mutableListOf<TextComponent>()
+                    if (before.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, before))
+                    repl.add(component)
+                    if (after.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, after))
+                    components.removeAt(i)
+                    components.addAll(i, repl)
+                } else {
+                    components.add(i + 1, component)
+                }
+                return componentsToText(components)
+            }
+            pos += len
+        }
+        components.add(component)
+        return componentsToText(components)
+    }
+
     /**
      * 将单个组件转换为标记文本
      */
@@ -592,13 +626,17 @@ object TextComponentHelper {
             }
             ComponentType.TRANSLATE -> {
                 result["translate"] = mainComponent.content
+                mainComponent.subComponents.find { it.type == SubComponentType.FALLBACK }?.let {
+                    result["fallback"] = it.content
+                }
                 if (mainComponent.subComponents.isNotEmpty()) {
                     val withSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.WITH }
                     if (withSubComponent != null) {
-                        // 解析with参数（用逗号分隔，支持\,转义）
-                        val withParams = parseTranslateWithContent(withSubComponent.content)
-                        // 过滤空参数并处理§代码
-                        val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
+                        // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with，不能生成 [""]
+                        val withParams = if (withSubComponent.content.isEmpty()) emptyList()
+                            else parseTranslateWithContent(withSubComponent.content)
+                        // 保留空参数（a,,b 必须保留中间的占位）
+                        val withComponents = withParams.map { param ->
                             val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
                             if (subFormatMap.isEmpty()) {
                                 param
@@ -692,13 +730,16 @@ object TextComponentHelper {
                     }
                     ComponentType.TRANSLATE -> {
                         subMap["translate"] = sub.content
+                        sub.subComponents.find { it.type == SubComponentType.FALLBACK }?.let {
+                            subMap["fallback"] = it.content
+                        }
                         if (sub.subComponents.isNotEmpty()) {
                             val withSubComponent = sub.subComponents.find { it.type == SubComponentType.WITH }
                             if (withSubComponent != null) {
-                                // 解析with参数（用逗号分隔，支持\,转义）
-                                val withParams = parseTranslateWithContent(withSubComponent.content)
-                                // 过滤空参数并处理§代码
-                                val withComponents = withParams.filter { it.isNotEmpty() }.map { param ->
+                                // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with
+                                val withParams = if (withSubComponent.content.isEmpty()) emptyList()
+                                    else parseTranslateWithContent(withSubComponent.content)
+                                val withComponents = withParams.map { param ->
                                     val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
                                     if (subFormatMap.isEmpty()) {
                                         param
@@ -820,13 +861,16 @@ object TextComponentHelper {
                 }
                 ComponentType.TRANSLATE -> {
                     item["translate"] = component.content
+                    if (component.subComponents.any { it.type == SubComponentType.FALLBACK }) {
+                        warnings?.add("基岩版不支持 translate 的 fallback，已忽略")
+                    }
                     if (component.subComponents.isNotEmpty()) {
                         val withSubComponent = component.subComponents.find { it.type == SubComponentType.WITH }
                         if (withSubComponent != null) {
-                            // 解析with参数（用逗号分隔，支持\,转义）
-                            val withParams = parseTranslateWithContent(withSubComponent.content)
-                            // 过滤空参数并处理§代码
-                            val withRawtext = withParams.filter { it.isNotEmpty() }.map { param ->
+                            // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with
+                            val withParams = if (withSubComponent.content.isEmpty()) emptyList()
+                                else parseTranslateWithContent(withSubComponent.content)
+                            val withRawtext = withParams.map { param ->
                                 mapOf<String, Any>("text" to processSectionCodesToBedrock(param, mNHandling, mnCFEnabled))
                             }
                             if (withRawtext.isNotEmpty()) {
@@ -1510,6 +1554,9 @@ object TextComponentHelper {
      * 解析translate组件的with参数
      * @return 参数列表
      */
+    /** 公开给网格预览：translate 的 with 参数（逗号分隔，\, 转义）。 */
+    fun parseTranslateArgs(content: String): List<String> = parseTranslateWithContent(content)
+
     private fun parseTranslateWithContent(content: String): List<String> {
         val result = mutableListOf<String>()
         var currentEntry = StringBuilder()
