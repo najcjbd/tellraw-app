@@ -421,6 +421,10 @@ object SelectorEvaluator {
      * 再叠加用户手填的额外 SNBT；按"查询是实际值子集"匹配。
      * 缺失的键会明确提示（通常是实体没填对应字段）。
      */
+    /** 供条件求值等外部调用：按网格实体的派生 NBT + 额外 SNBT 判断 nbt=。 */
+    fun matchesNbt(e: GridEntity, raw: String, notes: MutableList<String> = mutableListOf()): Boolean =
+        matchNbt(e, raw, notes)
+
     private fun matchNbt(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
         val query = SnbtLite.parseCompound(raw)
         if (query == null) {
