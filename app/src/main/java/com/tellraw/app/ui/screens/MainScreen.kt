@@ -61,6 +61,7 @@ fun MainScreen(
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
+    val asSensitive by viewModel.asSensitive.collectAsState()
     val showRawConvertDialog by viewModel.showRawConvertDialog.collectAsState()
     val rawConvertInput by viewModel.rawConvertInput.collectAsState()
     val rawConvertJava by viewModel.rawConvertJava.collectAsState()
@@ -226,6 +227,7 @@ fun MainScreen(
             executePrefixEnabled = executePrefixEnabled,
             separatorAsTextComponent = separatorAsTextComponent,
             bedrockColorToRgb = bedrockColorToRgb,
+            asSensitive = asSensitive,
             nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->

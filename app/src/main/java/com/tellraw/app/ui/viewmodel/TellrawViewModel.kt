@@ -105,6 +105,9 @@ class TellrawViewModel @Inject constructor(
     private val _bedrockColorToRgb = MutableStateFlow(true)
     val bedrockColorToRgb: StateFlow<Boolean> = _bedrockColorToRgb.asStateFlow()
 
+    private val _asSensitive = MutableStateFlow(true)
+    val asSensitive: StateFlow<Boolean> = _asSensitive.asStateFlow()
+
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: StateFlow<String> = _targetVersion.asStateFlow()
@@ -230,6 +233,7 @@ class TellrawViewModel @Inject constructor(
             // 加载separator使用文本组件设置
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
             _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
+            _asSensitive.value = loadedSettings.asSensitive
             _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
@@ -828,6 +832,11 @@ class TellrawViewModel @Inject constructor(
     fun dismissVersionChoiceDialog() { _showVersionChoiceDialog.value = false }
 
     /** 基岩独有 § 颜色码 -> Java 精确 RGB。 */
+    fun setAsSensitive(enabled: Boolean) {
+        _asSensitive.value = enabled
+        viewModelScope.launch { settingsRepository.setAsSensitive(enabled) }
+    }
+
     fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
         viewModelScope.launch {
@@ -1004,14 +1013,6 @@ class TellrawViewModel @Inject constructor(
                     selector to selector
                 }
                 
-                // 生成Java版命令
-                val javaWarnings = mutableListOf<String>()
-                val javaJson = TextFormatter.convertToJavaJson(
-                    messageToUse, mNHandling, _mnCFEnabled.value, applicationContext, javaWarnings,
-                    _separatorAsTextComponent.value, nbtSyntax, _bedrockColorToRgb.value, target
-                )
-                allReminders.addAll(javaWarnings)
-
                 // 选择器级否定（基岩 `=!` / `hasitem quantity=0`）：Java 的选择器写不出来，要用 execute 前缀
                 // （需求二.3、需求第十一节 9）。组合规则：用户前置框写的前缀在前、必须遵从，缺的接在其后。
                 val javaUserPrefix = convertedUserPrefix(
@@ -1052,16 +1053,46 @@ class TellrawViewModel @Inject constructor(
                     javaTarget = javaFilteredSelector
                     javaInnerTokens = null
                 }
-                val javaPlain = "tellraw $javaTarget $javaJson"
+                // as 不敏感：只有 tellraw 目标自己不需要 as 时，才让内容选择器驱动 as。
+                var contentAs: com.tellraw.app.util.ContentAsRewriter.Result? = null
+                if (!_asSensitive.value && javaNegation == null) {
+                    val r = com.tellraw.app.util.ContentAsRewriter.rewrite(
+                        javaTarget, messageToUse, _executePrefixInput.value
+                    )
+                    allReminders.addAll(r.notes)
+                    if (r.applied) contentAs = r
+                }
+                if (javaNegation != null && _asSensitive.value &&
+                    Regex("\\bas\\b").containsMatchIn(_executePrefixInput.value)
+                ) {
+                    allReminders.add("输入里原本已有 as；目标选择器否定又追加了 as，请确认执行者")
+                }
+
+                // 生成Java版命令（内容选择器若被 as 改写，用改写后的消息）
+                val javaWarnings = mutableListOf<String>()
+                val javaJson = TextFormatter.convertToJavaJson(
+                    contentAs?.message ?: messageToUse, mNHandling, _mnCFEnabled.value,
+                    applicationContext, javaWarnings, _separatorAsTextComponent.value,
+                    nbtSyntax, _bedrockColorToRgb.value, target
+                )
+                allReminders.addAll(javaWarnings)
+
+                val finalJavaTarget = contentAs?.targetSelector ?: javaTarget
+                val finalJavaInnerTokens: List<String>? = when {
+                    contentAs != null -> contentAs.extraTokens
+                    javaInnerTokens != null -> javaInnerTokens
+                    else -> null
+                }
+                val javaPlain = "tellraw $finalJavaTarget $javaJson"
                 val javaCommand = when {
-                    javaInnerTokens == null ->
+                    finalJavaInnerTokens == null ->
                         if (javaUserPrefix != null) {
                             ExecuteConverter.composeTellrawCommand(javaUserPrefix, javaPlain)
                         } else {
                             javaPlain
                         }
                     else -> ExecuteConverter.composeTellrawCommand(
-                        mergeExecutePrefix(javaUserPrefix, javaInnerTokens), javaPlain
+                        mergeExecutePrefix(javaUserPrefix, finalJavaInnerTokens), javaPlain
                     )
                 }
                 

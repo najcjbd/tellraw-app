@@ -64,12 +64,14 @@ import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.GridConditionEvaluator
 import com.tellraw.app.model.GridEntityStore
+import com.tellraw.app.model.GridItem
 import com.tellraw.app.model.KnownNbt
 import com.tellraw.app.model.SnbtLite
 import com.tellraw.app.model.SelectorEvaluator
 import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.ImageFilePickerDialog
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.google.gson.JsonParser
 import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
 import kotlinx.coroutines.withTimeoutOrNull
@@ -1362,11 +1364,60 @@ private fun NbtBranchDialog(
 }
 
 
-private fun parseWorldBlocks(text: String): Map<String, String> =
-    text.split(';', '\n').mapNotNull { entry ->
+/**
+ * 方块表：
+ *  - JSON：{"0,64,0":{"block":"minecraft:chest","items":[{"slot":0,"id":"minecraft:diamond","count":3}]}}
+ *  - 简写：0,64,0=chest | 0:minecraft:diamond x3,1:minecraft:stone
+ */
+private fun parseWorldBlocks(text: String): Map<String, GridConditionEvaluator.GridBlock> {
+    val t = text.trim()
+    if (t.startsWith("{")) {
+        try {
+            val root = JsonParser.parseString(t).asJsonObject
+            val out = linkedMapOf<String, GridConditionEvaluator.GridBlock>()
+            for ((pos, el) in root.entrySet()) {
+                if (!el.isJsonObject) continue
+                val o = el.asJsonObject
+                val id = o.get("block")?.asString ?: o.get("id")?.asString ?: continue
+                val items = linkedMapOf<Int, GridItem>()
+                o.getAsJsonArray("items")?.forEach { itemEl ->
+                    if (!itemEl.isJsonObject) return@forEach
+                    val io = itemEl.asJsonObject
+                    val iid = io.get("id")?.asString ?: return@forEach
+                    val slot = io.get("slot")?.asInt ?: 0
+                    val count = io.get("count")?.asInt ?: 1
+                    val damage = io.get("damage")?.asInt
+                    items[slot] = GridItem(normItemId(iid), count, damage)
+                }
+                out[pos.trim()] = GridConditionEvaluator.GridBlock(id, items)
+            }
+            return out
+        } catch (e: Exception) {
+            // 落到简写解析
+        }
+    }
+    return text.split(';', '\n').mapNotNull { entry ->
         val i = entry.indexOf('=')
-        if (i <= 0) null
-        else entry.substring(0, i).trim() to entry.substring(i + 1).trim()
+        if (i <= 0) return@mapNotNull null
+        val pos = entry.substring(0, i).trim()
+        val rest = entry.substring(i + 1).trim()
+        val parts = rest.split('|', limit = 2)
+        val id = parts[0].trim()
+        val items = if (parts.size == 2) parseSimpleBlockItems(parts[1]) else emptyMap()
+        pos to GridConditionEvaluator.GridBlock(id, items)
+    }.toMap()
+}
+
+private fun normItemId(id: String): String = if (id.contains(':')) id else "minecraft:$id"
+
+private fun parseSimpleBlockItems(text: String): Map<Int, GridItem> =
+    text.split(',', ';').mapNotNull { entry ->
+        val m = Regex("^\\s*(\\d+)\\s*:\\s*([^\\s,;]+)\\s*(?:x\\s*(\\d+))?\\s*$").find(entry)
+            ?: return@mapNotNull null
+        val slot = m.groupValues[1].toInt()
+        val id = normItemId(m.groupValues[2])
+        val count = m.groupValues[3].toIntOrNull() ?: 1
+        slot to GridItem(id, count)
     }.toMap()
 
 private fun parseStopwatches(text: String): Map<String, Double> =
@@ -1413,7 +1464,7 @@ private fun WorldSettingsDialog(
                 }
                 OutlinedTextField(
                     bl, { bl = it },
-                    label = { Text("方块：x,y,z=block; …（供 block/blocks）") },
+                    label = { Text("方块表：JSON（含 items）或 x,y,z=block | slot:item xN; …") },
                     minLines = 3, modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(f, { f = it },

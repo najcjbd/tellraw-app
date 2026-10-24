@@ -207,9 +207,9 @@ object ExecuteConverter {
      * 调用方负责：给"选择器本体"再过一遍目标版本的参数过滤，并把条件 token 折进 execute 前缀；
      * 若前缀里还要接用户自己写的前置命令，**用户写的在前，本结果接在其后**（execute需求 第十一节 9）。
      *
-     * [preferExecute] = "命令前置 execute"配置开关：
-     *  开 -> 正向"有某物品"也拆进 execute（用 items / data，你的规则"开启了就用 execute"）；
-     *  关 -> 正向"有某物品"留在选择器里走 `nbt=`，只有"选择器写不出的"（air / quantity=0 / 0..）才拆出来。
+     * 正向"有某物品"**优先留在选择器里走 `nbt=`**（无论开关）；
+     * 只有"选择器写不出的"（air / quantity=0 / 0..）或 1.20.5–1.21.4 的 equipment 谓词才拆进 execute。
+     * [preferExecute] 保留参数以兼容旧调用，不再影响正向 hasitem 的去向。
      */
     fun bedrockSelectorNegation(
         selector: String,
@@ -255,14 +255,12 @@ object ExecuteConverter {
                         kept.add(p)
                         continue
                     }
-                    // 开关关着（preferExecute=false）：正向"有某物品"留在选择器里走原有的 nbt= 路径
-                    // （避免无谓地改动既有输出）；开关打开时按你的规则一律用 execute。
-                    // "选择器写不出的"（item=air / quantity=0 / 0..）无论开关都要拆出来。
-                    // 1.20.5–1.21.4：armor/副手的选择器写法 nbt={equipment:…} 要 1.21.5 才生效
-                    // （1.20.5–1.21.4 上语法合法但永不匹配，实测）-> 一并拆进 execute items。
+                    // 正向"有某物品"首选 nbt=（能写进选择器就不要无谓地加 execute）；
+                    // "选择器写不出的"（air / quantity=0 / 0..）才拆；
+                    // 1.20.5–1.21.4 的 equipment 谓词不生效 -> 拆进 execute items。
                     val equipmentRerouted = VersionDiff.routesEquipmentViaItems(nbtSyntax) &&
                         objects.any { ExecCondSupport.isEquipmentLikeHasitem(it) }
-                    if (!preferExecute && !equipmentRerouted && objects.none { isNegationLikeHasitem(it) }) {
+                    if (!equipmentRerouted && objects.none { isNegationLikeHasitem(it) }) {
                         kept.add(p)
                         continue
                     }

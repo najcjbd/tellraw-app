@@ -470,42 +470,31 @@ class ExecuteConverterTest {
     }
 
     // ---------------------------------------------------------------
-    //  "开启了 execute 前缀就用 execute；没有就用 nbt="（配置开关 preferExecute）
+    //  正向 hasitem 优先留在选择器里走 nbt=（即使 execute 开关打开）
     // ---------------------------------------------------------------
 
     @Test
-    fun testPositiveHasitemUsesExecuteWhenToggleOn() {
+    fun testPositiveHasitemPrefersSelectorNbt() {
         val neg = ExecuteConverter.bedrockSelectorNegation(
             "@a[hasitem={item=diamond}]", mutableListOf(), preferExecute = true
         )
-        assertNotNull(neg)
-        assertEquals("@a", neg!!.first)
-        // 没写 location -> data + nbt（不能写 items + 裸 *：`*` 不存在）
-        assertEquals(
-            listOf("if", "data", "entity", "@s", "{Inventory:[{id:\"minecraft:diamond\"}]}"),
-            neg.second
-        )
+        assertNull("正向条件应留给 nbt=，不该拆进 execute", neg)
     }
 
     @Test
-    fun testPositiveHasitemWithLocationUsesItemsWhenToggleOn() {
+    fun testPositiveHasitemWithLocationPrefersSelectorNbt() {
         val neg = ExecuteConverter.bedrockSelectorNegation(
             "@a[hasitem={item=diamond,location=slot.hotbar}]", mutableListOf(), preferExecute = true
         )
-        assertNotNull(neg)
-        assertEquals("@a", neg!!.first)
-        assertTrue(neg.second.joinToString(" ").contains("hotbar.*"))
+        assertNull(neg)
     }
 
     @Test
-    fun testUnmappedLocationIsDroppedInsteadOfBareStar() {
-        // slot.chest / slot.armor / slot.equippable 只属于马、驴这些实体，玩家侧没有 items 对应 -> 舍弃
+    fun testUnmappedLocationLeftForSelectorFilter() {
         val neg = ExecuteConverter.bedrockSelectorNegation(
             "@a[hasitem={item=diamond,location=slot.chest}]", mutableListOf(), preferExecute = true
         )
-        assertNotNull(neg)
-        assertEquals("@a", neg!!.first)
-        assertTrue(neg.second.isEmpty())
+        assertNull(neg)
     }
 
     // ---------------------------------------------------------------
@@ -768,12 +757,7 @@ class ExecuteConverterTest {
         val neg = ExecuteConverter.bedrockSelectorNegation(
             "@a[hasitem={item=diamond,location=slot.enderchest,slot=0}]", mutableListOf(), preferExecute = true
         )
-        assertNotNull(neg)
-        assertEquals("@a", neg!!.first)
-        assertEquals(
-            listOf("if", "items", "entity", "@s", "enderchest.0", "minecraft:diamond"),
-            neg.second
-        )
+        assertNull("正向 hasitem 应走选择器 nbt=", neg)
         val (back, _) = conv("execute if items entity @s enderchest.0 minecraft:diamond", Direction.JAVA_TO_BEDROCK)
         assertEquals("execute if entity @s[hasitem={item=diamond,location=slot.enderchest,slot=0}]", back)
     }

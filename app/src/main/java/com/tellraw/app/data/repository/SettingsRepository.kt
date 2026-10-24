@@ -33,6 +33,7 @@ class SettingsRepository @Inject constructor(
         const val NBT_SYNTAX_FOLLOW = "follow"
         private const val KEY_EXECUTE_PREFIX_INPUT = "execute_prefix_input"
         private const val KEY_BEDROCK_COLOR_TO_RGB = "bedrock_color_to_rgb"
+        private const val KEY_AS_SENSITIVE = "as_sensitive"
         private const val KEY_TARGET_VERSION = "target_version"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
@@ -77,6 +78,10 @@ class SettingsRepository @Inject constructor(
     private val _bedrockColorToRgb = MutableStateFlow(true)
     val bedrockColorToRgb: Flow<Boolean> = _bedrockColorToRgb.asStateFlow()
 
+    /** 目标选择器参数对 as 是否敏感（默认是）。 */
+    private val _asSensitive = MutableStateFlow(true)
+    val asSensitive: Flow<Boolean> = _asSensitive.asStateFlow()
+
     /** 目标版本（配置文件里输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: Flow<String> = _targetVersion.asStateFlow()
@@ -120,6 +125,7 @@ class SettingsRepository @Inject constructor(
                         nbtSyntax = _nbtSyntax.value,
                         executePrefixInput = _executePrefixInput.value,
                         bedrockColorToRgb = _bedrockColorToRgb.value,
+                        asSensitive = _asSensitive.value,
                         targetVersion = _targetVersion.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
@@ -141,6 +147,7 @@ class SettingsRepository @Inject constructor(
                     nbtSyntax = _nbtSyntax.value,
                     executePrefixInput = _executePrefixInput.value,
                     bedrockColorToRgb = _bedrockColorToRgb.value,
+                    asSensitive = _asSensitive.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -158,6 +165,7 @@ class SettingsRepository @Inject constructor(
                     nbtSyntax = _nbtSyntax.value,
                     executePrefixInput = _executePrefixInput.value,
                     bedrockColorToRgb = _bedrockColorToRgb.value,
+                    asSensitive = _asSensitive.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -180,6 +188,7 @@ class SettingsRepository @Inject constructor(
         val nbtSyntax: String,
         val executePrefixInput: String,
         val bedrockColorToRgb: Boolean,
+        val asSensitive: Boolean,
         val targetVersion: String,
         val historyStorageUri: String?,
         val historyStorageFilename: String
@@ -224,6 +233,7 @@ class SettingsRepository @Inject constructor(
                 val historyStorageFilename = rawFilename.trim().replace("\"", "").replace("/", "").replace("\\", "")
                 val executePrefixInput = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_INPUT) ?: ""
                 val bedrockColorToRgb = extractJsonValue(jsonString, KEY_BEDROCK_COLOR_TO_RGB) != "false"
+                val asSensitive = extractJsonValue(jsonString, KEY_AS_SENSITIVE) != "false"
                 // -1 = 最新；其余必须能被 VersionSpec 解析，否则回落 -1
                 val targetVersion = extractJsonValue(jsonString, KEY_TARGET_VERSION)
                     ?.takeIf { it == "-1" || com.tellraw.app.model.VersionSpec.parse(it) != null } ?: "-1"
@@ -238,6 +248,7 @@ class SettingsRepository @Inject constructor(
                 _nbtSyntax.value = nbtSyntax
                 _executePrefixInput.value = executePrefixInput
                 _bedrockColorToRgb.value = bedrockColorToRgb
+                _asSensitive.value = asSensitive
                 _targetVersion.value = targetVersion
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
@@ -263,6 +274,7 @@ class SettingsRepository @Inject constructor(
         val nbtSyntax = _nbtSyntax.value
         val executePrefixInput = _executePrefixInput.value
         val bedrockColorToRgb = _bedrockColorToRgb.value
+        val asSensitive = _asSensitive.value
         val targetVersion = _targetVersion.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
@@ -279,6 +291,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_NBT_SYNTAX": "$nbtSyntax",
               "$KEY_EXECUTE_PREFIX_INPUT": "$executePrefixInput",
               "$KEY_BEDROCK_COLOR_TO_RGB": $bedrockColorToRgb,
+              "$KEY_AS_SENSITIVE": $asSensitive,
               "$KEY_TARGET_VERSION": "$targetVersion",
               "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
               "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
@@ -443,6 +456,14 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
+        saveConfig()
+    }
+
+    /** 目标选择器参数对 as 是否敏感（默认 true）。 */
+    fun getAsSensitive(): Boolean = _asSensitive.value
+
+    suspend fun setAsSensitive(enabled: Boolean) {
+        _asSensitive.value = enabled
         saveConfig()
     }
 
