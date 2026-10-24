@@ -49,7 +49,13 @@ data class GridEntity(
 }
 
 /** 网格实体某个槽位里的物品（count 用于 hasitem quantity 判定）。 */
-data class GridItem(val id: String, val count: Int = 1, val damage: Int? = null)
+data class GridItem(
+    val id: String,
+    val count: Int = 1,
+    val damage: Int? = null,
+    /** 物品数据组件（键可为短名或命名空间 ID），用于 items 谓词。 */
+    val components: Map<String, SnbtLite.Value> = emptyMap()
+)
 
 /**
  * 在网格实体上求值一个目标选择器：返回"会被选中"的实体 + 无法求值/不支持的提醒。
@@ -448,11 +454,12 @@ object SelectorEvaluator {
             "id" to SnbtLite.Value.Str(item.id),
             "count" to SnbtLite.Value.Num(item.count.toDouble())
         )
+        val comps = linkedMapOf<String, SnbtLite.Value>()
         if (item.damage != null && item.damage > 0) {
-            m["components"] = SnbtLite.Value.Compound(
-                mapOf("minecraft:damage" to SnbtLite.Value.Num(item.damage.toDouble()))
-            )
+            comps["minecraft:damage"] = SnbtLite.Value.Num(item.damage.toDouble())
         }
+        comps.putAll(item.components)
+        if (comps.isNotEmpty()) m["components"] = SnbtLite.Value.Compound(comps)
         return m
     }
 

@@ -64,6 +64,8 @@ import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.GridConditionEvaluator
 import com.tellraw.app.model.GridEntityStore
+import com.tellraw.app.model.GridSettingsStore
+import com.tellraw.app.model.GridUiSettings
 import com.tellraw.app.model.GridItem
 import com.tellraw.app.model.KnownNbt
 import com.tellraw.app.model.SnbtLite
@@ -130,6 +132,8 @@ fun GridEditorScreen(
 
     val entityStore = remember { GridEntityStore(File(context.filesDir, "grid_entities.json")) }
     val customStore = remember { CustomEntityStore(File(context.filesDir, "custom_entities.json")) }
+    val settingsStore = remember { GridSettingsStore(File(context.filesDir, "grid_settings.json")) }
+    val savedUi = remember { settingsStore.load() }
     val entities: SnapshotStateList<EditableGridEntity> = remember {
         mutableStateListOf<EditableGridEntity>().apply { addAll(entityStore.load()) }
     }
@@ -142,31 +146,63 @@ fun GridEditorScreen(
         customStore.save(customs.toList())
     }
 
-    var selectorText by rememberSaveable { mutableStateOf(selectorFromMain) }
-    var conditions by rememberSaveable { mutableStateOf("") }
+    var selectorText by rememberSaveable { mutableStateOf(savedUi.selector.ifBlank { selectorFromMain }) }
+    var conditions by rememberSaveable { mutableStateOf(savedUi.conditions) }
     LaunchedEffect(selectorFromMain) {
         if (selectorText.isBlank()) selectorText = selectorFromMain
     }
 
-    var viewport by remember { mutableStateOf(Viewport()) }
+    var viewport by remember {
+        mutableStateOf(Viewport(savedUi.camX, savedUi.camZ, savedUi.zoom.coerceIn(0.25f, 4f)))
+    }
     val viewportState = rememberUpdatedState(viewport)
     var jumpX by rememberSaveable { mutableStateOf("0") }
     var jumpZ by rememberSaveable { mutableStateOf("0") }
 
     // 执行者 / 原点（对应 execute 的 as / at / positioned）
-    var executorUid by rememberSaveable { mutableStateOf<String?>(null) }
-    var useExecutorOrigin by rememberSaveable { mutableStateOf(true) }
-    var manualOX by rememberSaveable { mutableStateOf("0") }
-    var manualOY by rememberSaveable { mutableStateOf("-60") }
-    var manualOZ by rememberSaveable { mutableStateOf("0") }
+    var executorUid by rememberSaveable { mutableStateOf<String?>(savedUi.executorUid) }
+    var useExecutorOrigin by rememberSaveable { mutableStateOf(savedUi.useExecutorOrigin) }
+    var manualOX by rememberSaveable { mutableStateOf(savedUi.manualOX) }
+    var manualOY by rememberSaveable { mutableStateOf(savedUi.manualOY) }
+    var manualOZ by rememberSaveable { mutableStateOf(savedUi.manualOZ) }
     var showExecutorPicker by remember { mutableStateOf(false) }
     var showWorldSettings by remember { mutableStateOf(false) }
-    var worldDimension by rememberSaveable { mutableStateOf("minecraft:overworld") }
-    var worldBiome by rememberSaveable { mutableStateOf("") }
-    var worldLoaded by rememberSaveable { mutableStateOf(true) }
-    var worldBlocks by rememberSaveable { mutableStateOf("") }
-    var worldFunctions by rememberSaveable { mutableStateOf("") }
-    var worldStopwatches by rememberSaveable { mutableStateOf("") }
+
+    var worldDimension by rememberSaveable { mutableStateOf(savedUi.worldDimension) }
+    var worldBiome by rememberSaveable { mutableStateOf(savedUi.worldBiome) }
+    var worldLoaded by rememberSaveable { mutableStateOf(savedUi.worldLoaded) }
+    var worldBlocks by rememberSaveable { mutableStateOf(savedUi.worldBlocks) }
+    var worldFunctions by rememberSaveable { mutableStateOf(savedUi.worldFunctions) }
+    var worldStopwatches by rememberSaveable { mutableStateOf(savedUi.worldStopwatches) }
+
+    // 网格设置持久化（防抖；输入过程中不会每个字符都写盘）
+    LaunchedEffect(
+        selectorText, conditions, worldDimension, worldBiome, worldLoaded,
+        worldBlocks, worldFunctions, worldStopwatches, executorUid,
+        useExecutorOrigin, manualOX, manualOY, manualOZ, viewport
+    ) {
+        kotlinx.coroutines.delay(400)
+        settingsStore.save(
+            GridUiSettings(
+                selector = selectorText,
+                conditions = conditions,
+                worldDimension = worldDimension,
+                worldBiome = worldBiome,
+                worldLoaded = worldLoaded,
+                worldBlocks = worldBlocks,
+                worldFunctions = worldFunctions,
+                worldStopwatches = worldStopwatches,
+                executorUid = executorUid,
+                useExecutorOrigin = useExecutorOrigin,
+                manualOX = manualOX,
+                manualOY = manualOY,
+                manualOZ = manualOZ,
+                camX = viewport.camX,
+                camZ = viewport.camZ,
+                zoom = viewport.zoom
+            )
+        )
+    }
 
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<EditableGridEntity?>(null) }
@@ -1059,7 +1095,7 @@ private fun EntityEditorDialog(
                     label = { Text("装备（head=...,mainhand=sword d=5）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(inventory, { inventory = it },
-                    label = { Text("物品栏（0-8 快捷栏，9+ 主栏；1=sword d=5）") },
+                    label = { Text("物品栏（0-8 快捷栏，9+ 主栏；1=sword x1 {damage:5}）") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row {
                     OutlinedTextField(gamemode, { gamemode = it },
@@ -1387,7 +1423,11 @@ private fun parseWorldBlocks(text: String): Map<String, GridConditionEvaluator.G
                     val slot = io.get("slot")?.asInt ?: 0
                     val count = io.get("count")?.asInt ?: 1
                     val damage = io.get("damage")?.asInt
-                    items[slot] = GridItem(normItemId(iid), count, damage)
+                    val comps = io.get("components")?.let { compEl ->
+                        (SnbtLite.parseValue(compEl.toString()) as? SnbtLite.Value.Compound)?.map
+                            ?: SnbtLite.parseCompoundLenient(compEl.toString())
+                    } ?: emptyMap()
+                    items[slot] = GridItem(normItemId(iid), count, damage, comps)
                 }
                 out[pos.trim()] = GridConditionEvaluator.GridBlock(id, items)
             }

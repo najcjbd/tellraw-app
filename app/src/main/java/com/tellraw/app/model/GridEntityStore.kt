@@ -79,13 +79,15 @@ data class EditableGridEntity(
                     }
                 }
             }
-            val m = Regex("^([^\\s*\\[]+)\\s*(?:[x*]\\s*(\\d+))?\\s*(?:d(?:amage)?\\s*=\\s*(\\d+))?$")
+            val m = Regex("^([^\\s*\\[{]+)\\s*(?:[x*]\\s*(\\d+))?\\s*(?:d(?:amage)?\\s*=\\s*(\\d+))?\\s*(\\{.*\\})?$")
                 .find(rawValue.trim()) ?: return
             val id0 = m.groupValues[1]
             val id = if (id0.contains(':')) id0 else "minecraft:$id0"
             val count = m.groupValues[2].toIntOrNull() ?: 1
             val damage = m.groupValues[3].toIntOrNull()
-            out[key] = GridItem(id, count, damage)
+            val comps = m.groupValues[4].takeIf { it.isNotBlank() }
+                ?.let { SnbtLite.parseCompoundLenient(it) } ?: emptyMap()
+            out[key] = GridItem(id, count, damage, comps)
         }
         for (part in equipment.split(',', '，')) {
             val i = part.indexOf('=')

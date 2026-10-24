@@ -37,6 +37,16 @@ object SnbtLite {
         null
     }
 
+    /** 宽松解析：允许未加引号的命名空间键（minecraft:custom_data）。 */
+    fun parseCompoundLenient(text: String): Map<String, Value>? {
+        parseCompoundBody(text)?.let { return it }
+        val fixed = text.replace(
+            Regex("([{,])\\s*([A-Za-z0-9_]+:[A-Za-z0-9_]+)\\s*:"),
+            "$1\"$2\":"
+        )
+        return parseCompoundBody(fixed)
+    }
+
     /** 解析 compound 的**内容**（不带外层花括号）。 */
     fun parseCompoundBody(text: String): Map<String, Value>? {
         val t = text.trim()

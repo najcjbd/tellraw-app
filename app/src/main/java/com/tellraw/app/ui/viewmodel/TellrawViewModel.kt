@@ -835,6 +835,7 @@ class TellrawViewModel @Inject constructor(
     fun setAsSensitive(enabled: Boolean) {
         _asSensitive.value = enabled
         viewModelScope.launch { settingsRepository.setAsSensitive(enabled) }
+        generateCommands()
     }
 
     fun setBedrockColorToRgb(enabled: Boolean) {
@@ -1057,7 +1058,7 @@ class TellrawViewModel @Inject constructor(
                 var contentAs: com.tellraw.app.util.ContentAsRewriter.Result? = null
                 if (!_asSensitive.value && javaNegation == null) {
                     val r = com.tellraw.app.util.ContentAsRewriter.rewrite(
-                        javaTarget, messageToUse, _executePrefixInput.value
+                        javaTarget, messageToUse, _executePrefixInput.value, nbtSyntax
                     )
                     allReminders.addAll(r.notes)
                     if (r.applied) contentAs = r

@@ -125,6 +125,23 @@ class GridConditionEvaluatorTest {
         assertTrue(ok("if slots entity @s inventory.*"))
     }
 
+    @Test fun itemsPredicateComponents() {
+        val comp = SnbtLite.parseCompoundBody("""{id:"test:bar"}""")!!
+        val item = GridItem(
+            "minecraft:diamond_sword", 1, null,
+            mapOf("minecraft:custom_data" to SnbtLite.Value.Compound(comp))
+        )
+        val e = GridEntity("e", "minecraft:player", items = mapOf("weapon.mainhand" to item))
+        fun ok(c: String) = GridConditionEvaluator.evaluate(c, e, listOf(e)).ok
+
+        assertTrue(ok("""if items entity @s weapon.mainhand *[custom_data~{id:"test:bar"}]"""))
+        assertFalse(ok("""if items entity @s weapon.mainhand *[custom_data~{id:"other"}]"""))
+        assertTrue(ok("""if items entity @s weapon.mainhand diamond_sword[custom_data={id:"test:bar"}]"""))
+        assertTrue(ok("if items entity @s weapon.mainhand *[!damage|damage=0]"))
+        assertTrue(ok("if items entity @s weapon.mainhand *[count~{min:1,max:1}]"))
+        assertFalse(ok("if items entity @s weapon.mainhand *[count~{min:2}]"))
+    }
+
     @Test fun itemsAndSlotsBlockContainer() {
         val world = GridConditionEvaluator.GridWorld(
             blocks = mapOf(
