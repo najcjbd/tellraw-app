@@ -15,12 +15,18 @@ object GridConditionEvaluator {
 
     data class Result(val ok: Boolean, val notes: List<String>)
 
-    /** 网格的世界状态（用于 block/biome/dimension/function/stopwatch 等条件）。 */
+    /** 方块表里的一格：方块 ID + 可选的方块容器物品（槽位号 -> 物品）。 */
+    data class GridBlock(
+        val id: String,
+        val items: Map<Int, GridItem> = emptyMap()
+    )
+
+    /** 网格的世界状态（用于 block/biome/dimension/function/stopwatch/items/slots 等条件）。 */
     data class GridWorld(
         val dimension: String = "minecraft:overworld",
         val biome: String = "",
         val loaded: Boolean = true,
-        val blocks: Map<String, String> = emptyMap(),   // "x,y,z" -> block id
+        val blocks: Map<String, GridBlock> = emptyMap(),   // "x,y,z" -> 方块
         val functions: Set<String> = emptySet(),
         val stopwatches: Map<String, Double> = emptyMap()
     )
@@ -132,7 +138,7 @@ object GridConditionEvaluator {
                             ok = true
                         } else {
                             val actual = world.blocks[posKey(p)]
-                            ok = actual != null && normBlock(actual) == normBlock(want)
+                            ok = actual != null && normBlock(actual.id) == normBlock(want)
                             consumed = 6
                         }
                     } else {
@@ -205,10 +211,45 @@ object GridConditionEvaluator {
                     }
                     consumed = 4
                 }
-                "items", "slots" -> {
-                    notes.add("条件 \"$name\" 在网格里未建模，未参与筛选")
-                    ok = true
-                    consumed = conditionSpan(tokens, i + 1)
+                "items" -> {
+                    val javaOk = target?.let {
+                        it.edition == VersionSpec.Edition.JAVA && it.atLeast(1, 20, 5)
+                    } ?: true
+                    if (!javaOk) {
+                        notes.add("items 条件需要 Java ≥1.20.5 且基岩没有该条件；未参与筛选")
+                        ok = true
+                        consumed = conditionSpan(tokens, i + 1)
+                    } else {
+                        val r = evalItems(tokens, i, entity, world, origin, notes)
+                        if (r == null) {
+                            notes.add("items 条件参数不完整，已忽略")
+                            ok = true
+                            consumed = conditionSpan(tokens, i + 1)
+                        } else {
+                            ok = r.first
+                            consumed = r.second
+                        }
+                    }
+                }
+                "slots" -> {
+                    val javaOk = target?.let {
+                        it.edition == VersionSpec.Edition.JAVA && it.atLeast(26, 3)
+                    } ?: true
+                    if (!javaOk) {
+                        notes.add("slots 条件需要 Java 26.3 且基岩没有该条件；未参与筛选")
+                        ok = true
+                        consumed = conditionSpan(tokens, i + 1)
+                    } else {
+                        val r = evalSlots(tokens, i, entity, world, origin, notes)
+                        if (r == null) {
+                            notes.add("slots 条件参数不完整，已忽略")
+                            ok = true
+                            consumed = conditionSpan(tokens, i + 1)
+                        } else {
+                            ok = r.first
+                            consumed = r.second
+                        }
+                    }
                 }
                 else -> {
                     notes.add("条件 \"$name\" 未支持，未参与筛选")
@@ -317,6 +358,159 @@ object GridConditionEvaluator {
         return t.toDoubleOrNull() ?: base
     }
 
+    // ---------- items / slots ----------
+
+    /** 返回 (条件是否成立, 消耗的 token 数)。 */
+    private fun evalItems(
+        tokens: List<String>,
+        i: Int,
+        entity: GridEntity,
+        world: GridWorld,
+        origin: Triple<Double, Double, Double>,
+        notes: MutableList<String>
+    ): Pair<Boolean, Int>? {
+        val source = tokens.getOrNull(i + 2) ?: return null
+        if (source == "entity") {
+            val target = tokens.getOrNull(i + 3) ?: return null
+            val slots = tokens.getOrNull(i + 4) ?: return null
+            val predicate = tokens.getOrNull(i + 5) ?: return null
+            val ok = if (target == "@s" || target.startsWith("@s")) {
+                matchesItemPredicate(entity.items, slots, predicate, notes)
+            } else {
+                notes.add("items 条件的目标不是 @s（$target），网格按候选实体近似")
+                matchesItemPredicate(entity.items, slots, predicate, notes)
+            }
+            return ok to 6
+        }
+        if (source == "block") {
+            val pos = readPos(tokens, i + 3, origin, notes) ?: return null
+            val slots = tokens.getOrNull(i + 6) ?: return null
+            val predicate = tokens.getOrNull(i + 7) ?: return null
+            val block = world.blocks[posKey(pos)]
+            if (block == null) {
+                notes.add("方块表里没有 ${posKey(pos)} 的容器数据，items 条件未参与筛选")
+                return true to 8
+            }
+            return matchesItemPredicate(blockItems(block), slots, predicate, notes) to 8
+        }
+        return null
+    }
+
+    private fun evalSlots(
+        tokens: List<String>,
+        i: Int,
+        entity: GridEntity,
+        world: GridWorld,
+        origin: Triple<Double, Double, Double>,
+        notes: MutableList<String>
+    ): Pair<Boolean, Int>? {
+        val source = tokens.getOrNull(i + 2) ?: return null
+        if (source == "entity") {
+            val target = tokens.getOrNull(i + 3) ?: return null
+            val slots = tokens.getOrNull(i + 4) ?: return null
+            val ok = if (target == "@s" || target.startsWith("@s")) {
+                entityHasSlots(entity, slots)
+            } else {
+                notes.add("slots 条件的目标不是 @s（$target），网格按候选实体近似")
+                entityHasSlots(entity, slots)
+            }
+            return ok to 5
+        }
+        if (source == "block") {
+            val pos = readPos(tokens, i + 3, origin, notes) ?: return null
+            val slots = tokens.getOrNull(i + 6) ?: return null
+            val block = world.blocks[posKey(pos)]
+            if (block == null) {
+                notes.add("方块表里没有 ${posKey(pos)} 的容器数据，slots 条件未参与筛选")
+                return true to 7
+            }
+            return blockHasSlots(block, slots) to 7
+        }
+        return null
+    }
+
+    private fun blockItems(block: GridBlock): Map<String, GridItem> =
+        block.items.mapKeys { "container.${it.key}" }
+
+    private fun slotMatches(source: String, key: String): Boolean {
+        val src = source.removePrefix("slot.")
+        val k = key.removePrefix("slot.")
+        if (src == "*") return true
+        if (src.endsWith(".*")) return k.startsWith(src.dropLast(1)) || k == src.dropLast(2)
+        // 槽位名不带编号时，视为该类的任意槽
+        if (src.count { it == '.' } == 0) return k == src || k.startsWith("$src.")
+        return k == src
+    }
+
+    private fun matchesItemPredicate(
+        items: Map<String, GridItem>,
+        slots: String,
+        predicate: String,
+        notes: MutableList<String>
+    ): Boolean {
+        val candidates = items.filterKeys { slotMatches(slots, it) }.values
+        val p = predicate.trim()
+        if (p == "*" || p.isEmpty()) return candidates.any { true }
+        val neg = p.startsWith("!")
+        val body = if (neg) p.substring(1) else p
+        val idPart = body.substringBefore('[').trim()
+        val bracket = body.substringAfter('[', "").substringBeforeLast(']', "")
+        val wantId = if (idPart == "*") null else normBlock(idPart)
+        val countRange = Regex("(?:^|,)count=([^,\\]]+)").find(bracket)?.groupValues?.get(1)
+        val (clo, chi) = parseRange(countRange ?: "")
+        val damage = Regex("(?:^|,)damage=(-?\\d+)").find(bracket)?.groupValues?.get(1)?.toIntOrNull()
+        val unknown = bracket.split(',').map { it.trim() }.filter {
+            it.isNotEmpty() && !it.startsWith("count=") && !it.startsWith("damage=")
+        }
+        if (unknown.isNotEmpty()) notes.add("items 谓词里的 ${unknown.joinToString("、")} 未建模")
+        val hit = candidates.any { item ->
+            (wantId == null || normBlock(item.id) == wantId) &&
+                (countRange == null || (item.count.toDouble() >= (clo ?: Double.NEGATIVE_INFINITY) &&
+                    item.count.toDouble() <= (chi ?: Double.POSITIVE_INFINITY))) &&
+                (damage == null || (item.damage ?: 0) == damage)
+        }
+        return if (neg) !hit else hit
+    }
+
+    private fun entityHasSlots(e: GridEntity, slots: String): Boolean {
+        val known = mutableSetOf<String>()
+        when (EntityRegistry.categoryOf(e.id)) {
+            EntityRegistry.Category.PLAYER -> {
+                known += listOf("inventory", "hotbar", "armor", "weapon", "enderchest")
+                for (i in 0..8) known += "hotbar.$i"
+                for (i in 0..26) known += "inventory.$i"
+                known += listOf("armor.head", "armor.chest", "armor.legs", "armor.feet")
+                known += listOf("weapon.mainhand", "weapon.offhand")
+            }
+            EntityRegistry.Category.HOSTILE, EntityRegistry.Category.PASSIVE -> {
+                known += listOf("armor", "weapon")
+                known += listOf("armor.head", "armor.chest", "armor.legs", "armor.feet")
+                known += listOf("weapon.mainhand", "weapon.offhand")
+                // 只有能装东西的动物才有 container 槽
+                if (e.id.removePrefix("minecraft:") in setOf(
+                        "donkey", "mule", "llama", "trader_llama"
+                    ) || e.items.keys.any { it.startsWith("container.") }
+                ) known += "container"
+            }
+            else -> Unit
+        }
+        known += e.items.keys
+        return known.any { slotMatches(slots, it) }
+    }
+
+    private fun blockHasSlots(block: GridBlock, slots: String): Boolean {
+        val containerBlocks = setOf(
+            "chest", "trapped_chest", "barrel", "furnace", "blast_furnace", "smoker",
+            "dispenser", "dropper", "hopper", "brewing_stand", "shulker_box"
+        )
+        val base = block.id.removePrefix("minecraft:")
+        val hasContainer = base in containerBlocks || base.endsWith("_shulker_box")
+        val keys = mutableSetOf<String>()
+        if (hasContainer) keys += "container"
+        for (i in block.items.keys) keys += "container.$i"
+        return keys.any { slotMatches(slots, it) }
+    }
+
     private fun parseRange(v: String): Pair<Double?, Double?> {
         val t = v.trim()
         return if (".." in t) {
@@ -363,11 +557,11 @@ object GridConditionEvaluator {
         val y1 = minOf(a.second, b.second); val y2 = maxOf(a.second, b.second)
         val z1 = minOf(a.third, b.third); val z2 = maxOf(a.third, b.third)
         for (x in x1..x2) for (y in y1..y2) for (z in z1..z2) {
-            val src = world.blocks["$x,$y,$z"] ?: return false
+            val src = world.blocks["$x,$y,$z"]?.id ?: return false
             val dx = dest.first + (x - x1)
             val dy = dest.second + (y - y1)
             val dz = dest.third + (z - z1)
-            val dst = world.blocks["$dx,$dy,$dz"] ?: return false
+            val dst = world.blocks["$dx,$dy,$dz"]?.id ?: return false
             if (normBlock(src) != normBlock(dst)) return false
         }
         return true

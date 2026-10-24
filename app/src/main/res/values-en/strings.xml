@@ -69,6 +69,8 @@
     <string name="raw_convert_open">Convert a pasted command…</string>
     <string name="raw_convert_unrecognized">Unrecognized: paste rawtext, Java component JSON, tellraw or execute+tellraw</string>
     <string name="bedrock_color_to_rgb">Bedrock-only § colors → exact Java RGB</string>
+    <string name="as_sensitive">Target selector args are as-sensitive</string>
+    <string name="as_sensitive_description">On: only the tellraw target selector drives as. Off: if the target needs no as, content selectors may drive it</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>

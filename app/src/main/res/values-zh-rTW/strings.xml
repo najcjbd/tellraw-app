@@ -72,6 +72,8 @@
     <string name="raw_convert_open">輸入整條命令轉換…</string>
     <string name="raw_convert_unrecognized">無法識別：請輸入 rawtext、Java 文本組件 JSON、tellraw 或 execute+tellraw</string>
     <string name="bedrock_color_to_rgb">基岩版獨有 § 顏色碼 → Java 精確 RGB color</string>
+    <string name="as_sensitive">目標選擇器參數對 as 敏感</string>
+    <string name="as_sensitive_description">開：只用 tellraw 目標選擇器決定 as；關：目標沒得改時才會用內容裡的選擇器做 as</string>
     
     <!-- 顏色代碼 -->
     <string name="color_black">黑色</string>

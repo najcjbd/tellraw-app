@@ -70,10 +70,10 @@ class GridConditionEvaluatorTest {
             biome = "minecraft:nether_wastes",
             loaded = true,
             blocks = mapOf(
-                "0,-60,0" to "minecraft:stone",
-                "1,-60,0" to "minecraft:dirt",
-                "10,-60,0" to "minecraft:stone",
-                "11,-60,0" to "minecraft:dirt"
+                "0,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"),
+                "1,-60,0" to GridConditionEvaluator.GridBlock("minecraft:dirt"),
+                "10,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"),
+                "11,-60,0" to GridConditionEvaluator.GridBlock("minecraft:dirt")
             ),
             functions = setOf("test:fn"),
             stopwatches = mapOf("sw" to 3.0)
@@ -97,12 +97,52 @@ class GridConditionEvaluatorTest {
     }
 
     @Test fun unsupportedConditionsAreNotedNotSilent() {
-        val r = eval("if items entity @s hotbar.0 minecraft:diamond")
-        assertTrue(r.ok)
-        assertTrue(r.notes.any { it.contains("未建模") })
         // block 已建模：没有世界方块数据时提示去填写，而不是静默
         val block = eval("if block ~ ~ ~ stone")
         assertTrue(block.ok)
         assertTrue(block.notes.any { it.contains("方块") })
+    }
+
+    @Test fun itemsAndSlotsEntity() {
+        val p = steve.copy(items = mapOf(
+            "weapon.mainhand" to GridItem("minecraft:diamond_sword", 1),
+            "armor.head" to GridItem("minecraft:diamond_helmet", 1),
+            "hotbar.0" to GridItem("minecraft:stone", 64)
+        ))
+        fun ok(c: String) = GridConditionEvaluator.evaluate(c, p, listOf(p)).ok
+        assertTrue(ok("if items entity @s weapon.mainhand minecraft:diamond_sword"))
+        assertFalse(ok("if items entity @s weapon.mainhand minecraft:stone"))
+        assertTrue(ok("if items entity @s armor.* minecraft:diamond_helmet"))
+        assertTrue(ok("if items entity @s hotbar.0 minecraft:stone[count=64..]"))
+        assertFalse(ok("if items entity @s hotbar.0 minecraft:stone[count=65..]"))
+        assertTrue(ok("if items entity @s * minecraft:diamond_sword"))
+        assertTrue(ok("unless items entity @s weapon.mainhand minecraft:stone"))
+
+        assertTrue(ok("if slots entity @s armor.*"))
+        assertTrue(ok("if slots entity @s hotbar.0"))
+        assertFalse(ok("if slots entity @s hotbar.9"))
+        assertFalse(ok("if slots entity @s container.*"))
+        assertTrue(ok("if slots entity @s inventory.*"))
+    }
+
+    @Test fun itemsAndSlotsBlockContainer() {
+        val world = GridConditionEvaluator.GridWorld(
+            blocks = mapOf(
+                "0,-60,0" to GridConditionEvaluator.GridBlock(
+                    "minecraft:chest",
+                    mapOf(0 to GridItem("minecraft:diamond", 3))
+                )
+            )
+        )
+        val e = GridEntity("e", "minecraft:zombie")
+        fun ok(c: String) = GridConditionEvaluator.evaluate(
+            c, e, listOf(e), null, world, Triple(0.0, -60.0, 0.0)
+        ).ok
+        assertTrue(ok("if items block 0 -60 0 container.0 minecraft:diamond"))
+        assertTrue(ok("if items block 0 -60 0 container.* minecraft:diamond[count=3]"))
+        assertFalse(ok("if items block 0 -60 0 container.1 minecraft:diamond"))
+        assertTrue(ok("if slots block 0 -60 0 container.*"))
+        assertTrue(ok("if slots block 0 -60 0 container.0"))
+        assertFalse(ok("if slots block 0 -60 0 container.9"))
     }
 }

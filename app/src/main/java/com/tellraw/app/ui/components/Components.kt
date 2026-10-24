@@ -656,6 +656,7 @@ fun SettingsDialog(
     executePrefixEnabled: Boolean,
     separatorAsTextComponent: Boolean,
     bedrockColorToRgb: Boolean,
+    asSensitive: Boolean = true,
     nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
@@ -666,6 +667,7 @@ fun SettingsDialog(
     onExecutePrefixEnabledChanged: (Boolean) -> Unit,
     onSeparatorAsTextComponentChanged: (Boolean) -> Unit,
     onBedrockColorToRgbChanged: (Boolean) -> Unit,
+    onAsSensitiveChanged: (Boolean) -> Unit = {},
     onNbtSyntaxChanged: (String) -> Unit,
     onOpenRawConvert: () -> Unit = {}
 ) {
@@ -947,6 +949,28 @@ fun SettingsDialog(
                         )
                     }
 
+                    // 目标选择器参数是否对 as 敏感
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = asSensitive,
+                            onCheckedChange = onAsSensitiveChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.as_sensitive),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.as_sensitive_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口
@@ -1206,6 +1230,28 @@ fun SettingsDialog(
                             text = stringResource(R.string.bedrock_color_to_rgb),
                             style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+
+                    // 目标选择器参数是否对 as 敏感
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = asSensitive,
+                            onCheckedChange = onAsSensitiveChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.as_sensitive),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.as_sensitive_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
