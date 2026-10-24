@@ -57,13 +57,20 @@ object KnownNbt {
         return External(tags, name, team)
     }
 
-    /** 去掉与上方字段同源的键（避免手写 NBT 覆盖字段值）；无法解析返回 null。 */
+    /**
+     * 去掉与上方字段同源的键（避免手写 NBT 覆盖字段值）。
+     * 只做"按顶层逗号删条目"，不重排/重写其他键，保住用户写的 `20.0f` 等类型后缀。
+     */
     fun stripExternal(nbtText: String): String? {
-        val base = SnbtLite.parseCompoundBody(nbtText)?.toMutableMap() ?: return null
-        base.remove("Tags")
-        base.remove("CustomName")
-        base.remove("Team")
-        return SnbtLite.serializeCompound(base)
+        if (nbtText.isBlank()) return ""
+        if (SnbtLite.parseCompoundBody(nbtText) == null) return null
+        val body = nbtText.trim().removeSurrounding("{", "}")
+        val keys = setOf("Tags", "CustomName", "Team")
+        val kept = com.tellraw.app.util.ExecCondSupport.splitTopLevel(body, ',').filterNot { part ->
+            val key = part.substringBefore(':').substringBefore('=').trim().removeSurrounding("\"")
+            key in keys
+        }
+        return kept.joinToString(",").trim()
     }
 
     /** 从 NBT 文本回填已知快捷键（未知键忽略，但文本本身不会被丢）。 */
