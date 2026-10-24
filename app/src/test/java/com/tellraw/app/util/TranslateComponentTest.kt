@@ -38,6 +38,43 @@ class TranslateComponentTest {
     }
 
     @Test
+    fun nestedWithJsonPreservedForJava() {
+        val comp = TextComponent(
+            ComponentType.TRANSLATE, "chat.type.text",
+            mutableListOf(
+                SubComponent(
+                    SubComponentType.WITH,
+                    """[{"text":"A","color":"red"},{"text":"B","extra":[{"text":"!"}]}]"""
+                )
+            )
+        )
+        val java = TextComponentHelper.convertToJavaJson(listOf(comp))
+        assertTrue(java, java.contains("\"color\":\"red\""))
+        assertTrue(java, java.contains("\"extra\""))
+
+        val warnings = mutableListOf<String>()
+        TextComponentHelper.convertToBedrockJson(listOf(comp), warnings = warnings)
+        assertTrue(warnings.any { it.contains("嵌套") })
+    }
+
+    @Test
+    fun rawNestedWithIsPreserved() {
+        val r = CommandInputParser.parse(
+            """{"translate":"x","with":[{"text":"A","color":"red"}]}"""
+        )!!
+        val with = r.components[0].subComponents.first { it.type == SubComponentType.WITH }.content
+        assertTrue(with, with.trim().startsWith("["))
+        assertTrue(r.javaJson, r.javaJson.contains("\"color\":\"red\""))
+        assertFalse(r.warnings.any { it.contains("不是纯文本") })
+    }
+
+    @Test
+    fun withEscapedCommaStaysInsideArgument() {
+        val args = TextComponentHelper.parseTranslateArgs("a\\,b,c")
+        assertEquals(listOf("a,b", "c"), args)
+    }
+
+    @Test
     fun translatePreviewSubstitutesPlaceholders() {
         assertEquals("Steve：你好", TranslatePreview.render("chat.type.text", listOf("Steve", "你好")))
         assertEquals("%s 加入了游戏", TranslatePreview.render("multiplayer.player.joined", emptyList()))

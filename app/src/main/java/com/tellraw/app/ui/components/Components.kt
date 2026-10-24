@@ -99,7 +99,7 @@ fun ColorCodeQuickInput(
             item {
                 FilterChip(
                     onClick = onCommaSelected,
-                    label = { Text(", (逗号)", maxLines = 1) },
+                    label = { Text(",（文本逗号）", maxLines = 1) },
                     selected = false
                 )
             }

@@ -7,6 +7,8 @@ package com.tellraw.app.util
 import android.content.Context
 import androidx.annotation.StringRes
 import com.tellraw.app.R
+import com.google.gson.JsonElement
+import com.google.gson.JsonParser
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.util.SelectorConverter
 
@@ -632,18 +634,19 @@ object TextComponentHelper {
                 if (mainComponent.subComponents.isNotEmpty()) {
                     val withSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.WITH }
                     if (withSubComponent != null) {
-                        // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with，不能生成 [""]
-                        val withParams = if (withSubComponent.content.isEmpty()) emptyList()
-                            else parseTranslateWithContent(withSubComponent.content)
-                        // 保留空参数（a,,b 必须保留中间的占位）
-                        val withComponents = withParams.map { param ->
-                            val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                            if (subFormatMap.isEmpty()) {
-                                param
+                        // with 可以是纯文本参数（逗号分隔，\, 转义），也可以是 JSON 组件数组
+                        val withComponents = parseWithItems(withSubComponent.content).mapNotNull { item ->
+                            if (item.json != null) {
+                                item.json
                             } else {
-                                val mutableMap = subFormatMap.toMutableMap()
-                                mutableMap["text"] = param
-                                mutableMap
+                                val param = item.raw
+                                val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
+                                if (subFormatMap.isEmpty()) param
+                                else {
+                                    val mutableMap = subFormatMap.toMutableMap()
+                                    mutableMap["text"] = param
+                                    mutableMap
+                                }
                             }
                         }
                         if (withComponents.isNotEmpty()) {
@@ -736,17 +739,19 @@ object TextComponentHelper {
                         if (sub.subComponents.isNotEmpty()) {
                             val withSubComponent = sub.subComponents.find { it.type == SubComponentType.WITH }
                             if (withSubComponent != null) {
-                                // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with
-                                val withParams = if (withSubComponent.content.isEmpty()) emptyList()
-                                    else parseTranslateWithContent(withSubComponent.content)
-                                val withComponents = withParams.map { param ->
-                                    val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                                    if (subFormatMap.isEmpty()) {
-                                        param
+                                // with 可以是纯文本参数，也可以是 JSON 组件数组
+                                val withComponents = parseWithItems(withSubComponent.content).mapNotNull { item ->
+                                    if (item.json != null) {
+                                        item.json
                                     } else {
-                                        val mutableMap = subFormatMap.toMutableMap()
-                                        mutableMap["text"] = param
-                                        mutableMap
+                                        val param = item.raw
+                                        val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
+                                        if (subFormatMap.isEmpty()) param
+                                        else {
+                                            val mutableMap = subFormatMap.toMutableMap()
+                                            mutableMap["text"] = param
+                                            mutableMap
+                                        }
                                     }
                                 }
                                 if (withComponents.isNotEmpty()) {
@@ -867,10 +872,13 @@ object TextComponentHelper {
                     if (component.subComponents.isNotEmpty()) {
                         val withSubComponent = component.subComponents.find { it.type == SubComponentType.WITH }
                         if (withSubComponent != null) {
-                            // 解析with参数（用逗号分隔，支持\,转义）；空内容=没有 with
-                            val withParams = if (withSubComponent.content.isEmpty()) emptyList()
-                                else parseTranslateWithContent(withSubComponent.content)
-                            val withRawtext = withParams.map { param ->
+                            // with：纯文本参数按原样；JSON 嵌套组件在基岩侧按纯文本处理并提醒
+                            val items = parseWithItems(withSubComponent.content)
+                            if (items.any { it.json != null }) {
+                                warnings?.add("基岩版不支持 with 的嵌套文本组件，已按纯文本处理")
+                            }
+                            val withRawtext = items.map { item ->
+                                val param = item.plainText()
                                 mapOf<String, Any>("text" to processSectionCodesToBedrock(param, mNHandling, mnCFEnabled))
                             }
                             if (withRawtext.isNotEmpty()) {
@@ -1554,8 +1562,56 @@ object TextComponentHelper {
      * 解析translate组件的with参数
      * @return 参数列表
      */
-    /** 公开给网格预览：translate 的 with 参数（逗号分隔，\, 转义）。 */
-    fun parseTranslateArgs(content: String): List<String> = parseTranslateWithContent(content)
+    /** 一个 with 项：普通文本（raw）或嵌套 JSON 文本组件。 */
+    data class WithItem(val raw: String = "", val json: JsonElement? = null) {
+        fun plainText(): String = if (json != null) jsonPlainText(json) else raw
+    }
+
+    /**
+     * 解析 translate 的 with：
+     *  - `[...]` / `{...}` -> JSON 文本组件（保留样式/嵌套）；
+     *  - 其他 -> 逗号分隔的纯文本（支持 `\,` 转义）。
+     */
+    fun parseWithItems(content: String): List<WithItem> {
+        val t = content.trim()
+        if (t.isEmpty()) return emptyList()
+        if (t.startsWith("[") || t.startsWith("{")) {
+            try {
+                val el = JsonParser.parseString(t)
+                if (el.isJsonArray) return el.asJsonArray.map { WithItem(json = it) }
+                if (el.isJsonObject) return listOf(WithItem(json = el))
+            } catch (e: Exception) {
+                // 落到纯文本
+            }
+        }
+        return parseTranslateWithContent(content).map { WithItem(raw = it) }
+    }
+
+    /** 公开给网格预览：translate 的 with 参数（嵌套组件取纯文本）。 */
+    fun parseTranslateArgs(content: String): List<String> = parseWithItems(content).map { it.plainText() }
+
+    private fun jsonPlainText(el: JsonElement): String {
+        if (el.isJsonPrimitive) return el.asString
+        if (el.isJsonArray) return el.asJsonArray.joinToString("") { jsonPlainText(it) }
+        if (!el.isJsonObject) return ""
+        val o = el.asJsonObject
+        val sb = StringBuilder()
+        when {
+            o.has("text") && o.get("text").isJsonPrimitive -> sb.append(o.get("text").asString)
+            o.has("translate") && o.get("translate").isJsonPrimitive -> sb.append(o.get("translate").asString)
+            o.has("selector") && o.get("selector").isJsonPrimitive -> sb.append(o.get("selector").asString)
+            o.has("score") && o.get("score").isJsonObject -> {
+                val sc = o.getAsJsonObject("score")
+                sb.append(sc.get("name")?.takeIf { it.isJsonPrimitive }?.asString ?: "")
+                sb.append(":")
+                sb.append(sc.get("objective")?.takeIf { it.isJsonPrimitive }?.asString ?: "")
+            }
+        }
+        o.get("extra")?.takeIf { it.isJsonArray }?.let { ex ->
+            for (e in ex.asJsonArray) sb.append(jsonPlainText(e))
+        }
+        return sb.toString()
+    }
 
     private fun parseTranslateWithContent(content: String): List<String> {
         val result = mutableListOf<String>()
@@ -1680,6 +1736,7 @@ object TextComponentHelper {
                 @Suppress("UNCHECKED_CAST")
                 listToJson(value as List<Any>)
             }
+            is JsonElement -> value.toString()
             else -> "\"${escapeJsonString(value.toString())}\""
         }
     }
