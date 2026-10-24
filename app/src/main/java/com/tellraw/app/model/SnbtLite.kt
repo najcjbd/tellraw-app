@@ -30,6 +30,13 @@ object SnbtLite {
         }
     }
 
+    /** 解析任意 SNBT 值（compound/list/标量）；失败返回 null。 */
+    fun parseValue(text: String): Value? = try {
+        Parser(text.trim()).value()
+    } catch (e: Exception) {
+        null
+    }
+
     /** 解析 compound 的**内容**（不带外层花括号）。 */
     fun parseCompoundBody(text: String): Map<String, Value>? {
         val t = text.trim()

@@ -7,7 +7,7 @@ package com.tellraw.app.model
  */
 object KnownNbt {
 
-    enum class Kind { BOOL, BYTE, FLOAT, INT, STRING }
+    enum class Kind { BOOL, BYTE, FLOAT, INT, STRING, LIST, COMPOUND }
 
     data class Spec(val key: String, val label: String, val kind: Kind, val hint: String = "")
 
@@ -51,6 +51,10 @@ object KnownNbt {
             Kind.INT -> t.toLongOrNull()?.let { "${it}s" } ?: "\"$t\""
             Kind.FLOAT -> t.toDoubleOrNull()?.let { "${it}f" } ?: "\"$t\""
             Kind.STRING -> "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+            Kind.LIST ->
+                if (SnbtLite.parseValue(t) is SnbtLite.Value.ListV) t else null
+            Kind.COMPOUND ->
+                if (SnbtLite.parseValue(t) is SnbtLite.Value.Compound) t else null
         }
     }
 
@@ -125,6 +129,7 @@ object KnownNbt {
         is SnbtLite.Value.Num ->
             if (v.v == v.v.toLong().toDouble()) v.v.toLong().toString() else v.v.toString()
         is SnbtLite.Value.Str -> v.v
+        is SnbtLite.Value.ListV, is SnbtLite.Value.Compound -> SnbtLite.serialize(v)
         else -> ""
     }
 }

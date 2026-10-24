@@ -158,6 +158,13 @@ fun GridEditorScreen(
     var manualOY by rememberSaveable { mutableStateOf("-60") }
     var manualOZ by rememberSaveable { mutableStateOf("0") }
     var showExecutorPicker by remember { mutableStateOf(false) }
+    var showWorldSettings by remember { mutableStateOf(false) }
+    var worldDimension by rememberSaveable { mutableStateOf("minecraft:overworld") }
+    var worldBiome by rememberSaveable { mutableStateOf("") }
+    var worldLoaded by rememberSaveable { mutableStateOf(true) }
+    var worldBlocks by rememberSaveable { mutableStateOf("") }
+    var worldFunctions by rememberSaveable { mutableStateOf("") }
+    var worldStopwatches by rememberSaveable { mutableStateOf("") }
 
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<EditableGridEntity?>(null) }
@@ -223,6 +230,18 @@ fun GridEditorScreen(
         )
     }
     val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
+    val worldState = remember(
+        worldDimension, worldBiome, worldLoaded, worldBlocks, worldFunctions, worldStopwatches
+    ) {
+        GridConditionEvaluator.GridWorld(
+            dimension = worldDimension.ifBlank { "minecraft:overworld" },
+            biome = worldBiome,
+            loaded = worldLoaded,
+            blocks = parseWorldBlocks(worldBlocks),
+            functions = splitList(worldFunctions).toSet(),
+            stopwatches = parseStopwatches(worldStopwatches)
+        )
+    }
     val resolvedOrigin = remember(effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec) {
         GridConditionEvaluator.resolveOrigin(
             effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec
@@ -242,9 +261,13 @@ fun GridEditorScreen(
             target = targetSpec
         )
     }
-    val conditionResults = remember(evaluation, effectiveConditions, allGridEntities, targetSpec) {
+    val conditionResults = remember(
+        evaluation, effectiveConditions, allGridEntities, targetSpec, worldState, evaluationOrigin
+    ) {
         evaluation.matched.map { ge ->
-            GridConditionEvaluator.evaluate(effectiveConditions, ge, allGridEntities, targetSpec) to ge
+            GridConditionEvaluator.evaluate(
+                effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
+            ) to ge
         }
     }
     val filteredMatched = conditionResults.filter { it.first.ok }.map { it.second }
@@ -596,9 +619,18 @@ fun GridEditorScreen(
             OutlinedTextField(
                 value = conditions,
                 onValueChange = { conditions = it },
-                label = { Text("附加条件（if/unless data entity @s {…} 或 if entity @s[…]）") },
+                label = { Text("附加条件（所有 if/unless 子条件）") },
                 modifier = Modifier.fillMaxWidth()
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { showWorldSettings = true }) { Text("世界条件…") }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "维度=${worldState.dimension} 群系=${worldState.biome.ifBlank { "未设置" }} " +
+                        "方块=${worldState.blocks.size} 函数=${worldState.functions.size}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
             Text(
                 "将选中 ${filteredMatched.size} / ${entities.size} 个实体" +
                     (if (conditions.isNotBlank()) "（已按附加条件筛选）" else ""),
@@ -662,6 +694,26 @@ fun GridEditorScreen(
                 }
             }
         }
+    }
+
+    if (showWorldSettings) {
+        WorldSettingsDialog(
+            dimension = worldDimension,
+            biome = worldBiome,
+            loaded = worldLoaded,
+            blocks = worldBlocks,
+            functions = worldFunctions,
+            stopwatches = worldStopwatches,
+            onChange = { d, b, l, bl, f, st ->
+                worldDimension = d
+                worldBiome = b
+                worldLoaded = l
+                worldBlocks = bl
+                worldFunctions = f
+                worldStopwatches = st
+            },
+            onDismiss = { showWorldSettings = false }
+        )
     }
 
     if (showExecutorPicker) {
@@ -1141,6 +1193,7 @@ private fun QuickNbtDialog(
     val quick = remember {
         mutableStateMapOf<String, String>().apply { KnownNbt.fillQuick(nbtText, this, entityId) }
     }
+    var branchSpec by remember { mutableStateOf<KnownNbt.Spec?>(null) }
 
     fun rebuild() {
         val merged = KnownNbt.merge(text, quick, entityId)
@@ -1194,6 +1247,19 @@ private fun QuickNbtDialog(
                                 label = { Text("关") }
                             )
                         }
+                    } else if (spec.kind == KnownNbt.Kind.LIST || spec.kind == KnownNbt.Kind.COMPOUND) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(spec.label, style = MaterialTheme.typography.bodySmall)
+                                val preview = quick[spec.key].orEmpty()
+                                Text(
+                                    if (preview.isBlank()) "（未设置）" else preview.take(90),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            OutlinedButton(onClick = { branchSpec = spec }) { Text("编辑…") }
+                        }
                     } else {
                         OutlinedTextField(
                             value = quick[spec.key].orEmpty(),
@@ -1239,8 +1305,134 @@ private fun QuickNbtDialog(
             }
         }
     }
+
+    branchSpec?.let { spec ->
+        NbtBranchDialog(
+            spec = spec,
+            value = quick[spec.key].orEmpty(),
+            onDismiss = { branchSpec = null },
+            onApply = { raw ->
+                quick[spec.key] = raw
+                rebuild()
+                branchSpec = null
+            }
+        )
+    }
 }
 
+/** 列表/复合键的分支编辑器：直接编辑该键的 SNBT 值。 */
+@Composable
+private fun NbtBranchDialog(
+    spec: KnownNbt.Spec,
+    value: String,
+    onDismiss: () -> Unit,
+    onApply: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(value) }
+    val valid = text.isBlank() || SnbtLite.parseValue(text) != null
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(
+                Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("编辑 ${spec.label}", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (spec.kind == KnownNbt.Kind.LIST) "列表值（[...]）" else "复合值（{...}）",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("SNBT 值；留空=移除该键") },
+                    minLines = 5,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!valid) {
+                    Text("SNBT 无法解析", color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Button(enabled = valid, onClick = { onApply(text.trim()) }) { Text("应用") }
+                }
+            }
+        }
+    }
+}
+
+
+private fun parseWorldBlocks(text: String): Map<String, String> =
+    text.split(';', '\n').mapNotNull { entry ->
+        val i = entry.indexOf('=')
+        if (i <= 0) null
+        else entry.substring(0, i).trim() to entry.substring(i + 1).trim()
+    }.toMap()
+
+private fun parseStopwatches(text: String): Map<String, Double> =
+    text.split(',', '，', ';', '\n').mapNotNull { entry ->
+        val i = entry.indexOf('=')
+        if (i <= 0) null
+        else entry.substring(0, i).trim() to (entry.substring(i + 1).trim().toDoubleOrNull() ?: return@mapNotNull null)
+    }.toMap()
+
+private fun splitList(text: String): List<String> =
+    text.split(',', '，', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+
+@Composable
+private fun WorldSettingsDialog(
+    dimension: String,
+    biome: String,
+    loaded: Boolean,
+    blocks: String,
+    functions: String,
+    stopwatches: String,
+    onChange: (String, String, Boolean, String, String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var d by remember { mutableStateOf(dimension) }
+    var b by remember { mutableStateOf(biome) }
+    var l by remember { mutableStateOf(loaded) }
+    var bl by remember { mutableStateOf(blocks) }
+    var f by remember { mutableStateOf(functions) }
+    var st by remember { mutableStateOf(stopwatches) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(
+                Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("世界条件", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(d, { d = it }, label = { Text("维度 dimension") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(b, { b = it }, label = { Text("生物群系 biome（可空）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(l, { l = it })
+                    Text("区块已加载 loaded")
+                }
+                OutlinedTextField(
+                    bl, { bl = it },
+                    label = { Text("方块：x,y,z=block; …（供 block/blocks）") },
+                    minLines = 3, modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(f, { f = it },
+                    label = { Text("返回 true 的函数（逗号分隔）") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(st, { st = it },
+                    label = { Text("stopwatch：id=秒, …") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Button(onClick = {
+                        onChange(d, b, l, bl, f, st)
+                        onDismiss()
+                    }) { Text("应用") }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun EntityPickerDialog(

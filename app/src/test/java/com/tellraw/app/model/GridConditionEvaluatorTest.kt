@@ -64,9 +64,45 @@ class GridConditionEvaluatorTest {
         assertEquals(listOf("e"), r.matched.map { it.uid })
     }
 
+    @Test fun worldConditions() {
+        val world = GridConditionEvaluator.GridWorld(
+            dimension = "minecraft:the_nether",
+            biome = "minecraft:nether_wastes",
+            loaded = true,
+            blocks = mapOf(
+                "0,-60,0" to "minecraft:stone",
+                "1,-60,0" to "minecraft:dirt",
+                "10,-60,0" to "minecraft:stone",
+                "11,-60,0" to "minecraft:dirt"
+            ),
+            functions = setOf("test:fn"),
+            stopwatches = mapOf("sw" to 3.0)
+        )
+        val e = GridEntity("e", "minecraft:zombie", x = 0.0, y = -60.0, z = 0.0,
+            scores = mapOf("obj" to 5))
+        fun ok(c: String) = GridConditionEvaluator.evaluate(
+            c, e, listOf(e), null, world, Triple(0.0, -60.0, 0.0)
+        ).ok
+
+        assertTrue(ok("if block 0 -60 0 minecraft:stone"))
+        assertFalse(ok("if block 0 -60 0 minecraft:dirt"))
+        assertTrue(ok("if blocks 0 -60 0 1 -60 0 10 -60 0 all"))
+        assertTrue(ok("if biome 0 -60 0 minecraft:nether_wastes"))
+        assertTrue(ok("if dimension minecraft:the_nether"))
+        assertTrue(ok("if loaded 0 -60 0"))
+        assertTrue(ok("if function test:fn"))
+        assertTrue(ok("if stopwatch sw 1..5"))
+        assertTrue(ok("if score @s obj matches 4..6"))
+        assertFalse(ok("if score @s obj matches 6..9"))
+    }
+
     @Test fun unsupportedConditionsAreNotedNotSilent() {
-        val r = eval("if block ~ ~ ~ stone")
+        val r = eval("if items entity @s hotbar.0 minecraft:diamond")
         assertTrue(r.ok)
         assertTrue(r.notes.any { it.contains("未建模") })
+        // block 已建模：没有世界方块数据时提示去填写，而不是静默
+        val block = eval("if block ~ ~ ~ stone")
+        assertTrue(block.ok)
+        assertTrue(block.notes.any { it.contains("方块") })
     }
 }

@@ -931,4 +931,45 @@ class ExecuteConverterTest {
         assertFalse("不能静默放宽条件", dropped!!.contains("entity @s["))
         assertTrue(reminders.any { it.contains("Health") })
     }
+
+    @Test
+    fun allJavaOnlyConditionsAreDroppedForBedrock() {
+        val cases = listOf(
+            "biome 0 0 0 minecraft:plains",
+            "dimension minecraft:overworld",
+            "loaded 0 0 0",
+            "function test:fn",
+            "predicate test:pred",
+            "stopwatch test 1..5",
+            "slots entity @s armor.head *"
+        )
+        for (c in cases) {
+            val (out, reminders) = conv("execute if $c", Direction.JAVA_TO_BEDROCK)
+            val name = c.substringBefore(' ')
+            assertFalse("$name 不应留在基岩输出：$out", out!!.contains(name))
+            assertTrue("$name 应提醒", reminders.any { it.contains(name) })
+        }
+    }
+
+    @Test
+    fun sharedConditionsAreKeptForBedrock() {
+        val block = conv("execute if block 0 0 0 minecraft:stone", Direction.JAVA_TO_BEDROCK).first
+        requireNotNull(block)
+        assertTrue(block, block!!.contains("if block 0 0 0 minecraft:stone"))
+
+        val blocks = conv(
+            "execute if blocks 0 0 0 1 1 1 1 1 1 all",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        requireNotNull(blocks)
+        assertTrue(blocks, blocks!!.contains("if blocks"))
+
+        val entity = conv("execute if entity @s[tag=x]", Direction.JAVA_TO_BEDROCK).first
+        requireNotNull(entity)
+        assertTrue(entity, entity!!.contains("if entity @s[tag=x]"))
+
+        val score = conv("execute if score @s obj matches 1..5", Direction.JAVA_TO_BEDROCK).first
+        requireNotNull(score)
+        assertTrue(score, score!!.contains("scores={obj=1..5}"))
+    }
 }
