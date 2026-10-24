@@ -209,8 +209,12 @@ object CommandInputParser {
         when {
             obj.has("translate") -> {
                 if (losesStyle) warnings.add("translate 组件上的样式字段暂未保留（会作用于 extra 子组件）")
-                if (obj.has("fallback")) warnings.add("translate 的 fallback 暂未保留")
                 val comp = TextComponent(ComponentType.TRANSLATE, str(obj, "translate"))
+                obj.get("fallback")?.let {
+                    comp.subComponents.add(
+                        SubComponent(SubComponentType.FALLBACK, plainTextOf(it, warnings))
+                    )
+                }
                 obj.get("with")?.takeIf { it.isJsonArray }?.let { w ->
                     val params = (w as JsonArray).map { plainTextOf(it, warnings) }
                     if (params.isNotEmpty()) {

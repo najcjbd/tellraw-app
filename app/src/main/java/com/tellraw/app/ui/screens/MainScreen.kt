@@ -76,6 +76,7 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     val showJavaBedrockMixedModeWarningDialog by viewModel.showJavaBedrockMixedModeWarningDialog.collectAsState()
+    var showTranslateInsertDialog by remember { mutableStateOf(false) }
     
     // 文本组件相关状态
     val selectedTextComponent by viewModel.selectedTextComponent.collectAsState()
@@ -129,6 +130,7 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onTranslateSelected = { showTranslateInsertDialog = true },
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -150,6 +152,7 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onTranslateSelected = { showTranslateInsertDialog = true },
             selectorInput = selectorInput,
             messageTextFieldValue = messageTextFieldValue,
             javaCommand = javaCommand,
@@ -309,6 +312,19 @@ fun MainScreen(
         )
     }
 
+    if (showTranslateInsertDialog) {
+        TranslateInsertDialog(
+            defaultTextMode = defaultUseText,
+            onDismiss = { showTranslateInsertDialog = false },
+            onConfirm = { key, withText, fallback ->
+                viewModel.insertTranslateComponent(
+                    messageTextFieldValue.value.selection.start, key, withText, fallback
+                )
+                showTranslateInsertDialog = false
+            }
+        )
+    }
+
     // 历史记录存储设置对话框
     if (showStorageSettingsDialog) {
         HistoryStorageSettingsDialog(
@@ -384,6 +400,7 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onTranslateSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,
@@ -562,6 +579,7 @@ private fun PortraitLayout(
                 
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
+                    onTranslateSelected = onTranslateSelected,
                     onCodeSelected = { code ->
                         val currentValue = messageTextFieldValue.value
                         val cursorPosition = currentValue.selection.start
@@ -678,6 +696,7 @@ private fun PortraitLayout(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onTranslateSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
     javaCommand: String,

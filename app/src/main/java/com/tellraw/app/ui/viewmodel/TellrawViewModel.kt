@@ -2066,6 +2066,49 @@ class TellrawViewModel @Inject constructor(
         lastMessageInput = newText
     }
     
+    /** 快捷插入一个 translate 组件（必要时从默认 text 模式切到组件模式）。 */
+    fun insertTranslateComponent(
+        insertPosition: Int,
+        key: String,
+        withText: String,
+        fallback: String
+    ) {
+        if (_defaultUseText.value) {
+            _defaultUseText.value = false
+            viewModelScope.launch {
+                settingsRepository.setDefaultUseText(false)
+                settingsRepository.saveConfig()
+            }
+            val plain = _messageInput.value
+            _messageInputWithMarkers.value = if (plain.isEmpty()) "" else
+                TextComponentHelper.componentsToText(
+                    listOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, plain))
+                )
+        }
+        val comp = TextComponentHelper.TextComponent(
+            TextComponentHelper.ComponentType.TRANSLATE, key
+        )
+        if (withText.isNotEmpty()) {
+            comp.subComponents.add(
+                TextComponentHelper.SubComponent(TextComponentHelper.SubComponentType.WITH, withText)
+            )
+        }
+        if (fallback.isNotEmpty()) {
+            comp.subComponents.add(
+                TextComponentHelper.SubComponent(TextComponentHelper.SubComponentType.FALLBACK, fallback)
+            )
+        }
+        val newMarkers = TextComponentHelper.insertComponentAt(
+            _messageInputWithMarkers.value, insertPosition, comp
+        )
+        _messageInputWithMarkers.value = newMarkers
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(newMarkers)
+        lastMessageInput = _messageInput.value
+        _selectedTextComponent.value = TextComponentHelper.ComponentType.TRANSLATE
+        _selectedSubComponent.value = null
+        generateCommands()
+    }
+
     /**
      * 带组件标记的文本插入（改进版）
      * 使用位置映射来精确插入，并更新lastMessageInput

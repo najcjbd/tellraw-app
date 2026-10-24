@@ -76,6 +76,7 @@ import com.tellraw.app.ui.viewmodel.TellrawViewModel
 import com.google.gson.JsonParser
 import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
+import com.tellraw.app.util.TranslatePreview
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.math.floor
@@ -885,7 +886,13 @@ private fun previewMessage(
                 val objective = c.content.substringAfter(':', "").substringBefore(':').trim()
                 entity.scoreMap()[objective]?.toString() ?: displayName
             }
-            TextComponentHelper.ComponentType.TRANSLATE -> c.content
+            TextComponentHelper.ComponentType.TRANSLATE -> {
+                val withText = c.subComponents
+                    .find { it.type == TextComponentHelper.SubComponentType.WITH }?.content
+                val args = if (withText.isNullOrEmpty()) emptyList()
+                    else TextComponentHelper.parseTranslateArgs(withText)
+                TranslatePreview.render(c.content, args)
+            }
         }
     }.ifBlank { "（消息为空）" }
 }
