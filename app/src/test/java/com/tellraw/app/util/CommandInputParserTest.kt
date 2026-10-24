@@ -83,4 +83,24 @@ class CommandInputParserTest {
         assertNull(CommandInputParser.parse(""))
         assertNull(CommandInputParser.parse("execute as @a"))   // 没有 run
     }
+
+    @Test
+    fun extraInheritsParentStyle() {
+        val r = CommandInputParser.parse("""{"text":"A","color":"red","extra":[{"text":"B"}]}""")!!
+        assertTrue(r.components[0].content.startsWith("§c"))
+        assertTrue("extra 子组件应继承父样式：${r.components[1].content}", r.components[1].content.startsWith("§c"))
+    }
+
+    @Test
+    fun selectorSeparatorAndUnsupportedTypes() {
+        val sel = CommandInputParser.parse("""{"selector":"@a","separator":{"text":", "}}""")!!
+        assertTrue(
+            sel.components[0].subComponents.any { it.type == TextComponentHelper.SubComponentType.SEPARATOR }
+        )
+
+        val kb = CommandInputParser.parse("""{"keybind":"key.inventory"}""")!!
+        assertTrue(kb.warnings.any { it.contains("keybind") })
+        val fb = CommandInputParser.parse("""{"translate":"x","fallback":"y"}""")!!
+        assertTrue(fb.warnings.any { it.contains("fallback") })
+    }
 }

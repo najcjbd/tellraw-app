@@ -37,6 +37,10 @@ class GridEntityStoreTest {
         assertEquals(GridItem("minecraft:bread", 3), items["hotbar.1"])
         val dmg = EditableGridEntity(inventory = "0=diamond_sword x1 d=5").itemMap()
         assertEquals(GridItem("minecraft:diamond_sword", 1, 5), dmg["hotbar.0"])
+        val comp = EditableGridEntity(
+            inventory = """0=diamond_sword x1 {minecraft:custom_data:{id:"test:bar"}}"""
+        ).itemMap()["hotbar.0"]
+        assertTrue(comp?.components?.containsKey("minecraft:custom_data") == true)
         assertEquals(GridItem("minecraft:dirt"), EditableGridEntity(inventory = "12=dirt").itemMap()["inventory.12"])
     }
 

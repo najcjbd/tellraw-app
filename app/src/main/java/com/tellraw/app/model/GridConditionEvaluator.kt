@@ -1,5 +1,7 @@
 package com.tellraw.app.model
 
+import com.tellraw.app.util.ExecCondSupport
+
 /**
  * 网格里的 execute 条件求值（近似）：把 `if/unless` 条件作用到**候选实体**上，
  * 用于回答"哪些实体会通过这条带条件的命令"。
@@ -450,26 +452,129 @@ object GridConditionEvaluator {
     ): Boolean {
         val candidates = items.filterKeys { slotMatches(slots, it) }.values
         val p = predicate.trim()
-        if (p == "*" || p.isEmpty()) return candidates.any { true }
-        val neg = p.startsWith("!")
-        val body = if (neg) p.substring(1) else p
-        val idPart = body.substringBefore('[').trim()
-        val bracket = body.substringAfter('[', "").substringBeforeLast(']', "")
-        val wantId = if (idPart == "*") null else normBlock(idPart)
-        val countRange = Regex("(?:^|,)count=([^,\\]]+)").find(bracket)?.groupValues?.get(1)
-        val (clo, chi) = parseRange(countRange ?: "")
-        val damage = Regex("(?:^|,)damage=(-?\\d+)").find(bracket)?.groupValues?.get(1)?.toIntOrNull()
-        val unknown = bracket.split(',').map { it.trim() }.filter {
-            it.isNotEmpty() && !it.startsWith("count=") && !it.startsWith("damage=")
+        if (p.isEmpty()) return candidates.any { true }
+
+        val bracketIndex = p.indexOf('[')
+        val idPart = (if (bracketIndex >= 0) p.substring(0, bracketIndex) else p).trim()
+        val bracket = if (bracketIndex >= 0 && p.endsWith("]")) {
+            p.substring(bracketIndex + 1, p.length - 1)
+        } else ""
+
+        val idNeg = idPart.startsWith("!")
+        val idRaw = if (idNeg) idPart.substring(1) else idPart
+        val wantId = if (idRaw == "*" || idRaw.isEmpty()) null else normBlock(idRaw)
+
+        // 测试项：`,` 是 AND（外层），`|` 是 OR（内层，优先级高）
+        val groups = if (bracket.isBlank()) emptyList()
+        else ExecCondSupport.splitTopLevel(bracket, ',')
+        val parsedGroups = groups.map { g ->
+            ExecCondSupport.splitTopLevel(g, '|').map { parseItemTerm(it.trim()) }
         }
-        if (unknown.isNotEmpty()) notes.add("items 谓词里的 ${unknown.joinToString("、")} 未建模")
-        val hit = candidates.any { item ->
-            (wantId == null || normBlock(item.id) == wantId) &&
-                (countRange == null || (item.count.toDouble() >= (clo ?: Double.NEGATIVE_INFINITY) &&
-                    item.count.toDouble() <= (chi ?: Double.POSITIVE_INFINITY))) &&
-                (damage == null || (item.damage ?: 0) == damage)
+
+        fun matchesTerm(item: GridItem, term: ItemTerm): Boolean {
+            val hit = when (term.kind) {
+                ItemTerm.Kind.COUNT -> {
+                    val c = item.count.toDouble()
+                    when {
+                        term.op == null -> true
+                        term.range == null -> false
+                        else -> c >= (term.range.first ?: Double.NEGATIVE_INFINITY) &&
+                            c <= (term.range.second ?: Double.POSITIVE_INFINITY)
+                    }
+                }
+                ItemTerm.Kind.COMPONENT -> {
+                    val key = normalizeComponent(term.key)
+                    val actual: SnbtLite.Value? = when (key) {
+                        "damage", "minecraft:damage" ->
+                            item.damage?.let { SnbtLite.Value.Num(it.toDouble()) }
+                                ?: item.components["minecraft:damage"]
+                                ?: item.components["damage"]
+                        else -> item.components[key] ?: item.components[term.key]
+                    }
+                    when {
+                        term.op == null -> actual != null
+                        actual == null -> false
+                        term.op == "=" -> term.value != null &&
+                            SnbtLite.serialize(term.value) == SnbtLite.serialize(actual)
+                        term.op == "~" -> term.value != null && SnbtLite.matches(term.value, actual)
+                        else -> false
+                    }
+                }
+            }
+            return if (term.neg) !hit else hit
         }
-        return if (neg) !hit else hit
+
+        val exprOk = parsedGroups.all { orGroup ->
+            orGroup.isEmpty() || orGroup.any { term -> candidates.any { matchesTerm(it, term) } }
+        }
+        val idOk = candidates.any { item -> wantId == null || normBlock(item.id) == wantId }
+        val hit = idOk && exprOk
+        return if (idNeg) !hit else hit
+    }
+
+    private data class ItemTerm(
+        val kind: Kind,
+        val key: String = "",
+        val op: String? = null,
+        val range: Pair<Double?, Double?>? = null,
+        val value: SnbtLite.Value? = null,
+        val neg: Boolean = false
+    ) {
+        enum class Kind { COUNT, COMPONENT }
+    }
+
+    private fun parseItemTerm(raw: String): ItemTerm {
+        val neg = raw.startsWith("!")
+        val body = if (neg) raw.substring(1) else raw
+        if (body == "count" || body.startsWith("count=") || body.startsWith("count~")) {
+            val op = when {
+                body.startsWith("count=") -> "="
+                body.startsWith("count~") -> "~"
+                else -> null
+            }
+            val valText = if (op != null) body.substringAfter(op) else ""
+            val range = when {
+                valText.isBlank() -> null
+                valText.startsWith("{") -> {
+                    val map = SnbtLite.parseCompoundBody(valText)
+                    if (map == null) null else {
+                        (map["min"] as? SnbtLite.Value.Num)?.v to
+                            (map["max"] as? SnbtLite.Value.Num)?.v
+                    }
+                }
+                ".." in valText -> valText.substringBefore("..").toDoubleOrNull() to
+                    valText.substringAfter("..").toDoubleOrNull()
+                else -> {
+                    val n = valText.toDoubleOrNull()
+                    n to n
+                }
+            }
+            return ItemTerm(ItemTerm.Kind.COUNT, op = op, range = range, neg = neg)
+        }
+        val eq = ExecCondSupport.indexOfTopLevel(body, '=')
+        val tilde = ExecCondSupport.indexOfTopLevel(body, '~')
+        val opIndex = when {
+            eq >= 0 -> eq
+            tilde >= 0 -> tilde
+            else -> -1
+        }
+        val key = if (opIndex >= 0) body.substring(0, opIndex).trim() else body.trim()
+        val op = when {
+            opIndex < 0 -> null
+            body[opIndex] == '=' -> "="
+            else -> "~"
+        }
+        val value = if (opIndex >= 0) SnbtLite.parseValue(body.substring(opIndex + 1).trim()) else null
+        return ItemTerm(ItemTerm.Kind.COMPONENT, key = key, op = op, value = value, neg = neg)
+    }
+
+    private fun normalizeComponent(key: String): String {
+        val k = key.trim()
+        return when {
+            k == "damage" -> "damage"
+            k.startsWith("minecraft:") -> k
+            else -> "minecraft:$k"
+        }
     }
 
     private fun entityHasSlots(e: GridEntity, slots: String): Boolean {

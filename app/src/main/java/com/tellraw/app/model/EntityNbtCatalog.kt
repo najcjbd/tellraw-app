@@ -1,8 +1,8 @@
 package com.tellraw.app.model
 
 /**
- * 每个实体的“专属已知 NBT”目录（由 26.2 服务端 data get 实测生成）。
- * 标量键直接用快捷键编辑；列表/复合键（attributes/Inventory/Offers…）走“分支编辑”。
+ * 每个实体的“专属已知 NBT”目录（由 26.3 服务端 data get 实测生成）。
+ * 玩家来自 1.21.11 假人 bot（26.3 bot 协议未支持）；列表/复合键走分支编辑。
  * 与 [KnownNbt.ALL] 的通用键合并使用。
  */
 object EntityNbtCatalog {
@@ -107,6 +107,7 @@ object EntityNbtCatalog {
         ),
         "minecraft:block_display" to listOf(
             s("billboard", "billboard", KnownNbt.Kind.STRING, ""),
+            s("block_state", "block_state", KnownNbt.Kind.STRING, ""),
             s("glow_color_override", "glow_color_override", KnownNbt.Kind.INT, ""),
             s("height", "height", KnownNbt.Kind.FLOAT, ""),
             s("interpolation_duration", "interpolation_duration", KnownNbt.Kind.INT, ""),
@@ -241,6 +242,9 @@ object EntityNbtCatalog {
             s("CanPickUpLoot", "CanPickUpLoot", KnownNbt.Kind.BOOL, ""),
             s("LeftHanded", "LeftHanded", KnownNbt.Kind.BOOL, ""),
         ),
+        "minecraft:cushion" to listOf(
+            s("color", "color", KnownNbt.Kind.STRING, ""),
+        ),
         "minecraft:dark_oak_chest_boat" to listOf(
             s("Items", "物品栏 Items（列表）", KnownNbt.Kind.LIST, ""),
         ),
@@ -337,6 +341,7 @@ object EntityNbtCatalog {
             s("Value", "Value", KnownNbt.Kind.INT, ""),
         ),
         "minecraft:falling_block" to listOf(
+            s("BlockState", "BlockState", KnownNbt.Kind.STRING, ""),
             s("CancelDrop", "CancelDrop", KnownNbt.Kind.BOOL, ""),
             s("DropItem", "DropItem", KnownNbt.Kind.BOOL, ""),
             s("FallHurtAmount", "FallHurtAmount", KnownNbt.Kind.FLOAT, ""),
@@ -700,6 +705,9 @@ object EntityNbtCatalog {
             s("LeftHanded", "LeftHanded", KnownNbt.Kind.BOOL, ""),
             s("anger_end_time", "anger_end_time", KnownNbt.Kind.INT, ""),
         ),
+        "minecraft:poplar_chest_boat" to listOf(
+            s("Items", "物品栏 Items（列表）", KnownNbt.Kind.LIST, ""),
+        ),
         "minecraft:pufferfish" to listOf(
             s("attributes", "属性 attributes（列表）", KnownNbt.Kind.LIST, ""),
             s("CanPickUpLoot", "CanPickUpLoot", KnownNbt.Kind.BOOL, ""),
@@ -751,7 +759,7 @@ object EntityNbtCatalog {
         "minecraft:shulker" to listOf(
             s("Color", "颜色 Color", KnownNbt.Kind.BYTE, "0-15"),
             s("attributes", "属性 attributes（列表）", KnownNbt.Kind.LIST, ""),
-            s("AttachFace", "AttachFace", KnownNbt.Kind.BOOL, ""),
+            s("AttachFace", "AttachFace", KnownNbt.Kind.BYTE, ""),
             s("CanPickUpLoot", "CanPickUpLoot", KnownNbt.Kind.BOOL, ""),
             s("LeftHanded", "LeftHanded", KnownNbt.Kind.BOOL, ""),
             s("Peek", "Peek", KnownNbt.Kind.BOOL, ""),
@@ -771,6 +779,7 @@ object EntityNbtCatalog {
         "minecraft:skeleton" to listOf(
             s("attributes", "属性 attributes（列表）", KnownNbt.Kind.LIST, ""),
             s("CanPickUpLoot", "CanPickUpLoot", KnownNbt.Kind.BOOL, ""),
+            s("FreezingTime", "FreezingTime", KnownNbt.Kind.INT, ""),
             s("LeftHanded", "LeftHanded", KnownNbt.Kind.BOOL, ""),
             s("StrayConversionTime", "StrayConversionTime", KnownNbt.Kind.INT, ""),
         ),
@@ -916,6 +925,7 @@ object EntityNbtCatalog {
             s("width", "width", KnownNbt.Kind.FLOAT, ""),
         ),
         "minecraft:tnt" to listOf(
+            s("block_state", "block_state", KnownNbt.Kind.STRING, ""),
             s("fuse", "fuse", KnownNbt.Kind.INT, ""),
         ),
         "minecraft:tnt_minecart" to listOf(

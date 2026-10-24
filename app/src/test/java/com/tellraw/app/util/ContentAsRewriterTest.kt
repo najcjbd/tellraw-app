@@ -53,6 +53,20 @@ class ContentAsRewriterTest {
     }
 
     @Test
+    fun rewritesHasitemNegationInContent() {
+        val msg = message(
+            ComponentType.SELECTOR to "@a[hasitem={item=diamond,quantity=0},tag=6]",
+            ComponentType.TEXT to "x"
+        )
+        val r = ContentAsRewriter.rewrite("@s", msg, "")
+        assertTrue(r.applied)
+        assertEquals("@p", r.targetSelector)
+        assertTrue(r.extraTokens.joinToString(" "), r.extraTokens.joinToString(" ").contains("unless"))
+        val rewritten = TextComponentHelper.parseTextComponents(r.message)[0].content
+        assertEquals("@s[tag=6]", rewritten)
+    }
+
+    @Test
     fun noNegativeScoresDoesNotApply() {
         val msg = message(ComponentType.SELECTOR to "@a[scores={l=5},tag=6]")
         val r = ContentAsRewriter.rewrite("@s", msg, "")

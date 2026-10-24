@@ -79,7 +79,9 @@ object CommandInputParser {
         if (root.isJsonNull || (!root.isJsonObject && !root.isJsonArray)) return null
 
         val (components, edition) = decodeRoot(root, warnings) ?: return null
-        if (components.isEmpty()) return null
+        // 只有"完全无内容且无警告"才返回 null；keybind/nbt/object 等不支持的类型
+        // 仍返回结果，让调用方展示 warnings，而不是静默失败。
+        if (components.isEmpty() && warnings.isEmpty()) return null
 
         // 4) 生成两版 JSON（复用既有转换器）
         val javaJson = TextComponentHelper.convertToJavaJson(components, context = context, warnings = warnings)
@@ -195,11 +197,19 @@ object CommandInputParser {
         return out
     }
 
-    private fun decodeComponent(obj: JsonObject, warnings: MutableList<String>): List<TextComponent> {
+    private fun decodeComponent(
+        obj: JsonObject,
+        warnings: MutableList<String>,
+        inheritedStyle: String = ""
+    ): List<TextComponent> {
         val out = mutableListOf<TextComponent>()
-        val stylePrefix = styleToSectionCodes(obj)
+        val ownStyle = styleToSectionCodes(obj, warnings)
+        val style = inheritedStyle + ownStyle
+        val losesStyle = ownStyle.isNotEmpty()
         when {
             obj.has("translate") -> {
+                if (losesStyle) warnings.add("translate 组件上的样式字段暂未保留（会作用于 extra 子组件）")
+                if (obj.has("fallback")) warnings.add("translate 的 fallback 暂未保留")
                 val comp = TextComponent(ComponentType.TRANSLATE, str(obj, "translate"))
                 obj.get("with")?.takeIf { it.isJsonArray }?.let { w ->
                     val params = (w as JsonArray).map { plainTextOf(it, warnings) }
@@ -210,16 +220,31 @@ object CommandInputParser {
                 out.add(comp)
             }
             obj.has("score") && obj.get("score").isJsonObject -> {
+                if (losesStyle) warnings.add("score 组件上的样式字段暂未保留")
                 val sc = obj.getAsJsonObject("score")
                 out.add(TextComponent(ComponentType.SCORE, "${str(sc, "name")}:${str(sc, "objective")}"))
             }
-            obj.has("selector") -> out.add(TextComponent(ComponentType.SELECTOR, str(obj, "selector")))
-            obj.has("text") -> out.add(TextComponent(ComponentType.TEXT, stylePrefix + str(obj, "text")))
-            else -> if (!obj.has("extra")) warnings.add("无法识别的组件（既不是 text/translate/score/selector）：$obj")
+            obj.has("selector") -> {
+                if (losesStyle) warnings.add("selector 组件上的样式字段暂未保留")
+                val comp = TextComponent(ComponentType.SELECTOR, str(obj, "selector"))
+                obj.get("separator")?.let { sep ->
+                    comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, plainTextOf(sep, warnings)))
+                }
+                out.add(comp)
+            }
+            obj.has("text") -> out.add(TextComponent(ComponentType.TEXT, style + str(obj, "text")))
+            obj.has("keybind") -> warnings.add("keybind 文本组件暂不支持，已忽略：${str(obj, "keybind")}")
+            obj.has("nbt") -> warnings.add("nbt 文本组件暂不支持，已忽略")
+            obj.has("object") -> warnings.add("object/精灵图文本组件暂不支持，已忽略")
+            else -> if (!obj.has("extra")) {
+                warnings.add("无法识别的组件（既不是 text/translate/score/selector/keybind/nbt/object）：$obj")
+            }
         }
-        // extra（递归；样式只在最内层 text 生效，这里不向 extra 传递父样式）
+        // extra 子组件继承父组件样式（父样式 + 子组件自己的样式）
         obj.get("extra")?.takeIf { it.isJsonArray }?.let { ex ->
-            for (e in ex.asJsonArray) if (e.isJsonObject) out.addAll(decodeComponent(e.asJsonObject, warnings))
+            for (e in ex.asJsonArray) if (e.isJsonObject) {
+                out.addAll(decodeComponent(e.asJsonObject, warnings, style))
+            }
         }
         return out
     }
