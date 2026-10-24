@@ -133,8 +133,9 @@ fun MainScreen(
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
+                        // 快捷按钮插入的是"文本逗号"（with 里的字面逗号），不是参数分隔符
                         viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, ","
+                            messageTextFieldValue.value.selection.start, "\\,"
                         )
                     } else {
                         showCommaChoiceDialog = true
@@ -173,8 +174,9 @@ fun MainScreen(
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
+                        // 快捷按钮插入的是"文本逗号"（with 里的字面逗号），不是参数分隔符
                         viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, ","
+                            messageTextFieldValue.value.selection.start, "\\,"
                         )
                     } else {
                         showCommaChoiceDialog = true
@@ -353,17 +355,17 @@ fun MainScreen(
             onDismissRequest = { showCommaChoiceDialog = false },
             title = { Text("逗号插入到哪里？") },
             text = {
-                Text("当前选中了 translate 组件。要把它作为 with 的参数分隔符，还是普通文本？")
+                Text("当前选中了 translate 组件。要插入 with 里的文本逗号（\\,），还是普通文本逗号（,）？")
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
                     viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH)
                     viewModel.insertTextWithComponent(
-                        messageTextFieldValue.value.selection.start, ","
+                        messageTextFieldValue.value.selection.start, "\\,"
                     )
                     showCommaChoiceDialog = false
-                }) { Text("with 分隔符") }
+                }) { Text("with 文本逗号（\\,）") }
             },
             dismissButton = {
                 Row {
@@ -372,7 +374,7 @@ fun MainScreen(
                             messageTextFieldValue.value.selection.start, ","
                         )
                         showCommaChoiceDialog = false
-                    }) { Text("普通文本") }
+                    }) { Text("普通文本逗号（,）") }
                     TextButton(onClick = { showCommaChoiceDialog = false }) { Text("取消") }
                 }
             }

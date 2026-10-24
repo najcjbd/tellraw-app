@@ -216,10 +216,18 @@ object CommandInputParser {
                     )
                 }
                 obj.get("with")?.takeIf { it.isJsonArray }?.let { w ->
-                    val params = (w as JsonArray).map { plainTextOf(it, warnings) }
-                    if (params.isNotEmpty()) {
-                        comp.subComponents.add(SubComponent(SubComponentType.WITH, params.joinToString(",")))
+                    val arr = w as JsonArray
+                    val hasNested = arr.any { it.isJsonObject || it.isJsonArray }
+                    if (hasNested) {
+                        // 保留嵌套组件 JSON，交给翻译转换器处理（Java 保留样式，基岩按纯文本并提醒）
+                        comp.subComponents.add(SubComponent(SubComponentType.WITH, arr.toString()))
+                    } else {
+                        val params = arr.map { it.asString }
+                        if (params.isNotEmpty()) {
+                            comp.subComponents.add(SubComponent(SubComponentType.WITH, params.joinToString(",")))
+                        }
                     }
+                    Unit
                 }
                 out.add(comp)
             }
