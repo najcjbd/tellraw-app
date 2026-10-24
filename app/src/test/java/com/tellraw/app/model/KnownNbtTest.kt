@@ -55,6 +55,24 @@ class KnownNbtTest {
         assertTrue(stripped.contains("Health"))
     }
 
+    @Test fun perEntityCatalogMergesWithCommon() {
+        val sheep = KnownNbt.specsFor("minecraft:sheep")
+        assertTrue(sheep.any { it.key == "Color" && it.kind == KnownNbt.Kind.BYTE })
+        assertTrue(sheep.any { it.key == "Sheared" })
+        assertTrue("通用键仍保留", sheep.any { it.key == "Health" })
+        assertEquals(
+            "Color:5b",
+            KnownNbt.merge("", mapOf("Color" to "5"), "minecraft:sheep")
+        )
+        // 别名实体也能拿到专属目录
+        assertTrue(KnownNbt.specsFor("minecraft:zombie_pigman").any { it.key == "IsBaby" })
+        // 字符串键
+        assertEquals(
+            "variant:\"pale\"",
+            KnownNbt.merge("", mapOf("variant" to "pale"), "minecraft:wolf")
+        )
+    }
+
     @Test fun invalidManualNbtReturnsNull() {
         assertNull(KnownNbt.merge("Health:", mapOf("Health" to "20")))
     }

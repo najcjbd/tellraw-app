@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.window.Dialog
 
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -2628,6 +2629,72 @@ fun DirectoryPickerDialog(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
                         Text(stringResource(R.string.select_directory), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+/**
+ * 头像/图片选择器：沿用历史记录目录选择器的“直接浏览文件系统”思路，
+ * 同时列出子目录与图片文件；点图片返回绝对路径。
+ */
+@Composable
+fun ImageFilePickerDialog(
+    initialPath: String = "/storage/emulated/0",
+    onDismiss: () -> Unit,
+    onImageSelected: (String) -> Unit
+) {
+    var currentPath by remember { mutableStateOf(initialPath) }
+    var entries by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
+    val imageExt = setOf("png", "jpg", "jpeg", "webp", "bmp")
+
+    LaunchedEffect(currentPath) {
+        entries = try {
+            val dir = java.io.File(currentPath)
+            if (dir.isDirectory) {
+                dir.listFiles()
+                    ?.filter { it.isDirectory || it.extension.lowercase() in imageExt }
+                    ?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+                    ?: emptyList()
+            } else emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp) {
+            Column(Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("选择头像图片", style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                    }
+                }
+                Text(currentPath, style = MaterialTheme.typography.labelSmall)
+                Row {
+                    TextButton(onClick = {
+                        val parent = java.io.File(currentPath).parent
+                        if (parent != null) currentPath = parent
+                    }) { Text("上一级") }
+                    TextButton(onClick = { currentPath = "/storage/emulated/0" }) { Text("存储根目录") }
+                }
+                LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                    items(entries, key = { it.absolutePath }) { f ->
+                        ListItem(
+                            headlineContent = { Text(f.name) },
+                            supportingContent = {
+                                Text(if (f.isDirectory) "文件夹" else f.extension.lowercase())
+                            },
+                            leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                            modifier = Modifier.clickable {
+                                if (f.isDirectory) currentPath = f.absolutePath
+                                else onImageSelected(f.absolutePath)
+                            }
+                        )
                     }
                 }
             }

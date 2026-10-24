@@ -238,6 +238,9 @@
     <string name="bedrock_type_tag_not_supported">基岩版不支持 type=#类型标签，已移除该条件</string>
     <string name="entity_id_converted">实体 ID %1$s 已按目标版本改写为 %2$s</string>
     <string name="entity_id_no_single_target_form">实体 ID %1$s 无法用单一 %2$s ID 表达，已移除该 type 条件</string>
+    <string name="unknown_selector_param_removed">未知的目标选择器参数 %s 已舍弃（无法确认目标版本是否支持）</string>
+    <string name="nbt_tags_name_converted">NBT 的 Tags/CustomName 已转换成基岩 tag=/name= 参数</string>
+    <string name="nbt_keys_not_convertible_to_bedrock">NBT 键 %s 无法转换成基岩选择器，已丢弃</string>
     <string name="at_n_converted_for_target_version">目标版本 %1$s 没有 @n，已改写为 @e 的等效 limit/sort 写法</string>
     <string name="target_version_forces_syntax">已按目标版本 %1$s 使用「%2$s」物品写法</string>
     <string name="execute_prefix_unsupported_for_target">目标版本 %1$s 不支持 execute 的 %2$s 写法，已忽略整个前置命令</string>

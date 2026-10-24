@@ -880,4 +880,55 @@ class ExecuteConverterTest {
         assertNotNull(cond)
         assertTrue(cond!!.contains("type=minecraft:zombified_piglin"))
     }
+
+    @Test
+    fun dataConditionConvertsTagsAndCustomNameForBedrock() {
+        val tags = conv(
+            "execute if data entity @s {Tags:[\"vip\",\"staff\"]}",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        requireNotNull(tags)
+        assertTrue(tags, tags!!.contains("if entity @s[tag=vip,tag=staff]"))
+
+        val name = conv(
+            "execute unless data entity @s {CustomName:\"Bob\"}",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        requireNotNull(name)
+        assertTrue(name, name!!.contains("unless entity @s[name=Bob]"))
+
+        val spaced = conv(
+            "execute if data entity @s {CustomName:\"Bob Jr\"}",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        requireNotNull(spaced)
+        assertTrue(spaced, spaced!!.contains("name=\"Bob Jr\""))
+    }
+
+    @Test
+    fun dataConditionWithUnconvertibleKeysIsDropped() {
+        val (out, reminders) = conv(
+            "execute if data entity @s {Tags:[\"vip\"],Health:20.0f}",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertFalse("不能静默放宽条件", out!!.contains("tag=vip"))
+        assertTrue(reminders.any { it.contains("Health") })
+    }
+
+    @Test
+    fun entityConditionNbtTagsNameToBedrock() {
+        val out = conv(
+            "execute if entity @s[nbt={Tags:[\"vip\"],CustomName:\"Bob\"}]",
+            Direction.JAVA_TO_BEDROCK
+        ).first
+        requireNotNull(out)
+        assertTrue(out, out!!.contains("if entity @s[tag=vip,name=Bob]"))
+
+        val (dropped, reminders) = conv(
+            "execute if entity @s[nbt={Health:20.0f}]",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertFalse("不能静默放宽条件", dropped!!.contains("entity @s["))
+        assertTrue(reminders.any { it.contains("Health") })
+    }
 }
