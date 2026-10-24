@@ -829,6 +829,7 @@ object SelectorConverter {
         val params = mutableListOf<String>()
         var currentParam = ""
         var braceCount = 0
+        var bracketCount = 0
         var inStringValue = false
         var stringChar = '"'
 
@@ -851,7 +852,15 @@ object SelectorConverter {
                     braceCount--
                     currentParam += char
                 }
-                !inStringValue && char == ',' && braceCount == 0 -> {
+                !inStringValue && char == '[' -> {
+                    bracketCount++
+                    currentParam += char
+                }
+                !inStringValue && char == ']' -> {
+                    bracketCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 && bracketCount == 0 -> {
                     // 在最外层遇到逗号，分割参数
                     if (currentParam.trim().isNotEmpty()) {
                         params.add(currentParam.trim())
@@ -951,7 +960,7 @@ object SelectorConverter {
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
-                else if (paramName !in knownParams) {
+                else if (paramName.lowercase() !in knownParams) {
                     removedParams.add(paramName)
                     conversionReminders.add(
                         getStringSafely(context, R.string.unknown_selector_param_removed, paramName)
@@ -3091,6 +3100,7 @@ object SelectorConverter {
     private fun parseHasitemObjectParams(obj: String): List<String> {
         val params = mutableListOf<String>()
         var braceCount = 0
+        var bracketCount = 0
         var currentParam = ""
         var inStringValue = false
         var stringChar = '"'
@@ -3114,7 +3124,15 @@ object SelectorConverter {
                     braceCount--
                     currentParam += char
                 }
-                !inStringValue && char == ',' && braceCount == 0 -> {
+                !inStringValue && char == '[' -> {
+                    bracketCount++
+                    currentParam += char
+                }
+                !inStringValue && char == ']' -> {
+                    bracketCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 && bracketCount == 0 -> {
                     if (currentParam.trim().isNotEmpty()) {
                         params.add(currentParam.trim())
                     }
@@ -3962,6 +3980,7 @@ object SelectorConverter {
         val params = mutableListOf<String>()
         var currentParam = ""
         var braceCount = 0
+        var bracketCount = 0
         var inStringValue = false
         var stringChar = '"'
         
@@ -3984,7 +4003,15 @@ object SelectorConverter {
                     braceCount--
                     currentParam += char
                 }
-                !inStringValue && char == ',' && braceCount == 0 -> {
+                !inStringValue && char == '[' -> {
+                    bracketCount++
+                    currentParam += char
+                }
+                !inStringValue && char == ']' -> {
+                    bracketCount--
+                    currentParam += char
+                }
+                !inStringValue && char == ',' && braceCount == 0 && bracketCount == 0 -> {
                     if (currentParam.trim().isNotEmpty()) {
                         params.add(currentParam.trim())
                     }
