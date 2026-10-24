@@ -73,6 +73,33 @@ class KnownNbtTest {
         )
     }
 
+    @Test fun playerAndStructuredKeys() {
+        val p = KnownNbt.specsFor("minecraft:player")
+        assertTrue(p.any { it.key == "XpLevel" && it.kind == KnownNbt.Kind.INT })
+        assertTrue(p.any { it.key == "Inventory" && it.kind == KnownNbt.Kind.LIST })
+
+        val merged = KnownNbt.merge(
+            "",
+            mapOf("Inventory" to """[{Slot:0b,id:"minecraft:stone"}]"""),
+            "minecraft:player"
+        )
+        requireNotNull(merged)
+        assertTrue(merged, merged.contains("Inventory:[{Slot:0b"))
+
+        // 结构化值必须是合法 SNBT；非法值不写回
+        assertEquals(
+            "",
+            KnownNbt.merge("", mapOf("Inventory" to "not a list"), "minecraft:player")
+        )
+        // 列表/复合键从现有 NBT 回填
+        val out = mutableMapOf<String, String>()
+        KnownNbt.fillQuick(
+            """attributes:[{id:"minecraft:movement_speed",base:0.3d}],Health:20.0f""",
+            out, "minecraft:zombie"
+        )
+        assertTrue(out["attributes"]?.contains("movement_speed") == true)
+    }
+
     @Test fun invalidManualNbtReturnsNull() {
         assertNull(KnownNbt.merge("Health:", mapOf("Health" to "20")))
     }

@@ -49,7 +49,11 @@ object ExecuteConverter {
     )
 
     // Java 专有条件：基岩没有对应写法，只能保留 + 提醒（是否该"放弃"是 execute实例表 的规格冲突①，未裁决）。
-    private val JAVA_ONLY_CONDITIONS = setOf("data", "items", "predicate", "function", "stopwatch", "loaded", "slots")
+    // 基岩 execute 只有 block/blocks/entity/score 四个条件；其余都是 Java 独有。
+    private val JAVA_ONLY_CONDITIONS = setOf(
+        "data", "items", "predicate", "function", "stopwatch", "loaded", "slots",
+        "biome", "dimension"
+    )
 
     /**
      * 解析 execute 前置命令（只解析、不转换条件）。
@@ -476,6 +480,14 @@ object ExecuteConverter {
                 if (op == "matches") 4 else 5
             }
             //   data block <source> <path>   = 1 + 3 + 1 = 5；data entity <source> <path> = 3
+            // slots 是 Java 26.3 条件；按 execute.txt 的签名：
+            //   slots entity <source> <slots>       = 3
+            //   slots block <pos> <slots>           = 1 + 3 + 1 = 5
+            "slots" -> when (source) {
+                null -> null
+                "block" -> 1 + POSITION_TOKENS + 1
+                else -> 3
+            }
             "data" -> when (source) {
                 null -> null
                 "block" -> 1 + POSITION_TOKENS + 1
@@ -581,7 +593,7 @@ object ExecuteConverter {
                     reminders.add("子条件 \"${cond.name}\" 基岩无对应写法 → 按需求十.5 舍弃该条")
                     CondOut.Drop
                 } else {
-                    CondOut.Out(originalTokens(cond)) // block/biome/dimension/entity 等两版都有，原样保留
+                    CondOut.Out(originalTokens(cond)) // block/blocks/entity/score 两版都有，原样保留
                 }
             }
             Direction.BEDROCK_TO_JAVA -> when (cond.name) {
