@@ -102,6 +102,94 @@ object GridConditionEvaluator {
         return j - start
     }
 
+    data class OriginResult(val origin: Triple<Double, Double, Double>, val notes: List<String>)
+
+    /**
+     * 解析 execute 前缀里的 positioned / at，得到"选择器外部"的默认原点。
+     * 选择器自己写的 x/y/z 优先级更高（在 SelectorEvaluator 内部覆盖）。
+     */
+    fun resolveOrigin(
+        prefix: String,
+        all: List<GridEntity>,
+        executor: GridEntity?,
+        base: Triple<Double, Double, Double>,
+        target: VersionSpec? = null
+    ): OriginResult {
+        val notes = mutableListOf<String>()
+        var origin = base
+        val tokens = tokenize(prefix)
+        var i = 0
+        while (i < tokens.size) {
+            when (tokens[i].lowercase()) {
+                "at" -> {
+                    val sel = tokens.getOrNull(i + 1)
+                    if (sel == null) {
+                        notes.add("at 缺少选择器，已忽略")
+                    } else {
+                        val r = SelectorEvaluator.evaluate(
+                            sel, all, executor = executor,
+                            edition = if (target?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
+                            origin = origin, target = target
+                        )
+                        notes.addAll(r.notes)
+                        val first = r.matched.firstOrNull()
+                        if (first != null) {
+                            origin = Triple(first.x, first.y, first.z)
+                        } else {
+                            notes.add("at $sel 没有选中实体，原点保持不变")
+                        }
+                    }
+                    i += 2
+                }
+                "positioned" -> {
+                    val xs = tokens.getOrNull(i + 1)
+                    val ys = tokens.getOrNull(i + 2)
+                    val zs = tokens.getOrNull(i + 3)
+                    if (xs == null || ys == null || zs == null) {
+                        notes.add("positioned 参数不完整，已忽略")
+                        i += 1
+                    } else {
+                        origin = Triple(
+                            coord(xs, origin.first, notes),
+                            coord(ys, origin.second, notes),
+                            coord(zs, origin.third, notes)
+                        )
+                        i += 4
+                    }
+                }
+                "in" -> {
+                    notes.add("execute in（维度）未建模，原点按当前世界处理")
+                    i += 2
+                }
+                "anchored" -> {
+                    val a = tokens.getOrNull(i + 1)
+                    if (a == "eyes") {
+                        notes.add("anchored eyes：按脚部 +1.62 近似眼睛高度")
+                        origin = origin.copy(second = origin.second + 1.62)
+                    }
+                    i += 2
+                }
+                "rotated", "facing", "align", "on" -> {
+                    notes.add("execute ${tokens[i]} 未建模（不改变选择器筛选结果）")
+                    i += 2
+                }
+                else -> i++
+            }
+        }
+        return OriginResult(origin, notes.distinct())
+    }
+
+    private fun coord(text: String, base: Double, notes: MutableList<String>): Double {
+        val t = text.trim()
+        if (t.startsWith("^")) {
+            notes.add("局部坐标 ^ 未建模，按波浪号相对坐标处理")
+            return base
+        }
+        if (t == "~") return base
+        if (t.startsWith("~")) return base + (t.substring(1).toDoubleOrNull() ?: 0.0)
+        return t.toDoubleOrNull() ?: base
+    }
+
     fun tokenize(s: String): List<String> {
         val out = mutableListOf<String>()
         val sb = StringBuilder()

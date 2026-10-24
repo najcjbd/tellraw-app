@@ -36,6 +36,34 @@ class GridConditionEvaluatorTest {
         assertFalse(eval("if data entity @s {Health:20.0f} if entity @s[tag=admin]").ok)
     }
 
+    @Test fun positionedAndAtResolveOrigin() {
+        val a = GridEntity("a", "minecraft:player", x = 10.0)
+        val z = GridEntity("z", "minecraft:zombie", x = 3.0)
+        val list = listOf(a, z)
+        val base = Triple(0.0, -60.0, 0.0)
+
+        val pos = GridConditionEvaluator.resolveOrigin("positioned 5 -60 0", list, null, base)
+        assertEquals(5.0, pos.origin.first, 0.0)
+
+        val at = GridConditionEvaluator.resolveOrigin("at @e[type=zombie]", list, null, base)
+        assertEquals(3.0, at.origin.first, 0.0)
+
+        val rel = GridConditionEvaluator.resolveOrigin(
+            "positioned ~2 ~ ~", emptyList(), null, Triple(1.0, -60.0, 0.0)
+        )
+        assertEquals(3.0, rel.origin.first, 0.0)
+    }
+
+    @Test fun selectorXyzOverridesPositioned() {
+        // positioned 原点在 10，但选择器自己写了 x=0，distance 应按选择器的 x 算
+        val e = GridEntity("e", "minecraft:zombie", x = 0.0)
+        val r = SelectorEvaluator.evaluate(
+            "@e[x=0,y=-60,z=0,distance=..1]", listOf(e),
+            origin = Triple(10.0, -60.0, 0.0)
+        )
+        assertEquals(listOf("e"), r.matched.map { it.uid })
+    }
+
     @Test fun unsupportedConditionsAreNotedNotSilent() {
         val r = eval("if block ~ ~ ~ stone")
         assertTrue(r.ok)

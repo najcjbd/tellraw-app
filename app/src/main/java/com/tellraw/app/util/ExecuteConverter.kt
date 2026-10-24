@@ -1,6 +1,7 @@
 package com.tellraw.app.util
 
 import com.tellraw.app.model.EntityIdAliases
+import com.tellraw.app.model.SnbtLite
 
 /**
  * execute 前置命令解析 / 条件子命令互转。
@@ -703,6 +704,8 @@ object ExecuteConverter {
 
         val kept = mutableListOf<String>()
         val hasitemObjs = mutableListOf<String>()
+        val extraParams = mutableListOf<String>()
+        val unsupported = linkedSetOf<String>()
         var airExistence = false
         var sawNbt = false
         for (p in ExecCondSupport.splitTopLevel(paramsPart, ',')) {
@@ -714,21 +717,43 @@ object ExecuteConverter {
             sawNbt = true
             val nbt = p.substringAfter("nbt=").trim()
             val mapping = ExecCondSupport.nbtToHasitemItems(nbt, reminders)
-            if (mapping.items.isEmpty()) {
-                reminders.add("nbt（$nbt）无法映射到基岩 hasitem，已舍弃该参数")
-                continue
-            }
             if (mapping.airExistence) airExistence = true
             hasitemObjs.addAll(mapping.items)
+            val parsed = SnbtLite.parseCompoundBody(nbt.trim().removeSurrounding("{", "}"))
+            if (parsed != null) {
+                for ((k, v) in parsed) {
+                    when (k) {
+                        "Tags" -> (v as? SnbtLite.Value.ListV)?.items?.forEach { item ->
+                            (item as? SnbtLite.Value.Str)?.v?.takeIf { it.isNotBlank() }
+                                ?.let { extraParams.add("tag=$it") }
+                        }
+                        "CustomName" -> (v as? SnbtLite.Value.Str)?.v?.let {
+                            extraParams.add("name=" + quoteSelectorValue(SnbtLite.plainText(it)))
+                        }
+                        "Team" -> unsupported.add("Team（基岩无队伍）")
+                        "Inventory", "SelectedItem", "equipment", "Items", "HandItems",
+                        "ArmorItems", "item", "body_armor_item" -> Unit
+                        else -> unsupported.add(k)
+                    }
+                }
+            }
         }
         if (!sawNbt) return CondOut.Out(originalTokens(cond))
-        if (hasitemObjs.isEmpty()) {
-            reminders.add("entity 条件里的 nbt 全部无法映射到基岩 hasitem，已舍弃该参数")
-            return if (kept.isEmpty()) {
-                dropAnd(reminders, "entity 条件的内容已全部舍弃")
-            } else {
-                CondOut.Out(listOf(if (cond.unless) "unless" else "if", "entity", "$varName[${kept.joinToString(",")}]"))
-            }
+        if (unsupported.isNotEmpty()) {
+            return dropAnd(
+                reminders,
+                "entity 条件里的 ${unsupported.joinToString("、")} 基岩无法用选择器表达"
+            )
+        }
+        if (hasitemObjs.isEmpty() && extraParams.isEmpty()) {
+            reminders.add("entity 条件里的 nbt 全部无法映射到基岩选择器")
+            return dropAnd(reminders, "entity 条件的内容已全部舍弃")
+        }
+        if (airExistence && extraParams.isNotEmpty()) {
+            return dropAnd(reminders, "nbt 同时包含空气槽与 Tags/CustomName，基岩极性无法保真")
+        }
+        if (cond.unless && hasitemObjs.isNotEmpty() && extraParams.isNotEmpty()) {
+            return dropAnd(reminders, "unless + 物品 + Tags/CustomName 的合取取反无法保真")
         }
 
         val hasitem = if (hasitemObjs.size == 1) {
@@ -736,36 +761,43 @@ object ExecuteConverter {
         } else {
             "[${hasitemObjs.joinToString(",") { "{$it}" }}]"
         }
-        // 空气法极性（第十节 15）：Java 的 unless（该槽为空）-> 基岩 if；
-        // 普通的"没有该物品"（unless + 无数量）-> 基岩 `hasitem={…,quantity=0}`（A5/C18），关键字仍是 if
         var kw = if (cond.unless) "unless" else "if"
-        val param: String
-        if (airExistence) {
-            kw = if (cond.unless) "if" else "unless"
-            param = "hasitem=$hasitem"
-            reminders.add(
-                "空气法极性：Java \"${if (cond.unless) "unless" else "if"} entity …\" 表示该槽位" +
-                    (if (cond.unless) "没有物品（空）" else "有物品") +
-                    "，已转成基岩 \"$kw entity …[hasitem={item=air}]\"（基岩 item=air 表示该槽为空）"
-            )
-        } else if (cond.unless) {
-            if (hasitemObjs.size > 1) {
-                return dropAnd(reminders, "\"unless + 多个 nbt\"语义为 NOT(全部同时成立)，基岩 hasitem 数组是且关系、无法表达")
+        val params = mutableListOf<String>()
+        params.addAll(kept)
+        params.addAll(extraParams)
+        if (hasitemObjs.isNotEmpty()) {
+            if (extraParams.isEmpty() && airExistence) {
+                kw = if (cond.unless) "if" else "unless"
+                params.add("hasitem=$hasitem")
+                reminders.add(
+                    "空气法极性：Java \"${if (cond.unless) "unless" else "if"} entity …\" 表示该槽位" +
+                        (if (cond.unless) "没有物品（空）" else "有物品") +
+                        "，已转成基岩 \"$kw entity …[hasitem={item=air}]\"（基岩 item=air 表示该槽为空）"
+                )
+            } else if (cond.unless && extraParams.isEmpty()) {
+                if (hasitemObjs.size > 1) {
+                    return dropAnd(reminders, "\"unless + 多个 nbt\"语义为 NOT(全部同时成立)，基岩 hasitem 数组是且关系、无法表达")
+                }
+                if ("quantity=" in hasitemObjs[0]) {
+                    return dropAnd(reminders, "\"unless + 带数量的 nbt\"无法用基岩 quantity=0 表达")
+                }
+                kw = "if"
+                params.add("hasitem={${hasitemObjs[0]},quantity=0}")
+                reminders.add("\"没有该物品\"已用基岩 quantity=0 表示（execute需求 A5/C18）")
+            } else {
+                params.add("hasitem=$hasitem")
             }
-            if ("quantity=" in hasitemObjs[0]) {
-                return dropAnd(reminders, "\"unless + 带数量的 nbt\"无法用基岩 quantity=0 表达")
-            }
-            kw = "if"
-            param = "hasitem={${hasitemObjs[0]},quantity=0}"
-            reminders.add("\"没有该物品\"已用基岩 quantity=0 表示（execute需求 A5/C18）")
-        } else {
-            param = "hasitem=$hasitem"
         }
-        val params = if (kept.isEmpty()) param else "${kept.joinToString(",")},$param"
-        return CondOut.Out(listOf(kw, "entity", "$varName[$params]"))
+        if (params.isEmpty()) return dropAnd(reminders, "entity 条件的内容已全部舍弃")
+        return CondOut.Out(listOf(kw, "entity", "$varName[${params.joinToString(",")}]"))
     }
 
     /** `if|unless data entity <target> <nbt>` -> `if|unless entity <target>[hasitem=…]` */
+    private fun quoteSelectorValue(v: String): String =
+        if (v.any { it.isWhitespace() || it == ',' || it == ']' || it == '[' || it == '"' }) {
+            "\"" + v.replace("\"", "\\\"") + "\""
+        } else v
+
     private fun convertDataJavaToBedrock(
         cond: Seg.Cond,
         exec: ExecState,
@@ -780,7 +812,40 @@ object ExecuteConverter {
         val nbt = args[2]
         if (target == "*") return dropAnd(reminders, "data 的目标 * (所有被追踪实体) 基岩无对应")
         val mapping = ExecCondSupport.nbtToHasitemItems(nbt, reminders)
-        if (mapping.items.isEmpty()) return dropAnd(reminders, "NBT 主片段无法映射到基岩 hasitem")
+        // Tags / CustomName 也能用基岩选择器表达；Team 与其余键无法表达 -> 整条条件丢弃（避免放宽语义）。
+        val extraParams = mutableListOf<String>()
+        val unsupported = linkedSetOf<String>()
+        val parsed = SnbtLite.parseCompoundBody(nbt.trim().removeSurrounding("{", "}"))
+        if (parsed != null) {
+            for ((k, v) in parsed) {
+                when (k) {
+                    "Tags" -> (v as? SnbtLite.Value.ListV)?.items?.forEach { item ->
+                        (item as? SnbtLite.Value.Str)?.v?.takeIf { it.isNotBlank() }
+                            ?.let { extraParams.add("tag=$it") }
+                    }
+                    "CustomName" -> (v as? SnbtLite.Value.Str)?.v?.let {
+                        val plain = SnbtLite.plainText(it)
+                        extraParams.add("name=" + quoteSelectorValue(plain))
+                    }
+                    "Team" -> unsupported.add("Team（基岩无队伍）")
+                    "Inventory", "SelectedItem", "equipment", "Items", "HandItems",
+                    "ArmorItems", "item", "body_armor_item" -> Unit
+                    else -> unsupported.add(k)
+                }
+            }
+        }
+        if (unsupported.isNotEmpty()) {
+            return dropAnd(
+                reminders,
+                "data 条件里的 ${unsupported.joinToString("、")} 基岩无法用选择器表达"
+            )
+        }
+        if (mapping.items.isEmpty() && extraParams.isEmpty()) {
+            return dropAnd(reminders, "data 条件里没有可映射到基岩的键")
+        }
+        if (mapping.airExistence && extraParams.isNotEmpty()) {
+            return dropAnd(reminders, "data 条件同时包含空气槽与 Tags/CustomName，基岩极性无法保真")
+        }
         if (nbt.contains("SelectedItem") && exec.isPlayer != true) {
             if (exec.isPlayer == false) {
                 reminders.add("执行者被判定为实体，SelectedItem（玩家主手）对实体无效；基岩侧仍写 location=slot.weapon.mainhand")
@@ -796,10 +861,17 @@ object ExecuteConverter {
                     "（那是怪物的写法）。这里按你写的 equipment.mainhand 原样转换，若目标是玩家请改用 SelectedItem"
             )
         }
-        val hasitem = if (mapping.items.size == 1) {
-            "{${mapping.items[0]}}"
-        } else {
-            "[${mapping.items.joinToString(",") { "{$it}" }}]"
+        val params = extraParams.toMutableList()
+        if (mapping.items.isNotEmpty()) {
+            val hasitem = if (mapping.items.size == 1) {
+                "{${mapping.items[0]}}"
+            } else {
+                "[${mapping.items.joinToString(",") { "{$it}" }}]"
+            }
+            params.add("hasitem=$hasitem")
+        }
+        if (extraParams.isNotEmpty()) {
+            reminders.add("data 条件里的 Tags/CustomName 已转成基岩 tag=/name=")
         }
         // 空气法极性（execute需求 第十节 15）：基岩 hasitem={item=air} 本身表示"该槽是空的"，
         // 因此 Java 的 unless（该槽为空）要换成基岩 if；Java 的 if（该槽有物品）要换成基岩 unless。
@@ -812,7 +884,7 @@ object ExecuteConverter {
                     "，已转成基岩 \"$kw entity …[hasitem={item=air}]\"（基岩 item=air 表示该槽为空）"
             )
         }
-        return foldEntity(kw, target, "hasitem=$hasitem")
+        return foldEntity(kw, target, params.joinToString(","))
     }
 
     /**

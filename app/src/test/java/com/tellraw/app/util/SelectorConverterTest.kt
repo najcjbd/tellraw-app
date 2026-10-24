@@ -3602,11 +3602,11 @@ class SelectorConverterTest {
      */
     @Test
     fun testEdgeCasesAndExceptions_1() {
-        // 无效参数
+        // 未知参数：无法确认目标版本是否支持 -> 舍弃 + 提醒
         val selector = "@a[invalid=value]"
         val conversion = SelectorConverter.convertBedrockToJava(selector, context)
-        // 无效参数应该被跳过
-        assertTrue("应该保留有效的选择器", conversion.javaSelector.startsWith("@a["))
+        assertEquals("@a", conversion.javaSelector)
+        assertTrue(conversion.javaReminders.any { it.contains("invalid") })
     }
 
     @Test
@@ -3863,6 +3863,24 @@ class SelectorConverterTest {
             "@n", SelectorType.BEDROCK, context, target = javaTarget
         )
         assertEquals("@n", bedrockOut)
+    }
+
+    @Test
+    fun testNbtTagsAndCustomNameToBedrockSelector() {
+        val (sel, _, reminders) = SelectorConverter.filterSelectorParameters(
+            "@a[nbt={Tags:[\"vip\"],CustomName:\"Bob\"}]",
+            SelectorType.BEDROCK, context
+        )
+        assertTrue(sel, sel.contains("tag=vip"))
+        assertTrue(sel, sel.contains("name=Bob"))
+        assertFalse("nbt 应被转换掉", sel.contains("nbt="))
+        assertTrue(reminders.any { it.contains("Tags") || it.contains("CustomName") })
+
+        val (health, _, healthReminders) = SelectorConverter.filterSelectorParameters(
+            "@a[nbt={Health:20.0f}]", SelectorType.BEDROCK, context
+        )
+        assertFalse(health.contains("nbt="))
+        assertTrue(healthReminders.any { it.contains("Health") })
     }
 
     @Test

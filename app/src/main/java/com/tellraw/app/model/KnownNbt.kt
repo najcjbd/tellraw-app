@@ -7,7 +7,7 @@ package com.tellraw.app.model
  */
 object KnownNbt {
 
-    enum class Kind { BOOL, FLOAT, INT }
+    enum class Kind { BOOL, BYTE, FLOAT, INT, STRING }
 
     data class Spec(val key: String, val label: String, val kind: Kind, val hint: String = "")
 
@@ -27,7 +27,15 @@ object KnownNbt {
         Spec("CustomNameVisible", "名字始终可见", Kind.BOOL, "")
     )
 
-    fun byKey(key: String): Spec? = ALL.firstOrNull { it.key.equals(key, true) }
+    fun specsFor(entityId: String? = null): List<Spec> {
+        val extra = entityId?.let { EntityNbtCatalog.extrasFor(it) } ?: emptyList()
+        if (extra.isEmpty()) return ALL
+        val known = ALL.map { it.key }.toSet()
+        return ALL + extra.filterNot { it.key in known }
+    }
+
+    fun byKey(key: String, entityId: String? = null): Spec? =
+        specsFor(entityId).firstOrNull { it.key.equals(key, true) }
 
     /** 快捷字段文本 -> 写回手动 NBT 的写法（带合适的类型后缀）。 */
     fun nbtTextOf(spec: Spec, text: String): String? {
@@ -39,8 +47,10 @@ object KnownNbt {
                 t.equals("false", true) || t == "0" -> "0b"
                 else -> null
             }
+            Kind.BYTE -> t.toLongOrNull()?.let { "${it}b" } ?: "\"$t\""
             Kind.INT -> t.toLongOrNull()?.let { "${it}s" } ?: "\"$t\""
             Kind.FLOAT -> t.toDoubleOrNull()?.let { "${it}f" } ?: "\"$t\""
+            Kind.STRING -> "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
         }
     }
 
@@ -74,10 +84,10 @@ object KnownNbt {
     }
 
     /** 从 NBT 文本回填已知快捷键（未知键忽略，但文本本身不会被丢）。 */
-    fun fillQuick(text: String, out: MutableMap<String, String>) {
+    fun fillQuick(text: String, out: MutableMap<String, String>, entityId: String? = null) {
         val parsed = SnbtLite.parseCompoundBody(text) ?: return
         for ((k, v) in parsed) {
-            val spec = byKey(k) ?: continue
+            val spec = byKey(k, entityId) ?: continue
             val t = if (spec.kind == Kind.BOOL) {
                 when (v) {
                     is SnbtLite.Value.Bool -> if (v.v) "true" else "false"
@@ -93,10 +103,10 @@ object KnownNbt {
      * 把快捷字段合并回手动 NBT：已知键按快捷值重写，未知键原样保留。
      * 无法解析时返回 null（调用方应提示用户先修正文本）。
      */
-    fun merge(nbtText: String, quick: Map<String, String>): String? {
+    fun merge(nbtText: String, quick: Map<String, String>, entityId: String? = null): String? {
         val base = SnbtLite.parseCompoundBody(nbtText)?.toMutableMap() ?: return null
         val knownParts = mutableListOf<String>()
-        for (spec in ALL) {
+        for (spec in specsFor(entityId)) {
             base.remove(spec.key)
             val v = quick[spec.key].orEmpty()
             if (v.isNotBlank()) {

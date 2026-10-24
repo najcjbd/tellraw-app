@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.tellraw.app.MainActivity
 import com.tellraw.app.model.CustomEntity
 import com.tellraw.app.model.CustomEntityStore
 import com.tellraw.app.model.EditableGridEntity
@@ -67,7 +68,9 @@ import com.tellraw.app.model.KnownNbt
 import com.tellraw.app.model.SnbtLite
 import com.tellraw.app.model.SelectorEvaluator
 import com.tellraw.app.model.VersionSpec
+import com.tellraw.app.ui.components.ImageFilePickerDialog
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -161,6 +164,9 @@ fun GridEditorScreen(
     var editingIsNew by remember { mutableStateOf(false) }
     var showCoordEditor by remember { mutableStateOf(false) }
     var showCustomManager by remember { mutableStateOf(false) }
+    var showAvatarPicker by remember { mutableStateOf(false) }
+    var pickedAvatarPath by remember { mutableStateOf<String?>(null) }
+    val activity = context as? MainActivity
 
     val density = LocalDensity.current
     val baseBlockPx = with(density) { GRID_BASE_BLOCK_DP.dp.toPx() }
@@ -192,8 +198,21 @@ fun GridEditorScreen(
         }
     }
 
+    // 允许直接粘贴整条 execute … run tellraw … / tellraw …；能解析时用命令里的选择器与前缀
+    val parsedCommand = remember(selectorText) {
+        val t = selectorText.trim()
+        if (t.startsWith("execute") || t.startsWith("tellraw")) {
+            CommandInputParser.parse(selectorText, context)
+        } else null
+    }
+    val effectiveSelector = parsedCommand?.selector?.takeIf { it.isNotBlank() } ?: selectorText
+    val effectiveConditions = listOfNotNull(
+        parsedCommand?.executePrefix?.takeIf { it.isNotBlank() },
+        conditions.takeIf { it.isNotBlank() }
+    ).joinToString(" ")
+
     val executorEntity = entities.firstOrNull { it.uid == executorUid }?.toGridEntity()
-    val evaluationOrigin: Triple<Double, Double, Double> = when {
+    val baseOrigin: Triple<Double, Double, Double> = when {
         useExecutorOrigin && executorEntity != null ->
             Triple(executorEntity.x, executorEntity.y, executorEntity.z)
         useExecutorOrigin -> Triple(0.0, -60.0, 0.0)
@@ -203,27 +222,37 @@ fun GridEditorScreen(
             manualOZ.toDoubleOrNull() ?: 0.0
         )
     }
+    val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
+    val resolvedOrigin = remember(effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec) {
+        GridConditionEvaluator.resolveOrigin(
+            effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec
+        )
+    }
+    val evaluationOrigin = resolvedOrigin.origin
     val evaluation = remember(
-        selectorText, entities.toList(), targetSpec,
-        executorUid, useExecutorOrigin, manualOX, manualOY, manualOZ
+        effectiveSelector, allGridEntities, targetSpec,
+        executorUid, resolvedOrigin
     ) {
         SelectorEvaluator.evaluate(
-            selector = selectorText,
-            entities = entities.map { it.toGridEntity() },
-            executor = entities.firstOrNull { it.uid == executorUid }?.toGridEntity(),
+            selector = effectiveSelector,
+            entities = allGridEntities,
+            executor = executorEntity,
             edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
             origin = evaluationOrigin,
             target = targetSpec
         )
     }
-    val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
-    val conditionResults = remember(evaluation, conditions, allGridEntities, targetSpec) {
+    val conditionResults = remember(evaluation, effectiveConditions, allGridEntities, targetSpec) {
         evaluation.matched.map { ge ->
-            GridConditionEvaluator.evaluate(conditions, ge, allGridEntities, targetSpec) to ge
+            GridConditionEvaluator.evaluate(effectiveConditions, ge, allGridEntities, targetSpec) to ge
         }
     }
     val filteredMatched = conditionResults.filter { it.first.ok }.map { it.second }
-    val conditionNotes = conditionResults.flatMap { it.first.notes }.distinct()
+    val conditionNotes = (
+        conditionResults.flatMap { it.first.notes } +
+            resolvedOrigin.notes +
+            (parsedCommand?.warnings ?: emptyList())
+        ).distinct()
     val matchedUids = remember(filteredMatched) { filteredMatched.map { it.uid }.toSet() }
 
     // 自定义头像：只在用户填了本地头像路径时加载（不联网）
@@ -555,7 +584,7 @@ fun GridEditorScreen(
             OutlinedTextField(
                 value = selectorText,
                 onValueChange = { selectorText = it },
-                label = { Text("tellraw 目标选择器") },
+                label = { Text("tellraw 目标选择器 / 整条 execute…run tellraw 命令") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
@@ -710,10 +739,27 @@ fun GridEditorScreen(
         }
     }
 
+    if (showAvatarPicker) {
+        ImageFilePickerDialog(
+            onDismiss = { showAvatarPicker = false },
+            onImageSelected = { path ->
+                pickedAvatarPath = path
+                showAvatarPicker = false
+            }
+        )
+    }
+
     // ---- 自定义实体管理 ----
     if (showCustomManager) {
         CustomEntityManagerDialog(
             customs = customs.toList(),
+            pickedAvatarPath = pickedAvatarPath,
+            onPickAvatar = {
+                activity?.checkAndRequestStoragePermission(
+                    onGranted = { showAvatarPicker = true },
+                    onDenied = { }
+                ) ?: run { showAvatarPicker = true }
+            },
             onDismiss = { showCustomManager = false },
             onChange = { list ->
                 customs.clear()
@@ -1051,6 +1097,7 @@ private fun EntityEditorDialog(
 
     if (showQuickNbt) {
         QuickNbtDialog(
+            entityId = id,
             nbtText = nbt,
             onDismiss = { showQuickNbt = false },
             onApply = { nbt = it; showQuickNbt = false }
@@ -1084,6 +1131,7 @@ private fun EntityEditorDialog(
  */
 @Composable
 private fun QuickNbtDialog(
+    entityId: String,
     nbtText: String,
     onDismiss: () -> Unit,
     onApply: (String) -> Unit
@@ -1091,11 +1139,11 @@ private fun QuickNbtDialog(
     var text by remember { mutableStateOf(nbtText) }
     var invalid by remember { mutableStateOf(false) }
     val quick = remember {
-        mutableStateMapOf<String, String>().apply { KnownNbt.fillQuick(nbtText, this) }
+        mutableStateMapOf<String, String>().apply { KnownNbt.fillQuick(nbtText, this, entityId) }
     }
 
     fun rebuild() {
-        val merged = KnownNbt.merge(text, quick)
+        val merged = KnownNbt.merge(text, quick, entityId)
         if (merged == null) {
             invalid = true
         } else {
@@ -1122,7 +1170,7 @@ private fun QuickNbtDialog(
                         style = MaterialTheme.typography.labelSmall)
                 }
 
-                KnownNbt.ALL.forEach { spec ->
+                KnownNbt.specsFor(entityId).forEach { spec ->
                     if (spec.kind == KnownNbt.Kind.BOOL) {
                         val v = quick[spec.key].orEmpty()
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1156,8 +1204,11 @@ private fun QuickNbtDialog(
                             label = { Text(spec.label + if (spec.hint.isBlank()) "" else " · ${spec.hint}") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
-                                keyboardType = if (spec.kind == KnownNbt.Kind.INT)
-                                    KeyboardType.Number else KeyboardType.Decimal
+                                keyboardType = when (spec.kind) {
+                                    KnownNbt.Kind.INT, KnownNbt.Kind.BYTE -> KeyboardType.Number
+                                    KnownNbt.Kind.FLOAT -> KeyboardType.Decimal
+                                    else -> KeyboardType.Text
+                                }
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1174,7 +1225,7 @@ private fun QuickNbtDialog(
                         } else {
                             invalid = false
                             quick.clear()
-                            KnownNbt.fillQuick(it, quick)
+                            KnownNbt.fillQuick(it, quick, entityId)
                         }
                     },
                     label = { Text("手动 NBT（多个键用逗号分隔）") },
@@ -1248,6 +1299,8 @@ private fun EntityPickerDialog(
 @Composable
 private fun CustomEntityManagerDialog(
     customs: List<CustomEntity>,
+    pickedAvatarPath: String? = null,
+    onPickAvatar: () -> Unit = {},
     onDismiss: () -> Unit,
     onChange: (List<CustomEntity>) -> Unit
 ) {
@@ -1255,6 +1308,9 @@ private fun CustomEntityManagerDialog(
     var displayName by remember { mutableStateOf("") }
     var builtinId by remember { mutableStateOf("minecraft:player") }
     var avatarPath by remember { mutableStateOf("") }
+    LaunchedEffect(pickedAvatarPath) {
+        if (!pickedAvatarPath.isNullOrBlank()) avatarPath = pickedAvatarPath
+    }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
             Column(
@@ -1273,7 +1329,17 @@ private fun CustomEntityManagerDialog(
                     modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(avatarPath, { avatarPath = it },
                     label = { Text("头像路径（可空）") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth())
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        TextButton(onClick = onPickAvatar) { Text("选择图片") }
+                    })
+                if (avatarPath.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SmallAvatar(builtinId.ifBlank { "minecraft:player" }, avatarPath)
+                        Spacer(Modifier.width(8.dp))
+                        Text(avatarPath, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 Button(
                     onClick = {
                         if (officialId.isNotBlank()) {

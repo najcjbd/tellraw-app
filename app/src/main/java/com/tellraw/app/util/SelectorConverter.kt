@@ -3,6 +3,7 @@ package com.tellraw.app.util
 import android.content.Context
 import com.tellraw.app.R
 import com.tellraw.app.model.*
+import com.tellraw.app.model.SnbtLite
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
@@ -139,6 +140,9 @@ object SelectorConverter {
         R.string.bedrock_type_tag_not_supported to "基岩版不支持 type=#类型标签，已移除该条件",
         R.string.entity_id_converted to "实体 ID %1\$s 已按目标版本改写为 %2\$s",
         R.string.entity_id_no_single_target_form to "实体 ID %1\$s 无法用单一 %2\$s ID 表达，已移除该 type 条件",
+        R.string.unknown_selector_param_removed to "未知的目标选择器参数 %s 已舍弃（无法确认目标版本是否支持）",
+        R.string.nbt_tags_name_converted to "NBT 的 Tags/CustomName 已转换成基岩 tag=/name= 参数",
+        R.string.nbt_keys_not_convertible_to_bedrock to "NBT 键 %s 无法转换成基岩选择器，已丢弃",
         R.string.java_distance_converted to "Java版distance=%s已转换为基岩版rm=%s,r=%s",
         R.string.java_distance_to_rm to "Java版distance=%s已转换为基岩版rm=%s",
         R.string.java_distance_to_r to "Java版distance=%s已转换为基岩版r=%s",
@@ -485,6 +489,15 @@ object SelectorConverter {
         // 基岩版特有参数（完全不支持，无法转换）
         val bedrockSpecificParams = listOf(
             "haspermission", "has_property", "family"
+        )
+
+        // 已知参数全集（两版合计）。不在表里的参数无法确认目标版本是否支持 -> 舍弃 + 提醒。
+        val knownParams = setOf(
+            "x", "y", "z", "dx", "dy", "dz", "distance", "type", "name", "tag",
+            "scores", "limit", "sort", "team", "predicate", "advancements", "nbt",
+            "level", "gamemode", "x_rotation", "y_rotation", "attributes",
+            "family", "hasitem", "haspermission", "has_property",
+            "r", "rm", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c"
         )
 
         // 如果没有参数部分，直接返回
@@ -938,11 +951,18 @@ object SelectorConverter {
                     // 不将此参数添加到filteredParams中，即跳过此参数
                     continue  // 跳过此参数，不添加到filteredParams中
                 }
+                else if (paramName !in knownParams) {
+                    removedParams.add(paramName)
+                    conversionReminders.add(
+                        getStringSafely(context, R.string.unknown_selector_param_removed, paramName)
+                    )
+                    continue
+                }
                 else {
                     filteredParams.add(param)
                 }
             } else {
-                // 没有等号的参数（可能是一些特殊参数）
+                // 没有等号的参数（一些特殊参数）：保留（已有 unparsable 提醒）
                 filteredParams.add(param)
             }
         }
@@ -3121,6 +3141,8 @@ object SelectorConverter {
         val allHasitemItems = mutableListOf<String>()
         var nbtMatches = mutableListOf<Pair<Int, String>>()  // (startIndex, fullMatch)
         var hasInventoryKey = false  // 标志：是否存在 Inventory 键
+        val extraParams = mutableListOf<String>()
+        val unconvertible = linkedSetOf<String>()
 
         // 查找所有nbt参数 - 使用更好的方法
         var searchStart = 0
@@ -3144,6 +3166,7 @@ object SelectorConverter {
                 // 解析这个nbt参数
                 val hasitemItems = parseNbtToHasitemItems(nbtContent, reminders, context)
                 allHasitemItems.addAll(hasitemItems)
+                extractNbtSelectorParams(nbtContent, extraParams, unconvertible)
 
                 // 从当前nbt参数结束位置开始搜索下一个
                 searchStart = nbtIndex + fullMatch.length
@@ -3211,8 +3234,56 @@ object SelectorConverter {
             }
         }
 
+        // Tags / CustomName -> 基岩 tag= / name=（去重）
+        for (p in extraParams.distinct()) {
+            val already = result.split(',', '[', ']').any { it.trim() == p }
+            if (!already) {
+                result = if (result.isBlank()) p else "$result,$p"
+            }
+        }
+        if (extraParams.isNotEmpty()) {
+            reminders.add(getStringSafely(context, R.string.nbt_tags_name_converted))
+        }
+        if (unconvertible.isNotEmpty()) {
+            reminders.add(
+                getStringSafely(
+                    context, R.string.nbt_keys_not_convertible_to_bedrock,
+                    unconvertible.joinToString("、")
+                )
+            )
+        }
+
         return result to reminders
     }
+
+    /** 从 nbt 里提取基岩选择器能表达的 Tags/CustomName（Team 与其余键记为不可转）。 */
+    private fun extractNbtSelectorParams(
+        nbtContent: String,
+        extra: MutableList<String>,
+        unconvertible: MutableSet<String>
+    ) {
+        val map = SnbtLite.parseCompoundBody(nbtContent.trim().removeSurrounding("{", "}")) ?: return
+        for ((k, v) in map) {
+            when (k) {
+                "Tags" -> (v as? SnbtLite.Value.ListV)?.items?.forEach { item ->
+                    (item as? SnbtLite.Value.Str)?.v?.takeIf { it.isNotBlank() }?.let { extra.add("tag=$it") }
+                }
+                "CustomName" -> (v as? SnbtLite.Value.Str)?.v?.let {
+                    val plain = SnbtLite.plainText(it)
+                    extra.add("name=" + quoteSelectorValue(plain))
+                }
+                "Team" -> unconvertible.add("Team")
+                "Inventory", "SelectedItem", "equipment", "Items", "HandItems", "ArmorItems", "item",
+                "body_armor_item" -> Unit  // 由 hasitem 处理
+                else -> unconvertible.add(k)
+            }
+        }
+    }
+
+    private fun quoteSelectorValue(v: String): String =
+        if (v.any { it.isWhitespace() || it == ',' || it == ']' || it == '[' || it == '"' }) {
+            "\"" + v.replace("\"", "\\\"") + "\""
+        } else v
 
     /**
      * 提取完整的 nbt 内容
