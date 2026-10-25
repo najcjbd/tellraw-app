@@ -685,7 +685,10 @@ private fun PortraitLayout(
                             viewModel.toggleSubComponents(component)
                         },
                         onSubComponentSelected = { subComponent ->
-                            viewModel.selectSubComponent(subComponent)
+                            viewModel.selectSubComponent(
+                                subComponent,
+                                messageTextFieldValue.value.selection.start
+                            )
                         },
                         onInsertPlainQuote = {
                             viewModel.insertTextWithComponent(
@@ -1027,7 +1030,10 @@ private fun LandscapeLayout(
                                     viewModel.toggleSubComponents(component)
                                 },
                                 onSubComponentSelected = { subComponent ->
-                                    viewModel.selectSubComponent(subComponent)
+                                    viewModel.selectSubComponent(
+                                        subComponent,
+                                        messageTextFieldValue.value.selection.start
+                                    )
                                 },
                                 onInsertPlainQuote = {
                                     viewModel.insertTextWithComponent(

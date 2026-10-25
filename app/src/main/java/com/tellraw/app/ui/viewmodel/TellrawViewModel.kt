@@ -358,6 +358,16 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
     
+    /** 把纯文本包装成一个 TEXT 组件标记（内部会转义 \、_、ྈ、༴）。 */
+    private fun markersForPlainText(text: String): String =
+        if (text.isEmpty()) "" else TextComponentHelper.componentsToText(
+            listOf(
+                TextComponentHelper.TextComponent(
+                    TextComponentHelper.ComponentType.TEXT, text
+                )
+            )
+        )
+
     fun updateMessage(message: String) {
         versionOverride = null
         _messageInput.value = message
@@ -367,8 +377,8 @@ class TellrawViewModel @Inject constructor(
             // 使用位置映射更新带标记符的文本（类似于updateBackendMessage）
             updateComponentMarkers(message)
         } else {
-            // 默认使用text模式，直接同步
-            _messageInputWithMarkers.value = message
+            // 默认使用text模式：也保存为 TEXT 组件标记，切到组件模式时不丢反斜杠等敏感符号
+            _messageInputWithMarkers.value = markersForPlainText(message)
             lastMessageInput = message
         }
         
@@ -404,7 +414,7 @@ class TellrawViewModel @Inject constructor(
         
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
-            _messageInputWithMarkers.value = frontendMessage
+            _messageInputWithMarkers.value = markersForPlainText(frontendMessage)
             lastMessageInput = frontendMessage
             return
         }
@@ -1417,7 +1427,7 @@ class TellrawViewModel @Inject constructor(
     fun loadFromHistory(history: HistoryItem) {
         _selectorInput.value = history.selector
         _messageInput.value = history.message
-        _messageInputWithMarkers.value = history.message
+        _messageInputWithMarkers.value = markersForPlainText(history.message)
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
         detectSelectorType()
@@ -1897,10 +1907,42 @@ class TellrawViewModel @Inject constructor(
     /**
      * 选择副组件
      */
-    fun selectSubComponent(subComponent: TextComponentHelper.SubComponentType) {
+    fun selectSubComponent(
+        subComponent: TextComponentHelper.SubComponentType,
+        insertPosition: Int = -1
+    ) {
         _selectedSubComponent.value = subComponent
+        // 选 with / with(JSON) 时立即把内容继承到新模式（如果光标在某个 translate 里）
+        if (insertPosition >= 0 && _selectedTextComponent.value == TextComponentHelper.ComponentType.TRANSLATE &&
+            (subComponent == TextComponentHelper.SubComponentType.WITH ||
+                subComponent == TextComponentHelper.SubComponentType.WITH_JSON)
+        ) {
+            val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value).toMutableList()
+            var pos = 0
+            for (i in components.indices) {
+                val c = components[i]
+                val len = c.content.length + c.subComponents.sumOf { it.content.length }
+                if (c.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                    insertPosition in pos..(pos + len)
+                ) {
+                    val migrated = TextComponentHelper.migrateWithMode(
+                        c, subComponent == TextComponentHelper.SubComponentType.WITH_JSON
+                    )
+                    if (migrated.subComponents != c.subComponents) {
+                        components[i] = migrated
+                        val markers = TextComponentHelper.componentsToText(components)
+                        _messageInputWithMarkers.value = markers
+                        _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
+                        lastMessageInput = _messageInput.value
+                        generateCommands()
+                    }
+                    break
+                }
+                pos += len
+            }
+        }
     }
-    
+
 /**
      * 更新光标悬停位置的组件类型
      */
@@ -1927,8 +1969,8 @@ class TellrawViewModel @Inject constructor(
             // 使用位置映射删除文本（类似于updateBackendMessage）
             deleteComponentMarkers(deletePosition, deletedLength, newText)
         } else {
-            // 默认使用text模式，直接同步
-            _messageInputWithMarkers.value = newText
+            // 默认使用text模式，也保存为 TEXT 组件标记
+            _messageInputWithMarkers.value = markersForPlainText(newText)
         }
         
         // 更新lastMessageInput
@@ -1964,7 +2006,7 @@ class TellrawViewModel @Inject constructor(
         
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
-            _messageInputWithMarkers.value = newText
+            _messageInputWithMarkers.value = markersForPlainText(newText)
             lastMessageInput = newText
             return
         }
@@ -2073,7 +2115,7 @@ class TellrawViewModel @Inject constructor(
             val plain = _messageInput.value
             val pos = insertPosition.coerceIn(0, plain.length)
             _messageInput.value = plain.substring(0, pos) + text + plain.substring(pos)
-            _messageInputWithMarkers.value = _messageInput.value
+            _messageInputWithMarkers.value = markersForPlainText(_messageInput.value)
             lastMessageInput = _messageInput.value
             generateCommands()
             return
@@ -2123,8 +2165,11 @@ class TellrawViewModel @Inject constructor(
             )
             _messageInputWithMarkers.value = newText
         } else {
-            // 未选中组件，直接插入（默认text组件）
-            _messageInputWithMarkers.value = _messageInputWithMarkers.value.substring(0, insertPosition) + textToInsert + _messageInputWithMarkers.value.substring(insertPosition)
+            // 未选中组件：插入 TEXT 组件（会转义敏感符号）
+            _messageInputWithMarkers.value = TextComponentHelper.insertComponentAt(
+                _messageInputWithMarkers.value, insertPosition,
+                TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, textToInsert)
+            )
         }
         
         // 更新前台显示的纯文本（去除标记符）
@@ -2171,13 +2216,16 @@ class TellrawViewModel @Inject constructor(
                     result.add(TextComponentHelper.TextComponent(component.type, newContent, component.subComponents))
                 } else {
                     // 光标在副组件内或副组件后（包括主组件末尾），更新副组件
-                    val updatedSubComponents = component.subComponents.toMutableList()
-                    // with 的纯文本 / JSON 是互斥模式：选哪个就移除另一个
-                    if (targetSubComponent == TextComponentHelper.SubComponentType.WITH) {
-                        updatedSubComponents.removeAll { it.type == TextComponentHelper.SubComponentType.WITH_JSON }
-                    } else if (targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
-                        updatedSubComponents.removeAll { it.type == TextComponentHelper.SubComponentType.WITH }
-                    }
+                    // with <-> with(JSON) 切换时把内容继承过去（纯文本内容多次切换稳定）
+                    val migrated = if (targetSubComponent == TextComponentHelper.SubComponentType.WITH ||
+                        targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
+                    ) {
+                        TextComponentHelper.migrateWithMode(
+                            component,
+                            targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
+                        )
+                    } else component
+                    val updatedSubComponents = migrated.subComponents.toMutableList()
                     val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
                     if (subComponent != null) {
                         // 更新现有副组件：将textToInsert追加到content末尾
@@ -2187,7 +2235,7 @@ class TellrawViewModel @Inject constructor(
                         // 添加新副组件
                         updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
                     }
-                    result.add(TextComponentHelper.TextComponent(component.type, component.content, updatedSubComponents))
+                    result.add(TextComponentHelper.TextComponent(migrated.type, migrated.content, updatedSubComponents))
                 }
                 processed = true
             } else {
@@ -2207,7 +2255,7 @@ class TellrawViewModel @Inject constructor(
     fun clearComponentMarkers() {
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         if (plainText != _messageInputWithMarkers.value) {
-            _messageInputWithMarkers.value = plainText
+            _messageInputWithMarkers.value = markersForPlainText(plainText)
             _messageInput.value = plainText
             // 清空悬停组件类型和内容
             _hoveredComponentType.value = null
