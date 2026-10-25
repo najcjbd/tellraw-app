@@ -51,6 +51,8 @@ class EntityIdAliasesTest {
         assertNotNull(
             EntityIdAliases.detectMixedEditionIds("@e[type=!minecraft:evoker,type=minecraft:evocation_illager]")
         )
+        // scores 内部的 type= 不是实体类型，不能误报
+        assertNull(EntityIdAliases.detectMixedEditionIds("@e[scores={a=1,type=2}]"))
     }
 
     @Test

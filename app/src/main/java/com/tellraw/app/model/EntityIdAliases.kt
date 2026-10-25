@@ -126,13 +126,48 @@ object EntityIdAliases {
         return (t in g.bedrock && t !in g.java) || (t in g.java && t !in g.bedrock)
     }
 
+    /** 只提取顶层 type= 的实体 ID（忽略 scores={...,type=...}、nbt={...} 内部）。 */
     private fun typeIds(text: String): List<String> {
-        // 只扫 type= 后面的 ID（支持 ! 反选与引号；不支持 # 标签）
-        val re = Regex("\\btype\\s*=\\s*\"?(!?)([a-zA-Z0-9_:#.\\-]+)")
-        return re.findAll(text).mapNotNull { m ->
-            val raw = m.groupValues[2]
-            if (raw.startsWith("#") || raw.isBlank()) null else n(raw)
-        }.toList()
+        val ids = mutableListOf<String>()
+        var brace = 0
+        var quote: Char? = null
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (quote != null) {
+                if (c == quote) quote = null
+                i++; continue
+            }
+            when (c) {
+                '"', '\'' -> { quote = c; i++; continue }
+                '{' -> { brace++; i++; continue }
+                '}' -> { brace--; i++; continue }
+            }
+            if (brace == 0 && text.startsWith("type", i) &&
+                (i == 0 || !(text[i - 1].isLetterOrDigit() || text[i - 1] == '_'))
+            ) {
+                var j = i + 4
+                while (j < text.length && text[j].isWhitespace()) j++
+                if (j < text.length && text[j] == '=') {
+                    j++
+                    while (j < text.length && text[j].isWhitespace()) j++
+                    val q = if (j < text.length && text[j] == '"') { j++; '"' } else null
+                    val startVal = j
+                    while (j < text.length) {
+                        val ch = text[j]
+                        if (q != null && ch == q) break
+                        if (q == null && (ch == ',' || ch == ']' || ch.isWhitespace())) break
+                        j++
+                    }
+                    val raw = text.substring(startVal, j).trim().removePrefix("!")
+                    if (raw.isNotBlank() && !raw.startsWith("#")) ids.add(n(raw))
+                    i = j + 1
+                    continue
+                }
+            }
+            i++
+        }
+        return ids
     }
 
     /**

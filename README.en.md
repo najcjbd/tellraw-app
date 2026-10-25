@@ -325,6 +325,27 @@ jobs:
 ./gradlew jacocoTestReport
 ```
 
+## ⚠️ Known Limitations (non-UI)
+
+> This section records capabilities that are known but not yet implemented or cannot be fully equivalent. UI interaction issues are out of scope.
+
+- **Entity IDs**: Java/Bedrock entity ID aliases are covered; **item/block ID aliases are not**.
+- **items predicate**: id/`*`/`!`, `count`/`count~{min,max}`, `damage`, `custom_data~{...}` are supported; **`#item tags` and full complex component predicates are not** (SNBT subset only).
+- **slots condition**: checks whether a slot source exists; built-in slot names/wildcards are supported, **custom 26.3 slot_sources (namespaced ID / SNBT) are not**.
+- **Content-driven as**: works for scores=! and hasitem air/quantity=0; **different negative conditions across content selectors are not merged** (a single tellraw cannot split groups losslessly).
+- **Grid evaluation**: `as @a` is approximated by treating each candidate as @s; `sort=random` is not truly random; hitboxes are approximate; `block/biome/dimension/function/stopwatch` require manually filled world data, otherwise they are reported as not participating.
+- **translate**:
+  - fallback is emitted for Java; Bedrock has no fallback (warning).
+  - translate's own color/bold styles are not preserved.
+  - `with` supports plain text / `with(JSON)`; JSON -> plain loses styles by nature.
+  - Bedrock `with` supports nested rawtext/translate, but **nested component styles are not fully preserved**.
+  - Grid translate preview uses a small built-in template map, not client language files.
+  - keybind / nbt / object components are unsupported (warning only).
+- **Inventory/equipment**: `items`/`slots` block containers require a manually filled block table; components require manual JSON/SNBT.
+- **Version awareness**: the 26.3 items slot-source form is not generated (our slot names remain valid in 26.3); mixed mode is heuristic.
+- **NBT catalog**: entity NBT is sampled from 26.3; player NBT is from a 1.21.11 fake player (26.3 bot protocol unsupported); fishing_bobber cannot be summoned; lightning_bolt/poplar boats have no unique scalar keys.
+- **Compatibility**: approximate conversions (sort, hasitem, old item NBT, etc.) must be verified in the target game version.
+
 ## 📦 Deploy
 
 ### Build Variants

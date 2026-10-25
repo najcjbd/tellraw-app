@@ -319,6 +319,27 @@ jobs:
 ./gradlew connectedAndroidTest
 ```
 
+## ⚠️ 已知限制（非 UI）
+
+> 这里记录"已经知道但暂未实现/无法完全等价"的能力边界。UI 交互问题不在此列。
+
+- **实体 ID**：Java/基岩实体 ID 有对照表；**物品/方块 ID 的跨版本差异尚未建表**。
+- **items 谓词**：支持 id/`*`/`!`、`count`/`count~{min,max}`、`damage`、`custom_data~{...}` 等；**不覆盖 `#物品标签`**，附魔/属性等复杂组件只做 SNBT 子集匹配。
+- **slots 条件**：按文档语义判断"是否有匹配槽位源的槽位"；支持内置槽位名/通配符，**26.3 的自定义 slot_source（命名空间 ID / SNBT）未建模**。
+- **内容驱动 as**：scores=!、hasitem 空气/quantity=0 等可驱动 as；**多个内容选择器负条件不一致时只改写第一组**（单条 tellraw 无法无损拆分多组）。
+- **网格求值**：`as @a` 仍按"候选实体当 @s"近似；`sort=random` 不是真随机；判定箱为近似值；`block/biome/dimension/function/stopwatch` 需要手填世界条件，未填时明确提示"未参与筛选"。
+- **translate**：
+  - Java 支持 fallback；基岩不支持 fallback（提醒）。
+  - translate 自身的 color/bold 等样式不保留。
+  - `with` 支持纯文本 / `with(JSON)`；JSON → 纯文本会丢失样式（纯文本模式的必然结果）。
+  - 基岩 with 支持嵌套 rawtext/translate，但**嵌套组件样式不完全保留**。
+  - 网格 translate 预览使用内置常见键模板，不读取客户端语言文件。
+  - keybind / nbt / object（精灵图）文本组件不支持，只提醒。
+- **物品栏/装备**：`items`/`slots` 的方块容器需要手填方块表；`custom_data` 等组件需要手动写 JSON/SNBT。
+- **版本感知**：Java 26.3 的 items 槽位源写法未生成（我们生成的槽位名在 26.3 仍合法）；混合模式是启发式，不能保证所有混写等价。
+- **NBT 目录**：26.3 实体 NBT 已实测；玩家 NBT 来自 1.21.11 假人（26.3 bot 协议未支持）；fishing_bobber 不能 summon，lightning_bolt/poplar 船等没有专属标量键。
+- **兼容性**：转换结果中的近似项（sort、hasitem、旧版本物品 NBT 等）必须在目标游戏版本里自行核对。
+
 ## 📦 部署
 
 ### 构建变体

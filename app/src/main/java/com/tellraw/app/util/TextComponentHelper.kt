@@ -932,6 +932,9 @@ object TextComponentHelper {
                             // with：纯文本参数 -> text；JSON 嵌套组件 -> 基岩 rawtext 对象列表
                             // （基岩 rawtext 的 with 支持 {"rawtext":[...]}，可含嵌套 translate）
                             val items = parseWithItems(withSubComponent.content, jsonMode)
+                            if (jsonMode && items.isEmpty() && withSubComponent.content.isNotBlank()) {
+                                warnings?.add("with(JSON) 解析失败，已忽略该 with")
+                            }
                             val withRawtext = mutableListOf<Any>()
                             for (item in items) {
                                 if (item.json != null) {
