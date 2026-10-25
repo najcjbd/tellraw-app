@@ -504,11 +504,13 @@ object GridConditionEvaluator {
             return if (term.neg) !hit else hit
         }
 
-        val exprOk = parsedGroups.all { orGroup ->
-            orGroup.isEmpty() || orGroup.any { term -> candidates.any { matchesTerm(it, term) } }
+        // 同一件物品必须同时满足所有 AND 组；组内任一 OR 项即可。
+        val hit = candidates.any { item ->
+            (wantId == null || normBlock(item.id) == wantId) &&
+                parsedGroups.all { orGroup ->
+                    orGroup.isEmpty() || orGroup.any { term -> matchesTerm(item, term) }
+                }
         }
-        val idOk = candidates.any { item -> wantId == null || normBlock(item.id) == wantId }
-        val hit = idOk && exprOk
         return if (idNeg) !hit else hit
     }
 
@@ -643,9 +645,10 @@ object GridConditionEvaluator {
         fun c(v: String, base: Double): Int {
             val t = v.trim()
             return when {
-                t == "~" -> base.toInt()
-                t.startsWith("~") -> (base + (t.substring(1).toDoubleOrNull() ?: 0.0)).toInt()
-                else -> t.toDoubleOrNull()?.toInt() ?: base.toInt()
+                t == "~" -> kotlin.math.floor(base).toInt()
+                t.startsWith("~") -> kotlin.math.floor(base + (t.substring(1).toDoubleOrNull() ?: 0.0)).toInt()
+                else -> t.toDoubleOrNull()?.let { kotlin.math.floor(it).toInt() }
+                    ?: kotlin.math.floor(base).toInt()
             }
         }
         return Triple(c(x, origin.first), c(y, origin.second), c(z, origin.third))
@@ -661,8 +664,11 @@ object GridConditionEvaluator {
         val x1 = minOf(a.first, b.first); val x2 = maxOf(a.first, b.first)
         val y1 = minOf(a.second, b.second); val y2 = maxOf(a.second, b.second)
         val z1 = minOf(a.third, b.third); val z2 = maxOf(a.third, b.third)
+        val masked = mode.equals("masked", true)
         for (x in x1..x2) for (y in y1..y2) for (z in z1..z2) {
-            val src = world.blocks["$x,$y,$z"]?.id ?: return false
+            val srcRaw = world.blocks["$x,$y,$z"]?.id
+            if (masked && (srcRaw == null || normBlock(srcRaw) == "minecraft:air")) continue
+            val src = srcRaw ?: return false
             val dx = dest.first + (x - x1)
             val dy = dest.second + (y - y1)
             val dz = dest.third + (z - z1)

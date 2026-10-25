@@ -133,9 +133,14 @@ fun MainScreen(
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
-                        // 快捷按钮插入的是"文本逗号"（with 里的字面逗号），不是参数分隔符
+                        // 文本模式：插入 with 里的字面逗号
                         viewModel.insertTextWithComponent(
                             messageTextFieldValue.value.selection.start, "\\,"
+                        )
+                    } else if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
+                        // JSON 模式：逗号就是 JSON 元素分隔符
+                        viewModel.insertTextWithComponent(
+                            messageTextFieldValue.value.selection.start, ","
                         )
                     } else {
                         showCommaChoiceDialog = true
@@ -174,9 +179,14 @@ fun MainScreen(
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
-                        // 快捷按钮插入的是"文本逗号"（with 里的字面逗号），不是参数分隔符
+                        // 文本模式：插入 with 里的字面逗号
                         viewModel.insertTextWithComponent(
                             messageTextFieldValue.value.selection.start, "\\,"
+                        )
+                    } else if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
+                        // JSON 模式：逗号就是 JSON 元素分隔符
+                        viewModel.insertTextWithComponent(
+                            messageTextFieldValue.value.selection.start, ","
                         )
                     } else {
                         showCommaChoiceDialog = true
@@ -355,7 +365,7 @@ fun MainScreen(
             onDismissRequest = { showCommaChoiceDialog = false },
             title = { Text("逗号插入到哪里？") },
             text = {
-                Text("当前选中了 translate 组件。要插入 with 里的文本逗号（\\,），还是普通文本逗号（,）？")
+                Text("当前选中了 translate 组件。with 要按纯文本还是 JSON 组件处理？")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -365,10 +375,18 @@ fun MainScreen(
                         messageTextFieldValue.value.selection.start, "\\,"
                     )
                     showCommaChoiceDialog = false
-                }) { Text("with 文本逗号（\\,）") }
+                }) { Text("纯文本 with（\\,）") }
             },
             dismissButton = {
-                Row {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = {
+                        viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                        viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH_JSON)
+                        viewModel.insertTextWithComponent(
+                            messageTextFieldValue.value.selection.start, ","
+                        )
+                        showCommaChoiceDialog = false
+                    }) { Text("JSON 组件 with（,）") }
                     TextButton(onClick = {
                         viewModel.insertPlainTextAt(
                             messageTextFieldValue.value.selection.start, ","

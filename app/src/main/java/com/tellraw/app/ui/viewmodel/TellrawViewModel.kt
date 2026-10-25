@@ -2172,6 +2172,12 @@ class TellrawViewModel @Inject constructor(
                 } else {
                     // 光标在副组件内或副组件后（包括主组件末尾），更新副组件
                     val updatedSubComponents = component.subComponents.toMutableList()
+                    // with 的纯文本 / JSON 是互斥模式：选哪个就移除另一个
+                    if (targetSubComponent == TextComponentHelper.SubComponentType.WITH) {
+                        updatedSubComponents.removeAll { it.type == TextComponentHelper.SubComponentType.WITH_JSON }
+                    } else if (targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
+                        updatedSubComponents.removeAll { it.type == TextComponentHelper.SubComponentType.WITH }
+                    }
                     val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
                     if (subComponent != null) {
                         // 更新现有副组件：将textToInsert追加到content末尾

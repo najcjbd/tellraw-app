@@ -1054,35 +1054,36 @@ object SelectorConverter {
         context: Context,
         reminders: MutableList<String>
     ): String {
-        val pattern = Regex("(^|,)(type=)(!?)([^,\\]]+)")
-        var out = pattern.replace(paramsPart) { m ->
-            val prefix = m.groupValues[1]
-            val neg = m.groupValues[3]
-            val raw = m.groupValues[4].trim().removeSurrounding("\"")
-            if (raw.startsWith("#") || raw.isBlank()) return@replace m.value
+        // 只处理顶层参数：不能用正则扫全串，否则 scores={a=1,type=2} 里的 type= 也会被误改
+        val parts = ExecCondSupport.splitTopLevel(paramsPart, ',')
+        val out = parts.mapNotNull { p ->
+            val trimmed = p.trim()
+            if (!trimmed.startsWith("type=")) return@mapNotNull p
+            val raw = trimmed.substringAfter('=').trim().removeSurrounding("\"")
+            if (raw.startsWith("#") || raw.isBlank()) return@mapNotNull p
+            val neg = raw.startsWith("!")
+            val id = if (neg) raw.substring(1) else raw
             val converted = when (targetVersion) {
-                SelectorType.JAVA -> EntityIdAliases.toJava(raw)
-                SelectorType.BEDROCK -> EntityIdAliases.toBedrock(raw)
-                else -> raw
+                SelectorType.JAVA -> EntityIdAliases.toJava(id)
+                SelectorType.BEDROCK -> EntityIdAliases.toBedrock(id)
+                else -> id
             }
             if (converted == null) {
                 reminders.add(
                     getStringSafely(
                         context, R.string.entity_id_no_single_target_form,
-                        raw, if (targetVersion == SelectorType.JAVA) "Java版" else "基岩版"
+                        id, if (targetVersion == SelectorType.JAVA) "Java版" else "基岩版"
                     )
                 )
-                prefix
+                null
             } else {
-                if (converted != raw) {
-                    reminders.add(getStringSafely(context, R.string.entity_id_converted, raw, converted))
+                if (converted != id) {
+                    reminders.add(getStringSafely(context, R.string.entity_id_converted, id, converted))
                 }
-                "$prefix" + "type=" + neg + converted
+                "type=" + (if (neg) "!" else "") + converted
             }
         }
-        while (",," in out) out = out.replace(",,", ",")
-        out = out.trimStart(',').trimEnd(',')
-        return out
+        return out.joinToString(",")
     }
 
     /**

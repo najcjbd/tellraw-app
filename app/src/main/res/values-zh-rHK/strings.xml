@@ -338,6 +338,7 @@
     <string name="component_score">記分板分數</string>
     <string name="component_selector">實體名稱</string>
     <string name="component_with">參數</string>
+    <string name="component_with_json">with（JSON 組件）</string>
     <string name="component_fallback">回落文字 fallback</string>
     <string name="component_separator">分隔符</string>
     <string name="component_quote_hint">純文字單引號（在 ,\'sep\': 的值裡，\'\'\'\' 表示一個字面單引號）</string>

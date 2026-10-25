@@ -147,10 +147,10 @@ fun GridEditorScreen(
         customStore.save(customs.toList())
     }
 
-    var selectorText by rememberSaveable { mutableStateOf(savedUi.selector.ifBlank { selectorFromMain }) }
+    var selectorText by rememberSaveable { mutableStateOf(selectorFromMain.ifBlank { savedUi.selector }) }
     var conditions by rememberSaveable { mutableStateOf(savedUi.conditions) }
     LaunchedEffect(selectorFromMain) {
-        if (selectorText.isBlank()) selectorText = selectorFromMain
+        if (selectorFromMain.isNotBlank()) selectorText = selectorFromMain
     }
 
     var viewport by remember {
@@ -887,10 +887,14 @@ private fun previewMessage(
                 entity.scoreMap()[objective]?.toString() ?: displayName
             }
             TextComponentHelper.ComponentType.TRANSLATE -> {
-                val withText = c.subComponents
-                    .find { it.type == TextComponentHelper.SubComponentType.WITH }?.content
-                val args = if (withText.isNullOrEmpty()) emptyList()
-                    else TextComponentHelper.parseTranslateArgs(withText)
+                val withSub = c.subComponents
+                    .firstOrNull { it.type == TextComponentHelper.SubComponentType.WITH_JSON }
+                    ?: c.subComponents.find { it.type == TextComponentHelper.SubComponentType.WITH }
+                val args = if (withSub == null || withSub.content.isEmpty()) emptyList()
+                    else TextComponentHelper.parseTranslateArgs(
+                        withSub.content,
+                        withSub.type == TextComponentHelper.SubComponentType.WITH_JSON
+                    )
                 TranslatePreview.render(c.content, args)
             }
         }
