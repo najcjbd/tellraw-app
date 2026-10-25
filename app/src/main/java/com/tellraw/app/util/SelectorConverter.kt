@@ -256,7 +256,8 @@ object SelectorConverter {
         
         if ('[' in selector && ']' in selector) {
             val paramsPart = selector.substringAfter('[').substringBeforeLast(']')
-            val params = paramsPart.split(',').map { it.trim() }
+            // 用括号/引号感知的拆分：nbt={...} 内部的逗号不能当作选择器参数
+            val params = ExecCondSupport.splitTopLevel(paramsPart, ',').map { it.trim() }
             
             var javaCount = 0
             var bedrockCount = 0

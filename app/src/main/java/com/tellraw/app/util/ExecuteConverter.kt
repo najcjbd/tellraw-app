@@ -538,8 +538,12 @@ object ExecuteConverter {
         val sel = selector.trim()
         if (!sel.startsWith("@")) return true // 玩家名
         val varName = sel.substringBefore('[')
-        val typeVals = Regex("(?:^|[,{])\\s*type\\s*=\\s*([^,}\\]]+)")
-            .findAll(sel).map { it.groupValues[1].trim() }.toList()
+        // 只取顶层参数里的 type=，避免把 scores={...,type=...} 内部的记分项当成实体类型
+        val params = if ('[' in sel && sel.endsWith("]")) {
+            ExecCondSupport.splitTopLevel(sel.substringAfter('[').dropLast(1), ',')
+        } else emptyList()
+        val typeVals = params.filter { it.trim().startsWith("type=") }
+            .map { it.trim().substringAfter('=').trim().removeSurrounding("\"") }
         val hasNegPlayer = typeVals.any { it == "!player" || it == "!minecraft:player" }
         val nonPlayer = typeVals.filter { it != "player" && it != "minecraft:player" && !it.startsWith("!") }
         return when (varName) {
