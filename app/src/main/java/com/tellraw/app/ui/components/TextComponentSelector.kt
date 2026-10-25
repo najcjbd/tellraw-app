@@ -73,18 +73,20 @@ fun TextComponentSelector(
                     )
                     // 展开时：副组件紧跟其后（同一横排），横向展开/收拢
                     if (component.hasSubComponent) {
-                        val sub = subComponentOf(component)
+                        val subs = subComponentsOf(component)
                         AnimatedVisibility(
-                            visible = isExpanded && sub != null,
+                            visible = isExpanded && subs.isNotEmpty(),
                             enter = fadeIn() + expandHorizontally(),
                             exit = fadeOut() + shrinkHorizontally()
                         ) {
-                            if (sub != null) {
-                                SubComponentChip(
-                                    subComponent = sub,
-                                    isSelected = selectedSubComponent == sub,
-                                    onSelected = { onSubComponentSelected(sub) }
-                                )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                subs.forEach { sub ->
+                                    SubComponentChip(
+                                        subComponent = sub,
+                                        isSelected = selectedSubComponent == sub,
+                                        onSelected = { onSubComponentSelected(sub) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -106,12 +108,15 @@ fun TextComponentSelector(
 }
 
 /** 组件对应的副组件（没有则返回 null）。 */
-private fun subComponentOf(
+private fun subComponentsOf(
     component: TextComponentHelper.ComponentType
-): TextComponentHelper.SubComponentType? = when (component) {
-    TextComponentHelper.ComponentType.TRANSLATE -> TextComponentHelper.SubComponentType.WITH
-    TextComponentHelper.ComponentType.SELECTOR -> TextComponentHelper.SubComponentType.SEPARATOR
-    else -> null
+): List<TextComponentHelper.SubComponentType> = when (component) {
+    TextComponentHelper.ComponentType.TRANSLATE -> listOf(
+        TextComponentHelper.SubComponentType.WITH,
+        TextComponentHelper.SubComponentType.WITH_JSON
+    )
+    TextComponentHelper.ComponentType.SELECTOR -> listOf(TextComponentHelper.SubComponentType.SEPARATOR)
+    else -> emptyList()
 }
 
 /** 主组件 chip（带副组件的尾部带展开/收起图标）。 */

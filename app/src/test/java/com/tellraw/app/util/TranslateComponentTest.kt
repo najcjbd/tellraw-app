@@ -43,7 +43,7 @@ class TranslateComponentTest {
             ComponentType.TRANSLATE, "chat.type.text",
             mutableListOf(
                 SubComponent(
-                    SubComponentType.WITH,
+                    SubComponentType.WITH_JSON,
                     """[{"text":"A","color":"red"},{"text":"B","extra":[{"text":"!"}]}]"""
                 )
             )
@@ -62,10 +62,22 @@ class TranslateComponentTest {
         val r = CommandInputParser.parse(
             """{"translate":"x","with":[{"text":"A","color":"red"}]}"""
         )!!
-        val with = r.components[0].subComponents.first { it.type == SubComponentType.WITH }.content
+        val with = r.components[0].subComponents.first { it.type == SubComponentType.WITH_JSON }.content
         assertTrue(with, with.trim().startsWith("["))
         assertTrue(r.javaJson, r.javaJson.contains("\"color\":\"red\""))
         assertFalse(r.warnings.any { it.contains("不是纯文本") })
+    }
+
+    @Test
+    fun jsonLookingWithStaysPlainInTextMode() {
+        // 明确选 with（纯文本）时，即使内容看起来像 JSON 也按纯文本处理
+        val comp = TextComponent(
+            ComponentType.TRANSLATE, "x",
+            mutableListOf(SubComponent(SubComponentType.WITH, """{"text":"A"}"""))
+        )
+        val json = TextComponentHelper.convertToJavaJson(listOf(comp))
+        val arr = com.google.gson.JsonParser.parseString(json).asJsonObject.getAsJsonArray("with")
+        assertTrue(arr[0].isJsonPrimitive)
     }
 
     @Test

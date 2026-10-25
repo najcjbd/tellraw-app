@@ -142,6 +142,48 @@ class GridConditionEvaluatorTest {
         assertFalse(ok("if items entity @s weapon.mainhand *[count~{min:2}]"))
     }
 
+    @Test fun itemPredicateAndGroupsMustMatchSameItem() {
+        val a = GridItem("minecraft:diamond", 1, null,
+            mapOf("minecraft:custom_data" to SnbtLite.Value.Compound(
+                SnbtLite.parseCompoundBody("""{id:"foo"}""")!!
+            )))
+        val b = GridItem("minecraft:stone", 2)
+        val e = GridEntity("e", "minecraft:player", items = mapOf(
+            "hotbar.0" to a, "hotbar.1" to b
+        ))
+        // 组1匹配 a，组2匹配 b，但没有同一件物品同时满足两组 -> 不应该命中
+        assertFalse(
+            GridConditionEvaluator.evaluate(
+                """if items entity @s hotbar.* *[custom_data~{id:"foo"},count=2]""",
+                e, listOf(e)
+            ).ok
+        )
+    }
+
+    @Test fun blockCoordinatesFloorAndMaskedMode() {
+        val world = GridConditionEvaluator.GridWorld(
+            blocks = mapOf(
+                "-1,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"),
+                "0,-60,0" to GridConditionEvaluator.GridBlock("minecraft:air"),
+                "1,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"),
+                "10,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"),
+                "11,-60,0" to GridConditionEvaluator.GridBlock("minecraft:air"),
+                "12,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone")
+            )
+        )
+        val e = GridEntity("e", "minecraft:zombie")
+        fun ok(c: String) = GridConditionEvaluator.evaluate(
+            c, e, listOf(e), null, world, Triple(0.0, -60.0, 0.0)
+        ).ok
+
+        // 方块坐标向下取整：-0.5 -> -1
+        assertTrue(ok("if block -0.5 -60 0 minecraft:stone"))
+        // masked：源区域的空气被跳过；destination 只比较非空气
+        assertTrue(ok("if blocks -1 -60 0 1 -60 0 10 -60 0 masked"))
+        // all：空气也要一致（10/12 是 stone,air,stone；源是 stone,air,stone -> 实际一致）
+        assertTrue(ok("if blocks -1 -60 0 1 -60 0 10 -60 0 all"))
+    }
+
     @Test fun itemsAndSlotsBlockContainer() {
         val world = GridConditionEvaluator.GridWorld(
             blocks = mapOf(

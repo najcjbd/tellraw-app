@@ -220,7 +220,7 @@ object CommandInputParser {
                     val hasNested = arr.any { it.isJsonObject || it.isJsonArray }
                     if (hasNested) {
                         // 保留嵌套组件 JSON，交给翻译转换器处理（Java 保留样式，基岩按纯文本并提醒）
-                        comp.subComponents.add(SubComponent(SubComponentType.WITH, arr.toString()))
+                        comp.subComponents.add(SubComponent(SubComponentType.WITH_JSON, arr.toString()))
                     } else {
                         val params = arr.map { it.asString }
                         if (params.isNotEmpty()) {

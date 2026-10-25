@@ -29,6 +29,7 @@ object TextComponentHelper {
     // 副组件类型
     enum class SubComponentType(val key: String, @StringRes val displayNameResId: Int, val parentComponent: ComponentType?) {
         WITH("with", R.string.component_with, ComponentType.TRANSLATE),
+        WITH_JSON("with_json", R.string.component_with_json, ComponentType.TRANSLATE),
         FALLBACK("fallback", R.string.component_fallback, ComponentType.TRANSLATE),
         SEPARATOR("separator", R.string.component_separator, ComponentType.SELECTOR)
     }
@@ -632,10 +633,14 @@ object TextComponentHelper {
                     result["fallback"] = it.content
                 }
                 if (mainComponent.subComponents.isNotEmpty()) {
-                    val withSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.WITH }
+                    val withSubComponent = withSubComponent(mainComponent, warnings)
                     if (withSubComponent != null) {
-                        // with 可以是纯文本参数（逗号分隔，\, 转义），也可以是 JSON 组件数组
-                        val withComponents = parseWithItems(withSubComponent.content).mapNotNull { item ->
+                        val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
+                        val items = parseWithItems(withSubComponent.content, jsonMode)
+                        if (jsonMode && items.isEmpty() && withSubComponent.content.isNotBlank()) {
+                            warnings?.add("with(JSON) 解析失败，已忽略该 with")
+                        }
+                        val withComponents = items.mapNotNull { item ->
                             if (item.json != null) {
                                 item.json
                             } else {
@@ -737,10 +742,14 @@ object TextComponentHelper {
                             subMap["fallback"] = it.content
                         }
                         if (sub.subComponents.isNotEmpty()) {
-                            val withSubComponent = sub.subComponents.find { it.type == SubComponentType.WITH }
+                            val withSubComponent = withSubComponent(sub, warnings)
                             if (withSubComponent != null) {
-                                // with 可以是纯文本参数，也可以是 JSON 组件数组
-                                val withComponents = parseWithItems(withSubComponent.content).mapNotNull { item ->
+                                val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
+                                val items = parseWithItems(withSubComponent.content, jsonMode)
+                                if (jsonMode && items.isEmpty() && withSubComponent.content.isNotBlank()) {
+                                    warnings?.add("with(JSON) 解析失败，已忽略该 with")
+                                }
+                                val withComponents = items.mapNotNull { item ->
                                     if (item.json != null) {
                                         item.json
                                     } else {
@@ -870,10 +879,11 @@ object TextComponentHelper {
                         warnings?.add("基岩版不支持 translate 的 fallback，已忽略")
                     }
                     if (component.subComponents.isNotEmpty()) {
-                        val withSubComponent = component.subComponents.find { it.type == SubComponentType.WITH }
+                        val withSubComponent = withSubComponent(component, warnings)
                         if (withSubComponent != null) {
+                            val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
                             // with：纯文本参数按原样；JSON 嵌套组件在基岩侧按纯文本处理并提醒
-                            val items = parseWithItems(withSubComponent.content)
+                            val items = parseWithItems(withSubComponent.content, jsonMode)
                             if (items.any { it.json != null }) {
                                 warnings?.add("基岩版不支持 with 的嵌套文本组件，已按纯文本处理")
                             }
@@ -1572,23 +1582,38 @@ object TextComponentHelper {
      *  - `[...]` / `{...}` -> JSON 文本组件（保留样式/嵌套）；
      *  - 其他 -> 逗号分隔的纯文本（支持 `\,` 转义）。
      */
-    fun parseWithItems(content: String): List<WithItem> {
+    fun parseWithItems(content: String, jsonMode: Boolean = false): List<WithItem> {
         val t = content.trim()
         if (t.isEmpty()) return emptyList()
-        if (t.startsWith("[") || t.startsWith("{")) {
+        if (jsonMode) {
             try {
                 val el = JsonParser.parseString(t)
                 if (el.isJsonArray) return el.asJsonArray.map { WithItem(json = it) }
                 if (el.isJsonObject) return listOf(WithItem(json = el))
             } catch (e: Exception) {
-                // 落到纯文本
+                return emptyList()   // 明确选了 JSON 但解析失败：由调用方提醒
             }
+            return emptyList()
         }
         return parseTranslateWithContent(content).map { WithItem(raw = it) }
     }
 
+    /** 取 translate 的 with 子组件：优先 with_json；两者同时存在时按 JSON 并提醒。 */
+    fun withSubComponent(component: TextComponent, warnings: MutableList<String>? = null): SubComponent? {
+        val json = component.subComponents.firstOrNull { it.type == SubComponentType.WITH_JSON }
+        val plain = component.subComponents.firstOrNull { it.type == SubComponentType.WITH }
+        if (json != null && plain != null) {
+            warnings?.add("translate 同时有 with 和 with(JSON)，已按 with(JSON) 处理")
+        }
+        return json ?: plain
+    }
+
+    fun isJsonWith(component: TextComponent): Boolean =
+        component.subComponents.any { it.type == SubComponentType.WITH_JSON }
+
     /** 公开给网格预览：translate 的 with 参数（嵌套组件取纯文本）。 */
-    fun parseTranslateArgs(content: String): List<String> = parseWithItems(content).map { it.plainText() }
+    fun parseTranslateArgs(content: String, jsonMode: Boolean = false): List<String> =
+        parseWithItems(content, jsonMode).map { it.plainText() }
 
     private fun jsonPlainText(el: JsonElement): String {
         if (el.isJsonPrimitive) return el.asString

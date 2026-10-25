@@ -3866,6 +3866,15 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testTypeInsideScoresIsNotRewritten() {
+        val (out, _, _) = SelectorConverter.filterSelectorParameters(
+            "@e[scores={a=1,type=2}]", SelectorType.BEDROCK, context
+        )
+        assertTrue(out, out.contains("scores={a=1,type=2}"))
+        assertFalse("记分项 type 不能被当成实体类型：$out", out.contains("type=minecraft:2"))
+    }
+
+    @Test
     fun testNbtTagsAndCustomNameToBedrockSelector() {
         val (sel, _, reminders) = SelectorConverter.filterSelectorParameters(
             "@a[nbt={Tags:[\"vip\"],CustomName:\"Bob\"}]",
