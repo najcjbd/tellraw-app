@@ -913,6 +913,17 @@ class TellrawViewModel @Inject constructor(
         val markers = TextComponentHelper.componentsToText(r.components)
         _messageInputWithMarkers.value = markers
         _messageInput.value = visibleTextOf(r.components)
+        // 填回的是组件命令时，默认 text 模式会丢掉组件结构 -> 自动切到组件模式
+        if (_defaultUseText.value && r.components.any {
+                it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+            }
+        ) {
+            _defaultUseText.value = false
+            viewModelScope.launch {
+                settingsRepository.setDefaultUseText(false)
+                settingsRepository.saveConfig()
+            }
+        }
         lastMessageInput = _messageInput.value
 
         _executePrefixInput.value = r.executePrefix ?: ""
@@ -1145,7 +1156,8 @@ class TellrawViewModel @Inject constructor(
 
                 // V2：按目标版本规划（tellraw 不可用 -> say；越界特性 -> 提醒）
                 // 输入用到"最新版已移除"的写法时，问一次：同版本对应 / 最新版。
-                val combinedInput = "$selector ${_messageInput.value} ${_executePrefixInput.value}"
+                // 只扫描选择器/前置命令；消息正文里出现 "items"/"@n" 等词不算使用了该特性
+                val combinedInput = "$selector ${_executePrefixInput.value}"
                 val removedHit = com.tellraw.app.model.RemovedFeatureDetector.detect(combinedInput)
                 if (versionOverride == null && _targetVersion.value == "-1" && removedHit != null) {
                     if (!versionChoiceAsked) {
@@ -1160,16 +1172,23 @@ class TellrawViewModel @Inject constructor(
                     versionChoiceAsked = false
                 }
                 val used = mutableSetOf<com.tellraw.app.model.FeatureGate.Feature>()
-                val combined = "$javaCommand $bedrockCommand"
+                // 只扫描选择器 / execute 前缀；不要扫描 tellraw 的消息 JSON（正文里的 "items" 等词会误报）
+                val metaText = buildString {
+                    append(selector).append(' ')
+                    append(javaSelector).append(' ')
+                    append(bedrockFilteredSelector).append(' ')
+                    append(_executePrefixInput.value).append(' ')
+                    if (javaInnerTokens != null) append(javaInnerTokens.joinToString(" "))
+                }
                 fun mark(cond: Boolean, f: com.tellraw.app.model.FeatureGate.Feature) { if (cond) used.add(f) }
-                mark("items entity" in combined || " items " in combined, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_ITEMS)
-                mark("stopwatch" in combined, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_STOPWATCH)
-                mark(Regex("\\bslots\\b").containsMatchIn(combined), com.tellraw.app.model.FeatureGate.Feature.EXECUTE_SLOTS)
-                mark("family=" in combined, com.tellraw.app.model.FeatureGate.Feature.FAMILY_PARAM)
-                mark("@n" in combined, com.tellraw.app.model.FeatureGate.Feature.AT_N)
-                mark("hasitem=" in combined, com.tellraw.app.model.FeatureGate.Feature.HASITEM_PARAM)
-                mark("has_property=" in combined, com.tellraw.app.model.FeatureGate.Feature.HAS_PROPERTY_PARAM)
-                mark("haspermission=" in combined, com.tellraw.app.model.FeatureGate.Feature.HASPERMISSION_PARAM)
+                mark("items entity" in metaText || " items " in metaText, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_ITEMS)
+                mark("stopwatch" in metaText, com.tellraw.app.model.FeatureGate.Feature.EXECUTE_STOPWATCH)
+                mark(Regex("\\bslots\\b").containsMatchIn(metaText), com.tellraw.app.model.FeatureGate.Feature.EXECUTE_SLOTS)
+                mark("family=" in metaText, com.tellraw.app.model.FeatureGate.Feature.FAMILY_PARAM)
+                mark("@n" in metaText, com.tellraw.app.model.FeatureGate.Feature.AT_N)
+                mark("hasitem=" in metaText, com.tellraw.app.model.FeatureGate.Feature.HASITEM_PARAM)
+                mark("has_property=" in metaText, com.tellraw.app.model.FeatureGate.Feature.HAS_PROPERTY_PARAM)
+                mark("haspermission=" in metaText, com.tellraw.app.model.FeatureGate.Feature.HASPERMISSION_PARAM)
                 val plan = com.tellraw.app.model.TargetVersionPlanner.plan(target, used)
                 allReminders.addAll(plan.notes)
                 val finalJava: String
@@ -1369,7 +1388,8 @@ class TellrawViewModel @Inject constructor(
                         message = message,
                         javaCommand = javaCommand,
                         bedrockCommand = bedrockCommand,
-                        timestamp = System.currentTimeMillis()
+                        timestamp = System.currentTimeMillis(),
+                        markers = _messageInputWithMarkers.value
                     )
                 )
             }
@@ -1427,7 +1447,20 @@ class TellrawViewModel @Inject constructor(
     fun loadFromHistory(history: HistoryItem) {
         _selectorInput.value = history.selector
         _messageInput.value = history.message
-        _messageInputWithMarkers.value = markersForPlainText(history.message)
+        val historyMarkers = history.markers.ifBlank { markersForPlainText(history.message) }
+        _messageInputWithMarkers.value = historyMarkers
+        // 历史里的组件命令：默认 text 模式下也要切到组件模式，否则重新生成会丢组件
+        val historyComponents = TextComponentHelper.parseTextComponents(historyMarkers)
+        if (_defaultUseText.value && historyComponents.any {
+                it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+            }
+        ) {
+            _defaultUseText.value = false
+            viewModelScope.launch {
+                settingsRepository.setDefaultUseText(false)
+                settingsRepository.saveConfig()
+            }
+        }
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
         detectSelectorType()
