@@ -53,8 +53,26 @@ class TranslateComponentTest {
         assertTrue(java, java.contains("\"extra\""))
 
         val warnings = mutableListOf<String>()
-        TextComponentHelper.convertToBedrockJson(listOf(comp), warnings = warnings)
-        assertTrue(warnings.any { it.contains("嵌套") })
+        val bedrock = TextComponentHelper.convertToBedrockJson(listOf(comp), warnings = warnings)
+        assertTrue(bedrock, bedrock.contains("\"with\"") && bedrock.contains("\"rawtext\""))
+        assertFalse(warnings.any { it.contains("不支持") })
+    }
+
+    @Test
+    fun bedrockWithSupportsNestedTranslate() {
+        val comp = TextComponent(
+            ComponentType.TRANSLATE, "outer",
+            mutableListOf(
+                SubComponent(
+                    SubComponentType.WITH_JSON,
+                    """[{"translate":"%%"},{"text":"%"}]"""
+                )
+            )
+        )
+        val warnings = mutableListOf<String>()
+        val bedrock = TextComponentHelper.convertToBedrockJson(listOf(comp), warnings = warnings)
+        assertTrue(bedrock, bedrock.contains("\"translate\""))
+        assertTrue(bedrock, bedrock.contains("\"text\""))
     }
 
     @Test

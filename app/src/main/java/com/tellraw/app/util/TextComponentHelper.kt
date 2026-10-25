@@ -56,20 +56,64 @@ object TextComponentHelper {
      * 标记格式：content + 副组件 + MARKER_START + type.key + MARKER_END
      * 即类型标记是它前面那段内容的后缀，副组件写在内容之后、类型标记之前
      */
+    // ---------------- 标记符转义 ----------------
+    // 用户输入里的 \、_、ྈ、༴ 会先转义，解析时再还原；
+    // 这样玩家输入的敏感符号不会被当成组件/副组件标记。
+
+    private fun escapeContent(value: String): String =
+        value.replace("\\", "\\\\")
+            .replace("_", "\\_")
+            .replace(MARKER_START.toString(), "\\" + MARKER_START)
+            .replace(MARKER_END.toString(), "\\" + MARKER_END)
+
+    private fun unescapeContent(value: String): String {
+        val sb = StringBuilder(value.length)
+        var i = 0
+        while (i < value.length) {
+            if (value[i] == '\\' && i + 1 < value.length) {
+                sb.append(value[i + 1]); i += 2
+            } else {
+                sb.append(value[i]); i++
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun isEscaped(text: String, index: Int): Boolean {
+        var count = 0
+        var i = index - 1
+        while (i >= 0 && text[i] == '\\') { count++; i-- }
+        return count % 2 == 1
+    }
+
+    private fun indexOfUnescaped(text: String, needle: String, start: Int): Int {
+        var i = start
+        while (i <= text.length - needle.length) {
+            if (text.startsWith(needle, i) && !isEscaped(text, i)) return i
+            i++
+        }
+        return -1
+    }
+
     fun parseTextComponents(text: String): List<TextComponent> {
+        // 没有组件标记：原样作为一个 TEXT 组件（不能 unescape，否则玩家输入的 \ 会消失）
+        if (MARKER_START !in text) {
+            return if (text.isEmpty()) emptyList() else listOf(TextComponent(ComponentType.TEXT, text))
+        }
         val components = mutableListOf<TextComponent>()
         var i = 0
         var componentStart = 0  // 追踪当前组件内容的开始位置
         
         while (i < text.length) {
-            // 查找组件开始标记
-            if (text[i] == MARKER_START) {
+            if (text[i] == '\\') { i += 2; continue }
+            // 查找组件开始标记（转义的不算）
+            if (text[i] == MARKER_START && !isEscaped(text, i)) {
                 // 查找组件类型
-                val typeEnd = text.indexOf(MARKER_END, i + 1)
+                val typeEnd = indexOfUnescaped(text, MARKER_END.toString(), i + 1)
                 
                 if (typeEnd == -1) {
                     // 没有找到类型结束标记，把标记之后的全部当普通文本处理
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart)))
+                    components.add(TextComponent(ComponentType.TEXT, unescapeContent(text.substring(componentStart))))
                     // 必须把 componentStart 推到底：否则结尾的"处理剩余普通文本"会把同一段再加一遍
                     // （实测 @aྈselector༴abྈ -> extra 里 abྈ 出现两次）
                     componentStart = text.length
@@ -81,7 +125,7 @@ object TextComponentHelper {
                 
                 if (type == null) {
                     // 未知的组件类型，将标记作为普通文本处理
-                    components.add(TextComponent(ComponentType.TEXT, text.substring(componentStart, typeEnd + 1)))
+                    components.add(TextComponent(ComponentType.TEXT, unescapeContent(text.substring(componentStart, typeEnd + 1))))
                     componentStart = typeEnd + 1
                     i = typeEnd + 1
                     continue
@@ -90,7 +134,7 @@ object TextComponentHelper {
                 // 提取组件内容（从componentStart到i的文本），再从中解析出副组件
                 val componentContent = text.substring(componentStart, i)
                 val component = parseSingleComponentWithContent(type, componentContent)
-                    ?: TextComponent(type, componentContent)
+                    ?: TextComponent(type, unescapeContent(componentContent))
                 components.add(component)
                 
                 // 更新位置
@@ -104,7 +148,7 @@ object TextComponentHelper {
         // 处理剩余的普通文本
         if (componentStart < text.length) {
             val remainingText = text.substring(componentStart)
-            components.add(TextComponent(ComponentType.TEXT, remainingText))
+            components.add(TextComponent(ComponentType.TEXT, unescapeContent(remainingText)))
         }
         
         return components
@@ -123,13 +167,13 @@ object TextComponentHelper {
         var searchStart = 0
         
         while (searchStart < content.length) {
-            // 查找副组件开始标记：__type.key__
-            val subComponentStart = content.indexOf("__", searchStart)
+            // 查找副组件开始标记：__type.key__（转义的 __ 不算）
+            val subComponentStart = indexOfUnescaped(content, "__", searchStart)
             if (subComponentStart == -1) break
             
             // 查找副组件类型
             val typeStart = subComponentStart + 2  // 跳过__
-            val typeEnd = content.indexOf("__", typeStart)
+            val typeEnd = indexOfUnescaped(content, "__", typeStart)
             if (typeEnd == -1) break
             
             val subTypeKey = content.substring(typeStart, typeEnd)
@@ -143,7 +187,7 @@ object TextComponentHelper {
             
             // 查找副组件内容（从typeEnd + 2开始，到下一个__）
             val contentStart = typeEnd + 2
-            val contentEnd = content.indexOf("__", contentStart)
+            val contentEnd = indexOfUnescaped(content, "__", contentStart)
             if (contentEnd == -1) {
                 // 没有找到结束标记，这不是有效的副组件
                 break
@@ -153,14 +197,14 @@ object TextComponentHelper {
                 // 主内容到第一个有效副组件为止
                 mainContentEnd = subComponentStart
             }
-            val subContent = content.substring(contentStart, contentEnd)
+            val subContent = unescapeContent(content.substring(contentStart, contentEnd))
             subComponents.add(SubComponent(subType, subContent))
             
             searchStart = contentEnd + 2  // 跳过结束标记__
         }
         
         // 主内容：到第一个有效副组件为止（没有副组件时就是整个内容）
-        val mainContent = content.substring(0, mainContentEnd)
+        val mainContent = unescapeContent(content.substring(0, mainContentEnd))
         
         return TextComponent(type, mainContent, subComponents)
     }
@@ -174,9 +218,9 @@ object TextComponentHelper {
     fun componentsToText(components: List<TextComponent>): String {
         return components.joinToString("") { component ->
             val subComponentText = component.subComponents.joinToString("") { sub ->
-                "__${sub.type.key}__${sub.content}__"
+                "__${sub.type.key}__${escapeContent(sub.content)}__"
             }
-            "${component.content}$subComponentText$MARKER_START${component.type.key}$MARKER_END"
+            "${escapeContent(component.content)}$subComponentText$MARKER_START${component.type.key}$MARKER_END"
         }
     }
     
@@ -193,7 +237,14 @@ object TextComponentHelper {
             val len = c.content.length + c.subComponents.sumOf { it.content.length }
             if (insertPosition in pos..(pos + len)) {
                 val offset = insertPosition - pos
-                if (c.type == ComponentType.TEXT && offset in 0..c.content.length) {
+                if (c.type == ComponentType.TEXT && component.type == ComponentType.TEXT &&
+                    offset in 0..c.content.length
+                ) {
+                    // TEXT 插 TEXT：合并，避免每敲一个字就多一个组件
+                    components[i] = c.copy(
+                        content = c.content.substring(0, offset) + component.content + c.content.substring(offset)
+                    )
+                } else if (c.type == ComponentType.TEXT && offset in 0..c.content.length) {
                     val before = c.content.substring(0, offset)
                     val after = c.content.substring(offset)
                     val repl = mutableListOf<TextComponent>()
@@ -438,15 +489,11 @@ object TextComponentHelper {
     ): String {
         if (textToInsert.isEmpty()) return originalText
         
-        // 如果没有选中组件，直接插入（默认text组件）
-        if (currentComponent == null) {
-            return originalText.substring(0, insertPosition) + textToInsert + originalText.substring(insertPosition)
-        }
-        
-        // 如果选中了TEXT组件，直接插入文本（不创建新的text组件标记）
-        // 这样连续输入的字符会被合并到一个TEXT组件中
-        if (currentComponent == ComponentType.TEXT) {
-            return originalText.substring(0, insertPosition) + textToInsert + originalText.substring(insertPosition)
+        // 没有选中组件 / 选中 TEXT：插入一个 TEXT 组件（内部会转义敏感符号）
+        if (currentComponent == null || currentComponent == ComponentType.TEXT) {
+            return insertComponentAt(
+                originalText, insertPosition, TextComponent(ComponentType.TEXT, textToInsert)
+            )
         }
         
         // 解析原始文本
@@ -882,14 +929,20 @@ object TextComponentHelper {
                         val withSubComponent = withSubComponent(component, warnings)
                         if (withSubComponent != null) {
                             val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
-                            // with：纯文本参数按原样；JSON 嵌套组件在基岩侧按纯文本处理并提醒
+                            // with：纯文本参数 -> text；JSON 嵌套组件 -> 基岩 rawtext 对象列表
+                            // （基岩 rawtext 的 with 支持 {"rawtext":[...]}，可含嵌套 translate）
                             val items = parseWithItems(withSubComponent.content, jsonMode)
-                            if (items.any { it.json != null }) {
-                                warnings?.add("基岩版不支持 with 的嵌套文本组件，已按纯文本处理")
-                            }
-                            val withRawtext = items.map { item ->
-                                val param = item.plainText()
-                                mapOf<String, Any>("text" to processSectionCodesToBedrock(param, mNHandling, mnCFEnabled))
+                            val withRawtext = mutableListOf<Any>()
+                            for (item in items) {
+                                if (item.json != null) {
+                                    jsonWithToBedrock(item.json, warnings, withRawtext)
+                                } else {
+                                    withRawtext.add(
+                                        mapOf<String, Any>(
+                                            "text" to processSectionCodesToBedrock(item.raw, mNHandling, mnCFEnabled)
+                                        )
+                                    )
+                                }
                             }
                             if (withRawtext.isNotEmpty()) {
                                 item["with"] = mapOf("rawtext" to withRawtext)
@@ -1611,6 +1664,43 @@ object TextComponentHelper {
     fun isJsonWith(component: TextComponent): Boolean =
         component.subComponents.any { it.type == SubComponentType.WITH_JSON }
 
+    /**
+     * 在 with（纯文本）与 with(JSON) 之间切换时继承内容：
+     *  - 文本 -> JSON：每个参数包成 {"text": ...}；
+     *  - JSON -> 文本：取纯文本，逗号写成 \, 防止被当分隔符；
+     *  - JSON 的样式在降级为纯文本时会丢失（这是纯文本模式的必然结果）。
+     * 多次切换对纯文本内容是稳定的；带样式的组件切回纯文本后无法恢复样式。
+     */
+    fun migrateWithMode(component: TextComponent, toJson: Boolean): TextComponent {
+        val subComponents = component.subComponents.toMutableList()
+        val plain = subComponents.firstOrNull { it.type == SubComponentType.WITH }
+        val json = subComponents.firstOrNull { it.type == SubComponentType.WITH_JSON }
+        if (toJson) {
+            if (json == null && plain != null) {
+                val args = if (plain.content.isEmpty()) emptyList()
+                    else parseTranslateWithContent(plain.content)
+                val arr = args.map { mapOf("text" to it) }
+                subComponents.remove(plain)
+                subComponents.add(
+                    SubComponent(SubComponentType.WITH_JSON, com.google.gson.Gson().toJson(arr))
+                )
+            } else if (json != null) {
+                subComponents.remove(plain)
+            }
+        } else {
+            if (plain == null && json != null) {
+                val args = parseWithItems(json.content, jsonMode = true).map { item ->
+                    item.plainText().replace(",", "\\,")
+                }
+                subComponents.remove(json)
+                subComponents.add(SubComponent(SubComponentType.WITH, args.joinToString(",")))
+            } else if (plain != null) {
+                subComponents.remove(json)
+            }
+        }
+        return component.copy(subComponents = subComponents)
+    }
+
     /** 公开给网格预览：translate 的 with 参数（嵌套组件取纯文本）。 */
     fun parseTranslateArgs(content: String, jsonMode: Boolean = false): List<String> =
         parseWithItems(content, jsonMode).map { it.plainText() }
@@ -1636,6 +1726,68 @@ object TextComponentHelper {
             for (e in ex.asJsonArray) sb.append(jsonPlainText(e))
         }
         return sb.toString()
+    }
+
+    /** 把 Java JSON 组件转成基岩 rawtext 项（with 对象形式）。样式字段暂未完全保留。 */
+    private fun jsonWithToBedrock(
+        el: JsonElement,
+        warnings: MutableList<String>?,
+        out: MutableList<Any>
+    ) {
+        when {
+            el.isJsonPrimitive -> out.add(mapOf("text" to el.asString))
+            el.isJsonArray -> el.asJsonArray.forEach { jsonWithToBedrock(it, warnings, out) }
+            el.isJsonObject -> {
+                val o = el.asJsonObject
+                val styleKeys = listOf(
+                    "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
+                    "font", "clickEvent", "hoverEvent", "insertion"
+                )
+                val styleHit = styleKeys.firstOrNull { o.has(it) }
+                if (styleHit != null) {
+                    warnings?.add("基岩 with 的嵌套组件样式暂未完全保留（$styleHit）")
+                }
+                when {
+                    o.has("text") -> out.add(mapOf("text" to o.get("text").asString))
+                    o.has("translate") -> {
+                        val m = mutableMapOf<String, Any>(
+                            "translate" to o.get("translate").asString
+                        )
+                        o.get("with")?.let { m["with"] = bedrockWithValue(it, warnings) }
+                        out.add(m)
+                    }
+                    o.has("selector") -> out.add(mapOf("selector" to o.get("selector").asString))
+                    o.has("score") && o.get("score").isJsonObject -> {
+                        val sc = o.getAsJsonObject("score")
+                        out.add(
+                            mapOf(
+                                "score" to mapOf(
+                                    "name" to (sc.get("name")?.takeIf { it.isJsonPrimitive }?.asString ?: "*"),
+                                    "objective" to (sc.get("objective")?.takeIf { it.isJsonPrimitive }?.asString ?: "*")
+                                )
+                            )
+                        )
+                    }
+                }
+                o.get("extra")?.let { extra -> jsonWithToBedrock(extra, warnings, out) }
+            }
+        }
+    }
+
+    private fun bedrockWithValue(el: JsonElement, warnings: MutableList<String>?): Any {
+        if (el.isJsonArray) {
+            val arr = el.asJsonArray
+            if (arr.all { it.isJsonPrimitive }) return arr.map { it.asString }
+            val list = mutableListOf<Any>()
+            jsonWithToBedrock(el, warnings, list)
+            return mapOf("rawtext" to list)
+        }
+        if (el.isJsonObject) {
+            val list = mutableListOf<Any>()
+            jsonWithToBedrock(el, warnings, list)
+            return mapOf("rawtext" to list)
+        }
+        return if (el.isJsonPrimitive) el.asString else ""
     }
 
     private fun parseTranslateWithContent(content: String): List<String> {
