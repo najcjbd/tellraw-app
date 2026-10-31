@@ -82,6 +82,15 @@ class TextEditAuditTest {
     }
 
     @Test
+    fun deletingWholeComponentRemovesIt() {
+        val old = listOf(text("ab"), translate("k"))
+        val result = TextComponentHelper.remapComponentContentsForEdit(old, "abk", "ab")
+        requireNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("ab", result[0].content)
+    }
+
+    @Test
     fun appendAtEndGoesToLastSegment() {
         val old = listOf(text("ab"), translate("hi", SubComponent(SubComponentType.WITH, "world")))
         val result = TextComponentHelper.remapComponentContentsForEdit(old, "abhiworld", "abhiworldX")

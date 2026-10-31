@@ -283,7 +283,8 @@ object TextComponentHelper {
         if (currentPos < newLength) {
             result.add(TextComponent(ComponentType.TEXT, frontendMessage.substring(currentPos)))
         }
-        return result
+        // 内容被删空的组件不应继续留在标记里（与 deleteComponentMarkers 的清理口径一致）
+        return result.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() }
     }
 
     /** 前台文本的一处编辑（公共前后缀之外的替换区间）。 */
@@ -361,7 +362,8 @@ object TextComponentHelper {
             subs[seg.subIndex] = SubComponent(oldSub.type, applyToText(oldSub.content, seg.start))
             updated[seg.compIndex] = c.copy(subComponents = subs)
         }
-        return updated
+        // 删除后变空的组件直接移除，避免留下空 translate/score/selector
+        return updated.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() }
     }
 
     /**
