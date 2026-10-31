@@ -252,8 +252,8 @@ fun MainScreen(
                 viewModel.setUseJavaFontStyle(useJava)
                 viewModel.dismissMNDialog()
             },
-            onMixedModeChoice = { code, choice ->
-                viewModel.handleMixedModeChoice(code, choice)
+            onMixedModeChoice = { code, choice, remember ->
+                viewModel.handleMixedModeChoice(code, choice, remember)
                 viewModel.dismissMNDialog()
             },
             mnMixedMode = mnMixedMode

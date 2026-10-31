@@ -53,6 +53,7 @@
     <string name="mn_cf_enabled_description">用§m_f/§m_c/§n_f/§n_c指定處理方式</string>
     <string name="mn_handling_method">選擇§m（刪除線）和§n（底線）的處理方式：</string>
     <string name="remember_choice">記住選擇</string>
+    <string name="remember_choice_session_hint">僅本次使用有效；點「清空全部」或重新開啟應用程式後恢復預設。</string>
     <string name="java_bedrock_mixed_mode">JAVA/基岩混合</string>
     <string name="java_bedrock_mixed_mode_description">輸入有兩版特有參數時，保留各自的參數並改其他參數</string>
     <string name="java_bedrock_mixed_mode_active">JAVA/基岩混合模式開啟：找到兩版特有參數，自動轉換</string>
