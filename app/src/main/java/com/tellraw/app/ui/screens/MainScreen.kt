@@ -306,6 +306,9 @@ fun MainScreen(
             onBedrockColorToRgbChanged = { enabled ->
                 viewModel.setBedrockColorToRgb(enabled)
             },
+            onAsSensitiveChanged = { enabled ->
+                viewModel.setAsSensitive(enabled)
+            },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)
             },
@@ -591,50 +594,28 @@ private fun PortraitLayout(
                         val oldText = messageTextFieldValue.value.text
                         val newText = it.text
                         val cursorPosition = it.selection.start
-                        
                         messageTextFieldValue.value = it
                         
-                        // 如果关闭了"默认使用text"，需要处理组件标记
                         if (!defaultUseText) {
                             val selectedComponent = selectedTextComponent
                             val currentSubComponent = selectedSubComponent
+                            val edit = TextComponentHelper.diffTextEdit(oldText, newText)
+                            val hasTarget = (currentSubComponent != null && selectedComponent != null &&
+                                selectedComponent.hasSubComponent) ||
+                                (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT)
                             
-                            // 检测文本变化类型
-                            if (newText.length > oldText.length) {
-                                // 文本增加：插入新文本
-                                val insertedText = newText.substring(cursorPosition - (newText.length - oldText.length), cursorPosition)
-                                val insertPosition = cursorPosition - insertedText.length
-                                
-                                // 调用ViewModel的插入方法
-                                if (currentSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
-                                    // 副组件
-                                    viewModel.insertTextWithComponent(insertPosition, insertedText)
-                                } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
-                                    // 主组件
-                                    viewModel.insertTextWithComponent(insertPosition, insertedText)
-                                } else {
-                                    // 默认text组件
-                                    viewModel.updateMessage(newText)
-                                }
-                            } else if (newText.length < oldText.length) {
-                                // 文本减少：删除文本
-                                val deletedLength = oldText.length - newText.length
-                                val deletePosition = cursorPosition  // 删除后的光标位置就是删除位置
-                                viewModel.deleteTextWithComponent(deletePosition, deletedLength, newText)
-                            } else {
-                                // 文本长度相同，可能是替换或光标移动
-                                // 检查是否真的需要更新（内容不同才更新）
-                                if (newText != oldText) {
-                                    viewModel.updateMessage(newText)
-                                }
+                            if (edit.removedLength == 0 && edit.insertedText.isNotEmpty() && hasTarget) {
+                                // 纯插入且选中了组件：按组件/副组件插入
+                                viewModel.insertTextWithComponent(edit.start, edit.insertedText)
+                            } else if (newText != oldText) {
+                                // 替换/删除（含选中文字后粘贴）：按实际编辑区间重切，避免丢字符或串位
+                                viewModel.updateMessage(newText)
                             }
                             
-                            // 更新悬停组件类型
                             if (cursorPosition > 0) {
                                 viewModel.updateHoveredComponentType(cursorPosition - 1)
                             }
-                        } else {
-                            // 直接更新
+                        } else if (newText != oldText) {
                             viewModel.updateMessage(newText)
                         }
                     },
@@ -945,45 +926,28 @@ private fun LandscapeLayout(
                                 val oldText = messageTextFieldValue.value.text
                                 val newText = it.text
                                 val cursorPosition = it.selection.start
-                                
                                 messageTextFieldValue.value = it
                                 
-                                // 如果关闭了"默认使用text"，需要处理组件标记
                                 if (!defaultUseText) {
                                     val selectedComponent = selectedTextComponent
                                     val currentSubComponent = selectedSubComponent
+                                    val edit = TextComponentHelper.diffTextEdit(oldText, newText)
+                                    val hasTarget = (currentSubComponent != null && selectedComponent != null &&
+                                        selectedComponent.hasSubComponent) ||
+                                        (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT)
                                     
-                                    // 检测文本变化类型
-                                    if (newText.length > oldText.length) {
-                                        // 文本增加：插入新文本
-                                        val insertedText = newText.substring(cursorPosition - (newText.length - oldText.length), cursorPosition)
-                                        val insertPosition = cursorPosition - insertedText.length
-                                        
-                                        // 调用ViewModel的插入方法
-                                        if (currentSubComponent != null && selectedComponent != null && selectedComponent.hasSubComponent) {
-                                            // 副组件
-                                            viewModel.insertTextWithComponent(insertPosition, insertedText)
-                                        } else if (selectedComponent != null && selectedComponent != TextComponentHelper.ComponentType.TEXT) {
-                                            // 主组件
-                                            viewModel.insertTextWithComponent(insertPosition, insertedText)
-                                        } else {
-                                            // 默认text组件
-                                            viewModel.updateMessage(newText)
-                                        }
-                                    } else if (newText.length < oldText.length) {
-                                        // 文本减少：删除文本
-                                        viewModel.updateMessage(newText)
-                                    } else {
-                                        // 文本长度相同，可能是替换或光标移动
+                                    if (edit.removedLength == 0 && edit.insertedText.isNotEmpty() && hasTarget) {
+                                        // 纯插入且选中了组件：按组件/副组件插入
+                                        viewModel.insertTextWithComponent(edit.start, edit.insertedText)
+                                    } else if (newText != oldText) {
+                                        // 替换/删除（含选中文字后粘贴）：按实际编辑区间重切，避免丢字符或串位
                                         viewModel.updateMessage(newText)
                                     }
                                     
-                                    // 更新悬停组件类型
                                     if (cursorPosition > 0) {
                                         viewModel.updateHoveredComponentType(cursorPosition - 1)
                                     }
-                                } else {
-                                    // 直接更新
+                                } else if (newText != oldText) {
                                     viewModel.updateMessage(newText)
                                 }
                             },

@@ -1465,7 +1465,8 @@ private fun parseSimpleBlockItems(text: String): Map<Int, GridItem> =
     text.split(',', ';').mapNotNull { entry ->
         val m = Regex("^\\s*(\\d+)\\s*:\\s*([^\\s,;]+)\\s*(?:x\\s*(\\d+))?\\s*$").find(entry)
             ?: return@mapNotNull null
-        val slot = m.groupValues[1].toInt()
+        // 槽位/数量可能超出 Int：忽略这一项，而不是让整个编辑器崩溃
+        val slot = m.groupValues[1].toIntOrNull() ?: return@mapNotNull null
         val id = normItemId(m.groupValues[2])
         val count = m.groupValues[3].toIntOrNull() ?: 1
         slot to GridItem(id, count)

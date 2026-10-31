@@ -266,8 +266,8 @@ class TellrawViewModel @Inject constructor(
      */
     private fun hasStoragePermission(): Boolean {
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            // Android 11+ 不需要传统存储权限
-            true
+            // 与 MainActivity 保持一致：按路径读写外部存储需要“所有文件访问”
+            android.os.Environment.isExternalStorageManager()
         } else {
             // Android 10及以下需要检查存储权限
             ContextCompat.checkSelfPermission(
@@ -446,8 +446,10 @@ class TellrawViewModel @Inject constructor(
             // 所有组件都是TEXT组件，将整个输入内容作为一个TEXT组件处理
             mutableListOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage))
         } else {
-            // 有非TEXT组件，需要保留原有的组件结构
-            TextComponentHelper.remapComponentContents(oldComponents, frontendMessage)
+            // 有非TEXT组件：先按本次实际编辑区间重切；跨段编辑再回退到长度重切
+            TextComponentHelper.remapComponentContentsForEdit(
+                oldComponents, oldPlainText, frontendMessage
+            ) ?: TextComponentHelper.remapComponentContents(oldComponents, frontendMessage)
         }
         
         _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
@@ -505,12 +507,17 @@ class TellrawViewModel @Inject constructor(
         _nCodeCount.value = currentNCount
     }
     
+    /** 组件模式/构造器直接改 markers 后，混合模式的后台文本也要重建，否则生成命令仍是旧内容。 */
+    private fun refreshMixedBackendIfNeeded() {
+        if (!_mnMixedMode.value) return
+        updateBackendMessage(TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value))
+    }
+    
     /**
      * 更新后台消息（混合模式下将§m/§n转换为§m_f/§m_c/§n_f/§n_c）
      * 使用位置映射来保留用户的选择
      */
-    private fun updateBackendMessage(frontendMessage: String) {
-        // 构建新的backendMessage
+    private fun updateBackendMessage(frontendMessage: String) {        // 构建新的backendMessage
         val newBackend = StringBuilder()
         val newMappings = mutableListOf<MNMapping>()
         
@@ -869,7 +876,8 @@ class TellrawViewModel @Inject constructor(
 
         val markers = TextComponentHelper.componentsToText(r.components)
         _messageInputWithMarkers.value = markers
-        _messageInput.value = visibleTextOf(r.components)
+        // 必须保留 TEXT 里的 § 样式码（不能用只保留可见字符的版本，否则纯文本模式会丢颜色/格式）
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
         // 填回的是组件命令时，默认 text 模式会丢掉组件结构 -> 自动切到组件模式
         if (_defaultUseText.value && r.components.any {
                 it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
@@ -883,24 +891,23 @@ class TellrawViewModel @Inject constructor(
         }
         lastMessageInput = _messageInput.value
 
-        _executePrefixInput.value = r.executePrefix ?: ""
+        val prefix = r.executePrefix.orEmpty()
+        _executePrefixInput.value = prefix
+        if (prefix.isNotBlank()) {
+            _executePrefixEnabled.value = true
+            viewModelScope.launch {
+                settingsRepository.setExecutePrefixEnabled(true)
+                settingsRepository.setExecutePrefixInput(prefix)
+            }
+        } else {
+            viewModelScope.launch { settingsRepository.setExecutePrefixInput("") }
+        }
+        refreshMixedBackendIfNeeded()
 
         _showRawConvertDialog.value = false
         generateCommands()
     }
 
-    /** 组件序列里"可见文字"（TEXT 去 §），用于显示在消息框。 */
-    private fun visibleTextOf(components: List<TextComponentHelper.TextComponent>): String {
-        val sb = StringBuilder()
-        for (c in components) {
-            if (c.type != TextComponentHelper.ComponentType.TEXT) continue
-            val s = c.content
-            var i = 0
-            while (i < s.length) { if (s[i] == '§' && i + 1 < s.length) i += 2 else sb.append(s[i++]) }
-        }
-        return sb.toString()
-    }
-    
     fun dismissMNDialog() {
         _showMNDialog.value = null
         generateCommands()
@@ -1936,6 +1943,7 @@ class TellrawViewModel @Inject constructor(
                         _messageInputWithMarkers.value = markers
                         _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
                         lastMessageInput = _messageInput.value
+                        refreshMixedBackendIfNeeded()
                         generateCommands()
                     }
                     break
@@ -2035,6 +2043,8 @@ class TellrawViewModel @Inject constructor(
         val state = _withBuilderState.value ?: return
         when (mode) {
             WithBuilderMode.JSON -> {
+                // 已经在该页时不要重置用户正在编辑的原文/错误
+                if (state.mode == WithBuilderMode.JSON) return
                 _withBuilderState.value = state.copy(
                     mode = WithBuilderMode.JSON,
                     rawJson = WithArgCodec.serializePretty(state.args),
@@ -2125,6 +2135,7 @@ class TellrawViewModel @Inject constructor(
         _expandedSubComponents.value =
             _expandedSubComponents.value + TextComponentHelper.ComponentType.TRANSLATE.key
         _withBuilderState.value = null
+        refreshMixedBackendIfNeeded()
         generateCommands()
     }
     
@@ -2171,6 +2182,7 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 生成命令
+        refreshMixedBackendIfNeeded()
         generateCommands()
     }
     
@@ -2302,6 +2314,7 @@ class TellrawViewModel @Inject constructor(
             _messageInput.value = plain.substring(0, pos) + text + plain.substring(pos)
             _messageInputWithMarkers.value = markersForPlainText(_messageInput.value)
             lastMessageInput = _messageInput.value
+            refreshMixedBackendIfNeeded()
             generateCommands()
             return
         }
@@ -2312,6 +2325,7 @@ class TellrawViewModel @Inject constructor(
         _messageInputWithMarkers.value = newMarkers
         _messageInput.value = TextComponentHelper.stripComponentMarkers(newMarkers)
         lastMessageInput = _messageInput.value
+        refreshMixedBackendIfNeeded()
         generateCommands()
     }
 
@@ -2364,6 +2378,7 @@ class TellrawViewModel @Inject constructor(
         // 更新lastMessageInput
         lastMessageInput = plainText
         
+        refreshMixedBackendIfNeeded()
         generateCommands()
     }
     
@@ -2442,6 +2457,7 @@ class TellrawViewModel @Inject constructor(
             // 清空悬停组件类型和内容
             _hoveredComponentType.value = null
             _hoveredComponentContent.value = null
+            refreshMixedBackendIfNeeded()
             generateCommands()
         }
     }

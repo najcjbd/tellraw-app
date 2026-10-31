@@ -48,7 +48,8 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("translate", key)
-            fallback?.takeIf { it.isNotEmpty() }?.let { o.addProperty("fallback", it) }
+            // 空字符串 fallback 与"没有 fallback"语义不同，保留原样
+            fallback?.let { o.addProperty("fallback", it) }
             if (args.isNotEmpty()) {
                 o.add("with", JsonArray().apply { args.forEach { add(it.toJson()) } })
             }
@@ -64,7 +65,8 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("selector", selector)
-            separator?.takeIf { it.isNotEmpty() }?.let { o.addProperty("separator", it) }
+            // 空 separator 与缺省 separator 语义不同，保留原样
+            separator?.let { o.addProperty("separator", it) }
             return o
         }
     }
@@ -107,7 +109,8 @@ sealed interface WithArgDraft {
             o.addProperty("nbt", path)
             addOptional(o, "source", source)
             addOptionalBool(o, "interpret", interpret)
-            separator?.takeIf { it.isNotEmpty() }?.let { o.addProperty("separator", it) }
+            // 空 separator 与缺省 separator 语义不同，保留原样
+            separator?.let { o.addProperty("separator", it) }
             return o
         }
     }

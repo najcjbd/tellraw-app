@@ -175,6 +175,24 @@ class WithArgDraftCodecTest {
     }
 
     @Test
+    fun emptyFallbackAndSeparatorArePreserved() {
+        val fallback = WithArgCodec.fromJson(json("""{"translate":"k","fallback":""}"""))
+        val fallbackOut = fallback.toJson().asJsonObject
+        assertTrue(fallbackOut.has("fallback"))
+        assertEquals("", fallbackOut.get("fallback").asString)
+
+        val separator = WithArgCodec.fromJson(json("""{"selector":"@a","separator":""}"""))
+        val sepOut = separator.toJson().asJsonObject
+        assertTrue(sepOut.has("separator"))
+        assertEquals("", sepOut.get("separator").asString)
+
+        val nbt = WithArgCodec.fromJson(json("""{"nbt":"Health","separator":""}"""))
+        val nbtOut = nbt.toJson().asJsonObject
+        assertTrue(nbtOut.has("separator"))
+        assertEquals("", nbtOut.get("separator").asString)
+    }
+
+    @Test
     fun bedrockIssuesDetectLimitedKinds() {
         val args = listOf(
             WithArgDraft.Text("a", color = "red"),

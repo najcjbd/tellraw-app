@@ -115,7 +115,19 @@ object ExecuteConverter {
                         }
                     }
                     out.addAll(toks)
-                    out.addAll(extra)
+                    val modName = seg.tokens.firstOrNull()
+                    val positionOnly = modName in setOf(
+                        "at", "positioned", "rotated", "facing", "anchored", "align", "in"
+                    )
+                    if (positionOnly && extra.isNotEmpty()) {
+                        // 位置修饰后的 @s 仍是原执行者；把选择器里的否定条件放这里会判错对象
+                        reminders.add(
+                            "位置修饰子命令 \"$modName\" 的选择器带否定条件，Java 无法在不改变执行者的情况下表达，" +
+                                "已忽略这些条件（位置筛选可能比原命令更宽）"
+                        )
+                    } else {
+                        out.addAll(extra)
+                    }
                     exec = applyModifier(toks, exec)
                 }
                 is Seg.Cond -> out.addAll(convertCondition(seg, direction, exec, reminders, nbtSyntax))
@@ -1036,6 +1048,13 @@ object ExecuteConverter {
             result.add(listOf(if (cond.unless) "unless" else "if", "entity", "$varName[${kept.joinToString(",")}]"))
         }
         result.addAll(extra)
+        if (cond.unless && result.size > 1) {
+            // ¬(A∧B) 无法用 Java 的顺序条件（¬A∧¬B）表达
+            return dropAnd(
+                reminders,
+                "\"unless entity\" 含多个可拆分条件：Java 顺序条件只能表达 ¬A∧¬B，无法表达 ¬(A∧B)，已舍弃该条件"
+            )
+        }
         return if (result.isEmpty()) dropAnd(reminders, "entity 条件的内容已全部舍弃") else CondOut.Out(result.flatten())
     }
 
