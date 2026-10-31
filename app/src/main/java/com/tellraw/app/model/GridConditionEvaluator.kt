@@ -58,6 +58,7 @@ object GridConditionEvaluator {
                 break
             }
             var ok: Boolean
+            var neutral = false
             var consumed = 2
             when (name.lowercase()) {
                 "entity" -> {
@@ -65,11 +66,13 @@ object GridConditionEvaluator {
                     if (sel == null) {
                         notes.add("if/unless entity 缺少选择器，已忽略")
                         ok = true
+                        neutral = true
                     } else {
                         val r = SelectorEvaluator.evaluate(
                             sel, all, executor = entity,
                             edition = if (target?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
-                            origin = Triple(entity.x, entity.y, entity.z),
+                            // 距离/体积应按执行原点算，不能用候选实体自己的坐标
+                            origin = origin,
                             target = target
                         )
                         notes.addAll(r.notes)
@@ -84,6 +87,7 @@ object GridConditionEvaluator {
                     if (source != "entity" || tgt == null || nbt == null) {
                         notes.add("只建模了 if/unless data entity <@s> <NBT>；该条件未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         if (tgt != "@s" && tgt != "@p" && tgt != "@n") {
                             notes.add("if/unless data 的目标是 $tgt，网格按候选实体近似判断")
@@ -94,8 +98,14 @@ object GridConditionEvaluator {
                 }
                 "predicate" -> {
                     val id = tokens.getOrNull(i + 2)
-                    ok = if (id == null) true else entity.predicates.any { it == id }
-                    if (id != null) consumed = 3
+                    if (id == null) {
+                        notes.add("predicate 条件缺少 ID，已忽略")
+                        ok = true
+                        neutral = true
+                    } else {
+                        ok = entity.predicates.any { it == id }
+                        consumed = 3
+                    }
                 }
                 "score" -> {
                     val tgt = tokens.getOrNull(i + 2)
@@ -104,6 +114,7 @@ object GridConditionEvaluator {
                     if (tgt == null || obj == null) {
                         notes.add("score 条件参数不完整，已忽略")
                         ok = true
+                        neutral = true
                     } else if (kw2 == "matches") {
                         val range = tokens.getOrNull(i + 5)
                         val (lo, hi) = parseRange(range ?: "")
@@ -115,11 +126,13 @@ object GridConditionEvaluator {
                         } else {
                             notes.add("score 条件的目标不是 @s 或实体没有该分数，按候选近似未筛选")
                             ok = true
+                            neutral = true
                             consumed = 6
                         }
                     } else {
                         notes.add("score 的比较形式需要源目标分数，网格未建模，未参与筛选")
                         ok = true
+                        neutral = true
                         consumed = 6
                     }
                 }
@@ -127,10 +140,12 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 $name 条件；未参与筛选")
                         ok = true
+                        neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else if (world.blocks.isEmpty()) {
                         notes.add("未提供方块数据，$name 条件未参与筛选（可在“世界条件”里填写）")
                         ok = true
+                        neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else if (name == "block") {
                         val p = readPos(tokens, i + 2, origin, notes)
@@ -138,6 +153,7 @@ object GridConditionEvaluator {
                         if (p == null || want == null) {
                             notes.add("block 条件参数不完整，已忽略")
                             ok = true
+                            neutral = true
                         } else {
                             val actual = world.blocks[posKey(p)]
                             ok = actual != null && normBlock(actual.id) == normBlock(want)
@@ -151,6 +167,7 @@ object GridConditionEvaluator {
                         if (a == null || b == null || dest == null || mode == null) {
                             notes.add("blocks 条件参数不完整，已忽略")
                             ok = true
+                            neutral = true
                         } else {
                             ok = compareRegions(world, a, b, dest, mode)
                             consumed = 12
@@ -161,9 +178,11 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 biome 条件；未参与筛选")
                         ok = true
+                        neutral = true
                     } else if (world.biome.isBlank()) {
                         notes.add("未提供生物群系，biome 条件未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         ok = normBlock(world.biome) == normBlock(tokens.getOrNull(i + 5) ?: "")
                     }
@@ -173,6 +192,7 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 dimension 条件；未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         ok = normBlock(world.dimension) == normBlock(tokens.getOrNull(i + 2) ?: "")
                     }
@@ -182,6 +202,7 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 loaded 条件；未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         ok = world.loaded
                     }
@@ -191,6 +212,7 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 function 条件；未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         ok = world.functions.contains(tokens.getOrNull(i + 2))
                     }
@@ -200,6 +222,7 @@ object GridConditionEvaluator {
                     if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
                         notes.add("基岩没有 stopwatch 条件；未参与筛选")
                         ok = true
+                        neutral = true
                     } else {
                         val id = tokens.getOrNull(i + 2)
                         val (lo, hi) = parseRange(tokens.getOrNull(i + 3) ?: "")
@@ -207,6 +230,7 @@ object GridConditionEvaluator {
                         if (v == null) {
                             notes.add("stopwatch $id 未在世界条件里设置，未参与筛选")
                             ok = true
+                            neutral = true
                         } else {
                             ok = v >= (lo ?: Double.NEGATIVE_INFINITY) && v <= (hi ?: Double.POSITIVE_INFINITY)
                         }
@@ -220,16 +244,19 @@ object GridConditionEvaluator {
                     if (!javaOk) {
                         notes.add("items 条件需要 Java ≥1.20.5 且基岩没有该条件；未参与筛选")
                         ok = true
+                        neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else {
                         val r = evalItems(tokens, i, entity, world, origin, notes)
                         if (r == null) {
                             notes.add("items 条件参数不完整，已忽略")
                             ok = true
+                            neutral = true
                             consumed = conditionSpan(tokens, i + 1)
                         } else {
-                            ok = r.first
-                            consumed = r.second
+                            ok = r.ok
+                            consumed = r.consumed
+                            neutral = r.neutral
                         }
                     }
                 }
@@ -240,26 +267,32 @@ object GridConditionEvaluator {
                     if (!javaOk) {
                         notes.add("slots 条件需要 Java 26.3 且基岩没有该条件；未参与筛选")
                         ok = true
+                        neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else {
                         val r = evalSlots(tokens, i, entity, world, origin, notes)
                         if (r == null) {
                             notes.add("slots 条件参数不完整，已忽略")
                             ok = true
+                            neutral = true
                             consumed = conditionSpan(tokens, i + 1)
                         } else {
-                            ok = r.first
-                            consumed = r.second
+                            ok = r.ok
+                            consumed = r.consumed
+                            neutral = r.neutral
                         }
                     }
                 }
                 else -> {
                     notes.add("条件 \"$name\" 未支持，未参与筛选")
                     ok = true
+                    neutral = true
                 }
             }
-            if (neg) ok = !ok
-            if (!ok) return Result(false, notes.distinct())
+            if (!neutral) {
+                if (neg) ok = !ok
+                if (!ok) return Result(false, notes.distinct())
+            }
             i += consumed
         }
         return Result(true, notes.distinct())
@@ -273,6 +306,9 @@ object GridConditionEvaluator {
     }
 
     data class OriginResult(val origin: Triple<Double, Double, Double>, val notes: List<String>)
+
+    /** 条件求值结果；neutral = 数据/版本不足，未参与筛选（unless 也不能反转它）。 */
+    private data class CondEval(val ok: Boolean, val consumed: Int, val neutral: Boolean = false)
 
     /**
      * 解析 execute 前缀里的 positioned / at，得到"选择器外部"的默认原点。
@@ -312,19 +348,49 @@ object GridConditionEvaluator {
                     i += 2
                 }
                 "positioned" -> {
-                    val xs = tokens.getOrNull(i + 1)
-                    val ys = tokens.getOrNull(i + 2)
-                    val zs = tokens.getOrNull(i + 3)
-                    if (xs == null || ys == null || zs == null) {
-                        notes.add("positioned 参数不完整，已忽略")
-                        i += 1
-                    } else {
-                        origin = Triple(
-                            coord(xs, origin.first, notes),
-                            coord(ys, origin.second, notes),
-                            coord(zs, origin.third, notes)
-                        )
-                        i += 4
+                    val first = tokens.getOrNull(i + 1)
+                    when (first) {
+                        "as" -> {
+                            val sel = tokens.getOrNull(i + 2)
+                            if (sel == null) {
+                                notes.add("positioned as 缺少选择器，已忽略")
+                                i += 1
+                            } else {
+                                val r = SelectorEvaluator.evaluate(
+                                    sel, all, executor = executor,
+                                    edition = if (target?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
+                                    origin = origin, target = target
+                                )
+                                notes.addAll(r.notes)
+                                val firstEntity = r.matched.firstOrNull()
+                                if (firstEntity != null) {
+                                    origin = Triple(firstEntity.x, firstEntity.y, firstEntity.z)
+                                } else {
+                                    notes.add("positioned as $sel 没有选中实体，原点保持不变")
+                                }
+                                i += 3
+                            }
+                        }
+                        "over" -> {
+                            notes.add("execute positioned over（高度图）未建模，原点保持不变")
+                            i += 3
+                        }
+                        else -> {
+                            val xs = first
+                            val ys = tokens.getOrNull(i + 2)
+                            val zs = tokens.getOrNull(i + 3)
+                            if (xs == null || ys == null || zs == null) {
+                                notes.add("positioned 参数不完整，已忽略")
+                                i += 1
+                            } else {
+                                origin = Triple(
+                                    coord(xs, origin.first, notes),
+                                    coord(ys, origin.second, notes),
+                                    coord(zs, origin.third, notes)
+                                )
+                                i += 4
+                            }
+                        }
                     }
                 }
                 "in" -> {
@@ -370,7 +436,7 @@ object GridConditionEvaluator {
         world: GridWorld,
         origin: Triple<Double, Double, Double>,
         notes: MutableList<String>
-    ): Pair<Boolean, Int>? {
+    ): CondEval? {
         val source = tokens.getOrNull(i + 2) ?: return null
         if (source == "entity") {
             val target = tokens.getOrNull(i + 3) ?: return null
@@ -382,7 +448,7 @@ object GridConditionEvaluator {
                 notes.add("items 条件的目标不是 @s（$target），网格按候选实体近似")
                 matchesItemPredicate(entity.items, slots, predicate, notes)
             }
-            return ok to 6
+            return CondEval(ok, 6)
         }
         if (source == "block") {
             val pos = readPos(tokens, i + 3, origin, notes) ?: return null
@@ -391,9 +457,9 @@ object GridConditionEvaluator {
             val block = world.blocks[posKey(pos)]
             if (block == null) {
                 notes.add("方块表里没有 ${posKey(pos)} 的容器数据，items 条件未参与筛选")
-                return true to 8
+                return CondEval(true, 8, neutral = true)
             }
-            return matchesItemPredicate(blockItems(block), slots, predicate, notes) to 8
+            return CondEval(matchesItemPredicate(blockItems(block), slots, predicate, notes), 8)
         }
         return null
     }
@@ -405,7 +471,7 @@ object GridConditionEvaluator {
         world: GridWorld,
         origin: Triple<Double, Double, Double>,
         notes: MutableList<String>
-    ): Pair<Boolean, Int>? {
+    ): CondEval? {
         val source = tokens.getOrNull(i + 2) ?: return null
         if (source == "entity") {
             val target = tokens.getOrNull(i + 3) ?: return null
@@ -416,7 +482,7 @@ object GridConditionEvaluator {
                 notes.add("slots 条件的目标不是 @s（$target），网格按候选实体近似")
                 entityHasSlots(entity, slots)
             }
-            return ok to 5
+            return CondEval(ok, 5)
         }
         if (source == "block") {
             val pos = readPos(tokens, i + 3, origin, notes) ?: return null
@@ -424,9 +490,9 @@ object GridConditionEvaluator {
             val block = world.blocks[posKey(pos)]
             if (block == null) {
                 notes.add("方块表里没有 ${posKey(pos)} 的容器数据，slots 条件未参与筛选")
-                return true to 7
+                return CondEval(true, 7, neutral = true)
             }
-            return blockHasSlots(block, slots) to 7
+            return CondEval(blockHasSlots(block, slots), 7)
         }
         return null
     }

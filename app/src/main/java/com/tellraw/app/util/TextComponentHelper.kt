@@ -286,6 +286,84 @@ object TextComponentHelper {
         return result
     }
 
+    /** 前台文本的一处编辑（公共前后缀之外的替换区间）。 */
+    data class TextEdit(val start: Int, val removedLength: Int, val insertedText: String)
+
+    fun diffTextEdit(oldText: String, newText: String): TextEdit {
+        var prefix = 0
+        val maxPrefix = minOf(oldText.length, newText.length)
+        while (prefix < maxPrefix && oldText[prefix] == newText[prefix]) prefix++
+        var suffix = 0
+        val maxSuffix = minOf(oldText.length - prefix, newText.length - prefix)
+        while (suffix < maxSuffix &&
+            oldText[oldText.length - 1 - suffix] == newText[newText.length - 1 - suffix]
+        ) suffix++
+        val removed = oldText.length - prefix - suffix
+        val inserted = newText.substring(prefix, newText.length - suffix)
+        return TextEdit(prefix, removed, inserted)
+    }
+
+    /**
+     * 按"这次实际改了哪一段"来重切内容：
+     * - 单点插入落在某个内容段内/边界时，插到该段（边界优先归前一段）；
+     * - 替换/删除完全落在同一段内时，只改这一段。
+     * 跨段编辑返回 null，由调用方回退到长度重切。
+     */
+    fun remapComponentContentsForEdit(
+        oldComponents: List<TextComponent>,
+        oldPlainText: String,
+        newPlainText: String
+    ): List<TextComponent>? {
+        if (oldComponents.isEmpty()) return null
+        val expected = oldComponents.joinToString("") { c ->
+            c.content + c.subComponents.joinToString("") { it.content }
+        }
+        if (expected != oldPlainText) return null
+
+        data class Seg(val compIndex: Int, val subIndex: Int, val start: Int, val end: Int)
+
+        val segments = mutableListOf<Seg>()
+        var pos = 0
+        oldComponents.forEachIndexed { ci, c ->
+            val mainEnd = pos + c.content.length
+            segments.add(Seg(ci, -1, pos, mainEnd))
+            pos = mainEnd
+            c.subComponents.forEachIndexed { si, sub ->
+                val end = pos + sub.content.length
+                segments.add(Seg(ci, si, pos, end))
+                pos = end
+            }
+        }
+
+        val edit = diffTextEdit(oldPlainText, newPlainText)
+        val seg: Seg = if (edit.removedLength == 0) {
+            val insertAt = edit.start
+            segments.lastOrNull { it.start < insertAt && insertAt <= it.end }
+                ?: segments.firstOrNull { insertAt >= it.start && insertAt <= it.end }
+                ?: return null
+        } else {
+            val end = edit.start + edit.removedLength
+            segments.firstOrNull { edit.start >= it.start && end <= it.end } ?: return null
+        }
+
+        fun applyToText(old: String, segStart: Int): String {
+            val rel = edit.start - segStart
+            return old.substring(0, rel) + edit.insertedText + old.substring(rel + edit.removedLength)
+        }
+
+        val updated = oldComponents.toMutableList()
+        val c = updated[seg.compIndex]
+        if (seg.subIndex < 0) {
+            updated[seg.compIndex] = c.copy(content = applyToText(c.content, seg.start))
+        } else {
+            val subs = c.subComponents.toMutableList()
+            val oldSub = subs[seg.subIndex]
+            subs[seg.subIndex] = SubComponent(oldSub.type, applyToText(oldSub.content, seg.start))
+            updated[seg.compIndex] = c.copy(subComponents = subs)
+        }
+        return updated
+    }
+
     /**
      * 在"纯文本位置"插入一个完整组件；如果位置落在 TEXT 组件内部，会把它拆成前后两段。
      * 位置按 content + 子组件内容的长度计算（标记符不参与）。
@@ -315,6 +393,9 @@ object TextComponentHelper {
                     if (after.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, after))
                     components.removeAt(i)
                     components.addAll(i, repl)
+                } else if (offset == 0) {
+                    // 光标在该组件起点：插在它前面
+                    components.add(i, component)
                 } else {
                     components.add(i + 1, component)
                 }
@@ -684,16 +765,49 @@ object TextComponentHelper {
         
         // 如果目标组件类型与当前选中组件类型相同，直接合并内容
         if (targetComponent.type == currentComponent) {
-            val newContent = targetComponent.content.substring(0, offsetInTargetComponent) + 
-                           textToInsert + 
-                           targetComponent.content.substring(offsetInTargetComponent)
-            val mergedComponent = TextComponent(currentComponent, newContent, targetComponent.subComponents)
+            val mainLen = targetComponent.content.length
+            val replacement: TextComponent
+            if (offsetInTargetComponent <= mainLen) {
+                val newContent = targetComponent.content.substring(0, offsetInTargetComponent) +
+                    textToInsert +
+                    targetComponent.content.substring(offsetInTargetComponent)
+                replacement = targetComponent.copy(content = newContent)
+            } else {
+                // 光标落在副组件内容里：插入到对应的副组件，而不是按主内容长度截 substring（会越界崩溃）
+                val subs = targetComponent.subComponents.toMutableList()
+                var remaining = offsetInTargetComponent - mainLen
+                var inserted = false
+                for (i in subs.indices) {
+                    if (remaining <= subs[i].content.length) {
+                        val c = subs[i].content
+                        subs[i] = SubComponent(
+                            subs[i].type,
+                            c.substring(0, remaining) + textToInsert + c.substring(remaining)
+                        )
+                        inserted = true
+                        break
+                    }
+                    remaining -= subs[i].content.length
+                }
+                replacement = if (inserted) {
+                    targetComponent.copy(subComponents = subs)
+                } else {
+                    // 兜底：追加到最后一个副组件（或主内容）末尾
+                    if (subs.isNotEmpty()) {
+                        val last = subs.last()
+                        subs[subs.lastIndex] = SubComponent(last.type, last.content + textToInsert)
+                        targetComponent.copy(subComponents = subs)
+                    } else {
+                        targetComponent.copy(content = targetComponent.content + textToInsert)
+                    }
+                }
+            }
             
             val result = StringBuilder()
             for (i in 0 until targetComponentIndex) {
                 result.append(componentToText(components[i]))
             }
-            result.append(componentToText(mergedComponent))
+            result.append(componentToText(replacement))
             for (i in targetComponentIndex + 1 until components.size) {
                 result.append(componentToText(components[i]))
             }
@@ -1885,15 +1999,33 @@ object TextComponentHelper {
                     warnings?.add("基岩 with 的嵌套组件样式暂未完全保留（$styleHit）")
                 }
                 when {
-                    o.has("text") -> out.add(mapOf("text" to o.get("text").asString))
+                    o.has("text") -> {
+                        val t = o.get("text")
+                        if (t.isJsonPrimitive) {
+                            out.add(mapOf("text" to t.asString))
+                        } else {
+                            warnings?.add("基岩 with 里的 text 不是字符串，已按 JSON 文本转换")
+                            out.add(mapOf("text" to t.toString()))
+                        }
+                    }
                     o.has("translate") -> {
-                        val m = mutableMapOf<String, Any>(
-                            "translate" to o.get("translate").asString
-                        )
+                        val keyEl = o.get("translate")
+                        val key = if (keyEl.isJsonPrimitive) keyEl.asString else {
+                            warnings?.add("基岩 with 里的 translate 键不是字符串，已按 JSON 文本转换")
+                            keyEl.toString()
+                        }
+                        val m = mutableMapOf<String, Any>("translate" to key)
                         o.get("with")?.let { m["with"] = bedrockWithValue(it, warnings) }
                         out.add(m)
                     }
-                    o.has("selector") -> out.add(mapOf("selector" to o.get("selector").asString))
+                    o.has("selector") -> {
+                        val selEl = o.get("selector")
+                        val sel = if (selEl.isJsonPrimitive) selEl.asString else {
+                            warnings?.add("基岩 with 里的 selector 不是字符串，已按 JSON 文本转换")
+                            selEl.toString()
+                        }
+                        out.add(mapOf("selector" to sel))
+                    }
                     o.has("score") && o.get("score").isJsonObject -> {
                         val sc = o.getAsJsonObject("score")
                         out.add(

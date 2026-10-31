@@ -91,9 +91,15 @@ object SelectorEvaluator {
         val params = if (paramsPart.isBlank()) emptyList()
         else ExecCondSupport.splitTopLevel(paramsPart, ',').map { it.trim() }.filter { it.isNotEmpty() }
 
+        val isBedrock = target?.edition == VersionSpec.Edition.BEDROCK ||
+            (target == null && edition == "bedrock")
+        val hasTypeParam = params.any { it.substringBefore('=').trim() == "type" }
+
         // 1) 选择器本体：先确定候选集合
         var candidates: List<GridEntity> = when (base) {
-            "@a", "@p", "@r" -> entities.filter { it.isPlayer }
+            "@a", "@p" -> entities.filter { it.isPlayer }
+            // 基岩 @r 可以配 type= 选非玩家；Java @r 只选玩家
+            "@r" -> if (isBedrock && hasTypeParam) entities else entities.filter { it.isPlayer }
             "@e", "@n" -> entities
             "@s" -> listOfNotNull(executor)
             "@c", "@v", "@initiator" -> {
@@ -105,7 +111,7 @@ object SelectorEvaluator {
                 return Result(emptyList(), notes)
             }
         }
-        if (base in setOf("@a", "@p", "@r") && params.any { it.startsWith("type=") }) {
+        if (hasTypeParam && (base == "@a" || base == "@p" || (base == "@r" && !isBedrock))) {
             notes.add("\"$base\" 上 type= 无效（该选择器本身就限定了玩家）")
         }
         if (base == "@n" && target != null && target != VersionSpec.LATEST &&
@@ -124,7 +130,7 @@ object SelectorEvaluator {
         var minDist: Double? = null
         var limit: Int? = null
         var sort: String? = null
-        var cNegative = false
+        var invalidLimit = false
 
         // 2) 逐参数筛选
         candidates = candidates.filter { e ->
@@ -160,11 +166,23 @@ object SelectorEvaluator {
                     "distance" -> { val (a, b) = parseRange(value); minDist = a; maxDist = b }
                     "r" -> maxDist = value.toDoubleOrNull()
                     "rm" -> minDist = value.toDoubleOrNull()
-                    "limit" -> limit = value.toIntOrNull()
+                    "limit" -> {
+                        val n = value.toIntOrNull()
+                        if (n == null || n < 0) {
+                            notes.add("limit=$value 无效（Java 要求非负整数），该选择器不会匹配任何实体")
+                            invalidLimit = true
+                        } else {
+                            limit = n
+                        }
+                    }
                     "sort" -> sort = value
                     "c" -> {
                         val n = value.toIntOrNull()
-                        if (n != null && n < 0) { cNegative = true; limit = -n } else limit = n
+                        if (n != null) {
+                            limit = kotlin.math.abs(n)
+                            // 基岩 c= 按到执行点距离排序；负值取最远
+                            sort = if (n < 0) "furthest" else "nearest"
+                        }
                     }
                     "hasitem" -> {
                         val editionOk = if (target != null) target.edition == VersionSpec.Edition.BEDROCK
@@ -184,7 +202,8 @@ object SelectorEvaluator {
                         val (lo, hi) = parseRange(value)
                         val lv = e.level
                         if (lv == null) {
-                            notes.add("level= 需要实体设置经验等级；该实体未设置，未按它筛选")
+                            notes.add("level= 只适用于玩家；非玩家自动排除")
+                            return@filter false
                         } else if (lv < (lo ?: 0.0) || lv > (hi ?: Double.MAX_VALUE)) {
                             return@filter false
                         }
@@ -193,7 +212,8 @@ object SelectorEvaluator {
                         val num = value.toDoubleOrNull()
                         val lv = e.level
                         if (lv == null) {
-                            notes.add("$key= 需要实体设置经验等级；该实体未设置，未按它筛选")
+                            notes.add("$key= 只适用于玩家；非玩家自动排除")
+                            return@filter false
                         } else if (num == null) {
                             notes.add("$key=$value 无法解析，已忽略")
                         } else if (key == "l" && lv > num) {
@@ -293,6 +313,8 @@ object SelectorEvaluator {
             }
         }
 
+        if (invalidLimit) return Result(emptyList(), notes.distinct())
+
         // 4) 排序 + 数量
         val sorted = when (sort ?: defaultSort(base)) {
             "nearest" -> candidates.sortedBy { dist2(it, ox, oy, oz) }
@@ -305,11 +327,7 @@ object SelectorEvaluator {
             "@p", "@r", "@n" -> 1
             else -> null
         }
-        val limited = when {
-            n == null -> sorted
-            cNegative -> sorted.takeLast(n)   // c=-N：取最远 N 个
-            else -> sorted.take(n)
-        }
+        val limited = if (n == null) sorted else sorted.take(n)
         return Result(limited, notes.distinct())
     }
 
@@ -377,7 +395,7 @@ object SelectorEvaluator {
         return if (neg) !hit else hit
     }
 
-    /** scores={a=1,b=!2}：`=!` 的口径 = "存在且不等于"。 */
+    /** scores={a=1..5,b=!2}：支持区间；`=!` 的口径 = "存在且不在范围内"。 */
     private fun matchScores(e: GridEntity, value: String, notes: MutableList<String>): Boolean {
         val body = value.removeSurrounding("{", "}")
         for (entry in ExecCondSupport.splitTopLevel(body, ',')) {
@@ -388,15 +406,25 @@ object SelectorEvaluator {
             val neg = raw.startsWith("!")
             val v = if (neg) raw.substring(1) else raw
             val score = e.scores[k]
-            val num = v.toIntOrNull()
-            val hit = if (num != null) score == num else score?.toString() == v
+            val hit = score != null && scoreInRange(score, v)
             if (neg) {
-                if (score == null || hit) return false   // 必须存在且不等
+                if (score == null || hit) return false   // 必须存在且不在范围内
             } else {
                 if (!hit) return false
             }
         }
         return true
+    }
+
+    /** 分数值：单值或 `a..b` 区间。 */
+    private fun scoreInRange(score: Int, raw: String): Boolean {
+        val v = raw.trim()
+        if (".." in v) {
+            val (lo, hi) = parseRange(v)
+            return score.toDouble() >= (lo ?: Double.NEGATIVE_INFINITY) &&
+                score.toDouble() <= (hi ?: Double.POSITIVE_INFINITY)
+        }
+        return score == v.toIntOrNull()
     }
 
     /** 游戏模式：支持 Java 全称、基岩缩写 s/c/a/d 与数字 0/1/2/5、以及 `!` 反选。 */
@@ -415,8 +443,8 @@ object SelectorEvaluator {
         }
         val actual = e.gamemode
         if (actual == null) {
-            notes.add("gamemode= 需要实体设置游戏模式；该实体未设置，未按它筛选")
-            return true
+            notes.add("gamemode= 只适用于玩家；非玩家自动排除")
+            return false
         }
         val hit = actual.lowercase() == want
         return if (neg) !hit else hit
@@ -646,10 +674,10 @@ object SelectorEvaluator {
 
     /**
      * hasitem 求值（网格已建模的部分）：
-     *  - 单个对象或对象数组（数组 = 任一匹配）；
-     *  - item / quantity（区间，默认 1..）/ location + slot（数字、!数字）；
+     *  - 单个对象或对象数组（数组 = 同时满足/AND，与基岩一致）；
+     *  - item / quantity（区间、!反选、0=没有）/ location + slot（数字、!数字、a..b）；
      *  - item=air 表示"该槽为空"；
-     *  - data 不参与判定（会提示）。
+     *  - data 按物品 damage 判定。
      */
     private fun matchHasitem(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
         val v = raw.trim()
@@ -661,7 +689,7 @@ object SelectorEvaluator {
             notes.add("hasitem 结构无法解析：$raw")
             return true
         }
-        return objects.any { obj ->
+        return objects.all { obj ->
             matchHasitemObject(e, obj.trim().removeSurrounding("{", "}"), notes)
         }
     }
@@ -701,11 +729,23 @@ object SelectorEvaluator {
             }
             if (slot != null) {
                 val idx = key.substringAfterLast('.', "")
-                if (slot!!.startsWith("!")) {
-                    val bad = slot!!.substring(1)
-                    if (idx == bad) return false
-                } else if (slot!!.toIntOrNull() != null && idx != slot) {
-                    return false
+                val idxNum = idx.toIntOrNull()
+                if (slot.startsWith("!")) {
+                    val bad = slot.substring(1)
+                    val badNum = bad.toIntOrNull()
+                    if (idx == bad || (badNum != null && idxNum == badNum)) return false
+                } else if (".." in slot) {
+                    if (idxNum == null) return false
+                    val (lo, hi) = parseRange(slot)
+                    if (lo != null && idxNum < lo) return false
+                    if (hi != null && idxNum > hi) return false
+                } else {
+                    val wanted = slot.toIntOrNull()
+                    if (wanted != null) {
+                        if (idxNum != wanted) return false
+                    } else if (idx != slot) {
+                        return false
+                    }
                 }
             }
             return true
@@ -716,13 +756,28 @@ object SelectorEvaluator {
             return e.items.none { (key, _) -> slotMatches(key) }
         }
         val wantId = if (want.contains(':')) want else "minecraft:$want"
-        val (qLo, qHi) = parseRange(rawQuantity ?: "1..")
+        val qNeg = rawQuantity?.startsWith("!") == true
+        val qText = if (qNeg) rawQuantity!!.substring(1) else rawQuantity
+        // quantity=0 / 0.. / 0..0 的含义是"没有该物品"（与 execute 需求 A5/C18 一致）
+        val meansNone = !qNeg && qText != null && qText in setOf("0", "0..", "0..0")
+        if (meansNone) {
+            return e.items.none { (key, stack) ->
+                slotMatches(key) && stack.id == wantId &&
+                    (data == null || (stack.damage ?: 0) == data)
+            }
+        }
+        val (qLo, qHi) = parseRange(qText ?: "1..")
         val lo = qLo ?: 0.0
         val hi = qHi ?: Double.MAX_VALUE
         return e.items.any { (key, stack) ->
-            slotMatches(key) && stack.id == wantId &&
-                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi &&
-                (data == null || (stack.damage ?: 0) == data)
+            if (!slotMatches(key) || stack.id != wantId) return@any false
+            val qtyOk = if (qNeg) {
+                // quantity=!N：存在且数量不等于 N
+                qText?.toIntOrNull()?.let { stack.count != it } ?: true
+            } else {
+                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi
+            }
+            qtyOk && (data == null || (stack.damage ?: 0) == data)
         }
     }
 

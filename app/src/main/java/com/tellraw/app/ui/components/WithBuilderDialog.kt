@@ -384,7 +384,12 @@ private fun TranslateItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
         onApply = {
-            onApply(original.copy(key = key, fallback = fallback.ifEmpty { null }, args = args))
+            val fallbackOut = if (fallback == original.fallback.orEmpty()) {
+                original.fallback
+            } else {
+                fallback.ifEmpty { null }
+            }
+            onApply(original.copy(key = key, fallback = fallbackOut, args = args))
         }
     ) {
         OutlinedTextField(
@@ -417,7 +422,14 @@ private fun SelectorItemDialog(
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
-        onApply = { onApply(original.copy(selector = selector, separator = separator.ifEmpty { null })) }
+        onApply = {
+            val separatorOut = if (separator == original.separator.orEmpty()) {
+                original.separator
+            } else {
+                separator.ifEmpty { null }
+            }
+            onApply(original.copy(selector = selector, separator = separatorOut))
+        }
     ) {
         OutlinedTextField(
             value = selector,
@@ -502,12 +514,17 @@ private fun NbtItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
         onApply = {
+            val separatorOut = if (separator == original.separator.orEmpty()) {
+                original.separator
+            } else {
+                separator.ifEmpty { null }
+            }
             onApply(
                 original.copy(
                     path = path,
                     source = source,
                     interpret = interpret,
-                    separator = separator.ifEmpty { null }
+                    separator = separatorOut
                 )
             )
         }

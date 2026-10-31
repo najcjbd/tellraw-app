@@ -180,8 +180,13 @@ object CommandInputParser {
     private fun decodeRoot(root: JsonElement, warnings: MutableList<String>): Pair<List<TextComponent>, SourceEdition>? =
         when {
             root.isJsonObject && root.asJsonObject.has("rawtext") -> {
-                val arr = root.asJsonObject.getAsJsonArray("rawtext")
-                decodeComponentArray(arr, warnings) to SourceEdition.BEDROCK
+                val rawtext = root.asJsonObject.get("rawtext")
+                if (rawtext == null || !rawtext.isJsonArray) {
+                    warnings.add("rawtext 必须是数组；无法解析该组件")
+                    null
+                } else {
+                    decodeComponentArray(rawtext.asJsonArray, warnings) to SourceEdition.BEDROCK
+                }
             }
             root.isJsonArray -> decodeComponentArray(root.asJsonArray, warnings) to SourceEdition.JAVA
             root.isJsonObject -> decodeComponent(root.asJsonObject, warnings) to SourceEdition.JAVA
@@ -204,7 +209,14 @@ object CommandInputParser {
     ): List<TextComponent> {
         val out = mutableListOf<TextComponent>()
         val ownStyle = styleToSectionCodes(obj, warnings)
-        val style = inheritedStyle + ownStyle
+        warnUnsupportedStyleFields(obj, warnings)
+        // 显式 false 要能关掉从父组件继承的格式码；否则子组件会被迫继承 true
+        val effectiveInherited = applyExplicitFalseStyleOverrides(obj, inheritedStyle)
+        val style = if (effectiveInherited != inheritedStyle) {
+            "§r$effectiveInherited$ownStyle"
+        } else {
+            inheritedStyle + ownStyle
+        }
         val losesStyle = ownStyle.isNotEmpty()
         when {
             obj.has("translate") -> {
@@ -215,17 +227,33 @@ object CommandInputParser {
                         SubComponent(SubComponentType.FALLBACK, plainTextOf(it, warnings))
                     )
                 }
-                obj.get("with")?.takeIf { it.isJsonArray }?.let { w ->
-                    val arr = w as JsonArray
-                    val hasNested = arr.any { it.isJsonObject || it.isJsonArray }
-                    if (hasNested) {
-                        // 保留嵌套组件 JSON，交给翻译转换器处理（Java 保留样式，基岩按纯文本并提醒）
-                        comp.subComponents.add(SubComponent(SubComponentType.WITH_JSON, arr.toString()))
-                    } else {
-                        val params = arr.map { it.asString }
-                        if (params.isNotEmpty()) {
-                            comp.subComponents.add(SubComponent(SubComponentType.WITH, params.joinToString(",")))
+                obj.get("with")?.let { w ->
+                    if (!w.isJsonArray) {
+                        warnings.add("translate 的 with 必须是数组，已忽略")
+                        return@let
+                    }
+                    val arr = w.asJsonArray
+                    if (arr.size() == 0) return@let
+                    val cleaned = JsonArray()
+                    for (el in arr) {
+                        if (el.isJsonNull) {
+                            warnings.add("translate 的 with 含 null，已忽略该项")
+                        } else {
+                            cleaned.add(el)
                         }
+                    }
+                    if (cleaned.size() == 0) return@let
+                    // 只有"全是不含逗号/反斜杠的非空字符串"才能安全地塞进纯文本 with；
+                    // 否则保留 JSON 数组，避免逗号被再次当成分隔符、空串被当成没有参数。
+                    val safePlain = cleaned.all {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString &&
+                            it.asString.isNotEmpty() && ',' !in it.asString && '\\' !in it.asString
+                    }
+                    if (safePlain) {
+                        val params = cleaned.map { it.asString }
+                        comp.subComponents.add(SubComponent(SubComponentType.WITH, params.joinToString(",")))
+                    } else {
+                        comp.subComponents.add(SubComponent(SubComponentType.WITH_JSON, cleaned.toString()))
                     }
                     Unit
                 }
@@ -277,6 +305,7 @@ object CommandInputParser {
                 ?: RGB_TO_SECTION[v.uppercase()]     // #RRGGBB
                 ?: BEDROCK_ONLY_RGB_TO_SECTION[v.uppercase()]
             if (code != null) sb.append('§').append(code)
+            else warnings.add("颜色 $v 无法用 § 代码表示，已忽略")
         }
         if (bool(obj, "bold")) sb.append("§l")
         if (bool(obj, "italic")) sb.append("§o")
@@ -284,6 +313,31 @@ object CommandInputParser {
         if (bool(obj, "strikethrough")) sb.append("§m")
         if (bool(obj, "obfuscated")) sb.append("§k")
         return sb.toString()
+    }
+
+    private val STYLE_FLAG_CODES = listOf(
+        "bold" to "§l", "italic" to "§o", "underlined" to "§n",
+        "strikethrough" to "§m", "obfuscated" to "§k"
+    )
+
+    /** 显式 false 的格式位从继承样式里移除（随后再补 §r 重置）。 */
+    private fun applyExplicitFalseStyleOverrides(obj: JsonObject, inheritedStyle: String): String {
+        var result = inheritedStyle
+        for ((field, code) in STYLE_FLAG_CODES) {
+            val e = obj.get(field) ?: continue
+            if (e.isJsonPrimitive && e.asJsonPrimitive.isBoolean && !e.asBoolean) {
+                result = result.replace(code, "")
+            }
+        }
+        return result
+    }
+
+    /** § 文本模型无法表达的样式字段，至少要明确告诉用户。 */
+    private fun warnUnsupportedStyleFields(obj: JsonObject, warnings: MutableList<String>) {
+        val keys = listOf("clickEvent", "hoverEvent", "font", "insertion").filter { obj.has(it) }
+        if (keys.isNotEmpty()) {
+            warnings.add("样式字段 ${keys.joinToString("、")} 暂未保留（§ 文本模型无法表达）")
+        }
     }
 
     private fun str(o: JsonObject, key: String): String {
