@@ -281,20 +281,20 @@ class SettingsRepository @Inject constructor(
         
         return """
             {
-              "$KEY_MN_HANDLING_MODE": "$mnHandlingMode",
+              "$KEY_MN_HANDLING_MODE": "${jsonEscape(mnHandlingMode)}",
               "$KEY_MN_MIXED_MODE": $mnMixedMode,
               "$KEY_MN_CF_ENABLED": $mnCfEnabled,
               "$KEY_JAVA_BEDROCK_MIXED_MODE": $javaBedrockMixedMode,
               "$KEY_DEFAULT_USE_TEXT": $defaultUseText,
               "$KEY_EXECUTE_PREFIX_ENABLED": $executePrefixEnabled,
               "$KEY_SEPARATOR_AS_TEXT_COMPONENT": $separatorAsTextComponent,
-              "$KEY_NBT_SYNTAX": "$nbtSyntax",
-              "$KEY_EXECUTE_PREFIX_INPUT": "$executePrefixInput",
+              "$KEY_NBT_SYNTAX": "${jsonEscape(nbtSyntax)}",
+              "$KEY_EXECUTE_PREFIX_INPUT": "${jsonEscape(executePrefixInput)}",
               "$KEY_BEDROCK_COLOR_TO_RGB": $bedrockColorToRgb,
               "$KEY_AS_SENSITIVE": $asSensitive,
-              "$KEY_TARGET_VERSION": "$targetVersion",
-              "$KEY_HISTORY_STORAGE_URI": "$historyStorageUri",
-              "$KEY_HISTORY_STORAGE_FILENAME": "$historyStorageFilename"
+              "$KEY_TARGET_VERSION": "${jsonEscape(targetVersion)}",
+              "$KEY_HISTORY_STORAGE_URI": "${jsonEscape(historyStorageUri)}",
+              "$KEY_HISTORY_STORAGE_FILENAME": "${jsonEscape(historyStorageFilename)}"
             }
         """.trimIndent()
     }
@@ -302,12 +302,9 @@ class SettingsRepository @Inject constructor(
     /**
      * 从 JSON 字符串中提取值
      */
-    private fun extractJsonValue(jsonString: String, key: String): String? {
-        val pattern = "\"$key\"\\s*:\\s*\"?([^\"]*)\"?".toRegex()
-        val match = pattern.find(jsonString)
-        return match?.groupValues?.get(1)?.trim()
-    }
-    
+    private fun extractJsonValue(jsonString: String, key: String): String? =
+        extractConfigValue(jsonString, key)
+
     // §m§n处理模式相关方法
     
     /**
@@ -516,4 +513,69 @@ class SettingsRepository @Inject constructor(
         _historyStorageFilename.value = DEFAULT_HISTORY_FILENAME
         saveConfig()
     }
+}
+/** 配置文件里的字符串值必须转义，否则引号/反斜杠/换行会破坏整个 JSON。 */
+internal fun jsonEscape(value: String): String {
+    val sb = StringBuilder(value.length + 8)
+    for (c in value) {
+        when (c) {
+            '"' -> sb.append("\\\"")
+            '\\' -> sb.append("\\\\")
+            '\n' -> sb.append("\\n")
+            '\r' -> sb.append("\\r")
+            '\t' -> sb.append("\\t")
+            '\b' -> sb.append("\\b")
+            '\u000C' -> sb.append("\\f")
+            else -> if (c < ' ') sb.append("\\u%04x".format(c.code)) else sb.append(c)
+        }
+    }
+    return sb.toString()
+}
+
+internal fun jsonUnescape(value: String): String {
+    if ('\\' !in value) return value
+    val sb = StringBuilder(value.length)
+    var i = 0
+    while (i < value.length) {
+        val c = value[i]
+        if (c != '\\' || i + 1 >= value.length) {
+            sb.append(c)
+            i++
+            continue
+        }
+        when (val n = value[i + 1]) {
+            '"' -> sb.append('"')
+            '\\' -> sb.append('\\')
+            '/' -> sb.append('/')
+            'b' -> sb.append('\b')
+            'f' -> sb.append('\u000C')
+            'n' -> sb.append('\n')
+            'r' -> sb.append('\r')
+            't' -> sb.append('\t')
+            'u' -> {
+                val code = if (i + 5 < value.length) {
+                    value.substring(i + 2, i + 6).toIntOrNull(16)
+                } else null
+                if (code != null) {
+                    sb.append(code.toChar())
+                    i += 6
+                    continue
+                }
+                sb.append(n)
+            }
+            else -> sb.append(n)
+        }
+        i += 2
+    }
+    return sb.toString()
+}
+
+/** 读取配置中的单个键；字符串值支持转义，布尔/数字按未加引号处理。 */
+internal fun extractConfigValue(jsonString: String, key: String): String? {
+    val quoted = Regex("\"${Regex.escape(key)}\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+        .find(jsonString)
+    if (quoted != null) return jsonUnescape(quoted.groupValues[1]).trim()
+    val raw = Regex("\"${Regex.escape(key)}\"\\s*:\\s*([^,\\s}]+)")
+        .find(jsonString)
+    return raw?.groupValues?.get(1)?.trim()
 }
