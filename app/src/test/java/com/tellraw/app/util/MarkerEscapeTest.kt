@@ -36,6 +36,23 @@ class MarkerEscapeTest {
     }
 
     @Test
+    fun fuzzSensitiveCombinationsRoundTrip() {
+        val parts = listOf("a", "_", "\\", "\u0FC8", "\u0F34", "__", ",", "{", "}", "[", "]", ":", "\"", "'", "\n")
+        var count = 0
+        for (a in parts) for (b in parts) for (c in parts) {
+            val content = a + b + c
+            val comp = TextComponent(ComponentType.TEXT, content)
+            val markers = TextComponentHelper.componentsToText(listOf(comp))
+            val parsed = TextComponentHelper.parseTextComponents(markers)
+            if (parsed.size != 1 || parsed[0].content != content) {
+                fail("TEXT round-trip failed for <$content>: $parsed")
+            }
+            count++
+        }
+        assertTrue(count > 1000)
+    }
+
+    @Test
     fun withModeMigrationCarriesContent() {
         val plain = TextComponent(
             ComponentType.TRANSLATE, "k",

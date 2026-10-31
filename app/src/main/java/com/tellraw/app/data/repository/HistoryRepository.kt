@@ -21,7 +21,9 @@ data class HistoryItem(
     val message: String,
     val javaCommand: String,
     val bedrockCommand: String,
-    val timestamp: Long
+    val timestamp: Long,
+    /** 内部带标记的组件文本（Base64 后写入历史文件）；空 = 旧记录。 */
+    val markers: String = ""
 )
 
 /**
@@ -263,6 +265,7 @@ class HistoryRepository @Inject constructor(
                 var message = ""
                 var javaCommand = ""
                 var bedrockCommand = ""
+                var markers = ""
                 
                 // 按行分割，但保留换行符
                 val lines = sectionContent.split("\n")
@@ -316,6 +319,25 @@ class HistoryRepository @Inject constructor(
                             currentField = "基岩版输出"
                             currentContent = mutableListOf(trimmedLine.substringAfter("基岩版输出:"))
                         }
+                        trimmedLine.startsWith("标记文本:") -> {
+                            when (currentField) {
+                                "时间" -> timestamp = parseTimestamp(currentContent.joinToString(""))
+                                "输入文本" -> message = currentContent.joinToString("\n").trim()
+                                "JAVA版输出" -> javaCommand = currentContent.joinToString("\n").trim()
+                                "基岩版输出" -> bedrockCommand = currentContent.joinToString("\n").trim()
+                            }
+                            currentField = "标记文本"
+                            markers = try {
+                                String(
+                                    android.util.Base64.decode(
+                                        trimmedLine.substringAfter("标记文本:").trim(),
+                                        android.util.Base64.NO_WRAP
+                                    ),
+                                    Charsets.UTF_8
+                                )
+                            } catch (e: Exception) { "" }
+                            currentContent = mutableListOf()
+                        }
                         currentField.isNotEmpty() -> {
                             // 添加到当前字段的内容
                             currentContent.add(line)
@@ -335,7 +357,7 @@ class HistoryRepository @Inject constructor(
                 if (message.isNotEmpty() || javaCommand.isNotEmpty() || bedrockCommand.isNotEmpty()) {
                     // 选择器从Java命令中提取
                     val selector = extractSelectorFromCommand(javaCommand)
-                    history.add(HistoryItem(selector, message, javaCommand, bedrockCommand, timestamp))
+                    history.add(HistoryItem(selector, message, javaCommand, bedrockCommand, timestamp, markers))
                 }
             } catch (e: Exception) {
                 // 跳过解析失败的记录
@@ -454,7 +476,12 @@ class HistoryRepository @Inject constructor(
      */
     fun buildSingleHistoryItem(item: HistoryItem): String {
         val timeText = dateFormat.format(Date(item.timestamp))
-        return "${START_MARKER}时间:$timeText\n 输入文本:${item.message}\n JAVA版输出:${item.javaCommand}\n 基岩版输出:${item.bedrockCommand}$END_MARKER\n\n"
+        val markersLine = if (item.markers.isNotBlank()) {
+            "\n 标记文本:" + android.util.Base64.encodeToString(
+                item.markers.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP
+            )
+        } else ""
+        return "${START_MARKER}时间:$timeText\n 输入文本:${item.message}\n JAVA版输出:${item.javaCommand}\n 基岩版输出:${item.bedrockCommand}$markersLine$END_MARKER\n\n"
     }
     
     /**
