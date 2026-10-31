@@ -35,7 +35,7 @@ fun UpdateDialog(
             ) {
                 // 版本信息
                 Text(
-                    text = stringResource(R.string.new_version, release.name),
+                    text = stringResource(R.string.new_version, release.name ?: release.tag_name),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -69,7 +69,7 @@ fun UpdateDialog(
                 }
                 
                 // 更新说明（截取前200个字符）
-                val body = release.body
+                val body = release.body.orEmpty()
                 if (body.isNotEmpty()) {
                     val truncatedBody = if (body.length > 200) {
                         body.take(200) + "..."
