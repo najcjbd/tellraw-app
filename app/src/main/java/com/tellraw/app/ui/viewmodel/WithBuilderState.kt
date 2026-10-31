@@ -13,6 +13,8 @@ data class WithBuilderState(
     val isNew: Boolean,
     val key: String,
     val fallback: String,
+    /** fallback 子组件是否存在（空字符串也区别于“没有 fallback”）。 */
+    val fallbackPresent: Boolean = false,
     val args: List<WithArgDraft>,
     val mode: WithBuilderMode,
     val rawJson: String,

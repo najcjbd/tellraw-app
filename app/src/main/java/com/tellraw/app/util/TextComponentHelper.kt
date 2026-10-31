@@ -445,7 +445,8 @@ object TextComponentHelper {
         targetPosition: Int,
         key: String,
         fallback: String,
-        argsJson: String
+        argsJson: String,
+        fallbackPresent: Boolean = fallback.isNotEmpty()
     ): String {
         require(key.isNotBlank()) { "translate key is blank" }
         val normalized = WithArgCodec.normalizeArgsJson(argsJson)
@@ -457,13 +458,13 @@ object TextComponentHelper {
             return insertComponentAt(
                 markers,
                 targetPosition,
-                buildTranslateComponent(key, fallback, normalized.takeIf { hasArgs })
+                buildTranslateComponent(key, fallback, fallbackPresent, normalized.takeIf { hasArgs })
             )
         }
 
         components[index] = components[index].copy(
             content = key,
-            subComponents = buildTranslateSubComponents(fallback, normalized.takeIf { hasArgs })
+            subComponents = buildTranslateSubComponents(fallback, fallbackPresent, normalized.takeIf { hasArgs })
         )
         return componentsToText(components)
     }
@@ -471,23 +472,47 @@ object TextComponentHelper {
     private fun buildTranslateComponent(
         key: String,
         fallback: String,
+        fallbackPresent: Boolean,
         argsJson: String?
     ): TextComponent = TextComponent(
         ComponentType.TRANSLATE,
         key,
-        buildTranslateSubComponents(fallback, argsJson)
+        buildTranslateSubComponents(fallback, fallbackPresent, argsJson)
     )
 
     private fun buildTranslateSubComponents(
         fallback: String,
+        fallbackPresent: Boolean,
         argsJson: String?
     ): MutableList<SubComponent> {
         val subs = mutableListOf<SubComponent>()
-        if (fallback.isNotEmpty()) subs.add(SubComponent(SubComponentType.FALLBACK, fallback))
+        if (fallbackPresent) subs.add(SubComponent(SubComponentType.FALLBACK, fallback))
         if (argsJson != null) subs.add(SubComponent(SubComponentType.WITH_JSON, argsJson))
         return subs
     }
     
+    /** TEXT 组件的 § 样式解析：复用纯文本转换器，得到可合并的 JSON 对象。 */
+    private fun plainTextComponentMap(
+        content: String,
+        mNHandling: String,
+        mnCFEnabled: Boolean,
+        context: Context?,
+        warnings: MutableList<String>?,
+        separatorAsTextComponent: Boolean,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        bedrockColorToRgb: Boolean,
+        target: com.tellraw.app.model.VersionSpec?
+    ): Map<String, Any?> {
+        val json = TextFormatter.convertToJavaJson(
+            content, mNHandling, mnCFEnabled, context, warnings,
+            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target,
+            parseMarkers = false
+        )
+        @Suppress("UNCHECKED_CAST")
+        val map = com.google.gson.Gson().fromJson(json, Map::class.java) as? Map<String, Any?>
+        return map ?: mapOf("text" to content)
+    }
+
     /**
      * 将组件内容中的§代码转换为Java版JSON属性
      */
@@ -919,10 +944,11 @@ object TextComponentHelper {
 
         when (mainComponent.type) {
             ComponentType.TEXT -> {
-                result["text"] = mainComponent.content
-                // 处理文本中的§代码
-                val formatMap = processSectionCodesToJson(mainComponent.content, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                result.putAll(formatMap)
+                val textMap = plainTextComponentMap(
+                    mainComponent.content, mNHandling, mnCFEnabled, context, warnings,
+                    separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                )
+                textMap.forEach { (k, v) -> if (v != null) result[k] = v }
             }
             ComponentType.TRANSLATE -> {
                 result["translate"] = mainComponent.content
@@ -1029,9 +1055,10 @@ object TextComponentHelper {
                 val subMap = mutableMapOf<String, Any>()
                 when (sub.type) {
                     ComponentType.TEXT -> {
-                        subMap["text"] = sub.content
-                        val formatMap = processSectionCodesToJson(sub.content, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                        subMap.putAll(formatMap)
+                        plainTextComponentMap(
+                            sub.content, mNHandling, mnCFEnabled, context, warnings,
+                            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                        ).forEach { (k, v) -> if (v != null) subMap[k] = v }
                     }
                     ComponentType.TRANSLATE -> {
                         subMap["translate"] = sub.content
@@ -1131,7 +1158,11 @@ object TextComponentHelper {
                 }
                 subMap
             }
-            result["extra"] = extra
+            // TEXT 的 § 分段可能已经产生 extra，这里要合并而不是覆盖
+            val merged: MutableList<Any?> =
+                (result["extra"] as? List<*>)?.toMutableList() ?: mutableListOf()
+            merged.addAll(extra)
+            result["extra"] = merged
         }
 
         return mapToJson(result)

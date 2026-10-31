@@ -16,10 +16,16 @@ object RemovedFeatureDetector {
 
     /** 按出现顺序匹配；命中第一个即可。 */
     fun detect(text: String): Hit? {
-        val t = text
-        if ("map_color" in t) return Hit(FeatureGate.RemovedFeature.MAP_COLOR, "map_color", spec(26, 2))
-        if ("HurtByTimestamp" in t) return Hit(FeatureGate.RemovedFeature.HURT_BY_TIMESTAMP, "HurtByTimestamp", spec(1, 21, 11))
-        if ("swing_animation" in t) return Hit(FeatureGate.RemovedFeature.SWING_ANIMATION, "swing_animation", spec(26, 2))
+        // 只匹配"作为键使用"的写法（key: / key=）；tag=map_color 这类值不算
+        if (Regex("""\bmap_color\s*[:=]""").containsMatchIn(text)) {
+            return Hit(FeatureGate.RemovedFeature.MAP_COLOR, "map_color", spec(26, 2))
+        }
+        if (Regex("""\bHurtByTimestamp\s*:""").containsMatchIn(text)) {
+            return Hit(FeatureGate.RemovedFeature.HURT_BY_TIMESTAMP, "HurtByTimestamp", spec(26, 1))
+        }
+        if (Regex("""\bswing_animation\s*[:=]""").containsMatchIn(text)) {
+            return Hit(FeatureGate.RemovedFeature.SWING_ANIMATION, "swing_animation", spec(26, 2))
+        }
         return null
     }
 }

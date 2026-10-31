@@ -11,8 +11,17 @@ class RemovedFeatureDetectorTest {
 
         val b = RemovedFeatureDetector.detect("data entity @s {HurtByTimestamp:0}")!!
         assertEquals(FeatureGate.RemovedFeature.HURT_BY_TIMESTAMP, b.feature)
-        assertEquals(VersionSpec.parse("1.21.11"), b.suggested)
+        assertEquals(VersionSpec.parse("26.1"), b.suggested)
+
+        assertEquals(
+            FeatureGate.RemovedFeature.SWING_ANIMATION,
+            RemovedFeatureDetector.detect("item {swing_animation:1}")!!.feature
+        )
 
         assertNull(RemovedFeatureDetector.detect("{\"text\":\"a\"}"))
+        // 标签/名字的值里出现同样单词，不算使用了该特性
+        assertNull(RemovedFeatureDetector.detect("@a[tag=swing_animation]"))
+        assertNull(RemovedFeatureDetector.detect("@a[tag=map_color]"))
+        assertNull(RemovedFeatureDetector.detect("@a[tag=HurtByTimestamp]"))
     }
 }

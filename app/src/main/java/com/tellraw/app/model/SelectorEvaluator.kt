@@ -66,7 +66,9 @@ object SelectorEvaluator {
 
     data class Result(
         val matched: List<GridEntity>,
-        val notes: List<String>
+        val notes: List<String>,
+        /** 有参数/版本不支持而“未参与筛选”；unless 也不能反转它。 */
+        val neutral: Boolean = false
     )
 
     /**
@@ -108,7 +110,7 @@ object SelectorEvaluator {
             }
             else -> {
                 notes.add("无法识别的选择器 \"$base\"")
-                return Result(emptyList(), notes)
+                return Result(emptyList(), notes, neutral = true)
             }
         }
         if (hasTypeParam && (base == "@a" || base == "@p" || (base == "@r" && !isBedrock))) {
@@ -133,6 +135,7 @@ object SelectorEvaluator {
         var invalidLimit = false
 
         // 2) 逐参数筛选
+        var neutral = false
         candidates = candidates.filter { e ->
             for (p in params) {
                 val i = ExecCondSupport.indexOfTopLevel(p, '=')
@@ -140,7 +143,10 @@ object SelectorEvaluator {
                 val key = p.substring(0, i).trim()
                 val value = p.substring(i + 1).trim().removeSurrounding("\"")
                 when (key) {
-                    "type" -> if (!matchType(e, value, notes)) return@filter false
+                    "type" -> {
+                        if (value.startsWith("#")) neutral = true
+                        if (!matchType(e, value, notes)) return@filter false
+                    }
                     "name" -> if (!matchName(e, value)) return@filter false
                     "tag" -> if (!matchTag(e, value)) return@filter false
                     "team" -> if (!matchTeam(e, value)) return@filter false
@@ -154,6 +160,7 @@ object SelectorEvaluator {
                         }
                         if (!editionOk || !versionOk) {
                             notes.add("family= 仅基岩版 ≥1.16.100 支持；目标版本不满足，**没有按它筛选**（不能当作已匹配）")
+                            neutral = true
                         } else if (!matchFamily(e, value)) return@filter false
                     }
                     "scores" -> if (!matchScores(e, value, notes)) return@filter false
@@ -194,10 +201,14 @@ object SelectorEvaluator {
                         }
                         if (!editionOk || !versionOk) {
                             notes.add("hasitem= 仅基岩版 ≥1.18.20 支持；目标版本不满足，**没有按它筛选**")
+                            neutral = true
                         } else if (!matchHasitem(e, value, notes)) return@filter false
                     }
-                    "gamemode", "m" ->
-                        if (!matchGamemode(e, value, notes)) return@filter false
+                    "gamemode", "m" -> when (matchGamemode(e, value, notes)) {
+                        null -> neutral = true
+                        false -> return@filter false
+                        true -> Unit
+                    }
                     "level" -> {
                         val (lo, hi) = parseRange(value)
                         if (!e.isPlayer) {
@@ -207,6 +218,7 @@ object SelectorEvaluator {
                         val lv = e.level
                         if (lv == null) {
                             notes.add("level= 玩家未设置经验等级，未按它筛选")
+                            neutral = true
                         } else if (lv < (lo ?: 0.0) || lv > (hi ?: Double.MAX_VALUE)) {
                             return@filter false
                         }
@@ -220,6 +232,7 @@ object SelectorEvaluator {
                         val lv = e.level
                         if (lv == null) {
                             notes.add("$key= 玩家未设置经验等级，未按它筛选")
+                            neutral = true
                         } else if (num == null) {
                             notes.add("$key=$value 无法解析，已忽略")
                         } else if (key == "l" && lv > num) {
@@ -233,6 +246,7 @@ object SelectorEvaluator {
                         val actual = if (key == "x_rotation") e.rotationX else e.rotationY
                         if (actual == null) {
                             notes.add("$key= 需要实体设置视角；该实体未设置，未按它筛选")
+                            neutral = true
                         } else if (actual < (lo ?: Double.NEGATIVE_INFINITY) ||
                             actual > (hi ?: Double.MAX_VALUE)
                         ) {
@@ -244,6 +258,7 @@ object SelectorEvaluator {
                         val actual = if (key.startsWith("rx")) e.rotationX else e.rotationY
                         if (actual == null) {
                             notes.add("$key= 需要实体设置视角；该实体未设置，未按它筛选")
+                            neutral = true
                         } else if (".." in value) {
                             val (lo, hi) = parseRange(value)
                             if (actual < (lo ?: Double.NEGATIVE_INFINITY) ||
@@ -264,6 +279,7 @@ object SelectorEvaluator {
                         else edition == "java"
                         if (!javaOk) {
                             notes.add("nbt= 仅 Java 版支持；目标版本不是 Java，**没有按它筛选**")
+                            neutral = true
                         } else if (!matchNbt(e, value, notes)) {
                             return@filter false
                         }
@@ -274,8 +290,10 @@ object SelectorEvaluator {
                         } else {
                             edition == "bedrock" && (version == null || version >= 1_20_70L)
                         }
-                        if (!ok) notes.add("has_property 仅基岩版 ≥1.20.70 支持，**没有按它筛选**")
-                        else if (!matchHasProperty(e, value, notes)) return@filter false
+                        if (!ok) {
+                            notes.add("has_property 仅基岩版 ≥1.20.70 支持，**没有按它筛选**")
+                            neutral = true
+                        } else if (!matchHasProperty(e, value, notes)) return@filter false
                     }
                     "haspermission" -> {
                         val ok = if (target != null) {
@@ -283,22 +301,31 @@ object SelectorEvaluator {
                         } else {
                             edition == "bedrock" && (version == null || version >= 1_19_80L)
                         }
-                        if (!ok) notes.add("haspermission 仅基岩版 ≥1.19.80 支持，**没有按它筛选**")
-                        else if (!matchPermission(e, value, notes)) return@filter false
+                        if (!ok) {
+                            notes.add("haspermission 仅基岩版 ≥1.19.80 支持，**没有按它筛选**")
+                            neutral = true
+                        } else if (!matchPermission(e, value, notes)) return@filter false
                     }
                     "predicate" -> {
                         val javaOk = if (target != null) target.edition == VersionSpec.Edition.JAVA
                         else edition == "java"
-                        if (!javaOk) notes.add("predicate 仅 Java 版支持，**没有按它筛选**")
-                        else if (!matchPredicate(e, value)) return@filter false
+                        if (!javaOk) {
+                            notes.add("predicate 仅 Java 版支持，**没有按它筛选**")
+                            neutral = true
+                        } else if (!matchPredicate(e, value)) return@filter false
                     }
                     "advancements" -> {
                         val javaOk = if (target != null) target.edition == VersionSpec.Edition.JAVA
                         else edition == "java"
-                        if (!javaOk) notes.add("advancements 仅 Java 版支持，**没有按它筛选**")
-                        else if (!matchAdvancements(e, value, notes)) return@filter false
+                        if (!javaOk) {
+                            notes.add("advancements 仅 Java 版支持，**没有按它筛选**")
+                            neutral = true
+                        } else if (!matchAdvancements(e, value, notes)) return@filter false
                     }
-                    else -> notes.add("参数 \"$key\" 未支持，已忽略")
+                    else -> {
+                        notes.add("参数 \"$key\" 未支持，已忽略")
+                        neutral = true
+                    }
                 }
             }
             true
@@ -334,7 +361,7 @@ object SelectorEvaluator {
             else -> null
         }
         val limited = if (n == null) sorted else sorted.take(n)
-        return Result(limited, notes.distinct())
+        return Result(limited, notes.distinct(), neutral)
     }
 
     private fun defaultSort(base: String): String = when (base) {
@@ -434,7 +461,8 @@ object SelectorEvaluator {
     }
 
     /** 游戏模式：支持 Java 全称、基岩缩写 s/c/a/d 与数字 0/1/2/5、以及 `!` 反选。 */
-    private fun matchGamemode(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
+    /** null = 无法判断/数据未填（不筛选）；false = 确定不匹配。 */
+    private fun matchGamemode(e: GridEntity, raw: String, notes: MutableList<String>): Boolean? {
         val neg = raw.startsWith("!")
         val value = (if (neg) raw.substring(1) else raw).lowercase()
         val want = when (value) {
@@ -444,7 +472,7 @@ object SelectorEvaluator {
             "d", "5", "spectator" -> "spectator"
             else -> {
                 notes.add("gamemode=$raw 无法识别，已忽略")
-                return true
+                return null
             }
         }
         if (!e.isPlayer) {
@@ -454,7 +482,7 @@ object SelectorEvaluator {
         val actual = e.gamemode
         if (actual == null) {
             notes.add("gamemode= 玩家未设置游戏模式，未按它筛选")
-            return true
+            return null
         }
         val hit = actual.lowercase() == want
         return if (neg) !hit else hit
@@ -737,6 +765,12 @@ object SelectorEvaluator {
                     (loc == "hotbar" && key == "hotbar")
                 if (!locOk) return false
             }
+            if (slot != null && loc != null &&
+                ExecCondSupport.isSingleSlotItemLocation("slot.$loc")
+            ) {
+                // 单槽位 location：数字槽位固定按 0 处理（armor.head 等）
+                return slotAccepts(0, slot)
+            }
             if (slot != null) {
                 val idx = key.substringAfterLast('.', "")
                 val idxNum = idx.toIntOrNull()
@@ -768,8 +802,10 @@ object SelectorEvaluator {
         val wantId = if (want.contains(':')) want else "minecraft:$want"
         val qNeg = rawQuantity?.startsWith("!") == true
         val qText = if (qNeg) rawQuantity!!.substring(1) else rawQuantity
-        // quantity=0 / 0.. / 0..0 的含义是"没有该物品"（与 execute 需求 A5/C18 一致）
-        val meansNone = !qNeg && qText != null && qText in setOf("0", "0..", "0..0")
+        // quantity=0.. = 该项目不做过滤（doc: autocheck Q6/Q7）
+        if (!qNeg && qText == "0..") return true
+        // quantity=0 / 0..0 的含义是"没有该物品"（与 execute 需求 A5/C18 一致）
+        val meansNone = !qNeg && qText != null && qText in setOf("0", "0..0")
         if (meansNone) {
             return e.items.none { (key, stack) ->
                 slotMatches(key) && stack.id == wantId &&
@@ -797,6 +833,21 @@ object SelectorEvaluator {
         if (v == "~") return base
         if (v.startsWith("~")) return base + (v.substring(1).toDoubleOrNull() ?: 0.0)
         return v.toDoubleOrNull() ?: base
+    }
+
+    /** hasitem 的 slot 过滤：数字、!数字、a..b。 */
+    private fun slotAccepts(n: Int, expr: String): Boolean {
+        val e = expr.trim()
+        if (e.startsWith("!")) {
+            val bad = e.substring(1).trim().toIntOrNull() ?: return true
+            return n != bad
+        }
+        if (".." in e) {
+            val (lo, hi) = parseRange(e)
+            return (lo == null || n >= lo) && (hi == null || n <= hi)
+        }
+        val wanted = e.toIntOrNull() ?: return true
+        return n == wanted
     }
 
     private fun parseRange(v: String): Pair<Double?, Double?> {

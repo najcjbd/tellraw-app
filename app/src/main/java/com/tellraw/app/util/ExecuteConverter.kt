@@ -1020,6 +1020,13 @@ object ExecuteConverter {
                     }
                     if (pos.isNotEmpty()) kept.add("scores={${pos.joinToString(",")}}")
                     if (neg.isNotEmpty()) {
+                        if (cond.unless && neg.size > 1) {
+                            // ¬(a≠1 ∧ b≠2) = (a=1 ∨ 缺失) ∨ (b=2 ∨ 缺失)，顺序条件无法表达
+                            return dropAnd(
+                                reminders,
+                                "\"unless entity\" 与多个 scores=! 叠加无法用 Java 顺序条件精确表达，已舍弃该条件"
+                            )
+                        }
                         // 目标就是执行者 @s、且不叠加 unless 时，可以精确表达：逐项"存在 ∧ ≠值"再 AND
                         // （2026-09-27 实测确认基岩就是逐项语义）。
                         // 其余情况（目标是别的选择器 / 叠加 unless）无法用顺序条件精确表达 -> 退化为

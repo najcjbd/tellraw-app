@@ -7,6 +7,13 @@ class VersionSpecTest {
     private val J = VersionSpec.Edition.JAVA
     private val B = VersionSpec.Edition.BEDROCK
 
+    @Test fun rejectsMalformedOrPrereleaseStrings() {
+        assertNull(VersionSpec.parse("1.20.5-pre1"))
+        assertNull(VersionSpec.parse("1.21.5-rc1"))
+        assertNull(VersionSpec.parse("1..5"))
+        assertNull(VersionSpec.parse("1.x"))
+    }
+
     @Test fun parsesUserExamples() {
         assertEquals(VersionSpec(J, listOf(26, 1)), VersionSpec.parse("26.1"))
         assertEquals(VersionSpec(B, listOf(1, 26, 1)), VersionSpec.parse("1.26.1"))

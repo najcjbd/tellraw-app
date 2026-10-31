@@ -24,6 +24,14 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
+    fun unlessEntityWithMultipleNegatedScoresIsDropped() {
+        val (out, reminders) = conv("execute unless entity @s[scores={a=!1,b=!2}]")
+        val text = out.orEmpty()
+        assertFalse(text, text.contains("scores={a=1,b=2}"))
+        assertTrue(reminders.any { it.contains("多个 scores=!") })
+    }
+
+    @Test
     fun positionModifierSelectorNegationIsNotAttachedToWrongExecutor() {
         val (out, reminders) = conv("execute at @a[scores={n=!5}]")
         assertEquals("execute at @a", out)

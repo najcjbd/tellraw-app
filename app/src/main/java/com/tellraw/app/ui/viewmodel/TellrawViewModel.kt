@@ -311,6 +311,8 @@ class TellrawViewModel @Inject constructor(
     private var mnMappings = mutableListOf<MNMapping>()
     /** 本次使用期间的 §m/§n 选择（m/n -> f/c）；不做磁盘持久化，清空全部或进程结束时失效。 */
     private val mnSessionModes = mutableMapOf<String, String>()
+    /** 同一次编辑里新增了 §m 和 §n 时，排队逐个询问。 */
+    private val mnPendingDialogTypes = mutableListOf<String>()
     
     // 上一次的输入文本内容，用于文本组件系统检测变化（类似于lastMessageContent）
     private var lastMessageInput = ""
@@ -338,6 +340,7 @@ class TellrawViewModel @Inject constructor(
     
     // 搜索结果状态
     private val _searchResults = MutableStateFlow<List<HistoryItem>>(emptyList())
+    private var lastHistoryQuery = ""
     val searchResults: StateFlow<List<HistoryItem>> = _searchResults.asStateFlow()
     
     // 历史记录存储相关状态
@@ -479,9 +482,7 @@ class TellrawViewModel @Inject constructor(
         if (newMCount > 0) {
             _mCodeCount.value += newMCount
             // 只在混合模式下弹出对话框；本次使用期间记住过就不再问
-            if (_mnMixedMode.value && mnSessionModes["m"] == null) {
-                _showMNDialog.value = "§m"
-            }
+            if (_mnMixedMode.value) enqueueMNDialog("m")
         }
         
         // 检测新增的§n代码
@@ -489,9 +490,7 @@ class TellrawViewModel @Inject constructor(
         if (newNCount > 0) {
             _nCodeCount.value += newNCount
             // 只在混合模式下弹出对话框；本次使用期间记住过就不再问
-            if (_mnMixedMode.value && mnSessionModes["n"] == null) {
-                _showMNDialog.value = "§n"
-            }
+            if (_mnMixedMode.value) enqueueMNDialog("n")
         }
         
         // 更新上一次的消息内容
@@ -509,10 +508,34 @@ class TellrawViewModel @Inject constructor(
         _nCodeCount.value = currentNCount
     }
     
+    private fun enqueueMNDialog(type: String) {
+        if (mnSessionModes[type] != null) return
+        val visible = _showMNDialog.value
+        val visibleType = when (visible) {
+            "§m" -> "m"
+            "§n" -> "n"
+            else -> null
+        }
+        if (visibleType == type) return
+        if (type !in mnPendingDialogTypes) mnPendingDialogTypes.add(type)
+        showNextMNDialog()
+    }
+
+    private fun showNextMNDialog() {
+        if (_showMNDialog.value != null) return
+        while (mnPendingDialogTypes.isNotEmpty()) {
+            val type = mnPendingDialogTypes.removeAt(0)
+            if (mnSessionModes[type] != null) continue
+            _showMNDialog.value = if (type == "m") "§m" else "§n"
+            return
+        }
+    }
+
     /** 组件模式/构造器直接改 markers 后，混合模式的后台文本也要重建，否则生成命令仍是旧内容。 */
     private fun refreshMixedBackendIfNeeded() {
         if (!_mnMixedMode.value) return
-        updateBackendMessage(TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value))
+        // 走完整检测：组件模式插入 §m/§n 时也要计数、询问并应用会话偏好
+        detectAndCountMNCodes(TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value))
     }
     
     /**
@@ -525,6 +548,8 @@ class TellrawViewModel @Inject constructor(
         
         var frontendIndex = 0
         var backendIndex = 0
+        val oldByType = mnMappings.groupBy { it.type }
+        val oldIndexByType = mutableMapOf<String, Int>()
         
         while (frontendIndex < frontendMessage.length) {
             // 检查是否是§m或§n
@@ -535,8 +560,10 @@ class TellrawViewModel @Inject constructor(
                 val code = frontendMessage.substring(frontendIndex, frontendIndex + 2)
                 val type = if (code == "§m") "m" else "n"
                 
-                // 检查是否在旧映射中存在
-                val oldMapping = mnMappings.find { it.frontendPos == frontendIndex }
+                // 按"同类型出现顺序"继承旧选择：插入/删除字符导致位置偏移时也不会丢
+                val ordinal = oldIndexByType.getOrDefault(type, 0)
+                oldIndexByType[type] = ordinal + 1
+                val oldMapping = oldByType[type]?.getOrNull(ordinal)
                 
                 if (oldMapping != null) {
                     // 保留旧的选择
@@ -644,6 +671,11 @@ class TellrawViewModel @Inject constructor(
     
     fun setMNMixedMode(enabled: Boolean) {
         _mnMixedMode.value = enabled
+        if (enabled) {
+            // 互斥项立即关掉，保证下面的 detect 不会因为 _c/_f 还开着而提前返回
+            _mnCFEnabled.value = false
+            _useJavaFontStyle.value = true
+        }
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNMixedMode(enabled)
@@ -658,11 +690,20 @@ class TellrawViewModel @Inject constructor(
             // 自动保存配置到JSON文件
             settingsRepository.saveConfig()
         }
+        if (enabled) {
+            // 开启混合模式时，已有 §m/§n 也算“新增”：重建 backend，并逐个询问
+            lastMessageContent = ""
+            detectAndCountMNCodes(_messageInput.value)
+        }
         generateCommands()
     }
     
     fun setMNCFEnabled(enabled: Boolean) {
         _mnCFEnabled.value = enabled
+        if (enabled) {
+            _mnMixedMode.value = false
+            _useJavaFontStyle.value = true
+        }
         // 保存设置到数据库
         viewModelScope.launch {
             settingsRepository.setMNCFEnabled(enabled)
@@ -906,7 +947,8 @@ class TellrawViewModel @Inject constructor(
         } else {
             viewModelScope.launch { settingsRepository.setExecutePrefixInput("") }
         }
-        refreshMixedBackendIfNeeded()
+        // 让 §m/§n 计数与混合模式后台文本和回填内容同步，避免接着输入时误触发/漏触发询问
+        detectAndCountMNCodes(_messageInput.value)
 
         _showRawConvertDialog.value = false
         generateCommands()
@@ -914,6 +956,7 @@ class TellrawViewModel @Inject constructor(
 
     fun dismissMNDialog() {
         _showMNDialog.value = null
+        showNextMNDialog()
         generateCommands()
     }
     
@@ -1388,6 +1431,7 @@ class TellrawViewModel @Inject constructor(
         backendMessageContent = ""
         mnMappings.clear()
         mnSessionModes.clear()
+        mnPendingDialogTypes.clear()
         
         // 重置对话框状态
         _showMNDialog.value = null
@@ -1405,6 +1449,7 @@ class TellrawViewModel @Inject constructor(
     fun deleteHistoryItem(history: HistoryItem) {
         viewModelScope.launch {
             historyRepository.deleteHistory(history)
+            refreshSearchResults()
         }
     }
     
@@ -1414,6 +1459,7 @@ class TellrawViewModel @Inject constructor(
     fun clearAllHistory() {
         viewModelScope.launch {
             historyRepository.clearHistory()
+            refreshSearchResults()
         }
     }
     
@@ -1462,9 +1508,16 @@ class TellrawViewModel @Inject constructor(
     
     // 搜索历史记录
     fun searchHistory(query: String) {
+        lastHistoryQuery = query
         viewModelScope.launch {
             val results = historyRepository.searchHistory(query)
             _searchResults.value = results
+        }
+    }
+    
+    private suspend fun refreshSearchResults() {
+        if (lastHistoryQuery.isNotBlank()) {
+            _searchResults.value = historyRepository.searchHistory(lastHistoryQuery)
         }
     }
     
@@ -1591,6 +1644,9 @@ class TellrawViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setHistoryStorageUri(uri)
             _historyStorageUri.value = uri
+            // 让 HistoryRepository 立即切到新文件并刷新列表/搜索结果
+            historyRepository.setStorageUri(uri)
+            refreshSearchResults()
 
             // 检查文件状态
             val filename = _historyStorageFilename.value
@@ -1633,6 +1689,8 @@ class TellrawViewModel @Inject constructor(
             val cleanFilename = filename.trim().replace("\"", "").replace("/", "").replace("\\", "")
             settingsRepository.setHistoryStorageFilename(cleanFilename)
             _historyStorageFilename.value = cleanFilename
+            historyRepository.setStorageFilename(cleanFilename)
+            refreshSearchResults()
 
             // 检查文件状态
             val storagePath = _historyStorageUri.value
@@ -1673,6 +1731,8 @@ class TellrawViewModel @Inject constructor(
             settingsRepository.setHistoryStorageFilename("TellrawCommand.txt")
             _historyStorageUri.value = null
             _historyStorageFilename.value = "TellrawCommand.txt"
+            historyRepository.clearStorageSettings()
+            refreshSearchResults()
         }
     }
     
@@ -1968,9 +2028,9 @@ class TellrawViewModel @Inject constructor(
         val index = TextComponentHelper.findTranslateIndexAt(components, insertPosition)
         val component = index?.let { components[it] }
         val key = component?.content.orEmpty()
-        val fallback = component?.subComponents
+        val fallbackSub = component?.subComponents
             ?.firstOrNull { it.type == TextComponentHelper.SubComponentType.FALLBACK }
-            ?.content.orEmpty()
+        val fallback = fallbackSub?.content.orEmpty()
         val withSub = component?.let { TextComponentHelper.withSubComponent(it) }
         
         var args: List<WithArgDraft> = emptyList()
@@ -2010,6 +2070,7 @@ class TellrawViewModel @Inject constructor(
             isNew = component == null,
             key = key,
             fallback = fallback,
+            fallbackPresent = fallbackSub != null,
             args = args,
             mode = mode,
             rawJson = rawJson,
@@ -2032,7 +2093,14 @@ class TellrawViewModel @Inject constructor(
     }
     
     fun updateWithBuilderFallback(fallback: String) {
-        _withBuilderState.value = _withBuilderState.value?.copy(fallback = fallback)
+        val state = _withBuilderState.value ?: return
+        // 保留“显式空 fallback”和“没有 fallback”的区别；用户清空已有内容时按移除处理
+        val present = when {
+            fallback.isNotEmpty() -> true
+            state.fallback.isNotEmpty() -> false
+            else -> state.fallbackPresent
+        }
+        _withBuilderState.value = state.copy(fallback = fallback, fallbackPresent = present)
     }
     
     fun setWithBuilderArgs(args: List<WithArgDraft>) {
@@ -2113,7 +2181,8 @@ class TellrawViewModel @Inject constructor(
                 state.targetPosition,
                 state.key,
                 state.fallback,
-                argsJson
+                argsJson,
+                state.fallbackPresent
             )
         } catch (e: Exception) {
             _withBuilderState.value = state.copy(
@@ -2400,54 +2469,78 @@ class TellrawViewModel @Inject constructor(
         val result = mutableListOf<TextComponentHelper.TextComponent>()
         var currentPos = 0
         var processed = false
-        
+
         for (component in components) {
             val componentLength = component.content.length + component.subComponents.sumOf { it.content.length }
-            
-            if (!processed && component.type == targetComponent && 
-                insertPosition >= currentPos && insertPosition <= currentPos + componentLength) {
-                // 找到了光标位置所在的组件（包括末尾）
-                
-                // 检查光标位置是否在主组件内（不包括末尾）
-                if (insertPosition < currentPos + component.content.length) {
-                    // 光标在主组件内（不包括末尾），更新主组件内容
-                    val offsetInMainContent = insertPosition - currentPos
-                    val newContent = component.content.substring(0, offsetInMainContent) + 
-                                   textToInsert + 
-                                   component.content.substring(offsetInMainContent)
-                    result.add(TextComponentHelper.TextComponent(component.type, newContent, component.subComponents))
+
+            if (!processed && component.type == targetComponent &&
+                insertPosition >= currentPos && insertPosition <= currentPos + componentLength
+            ) {
+                val offset = insertPosition - currentPos
+                if (offset < component.content.length) {
+                    val newContent = component.content.substring(0, offset) +
+                        textToInsert + component.content.substring(offset)
+                    result.add(component.copy(content = newContent))
                 } else {
-                    // 光标在副组件内或副组件后（包括主组件末尾），更新副组件
-                    // with <-> with(JSON) 切换时把内容继承过去（纯文本内容多次切换稳定）
-                    val migrated = if (targetSubComponent == TextComponentHelper.SubComponentType.WITH ||
-                        targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
-                    ) {
-                        TextComponentHelper.migrateWithMode(
-                            component,
-                            targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
-                        )
-                    } else component
-                    val updatedSubComponents = migrated.subComponents.toMutableList()
-                    val subComponent = updatedSubComponents.find { it.type == targetSubComponent }
-                    if (subComponent != null) {
-                        // 更新现有副组件：将textToInsert追加到content末尾
-                        val updatedSub = TextComponentHelper.SubComponent(subComponent.type, subComponent.content + textToInsert)
-                        updatedSubComponents[updatedSubComponents.indexOf(subComponent)] = updatedSub
-                    } else {
-                        // 添加新副组件
-                        updatedSubComponents.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+                    // 光标在副组件里：按实际位置插入（而不是一律追加到末尾）
+                    var remaining = offset - component.content.length
+                    val subs = component.subComponents.toMutableList()
+                    var inserted = false
+                    for (i in subs.indices) {
+                        val len = subs[i].content.length
+                        if (remaining <= len) {
+                            val c = subs[i].content
+                            subs[i] = TextComponentHelper.SubComponent(
+                                subs[i].type,
+                                c.substring(0, remaining) + textToInsert + c.substring(remaining)
+                            )
+                            inserted = true
+                            break
+                        }
+                        remaining -= len
                     }
-                    result.add(TextComponentHelper.TextComponent(migrated.type, migrated.content, updatedSubComponents))
+                    if (inserted) {
+                        result.add(component.copy(subComponents = subs))
+                    } else {
+                        // 光标在组件末尾：按选中的副组件追加（需要时先做 with 模式迁移）
+                        val migrated = if (targetSubComponent == TextComponentHelper.SubComponentType.WITH ||
+                            targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
+                        ) {
+                            TextComponentHelper.migrateWithMode(
+                                component,
+                                targetSubComponent == TextComponentHelper.SubComponentType.WITH_JSON
+                            )
+                        } else component
+                        val updated = migrated.subComponents.toMutableList()
+                        val index = updated.indexOfFirst { it.type == targetSubComponent }
+                        if (index >= 0) {
+                            val old = updated[index]
+                            updated[index] = TextComponentHelper.SubComponent(old.type, old.content + textToInsert)
+                        } else {
+                            updated.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+                        }
+                        result.add(TextComponentHelper.TextComponent(migrated.type, migrated.content, updated))
+                    }
                 }
                 processed = true
             } else {
-                // 主组件不匹配，保持原样
                 result.add(component)
             }
-            
+
             currentPos += componentLength
         }
 
+        if (!processed) {
+            // 光标不在目标组件里（常见于空输入/刚选类型）：新建一个组件，别把字符吞掉
+            val newComponent = TextComponentHelper.TextComponent(
+                targetComponent,
+                "",
+                mutableListOf(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
+            )
+            val markers = TextComponentHelper.componentsToText(components)
+            val inserted = TextComponentHelper.insertComponentAt(markers, insertPosition, newComponent)
+            return TextComponentHelper.parseTextComponents(inserted)
+        }
         return result
     }
     

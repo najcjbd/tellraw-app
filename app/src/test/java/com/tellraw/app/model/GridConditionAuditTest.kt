@@ -36,6 +36,17 @@ class GridConditionAuditTest {
     }
 
     @Test
+    fun unlessEntityWithUnsupportedSelectorParamIsNeutral() {
+        // Bedrock 目标下 nbt= 不参与筛选；unless 不能把它反转为“全部排除”
+        val r = eval(
+            "unless entity @e[nbt={Health:20f}]",
+            target = VersionSpec.parse("1.21.100")
+        )
+        assertTrue(r.ok)
+        assertTrue(r.notes.isNotEmpty())
+    }
+
+    @Test
     fun ifEntityDistanceUsesResolvedOrigin() {
         val farZombie = GridEntity("z", "minecraft:zombie", x = 100.0)
         val r = eval(

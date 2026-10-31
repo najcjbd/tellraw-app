@@ -116,6 +116,38 @@ class SelectorEvaluatorAuditTest {
     }
 
     @Test
+    fun quantityZeroDotDotDoesNotFilter() {
+        val withStone = GridEntity("a", "minecraft:player", items = mapOf("hotbar.0" to stone5))
+        val empty = GridEntity("b", "minecraft:player")
+        val r = eval(
+            "@a[hasitem={item=stone,quantity=0..}]",
+            listOf(withStone, empty),
+            edition = "bedrock"
+        )
+        assertEquals(listOf("a", "b"), r.matched.map { it.uid }.sorted())
+    }
+
+    @Test
+    fun singleSlotLocationAcceptsNumericZero() {
+        val e = GridEntity(
+            "a", "minecraft:player",
+            items = mapOf("armor.head" to GridItem("minecraft:diamond_helmet"))
+        )
+        assertTrue(
+            eval("@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=0}]", listOf(e), edition = "bedrock")
+                .matched.isNotEmpty()
+        )
+        assertTrue(
+            eval("@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=1}]", listOf(e), edition = "bedrock")
+                .matched.isEmpty()
+        )
+        assertTrue(
+            eval("@a[hasitem={item=diamond_helmet,location=slot.armor.head,slot=0,quantity=0}]", listOf(e), edition = "bedrock")
+                .matched.isEmpty()
+        )
+    }
+
+    @Test
     fun negativeLimitDoesNotCrash() {
         val z = GridEntity("z", "minecraft:zombie")
         val r = eval("@e[limit=-1]", listOf(z))

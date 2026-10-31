@@ -109,6 +109,16 @@ class ApplyTranslateWithTest {
     }
 
     @Test
+    fun explicitEmptyFallbackIsPreserved() {
+        val start = markers(translate("k"))
+        val result = TextComponentHelper.applyTranslateWithAt(
+            start, 0, "k", "", "[]", fallbackPresent = true
+        )
+        val fb = parse(result).single().subComponents.first { it.type == SubComponentType.FALLBACK }
+        assertEquals("", fb.content)
+    }
+
+    @Test
     fun blankFallbackRemovesFallback() {
         val start = markers(
             translate("k", SubComponent(SubComponentType.FALLBACK, "fb"))
