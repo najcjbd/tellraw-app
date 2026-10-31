@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -47,7 +49,12 @@ class HistoryRepository @Inject constructor(
         private const val END_MARKER = "\u200C"
     }
     
-    private val dateFormat = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
+    /** SimpleDateFormat 不是线程安全的；每次新建，避免并发读写历史时格式化出错。 */
+    private fun formatTimestamp(timestamp: Long): String =
+        SimpleDateFormat(DATE_FORMAT, Locale.getDefault()).format(Date(timestamp))
+    
+    /** 历史文件的读-改-写需要串行，避免“删除时正好在追加”导致丢记录。 */
+    private val fileMutex = Mutex()
     
     // 存储目录路径（用户通过文件管理器选择）
     private var _storageUri: MutableStateFlow<String?> = MutableStateFlow(null)
@@ -247,18 +254,18 @@ class HistoryRepository @Inject constructor(
      *  JAVA版输出:JAVA版的指令
      *  基岩版输出:基岩版的指令\u200C
      */
-    private fun parseHistoryContent(content: String): List<HistoryItem> {
+    internal fun parseHistoryContent(content: String): List<HistoryItem> {
         val history = mutableListOf<HistoryItem>()
         
-        // 按开始标记分割
-        val sections = content.split(START_MARKER)
+        // 只把"标记 + 时间:"当记录头；消息正文里出现单个特殊符号时不会被切成两段
+        val sections = content.split(Regex("(?=${START_MARKER}时间:)"))
         
         for (section in sections) {
             if (section.trim().isEmpty()) continue
             
             try {
-                // 移除结束标记
-                val sectionContent = section.replace(END_MARKER, "")
+                // 只去掉记录末尾的结束标记，保留正文里可能出现的同名符号
+                val sectionContent = section.substringBeforeLast(END_MARKER, section)
                 
                 // 使用前缀匹配来解析各个字段
                 var timestamp = System.currentTimeMillis()
@@ -389,7 +396,8 @@ class HistoryRepository @Inject constructor(
      */
     private fun parseTimestamp(timeText: String): Long {
         return try {
-            dateFormat.parse(timeText)?.time ?: System.currentTimeMillis()
+            SimpleDateFormat(DATE_FORMAT, Locale.getDefault()).parse(timeText)?.time
+                ?: System.currentTimeMillis()
         } catch (e: Exception) {
             System.currentTimeMillis()
         }
@@ -401,49 +409,24 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun saveHistory(historyList: List<HistoryItem>) {
         withContext(Dispatchers.IO) {
-            try {
-                val file = getHistoryFile() ?: return@withContext
-                
-                // 清空文件并重新写入
-                file.writeText("")
-                
-                // 按时间从新到旧排序并写入
-                val sortedList = historyList.sortedByDescending { it.timestamp }
-                for (item in sortedList) {
-                    val content = buildSingleHistoryItem(item)
-                    file.appendText(content)
+            fileMutex.withLock {
+                try {
+                    val file = getHistoryFile() ?: return@withLock
+                    
+                    // 按时间从新到旧排序后一次性写入，避免中途失败留下半截文件
+                    val sortedList = historyList.sortedByDescending { it.timestamp }
+                    val content = buildString {
+                        for (item in sortedList) append(buildSingleHistoryItem(item))
+                    }
+                    file.writeText(content)
+                    
+                    _historyList.value = sortedList
+                    saveConfig()
+                } catch (e: Exception) {
+                    // 保存失败
                 }
-                
-                _historyList.value = sortedList
-                saveConfig()
-            } catch (e: Exception) {
-                // 保存失败
             }
         }
-    }
-    
-    /**
-     * 构建历史记录内容（新格式）
-     * 格式：时间:年:月:日 时:分:秒 \u200B
-     * 输入文本:输入的文本
-     * JAVA版输出:JAVA版的指令
-     * 基岩版输出:基岩版的指令 \u200C
-     */
-    private fun buildHistoryContentInternal(historyList: List<HistoryItem>): String {
-        val content = StringBuilder()
-        
-        // 按时间从新到旧排序
-        val sortedList = historyList.sortedByDescending { it.timestamp }
-        
-        for (item in sortedList) {
-            val timeText = dateFormat.format(Date(item.timestamp))
-            content.append("${START_MARKER}时间:$timeText\n")
-            content.append(" 输入文本:").append(item.message).append("\n")
-            content.append(" JAVA版输出:").append(item.javaCommand).append("\n")
-            content.append(" 基岩版输出:").append(item.bedrockCommand).append(END_MARKER).append("\n\n")
-        }
-        
-        return content.toString()
     }
     
     /**
@@ -451,18 +434,20 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun addHistory(item: HistoryItem) {
         withContext(Dispatchers.IO) {
-            try {
-                val file = getHistoryFile() ?: return@withContext
-                
-                val content = buildSingleHistoryItem(item)
-                
-                // 追加到文件末尾
-                file.appendText(content)
-                
-                // 重新加载历史记录
-                loadHistory()
-            } catch (e: Exception) {
-                // 添加失败
+            fileMutex.withLock {
+                try {
+                    val file = getHistoryFile() ?: return@withLock
+                    
+                    val content = buildSingleHistoryItem(item)
+                    
+                    // 追加到文件末尾
+                    file.appendText(content)
+                    
+                    // 重新加载历史记录
+                    loadHistory()
+                } catch (e: Exception) {
+                    // 添加失败
+                }
             }
         }
     }
@@ -475,7 +460,7 @@ class HistoryRepository @Inject constructor(
      *  基岩版输出:基岩版的指令\u200C
      */
     fun buildSingleHistoryItem(item: HistoryItem): String {
-        val timeText = dateFormat.format(Date(item.timestamp))
+        val timeText = formatTimestamp(item.timestamp)
         val markersLine = if (item.markers.isNotBlank()) {
             "\n 标记文本:" + android.util.Base64.encodeToString(
                 item.markers.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP
@@ -489,53 +474,48 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun deleteHistory(item: HistoryItem) {
         withContext(Dispatchers.IO) {
-            try {
-                val file = getHistoryFile() ?: return@withContext
-                if (!file.exists()) return@withContext
-                
-                val timeText = dateFormat.format(Date(item.timestamp))
-                
-                var content = file.readText()
-                val itemContent = buildSingleHistoryItem(item)
-                val originalLength = content.length
-                
-                // 使用正则表达式匹配并删除记录
-                // 首先尝试精确匹配
-                if (itemContent in content) {
-                    content = content.replace(itemContent, "")
-                    // 清理多余的空行
-                    content = content.replace(Regex("\n{3,}"), "\n\n")
-                    file.writeText(content)
-                } else {
-                    // 如果精确匹配失败，尝试使用更精确的正则表达式匹配
-                    // 包含时间戳、选择器和消息哈希，确保唯一性
-                    val selectorHash = item.selector.hashCode()
-                    val messageHash = item.message.hashCode()
+            fileMutex.withLock {
+                try {
+                    val file = getHistoryFile() ?: return@withLock
+                    if (!file.exists()) return@withLock
                     
-                    // 构建更精确的正则表达式：匹配 START_MARKER + 时间 + 选择器特征 + 任意内容 + END_MARKER
-                    val pattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?selector:[\\s\\S]*?$END_MARKER")
-                    val newContent = pattern.replace(content, "")
+                    val timeText = formatTimestamp(item.timestamp)
                     
-                    if (newContent != content) {
-                        // 匹配成功
-                        content = newContent
-                        // 清理多余的空行
-                        content = content.replace(Regex("\n{3,}"), "\n\n")
-                        file.writeText(content)
+                    var content = file.readText()
+                    val original = content
+                    val itemContent = buildSingleHistoryItem(item)
+                    
+                    // 先精确匹配：只删一条，避免同名记录（同一秒内重复生成）被一起删掉
+                    val exactIndex = content.indexOf(itemContent)
+                    if (exactIndex >= 0) {
+                        content = content.removeRange(exactIndex, exactIndex + itemContent.length)
                     } else {
-                        // 如果还是匹配失败，尝试只使用时间戳匹配（最后手段）
-                        val fallbackPattern = Regex("${START_MARKER}时间:$timeText[\\s\\S]*?$END_MARKER")
-                        content = fallbackPattern.replace(content, "")
+                        // 文件被手工改过时，用“时间 + 输入文本”定位一条
+                        val precise = Regex(
+                            "${START_MARKER}时间:${Regex.escape(timeText)}\\n 输入文本:${Regex.escape(item.message)}\\n JAVA版输出:[\\s\\S]*?$END_MARKER"
+                        )
+                        val preciseMatch = precise.find(content)
+                        if (preciseMatch != null) {
+                            content = content.removeRange(preciseMatch.range)
+                        } else {
+                            // 最后手段：只按时间删一条，不再一次性删掉同秒的所有记录
+                            val fallback = Regex("${START_MARKER}时间:${Regex.escape(timeText)}[\\s\\S]*?$END_MARKER")
+                            val fallbackMatch = fallback.find(content)
+                            if (fallbackMatch != null) content = content.removeRange(fallbackMatch.range)
+                        }
+                    }
+                    
+                    if (content != original) {
                         // 清理多余的空行
                         content = content.replace(Regex("\n{3,}"), "\n\n")
                         file.writeText(content)
                     }
+                    
+                    // 重新加载历史记录
+                    loadHistory()
+                } catch (e: Exception) {
+                    // 删除历史记录失败
                 }
-                
-                // 重新加载历史记录
-                loadHistory()
-            } catch (e: Exception) {
-                // 删除历史记录失败
             }
         }
     }
@@ -546,55 +526,31 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun clearHistory() {
         withContext(Dispatchers.IO) {
-            try {
-                val file = getHistoryFile()
-                if (file != null && file.exists()) {
-                    var content = file.readText()
+            fileMutex.withLock {
+                try {
+                    // 只匹配真正的记录头（标记 + "时间:"），避免消息正文里的单个特殊符号把整段吃掉
+                    val pattern = Regex("${START_MARKER}时间:[\\s\\S]*?$END_MARKER\\n*")
+                    fun cleaned(text: String): String = text
+                        .replace(pattern, "")
+                        .replace(Regex("\n{3,}"), "\n\n")
+                        .trimStart('\n')
                     
-                    // 使用正则表达式删除所有从 START_MARKER 到 END_MARKER 的完整记录
-                    // 匹配模式：START_MARKER + 任意内容 + END_MARKER
-                    val pattern = Regex("$START_MARKER[\\s\\S]*?$END_MARKER")
-                    content = content.replace(pattern, "")
-                    
-                    // 清理多余的空行（连续的2个或更多空行替换为单个空行）
-                    content = content.replace(Regex("\n{3,}"), "\n\n")
-                    
-                    // 清理开头的空行
-                    content = content.trimStart('\n')
-                    
-                    // 写入清理后的内容
-                    file.writeText(content)
-                    
-                    // 更新内存中的历史记录列表
-                    _historyList.value = emptyList()
-                    
-                    // 保存配置
-                    saveConfig()
-                } else {
-                    // 没有配置存储目录，检查是否需要清空沙盒文件
-                    val sandboxFile = File(context.filesDir, DEFAULT_FILENAME)
-                    if (sandboxFile.exists()) {
-                        var content = sandboxFile.readText()
-                        
-                        // 使用正则表达式删除所有从 START_MARKER 到 END_MARKER 的完整记录
-                        val pattern = Regex("$START_MARKER[\\s\\S]*?$END_MARKER")
-                        content = content.replace(pattern, "")
-                        
-                        // 清理多余的空行
-                        content = content.replace(Regex("\n{3,}"), "\n\n")
-                        
-                        // 清理开头的空行
-                        content = content.trimStart('\n')
-                        
-                        // 写入清理后的内容
-                        sandboxFile.writeText(content)
-                        
-                        // 更新内存中的历史记录列表
+                    val file = getHistoryFile()
+                    if (file != null && file.exists()) {
+                        file.writeText(cleaned(file.readText()))
                         _historyList.value = emptyList()
+                        saveConfig()
+                    } else {
+                        // 没有配置存储目录，检查是否需要清空沙盒文件
+                        val sandboxFile = File(context.filesDir, DEFAULT_FILENAME)
+                        if (sandboxFile.exists()) {
+                            sandboxFile.writeText(cleaned(sandboxFile.readText()))
+                            _historyList.value = emptyList()
+                        }
                     }
+                } catch (e: Exception) {
+                    // 清空失败
                 }
-            } catch (e: Exception) {
-                // 清空失败
             }
         }
     }

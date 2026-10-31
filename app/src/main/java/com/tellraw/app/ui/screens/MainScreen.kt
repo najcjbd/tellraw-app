@@ -999,6 +999,7 @@ private fun LandscapeLayout(
                         
                         // 颜色代码快速输入
                         ColorCodeQuickInput(
+                            onCommaSelected = onCommaSelected,
                             onCodeSelected = { code ->
                                 val currentValue = messageTextFieldValue.value
                                 val cursorPosition = currentValue.selection.start
