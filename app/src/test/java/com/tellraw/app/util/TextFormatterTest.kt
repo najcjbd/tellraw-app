@@ -1715,7 +1715,8 @@ class TextFormatterTest {
     @Test
     fun testMNCFMode_9() {
         // 所有§m/§n_c/f代码组合（带文本）
-        val json = TextFormatter.convertToJavaJson("§m_f§m_caa§n_f§n_cbb", mnCFEnabled = true)
+        // 颜色类代码会清除格式位，因此每个 f/c 代码后都要有文本，才能验证字段确实生效
+        val json = TextFormatter.convertToJavaJson("§m_fstrike§m_caa§n_funder§n_cbb", mnCFEnabled = true)
         assertTrue("应包含strikethrough字段", json.contains("\"strikethrough\":true"))
         assertTrue("应包含 #971607", json.contains("\"#971607\""))
         assertTrue("应包含aa文本", json.contains("aa"))
