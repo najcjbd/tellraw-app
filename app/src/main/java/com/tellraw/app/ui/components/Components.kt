@@ -228,7 +228,7 @@ fun MNCodeDialog(
     codeType: String?,
     onDismiss: () -> Unit,
     onUseJavaFontStyle: (Boolean) -> Unit,
-    onMixedModeChoice: (String, String) -> Unit = { _, _ -> },
+    onMixedModeChoice: (String, String, Boolean) -> Unit = { _, _, _ -> },
     mnMixedMode: Boolean = false
 ) {
     val codeName = when (codeType) {
@@ -273,7 +273,7 @@ fun MNCodeDialog(
                         IconButton(
                             onClick = {
                                 if (mnMixedMode) {
-                                    onMixedModeChoice(codeType ?: "§m", "font")
+                                    onMixedModeChoice(codeType ?: "§m", "font", rememberChoice)
                                 } else {
                                     onUseJavaFontStyle(true)
                                 }
@@ -336,6 +336,11 @@ fun MNCodeDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.remember_choice))
                     }
+                    Text(
+                        text = stringResource(R.string.remember_choice_session_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 
                 // 底部按钮
@@ -353,7 +358,7 @@ fun MNCodeDialog(
                         OutlinedButton(
                             onClick = {
                                 if (mnMixedMode) {
-                                    onMixedModeChoice(codeType ?: "§m", "font")
+                                    onMixedModeChoice(codeType ?: "§m", "font", rememberChoice)
                                 } else {
                                     onUseJavaFontStyle(true)
                                 }
@@ -367,7 +372,7 @@ fun MNCodeDialog(
                         Button(
                             onClick = {
                                 if (mnMixedMode) {
-                                    onMixedModeChoice(codeType ?: "§m", "color")
+                                    onMixedModeChoice(codeType ?: "§m", "color", rememberChoice)
                                 } else {
                                     onUseJavaFontStyle(false)
                                 }
@@ -387,7 +392,7 @@ fun MNCodeDialog(
         AlertDialog(
             onDismissRequest = {
                 if (mnMixedMode) {
-                    onMixedModeChoice(codeType ?: "§m", "font")
+                    onMixedModeChoice(codeType ?: "§m", "font", rememberChoice)
                 } else {
                     onUseJavaFontStyle(true)
                 }
@@ -432,13 +437,18 @@ fun MNCodeDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.remember_choice))
                     }
+                    Text(
+                        text = stringResource(R.string.remember_choice_session_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = {
                         if (mnMixedMode) {
-                            onMixedModeChoice(codeType ?: "§m", "font")
+                            onMixedModeChoice(codeType ?: "§m", "font", rememberChoice)
                         } else {
                             onUseJavaFontStyle(true)
                         }
@@ -451,7 +461,7 @@ fun MNCodeDialog(
                 TextButton(
                     onClick = {
                         if (mnMixedMode) {
-                            onMixedModeChoice(codeType ?: "§m", "color")
+                            onMixedModeChoice(codeType ?: "§m", "color", rememberChoice)
                         } else {
                             onUseJavaFontStyle(false)
                         }

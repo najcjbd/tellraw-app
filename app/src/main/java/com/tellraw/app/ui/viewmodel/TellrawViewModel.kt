@@ -309,6 +309,8 @@ class TellrawViewModel @Inject constructor(
         val mode: String               // "f" (font) 或 "c" (color)
     )
     private var mnMappings = mutableListOf<MNMapping>()
+    /** 本次使用期间的 §m/§n 选择（m/n -> f/c）；不做磁盘持久化，清空全部或进程结束时失效。 */
+    private val mnSessionModes = mutableMapOf<String, String>()
     
     // 上一次的输入文本内容，用于文本组件系统检测变化（类似于lastMessageContent）
     private var lastMessageInput = ""
@@ -476,8 +478,8 @@ class TellrawViewModel @Inject constructor(
         val newMCount = currentMCount - countOccurrences(lastMessageContent, "§m")
         if (newMCount > 0) {
             _mCodeCount.value += newMCount
-            // 只在混合模式下弹出对话框
-            if (_mnMixedMode.value) {
+            // 只在混合模式下弹出对话框；本次使用期间记住过就不再问
+            if (_mnMixedMode.value && mnSessionModes["m"] == null) {
                 _showMNDialog.value = "§m"
             }
         }
@@ -486,8 +488,8 @@ class TellrawViewModel @Inject constructor(
         val newNCount = currentNCount - countOccurrences(lastMessageContent, "§n")
         if (newNCount > 0) {
             _nCodeCount.value += newNCount
-            // 只在混合模式下弹出对话框
-            if (_mnMixedMode.value) {
+            // 只在混合模式下弹出对话框；本次使用期间记住过就不再问
+            if (_mnMixedMode.value && mnSessionModes["n"] == null) {
                 _showMNDialog.value = "§n"
             }
         }
@@ -552,14 +554,15 @@ class TellrawViewModel @Inject constructor(
                     ))
                     backendIndex += 4
                 } else {
-                    // 新增的§m/§n，默认使用字体方式
-                    val backendCode = if (type == "m") "§m_f" else "§n_f"
+                    // 新增的§m/§n：本次使用期间记住过就沿用，否则默认字体方式
+                    val mode = mnSessionModes[type] ?: "f"
+                    val backendCode = if (type == "m") "§m_$mode" else "§n_$mode"
                     newBackend.append(backendCode)
                     newMappings.add(MNMapping(
                         frontendPos = frontendIndex,
                         backendPos = backendIndex,
                         type = type,
-                        mode = "f"
+                        mode = mode
                     ))
                     backendIndex += 4
                 }
@@ -578,35 +581,36 @@ class TellrawViewModel @Inject constructor(
     }
     
     /**
-     * 处理混合模式下的§m/§n选择
-     * @param codeType §m或§n
-     * @param choice "font"表示方式一（Java版用字体模式，基岩版用颜色模式），"color"表示方式二（两版都用颜色模式）
+     * 处理混合模式下的 §m/§n 选择。
+     * "记住选择" 只是本次使用期间的偏好：进程被杀或点“清空全部”后失效，不写磁盘。
      */
-    fun handleMixedModeChoice(codeType: String, choice: String) {
-        if (_mnMixedMode.value) {
-            val type = if (codeType == "§m") "m" else "n"
-            
-            if (choice == "font") {
-                // 方式一：Java版用字体模式（§m_f/§n_f），基岩版用颜色模式（§m/§n）
-                // 不需要修改后台消息，保持§m_f/§n_f
-                // 在生成命令时，Java版会使用§m_f/§n_f（字体方式），基岩版会将§m_f/§n_f转换为§m/§n（颜色代码）
-                return
-            } else if (choice == "color") {
-                // 方式二：两版都用颜色模式（§m_c/§n_c）
-                // 找到第一个mode为"f"的映射并更新
-                val mappingIndex = mnMappings.indexOfFirst { it.type == type && it.mode == "f" }
-                if (mappingIndex != -1) {
-                    val mapping = mnMappings[mappingIndex]
-                    // 更新映射表
-                    mnMappings[mappingIndex] = mapping.copy(mode = "c")
-                    // 更新backendMessageContent
-                    val backendCode = if (type == "m") "§m_c" else "§n_c"
-                    backendMessageContent = backendMessageContent.substring(0, mapping.backendPos) + 
-                                             backendCode + 
-                                             backendMessageContent.substring(mapping.backendPos + 4)
-                }
+    fun handleMixedModeChoice(codeType: String, choice: String, remember: Boolean = false) {
+        if (!_mnMixedMode.value) return
+        val type = if (codeType == "§m") "m" else "n"
+        val mode = if (choice == "color") "c" else "f"
+
+        // 本条消息里同类型的代码统一应用这次选择（对话框只针对这一种代码问一次）
+        var changed = false
+        for (i in mnMappings.indices) {
+            if (mnMappings[i].type == type && mnMappings[i].mode != mode) {
+                mnMappings[i] = mnMappings[i].copy(mode = mode)
+                changed = true
             }
         }
+        if (changed) rebuildBackendFromMappings()
+
+        if (remember) mnSessionModes[type] = mode else mnSessionModes.remove(type)
+    }
+
+    /** 按 mnMappings 的 mode 重写 backendMessageContent（代码长度固定 4 字符，位置不变）。 */
+    private fun rebuildBackendFromMappings() {
+        var content = backendMessageContent
+        for (m in mnMappings) {
+            if (m.backendPos + 4 > content.length) continue
+            val code = if (m.type == "m") "§m_${m.mode}" else "§n_${m.mode}"
+            content = content.substring(0, m.backendPos) + code + content.substring(m.backendPos + 4)
+        }
+        backendMessageContent = content
     }
     
     /**
@@ -1380,9 +1384,10 @@ class TellrawViewModel @Inject constructor(
         _nCodeCount.value = 0
         lastMessageContent = ""
         
-        // 重置后台消息和映射表
+        // 重置后台消息和映射表（含本次使用期间“记住”的 §m/§n 选择）
         backendMessageContent = ""
         mnMappings.clear()
+        mnSessionModes.clear()
         
         // 重置对话框状态
         _showMNDialog.value = null
