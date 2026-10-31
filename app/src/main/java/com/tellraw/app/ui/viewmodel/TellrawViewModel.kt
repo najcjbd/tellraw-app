@@ -2209,9 +2209,6 @@ class TellrawViewModel @Inject constructor(
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         _messageInput.value = plainText
         
-        // 重新构建位置映射
-        val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
-        
         // 更新lastMessageInput
         lastMessageInput = plainText
         
