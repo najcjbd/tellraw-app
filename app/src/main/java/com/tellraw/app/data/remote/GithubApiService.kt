@@ -10,8 +10,9 @@ interface GithubApiService {
 
 data class GithubRelease(
     val tag_name: String,
-    val name: String,
+    /** GitHub 允许发布没有标题/说明的 release，这两个字段可能为 null。 */
+    val name: String? = null,
     val html_url: String,
     val published_at: String,
-    val body: String
+    val body: String? = null
 )

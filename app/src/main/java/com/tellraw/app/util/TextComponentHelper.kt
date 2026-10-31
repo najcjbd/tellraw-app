@@ -225,6 +225,68 @@ object TextComponentHelper {
     }
     
     /**
+     * 前台纯文本被增删后，按旧组件结构重新切分内容（结构保持不变）。
+     * 只用于存在非 TEXT 组件的情况；截断时副组件同样按绝对位置截取。
+     */
+    fun remapComponentContents(
+        oldComponents: List<TextComponent>,
+        frontendMessage: String
+    ): List<TextComponent> {
+        val result = mutableListOf<TextComponent>()
+        val newLength = frontendMessage.length
+        var currentPos = 0
+
+        for (oldComponent in oldComponents) {
+            val componentLength =
+                oldComponent.content.length + oldComponent.subComponents.sumOf { it.content.length }
+
+            if (currentPos + componentLength <= newLength) {
+                val newContent =
+                    frontendMessage.substring(currentPos, currentPos + oldComponent.content.length)
+                val newSubComponents = oldComponent.subComponents.mapIndexed { index, oldSub ->
+                    val offset = oldComponent.content.length +
+                        oldComponent.subComponents.take(index).sumOf { it.content.length }
+                    val subContent = frontendMessage.substring(
+                        currentPos + offset, currentPos + offset + oldSub.content.length
+                    )
+                    SubComponent(oldSub.type, subContent)
+                }.toMutableList()
+
+                result.add(TextComponent(oldComponent.type, newContent, newSubComponents))
+                currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
+            } else {
+                val remainingLength = newLength - currentPos
+                if (remainingLength > 0) {
+                    val newContent = frontendMessage.substring(
+                        currentPos, currentPos + minOf(oldComponent.content.length, remainingLength)
+                    )
+                    val newSubComponents = mutableListOf<SubComponent>()
+                    // 副组件的绝对起点 = 当前组件起点 + 旧主内容长度
+                    var subOffset = currentPos + oldComponent.content.length
+                    for (oldSub in oldComponent.subComponents) {
+                        if (subOffset < newLength) {
+                            val remainingSubLength = newLength - subOffset
+                            val subContent = frontendMessage.substring(
+                                subOffset, subOffset + minOf(oldSub.content.length, remainingSubLength)
+                            )
+                            newSubComponents.add(SubComponent(oldSub.type, subContent))
+                            subOffset += oldSub.content.length
+                        }
+                    }
+
+                    result.add(TextComponent(oldComponent.type, newContent, newSubComponents))
+                    currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
+                }
+            }
+        }
+
+        if (currentPos < newLength) {
+            result.add(TextComponent(ComponentType.TEXT, frontendMessage.substring(currentPos)))
+        }
+        return result
+    }
+
+    /**
      * 在"纯文本位置"插入一个完整组件；如果位置落在 TEXT 组件内部，会把它拆成前后两段。
      * 位置按 content + 子组件内容的长度计算（标记符不参与）。
      */

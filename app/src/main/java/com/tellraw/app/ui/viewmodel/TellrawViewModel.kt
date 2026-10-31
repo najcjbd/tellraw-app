@@ -186,37 +186,41 @@ class TellrawViewModel @Inject constructor(
                 _historyStorageUri.value = historyStorageUri
             }
             
-            // 处理配置文件中的互斥逻辑
-            // 三个选项是互斥的：混合模式、选择§m/§n的处理、§m/§n_c/f
-            // 当检测到两个及以上开启时，默认关闭其他的，只开启"选择§m/§n的处理"
+            // 处理配置文件中的互斥逻辑：混合模式与 §m/§n_c/f 互斥；
+            // 只有两个同时为真（旧配置/手工改坏）时才退回"选择§m/§n的处理"，
+            // 不能把用户正常保存的单项开关在启动时清掉。
             val mnHandlingMode = loadedSettings.mnHandlingMode
             val mixedMode = loadedSettings.mnMixedMode
             val cfEnabled = loadedSettings.mnCFEnabled
-            val enabledCount = listOf(mixedMode, cfEnabled, true).count { it }
             
-            if (enabledCount >= 2) {
-                // 两个及以上开启，只保留"选择§m/§n的处理"
-                settingsRepository.setMNMixedMode(false)
-                settingsRepository.setMNCFEnabled(false)
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = false
-                // 保留原有的mn_handling_mode
-                _useJavaFontStyle.value = mnHandlingMode
-            } else if (mixedMode) {
-                // 只开启混合模式
-                _mnMixedMode.value = true
-                _mnCFEnabled.value = false
-                _useJavaFontStyle.value = true // 默认值，但UI中不显示
-            } else if (cfEnabled) {
-                // 只开启§m/§n_c/f
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = true
-                _useJavaFontStyle.value = true // 默认值，但UI中不显示
-            } else {
-                // 都没开启时，使用原有的mn_handling_mode
-                _mnMixedMode.value = false
-                _mnCFEnabled.value = false
-                _useJavaFontStyle.value = mnHandlingMode
+            when {
+                mixedMode && cfEnabled -> {
+                    // 两个互斥项同时开启：只保留"选择§m/§n的处理"
+                    settingsRepository.setMNMixedMode(false)
+                    settingsRepository.setMNCFEnabled(false)
+                    _mnMixedMode.value = false
+                    _mnCFEnabled.value = false
+                    // 保留原有的mn_handling_mode
+                    _useJavaFontStyle.value = mnHandlingMode
+                }
+                mixedMode -> {
+                    // 只开启混合模式
+                    _mnMixedMode.value = true
+                    _mnCFEnabled.value = false
+                    _useJavaFontStyle.value = true // 默认值，但UI中不显示
+                }
+                cfEnabled -> {
+                    // 只开启§m/§n_c/f
+                    _mnMixedMode.value = false
+                    _mnCFEnabled.value = true
+                    _useJavaFontStyle.value = true // 默认值，但UI中不显示
+                }
+                else -> {
+                    // 都没开启时，使用原有的mn_handling_mode
+                    _mnMixedMode.value = false
+                    _mnCFEnabled.value = false
+                    _useJavaFontStyle.value = mnHandlingMode
+                }
             }
             
             // 加载JAVA/基岩混合模式
@@ -437,60 +441,7 @@ class TellrawViewModel @Inject constructor(
             mutableListOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage))
         } else {
             // 有非TEXT组件，需要保留原有的组件结构
-            val result = mutableListOf<TextComponentHelper.TextComponent>()
-            var currentPos = 0
-
-            for (oldComponent in oldComponents) {
-                val componentLength = oldComponent.content.length + oldComponent.subComponents.sumOf { it.content.length }
-
-                if (currentPos + componentLength <= newLength) {
-                    // 提取新的主组件内容
-                    val newContent = frontendMessage.substring(currentPos, currentPos + oldComponent.content.length)
-
-                    // 提取新的副组件内容
-                    val newSubComponents = oldComponent.subComponents.mapIndexed { index, oldSub ->
-                        // 计算副组件的起始位置（使用旧主组件内容长度 + 前面副组件的总长度）
-                        // 注意：必须使用oldComponent.content.length，因为副组件位置是基于旧组件结构的
-                        val offset = oldComponent.content.length + oldComponent.subComponents.take(index).sumOf { it.content.length }
-                        val subContent = frontendMessage.substring(currentPos + offset, currentPos + offset + oldSub.content.length)
-                        TextComponentHelper.SubComponent(oldSub.type, subContent)
-                    }.toMutableList()
-
-                    result.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
-                    // 使用新组件的实际长度更新currentPos，而不是旧长度
-                    currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
-                } else {
-                    // 组件长度超过了新文本长度，只保留部分内容
-                    val remainingLength = newLength - currentPos
-                    if (remainingLength > 0) {
-                        // 提取新的主组件内容（截断）
-                        val newContent = frontendMessage.substring(currentPos, currentPos + minOf(oldComponent.content.length, remainingLength))
-                        
-                        // 提取新的副组件内容（截断）
-                        val newSubComponents = mutableListOf<TextComponentHelper.SubComponent>()
-                        var subOffset = oldComponent.content.length
-                        
-                        for (oldSub in oldComponent.subComponents) {
-                            if (subOffset < newLength) {
-                                val remainingSubLength = newLength - subOffset
-                                val subContent = frontendMessage.substring(subOffset, subOffset + minOf(oldSub.content.length, remainingSubLength))
-                                newSubComponents.add(TextComponentHelper.SubComponent(oldSub.type, subContent))
-                                subOffset += oldSub.content.length
-                            }
-                        }
-                        
-                        result.add(TextComponentHelper.TextComponent(oldComponent.type, newContent, newSubComponents))
-                        currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
-                    }
-                }
-            }
-
-            // 添加剩余的纯文本
-            if (currentPos < newLength) {
-                result.add(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage.substring(currentPos)))
-            }
-
-            result
+            TextComponentHelper.remapComponentContents(oldComponents, frontendMessage)
         }
         
         _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
@@ -2220,9 +2171,6 @@ class TellrawViewModel @Inject constructor(
         // 更新前台显示的纯文本（去除标记符）
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         _messageInput.value = plainText
-        
-        // 重新构建位置映射
-        val components = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
         
         // 更新lastMessageInput
         lastMessageInput = plainText
