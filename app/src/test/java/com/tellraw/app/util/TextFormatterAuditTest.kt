@@ -21,18 +21,28 @@ class TextFormatterAuditTest {
         assertEquals("red", root.get("color").asString)
         val b = root.getAsJsonArray("extra")[0].asJsonObject
         assertEquals("B", b.get("text").asString)
-        assertEquals("reset", b.get("color").asString)
+        assertEquals("white", b.get("color").asString)
     }
 
     @Test
-    fun colorCodeClearsInheritedBold() {
+    fun colorCodeKeepsFormats() {
         val root = JsonParser.parseString(java("A§lB§cC")).asJsonObject
         val extra = root.getAsJsonArray("extra")
         val b = extra[0].asJsonObject
         assertEquals(true, b.get("bold").asBoolean)
         val c = extra[1].asJsonObject
         assertEquals("red", c.get("color").asString)
-        assertFalse("§c 之后不应继续继承粗体", c.has("bold"))
+        assertEquals("§c 不能清除粗体", true, c.get("bold").asBoolean)
+    }
+
+    @Test
+    fun boldRedIsRepresentableInEitherOrder() {
+        for (text in listOf("§l§cX", "§c§lX")) {
+            val root = JsonParser.parseString(java(text)).asJsonObject
+            assertEquals(text, "X", root.get("text").asString)
+            assertEquals(text, "red", root.get("color").asString)
+            assertEquals(text, true, root.get("bold").asBoolean)
+        }
     }
 
     @Test
@@ -47,6 +57,20 @@ class TextFormatterAuditTest {
         val warnings = mutableListOf<String>()
         java("§x§F§F§0§0§0§0Hi", warnings)
         assertTrue(warnings.joinToString(), warnings.any { it.contains("§x") })
+    }
+
+    @Test
+    fun nonTextSiblingsDoNotInheritRootTextStyles() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "§c§lA"),
+            TextComponent(ComponentType.SELECTOR, "@a")
+        )
+        val json = TextComponentHelper.convertToJavaJson(components, context = null)
+        val root = JsonParser.parseString(json).asJsonObject
+        val extra = root.getAsJsonArray("extra")
+        val selectorPart = extra.first { it.asJsonObject.has("selector") }.asJsonObject
+        assertEquals("white", selectorPart.get("color").asString)
+        assertFalse("selector 不应继承粗体", selectorPart.get("bold")?.asBoolean ?: false)
     }
 
     @Test

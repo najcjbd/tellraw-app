@@ -1158,6 +1158,23 @@ object TextComponentHelper {
                 }
                 subMap
             }
+            // 外层根组件的样式会被所有 extra 继承；非 TEXT 兄弟组件没有样式时应显式复位
+            val styleKeys = setOf(
+                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated"
+            )
+            val rootStyle = result.filterKeys { it in styleKeys }
+            if (rootStyle.isNotEmpty()) {
+                extra.forEach { subMap ->
+                    for ((key, value) in rootStyle) {
+                        if (subMap.containsKey(key)) continue
+                        when {
+                            // tellraw 默认前景色是白色（JSON 没有官方的 color:"reset"）
+                            key == "color" -> subMap["color"] = "white"
+                            value == true -> subMap[key] = false
+                        }
+                    }
+                }
+            }
             // TEXT 的 § 分段可能已经产生 extra，这里要合并而不是覆盖
             val merged: MutableList<Any?> =
                 (result["extra"] as? List<*>)?.toMutableList() ?: mutableListOf()
