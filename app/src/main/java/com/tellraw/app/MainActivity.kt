@@ -28,12 +28,22 @@ class MainActivity : ComponentActivity() {
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
-        if (allGranted) {
-            onPermissionGranted?.invoke()
-        } else {
-            onPermissionDenied?.invoke()
-        }
+        resolvePermissionResult(permissions.entries.all { it.value })
+    }
+
+    // Android 11+ 的“所有文件访问”是跳转系统设置授予的，没有权限回调，只能回来后自己查状态
+    private val allFilesAccessLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        resolvePermissionResult(hasAllFilesAccessPermission())
+    }
+
+    private fun resolvePermissionResult(granted: Boolean) {
+        val grantedCallback = onPermissionGranted
+        val deniedCallback = onPermissionDenied
+        onPermissionGranted = null
+        onPermissionDenied = null
+        if (granted) grantedCallback?.invoke() else deniedCallback?.invoke()
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,23 +134,29 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * 请求所有文件访问权限（跳转到系统设置）
+     * 请求所有文件访问权限（跳转到系统设置），返回后由 [allFilesAccessLauncher] 回调
      */
     fun requestAllFilesAccessPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val intent = android.content.Intent(
-                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    android.net.Uri.parse("package:$packageName")
+                allFilesAccessLauncher.launch(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        android.net.Uri.parse("package:$packageName")
+                    )
                 )
-                startActivity(intent)
             } catch (e: Exception) {
                 // 某些设备可能不支持这个 Intent，尝试通用设置
-                val intent = android.content.Intent(
-                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    android.net.Uri.parse("package:$packageName")
-                )
-                startActivity(intent)
+                try {
+                    allFilesAccessLauncher.launch(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (e2: Exception) {
+                    resolvePermissionResult(false)
+                }
             }
         }
     }
@@ -150,8 +166,8 @@ class MainActivity : ComponentActivity() {
      */
     private fun hasStoragePermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ 不需要传统存储权限
-            true
+            // Android 11+ 直接按路径读写外部存储需要 MANAGE_EXTERNAL_STORAGE
+            android.os.Environment.isExternalStorageManager()
         } else {
             // Android 10及以下需要检查存储权限
             ContextCompat.checkSelfPermission(
@@ -169,22 +185,15 @@ class MainActivity : ComponentActivity() {
      * 请求存储权限
      */
     private fun requestStoragePermission() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ 不需要请求传统存储权限
-            emptyArray()
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11-12 不需要传统存储权限
-            emptyArray()
-        } else {
-            // Android 10及以下需要请求存储权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            requestAllFilesAccessPermission()
+            return
+        }
+        storagePermissionLauncher.launch(
             arrayOf(
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
-        }
-        
-        if (permissions.isNotEmpty()) {
-            storagePermissionLauncher.launch(permissions)
-        }
+        )
     }
 }
