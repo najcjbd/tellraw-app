@@ -39,6 +39,7 @@ fun TextComponentSelector(
     onSubComponentToggle: (TextComponentHelper.ComponentType) -> Unit,
     onSubComponentSelected: (TextComponentHelper.SubComponentType) -> Unit = {},
     onInsertPlainQuote: () -> Unit = {},
+    onOpenWithBuilder: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -102,6 +103,21 @@ fun TextComponentSelector(
                         )
                     }
                 )
+            }
+
+            // translate 选中时提供结构化构造器入口（不占用横向 chip 行）
+            if (selectedComponent == TextComponentHelper.ComponentType.TRANSLATE &&
+                onOpenWithBuilder != null
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    AssistChip(
+                        onClick = onOpenWithBuilder,
+                        label = { Text(stringResource(R.string.with_builder_open)) }
+                    )
+                }
             }
         }
     }

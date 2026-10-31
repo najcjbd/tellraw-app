@@ -20,6 +20,8 @@ import com.tellraw.app.util.ExecuteConverter
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
 import com.tellraw.app.util.TextComponentHelper
+import com.tellraw.app.util.WithArgCodec
+import com.tellraw.app.util.WithArgDraft
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -146,6 +148,10 @@ class TellrawViewModel @Inject constructor(
     
     private val _selectedSubComponent = MutableStateFlow<TextComponentHelper.SubComponentType?>(null)
     val selectedSubComponent: StateFlow<TextComponentHelper.SubComponentType?> = _selectedSubComponent.asStateFlow()
+    
+    // translate 的 with 参数可视化构造器
+    private val _withBuilderState = MutableStateFlow<WithBuilderState?>(null)
+    val withBuilderState: StateFlow<WithBuilderState?> = _withBuilderState.asStateFlow()
     
     // 当前光标位置的组件类型（用于悬停显示）
     private val _hoveredComponentType = MutableStateFlow<TextComponentHelper.ComponentType?>(null)
@@ -1938,8 +1944,191 @@ class TellrawViewModel @Inject constructor(
             }
         }
     }
-
-/**
+    
+    /**
+     * 打开 translate 的 with 参数构造器。
+     * 光标命中已有 translate 时编辑它；否则应用时在光标处新建。
+     */
+    fun openWithBuilder(insertPosition: Int) {
+        val markers = _messageInputWithMarkers.value
+        val components = TextComponentHelper.parseTextComponents(markers)
+        val index = TextComponentHelper.findTranslateIndexAt(components, insertPosition)
+        val component = index?.let { components[it] }
+        val key = component?.content.orEmpty()
+        val fallback = component?.subComponents
+            ?.firstOrNull { it.type == TextComponentHelper.SubComponentType.FALLBACK }
+            ?.content.orEmpty()
+        val withSub = component?.let { TextComponentHelper.withSubComponent(it) }
+        
+        var args: List<WithArgDraft> = emptyList()
+        var mode = WithBuilderMode.VISUAL
+        var rawJson = WithArgCodec.serializePretty(args)
+        var rawError: String? = null
+        
+        if (withSub != null) {
+            if (withSub.type == TextComponentHelper.SubComponentType.WITH_JSON) {
+                val normalized = if (withSub.content.isBlank()) {
+                    "[]"
+                } else {
+                    try {
+                        WithArgCodec.normalizeArgsJson(withSub.content)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                if (normalized == null) {
+                    // 无法解析：保留原文让用户在 JSON 页修正，绝不能静默丢弃
+                    mode = WithBuilderMode.JSON
+                    rawJson = withSub.content
+                    rawError = applicationContext.getString(R.string.with_builder_json_error)
+                } else {
+                    args = WithArgCodec.parseArgs(normalized)
+                    rawJson = WithArgCodec.serializePretty(args)
+                }
+            } else {
+                args = TextComponentHelper.parseWithItems(withSub.content, jsonMode = false)
+                    .map { WithArgDraft.Text(it.raw) }
+                rawJson = WithArgCodec.serializePretty(args)
+            }
+        }
+        
+        _withBuilderState.value = WithBuilderState(
+            targetPosition = insertPosition.coerceAtLeast(0),
+            isNew = component == null,
+            key = key,
+            fallback = fallback,
+            args = args,
+            mode = mode,
+            rawJson = rawJson,
+            rawError = rawError
+        )
+    }
+    
+    fun closeWithBuilder() {
+        _withBuilderState.value = null
+    }
+    
+    private fun builderJsonError(e: Exception): String {
+        val detail = e.message?.takeIf { it.isNotBlank() }
+        val prefix = applicationContext.getString(R.string.with_builder_json_error)
+        return if (detail == null) prefix else "$prefix: $detail"
+    }
+    
+    fun updateWithBuilderKey(key: String) {
+        _withBuilderState.value = _withBuilderState.value?.copy(key = key)
+    }
+    
+    fun updateWithBuilderFallback(fallback: String) {
+        _withBuilderState.value = _withBuilderState.value?.copy(fallback = fallback)
+    }
+    
+    fun setWithBuilderArgs(args: List<WithArgDraft>) {
+        val state = _withBuilderState.value ?: return
+        _withBuilderState.value = state.copy(
+            args = args,
+            rawJson = WithArgCodec.serializePretty(args),
+            rawError = null
+        )
+    }
+    
+    fun setWithBuilderMode(mode: WithBuilderMode) {
+        val state = _withBuilderState.value ?: return
+        when (mode) {
+            WithBuilderMode.JSON -> {
+                _withBuilderState.value = state.copy(
+                    mode = WithBuilderMode.JSON,
+                    rawJson = WithArgCodec.serializePretty(state.args),
+                    rawError = null
+                )
+            }
+            WithBuilderMode.VISUAL -> {
+                if (state.mode == WithBuilderMode.VISUAL) return
+                val parsed = try {
+                    WithArgCodec.parseArgs(state.rawJson)
+                } catch (e: Exception) {
+                    _withBuilderState.value = state.copy(
+                        rawError = builderJsonError(e)
+                    )
+                    return
+                }
+                _withBuilderState.value = state.copy(
+                    mode = WithBuilderMode.VISUAL,
+                    args = parsed,
+                    rawError = null
+                )
+            }
+        }
+    }
+    
+    fun updateWithBuilderRawJson(text: String) {
+        val state = _withBuilderState.value ?: return
+        val error = try {
+            WithArgCodec.normalizeArgsJson(text)
+            null
+        } catch (e: Exception) {
+            builderJsonError(e)
+        }
+        _withBuilderState.value = state.copy(rawJson = text, rawError = error)
+    }
+    
+    fun applyWithBuilder() {
+        val state = _withBuilderState.value ?: return
+        if (state.key.isBlank()) return
+        
+        val argsJson = try {
+            if (state.mode == WithBuilderMode.JSON) {
+                WithArgCodec.normalizeArgsJson(state.rawJson)
+            } else {
+                WithArgCodec.serialize(state.args)
+            }
+        } catch (e: Exception) {
+            _withBuilderState.value = state.copy(
+                mode = WithBuilderMode.JSON,
+                rawJson = if (state.mode == WithBuilderMode.VISUAL) {
+                    WithArgCodec.serializePretty(state.args)
+                } else state.rawJson,
+                rawError = builderJsonError(e)
+            )
+            return
+        }
+        
+        val markers = try {
+            TextComponentHelper.applyTranslateWithAt(
+                _messageInputWithMarkers.value,
+                state.targetPosition,
+                state.key,
+                state.fallback,
+                argsJson
+            )
+        } catch (e: Exception) {
+            _withBuilderState.value = state.copy(
+                rawError = builderJsonError(e)
+            )
+            return
+        }
+        
+        _messageInputWithMarkers.value = markers
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
+        lastMessageInput = _messageInput.value
+        
+        if (_defaultUseText.value) {
+            _defaultUseText.value = false
+            viewModelScope.launch {
+                settingsRepository.setDefaultUseText(false)
+                settingsRepository.saveConfig()
+            }
+        }
+        
+        _selectedTextComponent.value = TextComponentHelper.ComponentType.TRANSLATE
+        _selectedSubComponent.value =
+            if (argsJson != "[]") TextComponentHelper.SubComponentType.WITH_JSON else null
+        _expandedSubComponents.value =
+            _expandedSubComponents.value + TextComponentHelper.ComponentType.TRANSLATE.key
+        _withBuilderState.value = null
+        generateCommands()
+    }
+    
+    /**
      * 更新光标悬停位置的组件类型
      */
     fun updateHoveredComponentType(position: Int) {

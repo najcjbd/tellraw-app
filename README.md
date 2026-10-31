@@ -332,9 +332,10 @@ jobs:
   - Java 支持 fallback；基岩不支持 fallback（提醒）。
   - translate 自身的 color/bold 等样式不保留。
   - `with` 支持纯文本 / `with(JSON)`；JSON → 纯文本会丢失样式（纯文本模式的必然结果）。
+  - 选中 translate 后可用「构造 with 参数…」可视化编辑嵌套参数：纯文本（颜色/格式）、translate（可无限嵌套）、selector、score、keybind、NBT、原始 JSON。
   - 基岩 with 支持嵌套 rawtext/translate，但**嵌套组件样式不完全保留**。
   - 网格 translate 预览使用内置常见键模板，不读取客户端语言文件。
-  - keybind / nbt / object（精灵图）文本组件不支持，只提醒。
+  - 顶层文本组件仍不支持 keybind / nbt / object（精灵图），只提醒；with 内部可通过构造器或原始 JSON 写入。
 - **物品栏/装备**：`items`/`slots` 的方块容器需要手填方块表；`custom_data` 等组件需要手动写 JSON/SNBT。
 - **版本感知**：Java 26.3 的 items 槽位源写法未生成（我们生成的槽位名在 26.3 仍合法）；混合模式是启发式，不能保证所有混写等价。
 - **NBT 目录**：26.3 实体 NBT 已实测；玩家 NBT 来自 1.21.11 假人（26.3 bot 协议未支持）；fishing_bobber 不能 summon，lightning_bolt/poplar 船等没有专属标量键。

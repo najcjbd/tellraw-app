@@ -338,9 +338,10 @@ jobs:
   - fallback is emitted for Java; Bedrock has no fallback (warning).
   - translate's own color/bold styles are not preserved.
   - `with` supports plain text / `with(JSON)`; JSON -> plain loses styles by nature.
+  - With translate selected, "Build with args…" opens a visual editor for nested arguments: text (color/format), translate (unlimited nesting), selector, score, keybind, NBT, and raw JSON.
   - Bedrock `with` supports nested rawtext/translate, but **nested component styles are not fully preserved**.
   - Grid translate preview uses a small built-in template map, not client language files.
-  - keybind / nbt / object components are unsupported (warning only).
+  - Top-level keybind / nbt / object components remain unsupported (warning only); they can be written inside `with` via the builder or raw JSON.
 - **Inventory/equipment**: `items`/`slots` block containers require a manually filled block table; components require manual JSON/SNBT.
 - **Version awareness**: the 26.3 items slot-source form is not generated (our slot names remain valid in 26.3); mixed mode is heuristic.
 - **NBT catalog**: entity NBT is sampled from 26.3; player NBT is from a 1.21.11 fake player (26.3 bot protocol unsupported); fishing_bobber cannot be summoned; lightning_bolt/poplar boats have no unique scalar keys.

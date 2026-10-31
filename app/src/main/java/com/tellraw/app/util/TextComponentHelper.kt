@@ -332,6 +332,78 @@ object TextComponentHelper {
     fun componentToText(component: TextComponent): String {
         return componentsToText(listOf(component))
     }
+
+    /**
+     * 光标所在位置的 translate 组件下标（没有返回 null）。
+     * 位置按 content + 子组件内容长度计算；区间含两端，光标停在 translate 末尾也能命中。
+     */
+    fun findTranslateIndexAt(components: List<TextComponent>, position: Int): Int? {
+        if (position < 0) return null
+        var pos = 0
+        for ((index, component) in components.withIndex()) {
+            val len = component.content.length + component.subComponents.sumOf { it.content.length }
+            if (component.type == ComponentType.TRANSLATE && position in pos..(pos + len)) {
+                return index
+            }
+            pos += len
+        }
+        return null
+    }
+
+    /**
+     * 把构造器的结果写回标记文本：
+     * - 光标命中 translate -> 替换键、fallback 与 with；
+     * - 没有 translate -> 在光标处新建（复用 [insertComponentAt] 的拆分规则）。
+     *
+     * [argsJson] 会先规范成紧凑 JSON 数组；空数组表示不写 with 子组件。
+     */
+    fun applyTranslateWithAt(
+        markers: String,
+        targetPosition: Int,
+        key: String,
+        fallback: String,
+        argsJson: String
+    ): String {
+        require(key.isNotBlank()) { "translate key is blank" }
+        val normalized = WithArgCodec.normalizeArgsJson(argsJson)
+        val hasArgs = normalized != "[]"
+        val components = parseTextComponents(markers).toMutableList()
+        val index = findTranslateIndexAt(components, targetPosition)
+
+        if (index == null) {
+            return insertComponentAt(
+                markers,
+                targetPosition,
+                buildTranslateComponent(key, fallback, normalized.takeIf { hasArgs })
+            )
+        }
+
+        components[index] = components[index].copy(
+            content = key,
+            subComponents = buildTranslateSubComponents(fallback, normalized.takeIf { hasArgs })
+        )
+        return componentsToText(components)
+    }
+
+    private fun buildTranslateComponent(
+        key: String,
+        fallback: String,
+        argsJson: String?
+    ): TextComponent = TextComponent(
+        ComponentType.TRANSLATE,
+        key,
+        buildTranslateSubComponents(fallback, argsJson)
+    )
+
+    private fun buildTranslateSubComponents(
+        fallback: String,
+        argsJson: String?
+    ): MutableList<SubComponent> {
+        val subs = mutableListOf<SubComponent>()
+        if (fallback.isNotEmpty()) subs.add(SubComponent(SubComponentType.FALLBACK, fallback))
+        if (argsJson != null) subs.add(SubComponent(SubComponentType.WITH_JSON, argsJson))
+        return subs
+    }
     
     /**
      * 将组件内容中的§代码转换为Java版JSON属性
