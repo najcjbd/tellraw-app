@@ -1370,7 +1370,14 @@ class TellrawViewModel @Inject constructor(
             putExtra(Intent.EXTRA_TEXT, command)
             putExtra(Intent.EXTRA_SUBJECT, applicationContext.getString(R.string.share_subject))
         }
-        applicationContext.startActivity(Intent.createChooser(shareIntent, applicationContext.getString(R.string.share_tellraw_command)))
+        val chooser = Intent.createChooser(
+            shareIntent, applicationContext.getString(R.string.share_tellraw_command)
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            applicationContext.startActivity(chooser)
+        } catch (e: Exception) {
+            // 没有可用的分享目标：忽略，避免从 Application context 启动时崩溃
+        }
     }
 
     fun clearAll() {
@@ -1532,7 +1539,12 @@ class TellrawViewModel @Inject constructor(
      */
     fun openDownloadUrl(url: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        applicationContext.startActivity(intent)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            applicationContext.startActivity(intent)
+        } catch (e: Exception) {
+            // 没有可用浏览器：忽略
+        }
     }
     
     /**
