@@ -779,7 +779,7 @@ private fun summaryOf(draft: WithArgDraft): String = when (draft) {
         if (flags.isNotEmpty()) append(" · ").append(flags.joinToString("/"))
     }
     is WithArgDraft.Translate ->
-        draft.key + if (draft.args.isEmpty()) "" else " · ${draft.args.size} 个参数"
+        draft.key + if (draft.args.isEmpty()) "" else " (${draft.args.size})"
     is WithArgDraft.Selector -> draft.selector
     is WithArgDraft.Score -> "${draft.name}:${draft.objective}"
     is WithArgDraft.Keybind -> draft.keybind
