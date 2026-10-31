@@ -51,6 +51,10 @@ class SelectorEvaluatorAuditTest {
         // 反选也不能把非玩家选进来
         assertTrue(eval("@e[gamemode=!creative]", listOf(zombie)).matched.isEmpty())
         assertTrue(eval("@e[level=!20..40]", listOf(zombie)).matched.isEmpty())
+        // 玩家只是没填该字段：按“未设置、未参与筛选”处理，不应误杀
+        val unknownPlayer = GridEntity("u", "minecraft:player")
+        assertTrue(eval("@e[gamemode=creative]", listOf(unknownPlayer)).matched.isNotEmpty())
+        assertTrue(eval("@e[level=20..40]", listOf(unknownPlayer)).matched.isNotEmpty())
     }
 
     @Test
