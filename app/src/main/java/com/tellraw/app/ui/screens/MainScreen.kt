@@ -84,6 +84,7 @@ fun MainScreen(
     val selectedSubComponent by viewModel.selectedSubComponent.collectAsState()
     val hoveredComponentType by viewModel.hoveredComponentType.collectAsState()
     val hoveredComponentContent by viewModel.hoveredComponentContent.collectAsState()
+    val withBuilderState by viewModel.withBuilderState.collectAsState()
     
     // 历史记录存储相关状态
     val showStorageSettingsDialog by viewModel.showStorageSettingsDialog.collectAsState()
@@ -357,6 +358,20 @@ fun MainScreen(
             onInputChange = { viewModel.updateRawConvertInput(it) },
             onApply = { viewModel.applyRawConvertToGenerator() },
             onDismiss = { viewModel.closeRawConvertDialog() }
+        )
+    }
+
+    // translate 的 with 参数构造器（竖屏/横屏共用）
+    withBuilderState?.let { state ->
+        WithBuilderDialog(
+            state = state,
+            onDismiss = { viewModel.closeWithBuilder() },
+            onKeyChange = { viewModel.updateWithBuilderKey(it) },
+            onFallbackChange = { viewModel.updateWithBuilderFallback(it) },
+            onArgsChange = { viewModel.setWithBuilderArgs(it) },
+            onModeChange = { viewModel.setWithBuilderMode(it) },
+            onRawJsonChange = { viewModel.updateWithBuilderRawJson(it) },
+            onApply = { viewModel.applyWithBuilder() }
         )
     }
 
@@ -695,6 +710,9 @@ private fun PortraitLayout(
                                 messageTextFieldValue.value.selection.start,
                                 "'"
                             )
+                        },
+                        onOpenWithBuilder = {
+                            viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                         }
                     )
                 }
@@ -1041,6 +1059,9 @@ private fun LandscapeLayout(
                                         messageTextFieldValue.value.selection.start,
                                         "'"
                                     )
+                                },
+                                onOpenWithBuilder = {
+                                    viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                                 }
                             )
                         }
