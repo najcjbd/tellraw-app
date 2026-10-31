@@ -478,6 +478,8 @@ fun GridEditorScreen(
                             var draggedUid: String? = hit?.uid
                             var moved = 0f
                             var longFired = false
+                            var multiTouch = false
+                            var resyncSingle = false
                             var lastPos = down.position
                             down.consume()
                             while (true) {
@@ -505,6 +507,8 @@ fun GridEditorScreen(
                                 }
                                 val pressed = ev.changes.filter { it.pressed }
                                 if (pressed.size >= 2) {
+                                    multiTouch = true
+                                    resyncSingle = true
                                     val zoomChange = ev.calculateZoom()
                                     val pan = ev.calculatePan()
                                     vp = viewportState.value
@@ -519,6 +523,12 @@ fun GridEditorScreen(
                                     ev.changes.forEach { it.consume() }
                                 } else if (pressed.size == 1) {
                                     val change = pressed[0]
+                                    if (resyncSingle) {
+                                        // 双指变单指：先对齐位置，避免用旧手指坐标算出一个大 delta
+                                        lastPos = change.position
+                                        resyncSingle = false
+                                        continue
+                                    }
                                     val delta = change.position - lastPos
                                     lastPos = change.position
                                     moved += delta.getDistance()
@@ -546,7 +556,7 @@ fun GridEditorScreen(
                                 }
                                 if (pressed.isEmpty()) break
                             }
-                            if (!longFired && moved <= viewConfiguration.touchSlop) {
+                            if (!longFired && !multiTouch && moved <= viewConfiguration.touchSlop) {
                                 if (hit != null) {
                                     editing = hit
                                     editingIsNew = false
@@ -851,6 +861,7 @@ fun GridEditorScreen(
                     onDenied = { }
                 ) ?: run { showAvatarPicker = true }
             },
+            onAvatarConsumed = { pickedAvatarPath = null },
             onDismiss = { showCustomManager = false },
             onChange = { list ->
                 customs.clear()
@@ -1596,6 +1607,7 @@ private fun CustomEntityManagerDialog(
     customs: List<CustomEntity>,
     pickedAvatarPath: String? = null,
     onPickAvatar: () -> Unit = {},
+    onAvatarConsumed: () -> Unit = {},
     onDismiss: () -> Unit,
     onChange: (List<CustomEntity>) -> Unit
 ) {
@@ -1604,7 +1616,11 @@ private fun CustomEntityManagerDialog(
     var builtinId by remember { mutableStateOf("minecraft:player") }
     var avatarPath by remember { mutableStateOf("") }
     LaunchedEffect(pickedAvatarPath) {
-        if (!pickedAvatarPath.isNullOrBlank()) avatarPath = pickedAvatarPath
+        if (!pickedAvatarPath.isNullOrBlank()) {
+            avatarPath = pickedAvatarPath
+            // 消费后清空，避免下一次新建条目自动带上上一次的头像
+            onAvatarConsumed()
+        }
     }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
