@@ -200,20 +200,26 @@ object SelectorEvaluator {
                         if (!matchGamemode(e, value, notes)) return@filter false
                     "level" -> {
                         val (lo, hi) = parseRange(value)
-                        val lv = e.level
-                        if (lv == null) {
+                        if (!e.isPlayer) {
                             notes.add("level= 只适用于玩家；非玩家自动排除")
                             return@filter false
+                        }
+                        val lv = e.level
+                        if (lv == null) {
+                            notes.add("level= 玩家未设置经验等级，未按它筛选")
                         } else if (lv < (lo ?: 0.0) || lv > (hi ?: Double.MAX_VALUE)) {
                             return@filter false
                         }
                     }
                     "l", "lm" -> {
                         val num = value.toDoubleOrNull()
-                        val lv = e.level
-                        if (lv == null) {
+                        if (!e.isPlayer) {
                             notes.add("$key= 只适用于玩家；非玩家自动排除")
                             return@filter false
+                        }
+                        val lv = e.level
+                        if (lv == null) {
+                            notes.add("$key= 玩家未设置经验等级，未按它筛选")
                         } else if (num == null) {
                             notes.add("$key=$value 无法解析，已忽略")
                         } else if (key == "l" && lv > num) {
@@ -441,10 +447,14 @@ object SelectorEvaluator {
                 return true
             }
         }
-        val actual = e.gamemode
-        if (actual == null) {
+        if (!e.isPlayer) {
             notes.add("gamemode= 只适用于玩家；非玩家自动排除")
             return false
+        }
+        val actual = e.gamemode
+        if (actual == null) {
+            notes.add("gamemode= 玩家未设置游戏模式，未按它筛选")
+            return true
         }
         val hit = actual.lowercase() == want
         return if (neg) !hit else hit
