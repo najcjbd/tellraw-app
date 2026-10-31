@@ -264,8 +264,10 @@ class HistoryRepository @Inject constructor(
             if (section.trim().isEmpty()) continue
             
             try {
+                // 零宽前瞻切分后，记录头标记会留在段首；先去掉，否则首行不是 "时间:"
+                val body = section.removePrefix(START_MARKER)
                 // 只去掉记录末尾的结束标记，保留正文里可能出现的同名符号
-                val sectionContent = section.substringBeforeLast(END_MARKER, section)
+                val sectionContent = body.substringBeforeLast(END_MARKER, body)
                 
                 // 使用前缀匹配来解析各个字段
                 var timestamp = System.currentTimeMillis()
