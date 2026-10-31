@@ -197,10 +197,10 @@ object TextFormatter {
     /**
      * 将文本转换为Java版tellraw JSON格式，与Python版本的parse_minecraft_formatting函数逻辑一致
      */
-    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, bedrockColorToRgb: Boolean = true, target: com.tellraw.app.model.VersionSpec? = null): String {
+    fun convertToJavaJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, separatorAsTextComponent: Boolean = false, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, bedrockColorToRgb: Boolean = true, target: com.tellraw.app.model.VersionSpec? = null, parseMarkers: Boolean = true): String {
         // 检查是否包含文本组件标记
         var plainText = text
-        if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
+        if (parseMarkers && text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
             if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {
@@ -271,9 +271,11 @@ object TextFormatter {
             }
         }
         
-        // 如果有未知的§组合，跳过它们继续处理
-        // 不抛出异常，以保持与测试期望一致
-        // unknownCodes 可以用于日志记录或其他用途
+        // §x 旧版十六进制写法暂不支持：明确提醒，避免静默产生错误颜色
+        if (unknownCodes.any { it.equals("§x", ignoreCase = true) }) {
+            warnings?.add("§x 十六进制颜色暂不支持，已按后续颜色码逐个处理")
+        }
+        // 其他未知的§组合跳过，不抛出异常
         
         // 使用正则表达式解析颜色代码和文本
         // 匹配§+字符的模式，然后处理后续的文本
@@ -322,9 +324,11 @@ object TextFormatter {
         // 按Java版逻辑处理：相同颜色相同字体形式的文本放在一起处理
         for ((tokenType, tokenValue) in tokens) {
             if (tokenType == "format_code") {
-                val code = tokenValue
+                val code = tokenValue.lowercase()
                 // 颜色代码（不包含格式代码k、l、m、n、o、r）
                 if (code[1] in "0123456789abcdef") {
+                    // 传统 § 颜色码会重置此前的格式位
+                    currentFormat.clear()
                     // 普通颜色代码，正常处理
                     // 注意：基岩版独占颜色代码（§g, §h, §i, §j, §p, §q, §s, §t, §u, §v）
                     // 已经在预处理步骤转换为普通颜色代码，这里不需要特殊处理
@@ -349,6 +353,7 @@ object TextFormatter {
                 }
                 // 基岩版独有颜色（§g..§v）：bedrockColorToRgb 时写**精确 RGB**（Java 支持 color:"#RRGGBB"）
                 else if (bedrockColorToRgb && code.length == 2 && code[1] in VersionDiff.BEDROCK_ONLY_COLOR_RGB) {
+                    currentFormat.clear()
                     currentFormat["color"] = VersionDiff.BEDROCK_ONLY_COLOR_RGB.getValue(code[1])
                 }
                 // §m_f/§m_c/§n_f/§n_c格式（优先处理，因为它们是4字符代码）
@@ -360,6 +365,7 @@ object TextFormatter {
                         }
                         "§m_c" -> {
                             // 颜色方式：material_redstone（bedrockColorToRgb 时用精确 RGB）
+                            currentFormat.clear()
                             currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('m') else "dark_red"
                         }
                         "§n_f" -> {
@@ -368,6 +374,7 @@ object TextFormatter {
                         }
                         "§n_c" -> {
                             // 颜色方式：material_copper（bedrockColorToRgb 时用精确 RGB）
+                            currentFormat.clear()
                             currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('n') else "red"
                         }
                     }
@@ -383,6 +390,7 @@ object TextFormatter {
                                 currentFormat["strikethrough"] = true
                             } else {
                                 // 颜色方式：基岩 material_redstone。bedrockColorToRgb 时用精确 RGB
+                                currentFormat.clear()
                                 currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('m') else "dark_red"
                             }
                         }
@@ -392,6 +400,7 @@ object TextFormatter {
                                 currentFormat["underlined"] = true
                             } else {
                                 // 颜色方式：基岩 material_copper。bedrockColorToRgb 时用精确 RGB
+                                currentFormat.clear()
                                 currentFormat["color"] = if (bedrockColorToRgb) VersionDiff.BEDROCK_MN_COLOR_RGB.getValue('n') else "red"
                             }
                         }
@@ -425,6 +434,7 @@ object TextFormatter {
                         // 格式不同，添加新部分
                         val newPart = mutableMapOf<String, Any>("text" to textContent)
                         newPart.putAll(currentFormat)
+                        addInheritanceResets(result, newPart)
                         extraParts.add(newPart)
                     }
                 } else {
@@ -444,6 +454,7 @@ object TextFormatter {
                             // 格式不同，添加到extra部分
                             val newPart = mutableMapOf<String, Any>("text" to textContent)
                             newPart.putAll(currentFormat)
+                            addInheritanceResets(result, newPart)
                             extraParts.add(newPart)
                         }
                     } else {
@@ -538,6 +549,20 @@ object TextFormatter {
         return gson.toJson(rawTextMap)
     }
     
+    /**
+     * Java 的 extra 子组件会继承根组件的样式；未显式覆盖时要把根样式复位，
+     * 否则 §r / 无样式片段会继续显示父级的颜色/粗体等。
+     */
+    private fun addInheritanceResets(root: Map<String, Any>, part: MutableMap<String, Any>) {
+        for ((key, value) in root) {
+            if (key == "text" || part.containsKey(key)) continue
+            when {
+                key == "color" -> part["color"] = "reset"
+                value == true -> part[key] = false
+            }
+        }
+    }
+
     /**
      * 构建单个文本组件
      */

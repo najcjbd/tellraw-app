@@ -77,6 +77,8 @@ object GridConditionEvaluator {
                         )
                         notes.addAll(r.notes)
                         ok = r.matched.any { it.uid == entity.uid }
+                        // 选择器里有“未参与筛选”的参数时，unless 也不能反转
+                        neutral = r.neutral
                         consumed = 3
                     }
                 }

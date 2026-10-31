@@ -44,7 +44,10 @@ data class VersionSpec(val edition: Edition, val parts: List<Int>) : Comparable<
                 t.startsWith("java:", true) -> { explicit = Edition.JAVA; t = t.substring(5) }
                 t.startsWith("bedrock:", true) -> { explicit = Edition.BEDROCK; t = t.substring(8) }
             }
-            val nums = t.split('.').mapNotNull { it.trim().toIntOrNull() }
+            val rawParts = t.split('.')
+            // 每段都必须是纯数字；像 1.20.5-pre1 这种预发布号不能截断成 1.20
+            if (rawParts.any { it.trim().toIntOrNull() == null }) return null
+            val nums = rawParts.map { it.trim().toInt() }
             if (nums.size < 2) return null
 
             if (explicit != null) return VersionSpec(explicit, nums)

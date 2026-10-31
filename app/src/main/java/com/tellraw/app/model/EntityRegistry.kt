@@ -218,6 +218,7 @@ object EntityRegistry {
             "minecraft:silverfish",
             "minecraft:skeleton",
             "minecraft:slime",
+            "minecraft:spider",
             "minecraft:stray",
             "minecraft:vex",
             "minecraft:vindicator",

@@ -27,6 +27,7 @@ class EntityRegistryTest {
         assertEquals(EntityRegistry.Category.PLAYER, EntityRegistry.categoryOf("minecraft:player"))
         assertEquals(EntityRegistry.Category.HOSTILE, EntityRegistry.categoryOf("zombie"))
         assertEquals(EntityRegistry.Category.HOSTILE, EntityRegistry.categoryOf("minecraft:creeper"))
+        assertEquals(EntityRegistry.Category.HOSTILE, EntityRegistry.categoryOf("minecraft:spider"))
         assertEquals(EntityRegistry.Category.PASSIVE, EntityRegistry.categoryOf("cow"))
         assertEquals(EntityRegistry.Category.PROJECTILE, EntityRegistry.categoryOf("arrow"))
         assertEquals(EntityRegistry.Category.VEHICLE, EntityRegistry.categoryOf("oak_boat"))

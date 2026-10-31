@@ -59,6 +59,23 @@ class TargetVersionPlannerTest {
         assertNull(
             TargetVersionPlanner.unsupportedExecuteToken("execute if slots block ~ ~ ~", v("26.3"))
         )
+        // run function / tag 值里的 function/items 不是条件名，不应误判
+        assertNull(
+            TargetVersionPlanner.unsupportedExecuteToken(
+                "execute as @a run function ns:f", v("1.19.3")
+            )
+        )
+        assertNull(
+            TargetVersionPlanner.unsupportedExecuteToken(
+                "execute if entity @s[tag=items]", v("1.20.4")
+            )
+        )
+        assertEquals(
+            "function",
+            TargetVersionPlanner.unsupportedExecuteToken(
+                "execute if function ns:f", v("1.19.3")
+            )
+        )
         // 目标最新版不门控
         assertNull(TargetVersionPlanner.unsupportedExecuteToken("execute if items entity @s armor.head *", null))
     }

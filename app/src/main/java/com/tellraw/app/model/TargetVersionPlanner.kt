@@ -47,7 +47,7 @@ object TargetVersionPlanner {
             "function" to FeatureGate.Feature.EXECUTE_IF_FUNCTION
         )
         for ((token, feature) in checks) {
-            if (Regex("\\b$token\\b").containsMatchIn(prefix) &&
+            if (Regex("\\b(if|unless)\\s+$token\\b").containsMatchIn(prefix) &&
                 !FeatureGate.isAvailable(feature, target)
             ) {
                 return token

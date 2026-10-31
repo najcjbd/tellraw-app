@@ -176,6 +176,25 @@ fun GridEditorScreen(
     var worldFunctions by rememberSaveable { mutableStateOf(savedUi.worldFunctions) }
     var worldStopwatches by rememberSaveable { mutableStateOf(savedUi.worldStopwatches) }
 
+    fun currentUiSettings() = GridUiSettings(
+        selector = selectorText,
+        conditions = conditions,
+        worldDimension = worldDimension,
+        worldBiome = worldBiome,
+        worldLoaded = worldLoaded,
+        worldBlocks = worldBlocks,
+        worldFunctions = worldFunctions,
+        worldStopwatches = worldStopwatches,
+        executorUid = executorUid,
+        useExecutorOrigin = useExecutorOrigin,
+        manualOX = manualOX,
+        manualOY = manualOY,
+        manualOZ = manualOZ,
+        camX = viewport.camX,
+        camZ = viewport.camZ,
+        zoom = viewport.zoom
+    )
+
     // 网格设置持久化（防抖；输入过程中不会每个字符都写盘）
     LaunchedEffect(
         selectorText, conditions, worldDimension, worldBiome, worldLoaded,
@@ -183,26 +202,12 @@ fun GridEditorScreen(
         useExecutorOrigin, manualOX, manualOY, manualOZ, viewport
     ) {
         kotlinx.coroutines.delay(400)
-        settingsStore.save(
-            GridUiSettings(
-                selector = selectorText,
-                conditions = conditions,
-                worldDimension = worldDimension,
-                worldBiome = worldBiome,
-                worldLoaded = worldLoaded,
-                worldBlocks = worldBlocks,
-                worldFunctions = worldFunctions,
-                worldStopwatches = worldStopwatches,
-                executorUid = executorUid,
-                useExecutorOrigin = useExecutorOrigin,
-                manualOX = manualOX,
-                manualOY = manualOY,
-                manualOZ = manualOZ,
-                camX = viewport.camX,
-                camZ = viewport.camZ,
-                zoom = viewport.zoom
-            )
-        )
+        settingsStore.save(currentUiSettings())
+    }
+
+    // 离开页面时补一次保存，避免最后 400ms 内的修改被防抖吞掉
+    DisposableEffect(Unit) {
+        onDispose { settingsStore.save(currentUiSettings()) }
     }
 
     var showEditor by remember { mutableStateOf(false) }
