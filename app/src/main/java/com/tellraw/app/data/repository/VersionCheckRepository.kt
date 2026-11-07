@@ -63,6 +63,9 @@ class VersionCheckRepository @Inject constructor(
             Result.failure(Exception(context.getString(R.string.network_error, e.message ?: "")))
         } catch (e: HttpException) {
             Result.failure(Exception(context.getString(R.string.server_error, e.message ?: "")))
+        } catch (e: Exception) {
+            // 代理/论坛/ captive portal 返回 200 HTML 等会让 Gson 抛非 IO 异常；启动检查不能崩
+            Result.failure(Exception(context.getString(R.string.server_error, e.message ?: "")))
         }
     }
     

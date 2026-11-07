@@ -50,6 +50,18 @@ class CommandInputParserAuditTest {
     }
 
     @Test
+    fun rootArraySiblingsDoNotInheritStyles() {
+        val r = parse("""[{"text":"A","color":"red"},{"text":"B"}]""")
+        assertNotNull(r)
+        val json = TextComponentHelper.convertToJavaJson(r!!.components, context = null)
+        val root = com.google.gson.JsonParser.parseString(json).asJsonObject
+        val b = root.getAsJsonArray("extra").first {
+            it.asJsonObject.get("text")?.asString == "B"
+        }.asJsonObject
+        assertEquals("white", b.get("color").asString)
+    }
+
+    @Test
     fun unsupportedStyleFieldsAreWarned() {
         val r = parse(
             """{"text":"A","color":"#12AB34","clickEvent":{"action":"run_command","value":"/say hi"},"font":"minecraft:uniform"}"""

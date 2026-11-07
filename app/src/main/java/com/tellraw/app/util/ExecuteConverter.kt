@@ -627,6 +627,96 @@ object ExecuteConverter {
         }
     }
 
+    // ==================================================================
+    //  多命令 tag 方案
+    // ==================================================================
+
+    data class MultiCommandPlan(val commands: List<String>, val tags: List<String>)
+
+    /**
+     * 当单条 execute 链无法表达多个“以 @s 为目标”的条件时，用临时 tag 求交集：
+     *   execute as @a <cond_i> run tag @s add <tag_i>
+     *   tellraw <base>[tag=t1,tag=t2,...] <message>
+     *   tag <base>[tag=t_i] remove <tag_i>
+     *
+     * 只支持 `execute as @a/@e ...` + 全部条件都以 @s 为目标、且没有 at/positioned 等修饰；
+     * 其他形态返回 null，由调用方保持原有单命令/舍弃行为。
+     */
+    fun buildMultiCommandTagPlan(
+        prefix: String,
+        direction: Direction,
+        tellrawTarget: String,
+        tellrawJson: String,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+        requireUnmergeable: Boolean = true,
+        tagSuffix: String? = null
+    ): MultiCommandPlan? {
+        val segs = parseSegments(prefix, mutableListOf()) ?: return null
+        if (segs.isEmpty()) return null
+        val first = segs.first() as? Seg.Mod ?: return null
+        if (first.tokens.size != 2 || first.tokens[0] != "as") return null
+        val base = first.tokens[1]
+        // 只支持无参数的玩家选择器：避免把 Java 的 nbt=/scores=! 等原样带进基岩，且 tellraw 只收玩家
+        if (base != "@a" && base != "@p") return null
+        if (tellrawTarget != "@s" && tellrawTarget != base &&
+            !tellrawTarget.startsWith("$base[")
+        ) return null
+
+        val conditions = segs.drop(1)
+        if (conditions.size < 2) return null
+        if (conditions.any { it !is Seg.Cond }) return null
+        val conds = conditions.map { it as Seg.Cond }
+        if (conds.any { !isPerEntityCondition(it) }) return null
+
+        if (requireUnmergeable) {
+            val probe = mutableListOf<String>()
+            val single = convertExecutePrefix(prefix, direction, probe, nbtSyntax) ?: return null
+            if (single.isBlank()) return null
+            val markers = listOf("量词不同", "同一目标", "无法保持同一实体", "不做任何合并", "NOT(")
+            if (markers.none { marker -> probe.any { it.contains(marker) } }) return null
+        }
+
+        val exec = applyModifier(first.tokens, ExecState(isPlayer = true, changed = false))
+        val rawSuffix = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
+        // Java 版 tag 名只允许 -+._A-Za-z0-9；这里统一只保留字母数字下划线
+        val suffix = rawSuffix.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "tag" }
+        val tags = conds.indices.map { "tellraw_a${it + 1}_$suffix" }
+        val commands = mutableListOf<String>()
+        conds.forEachIndexed { index, cond ->
+            val warnings = mutableListOf<String>()
+            val tokens = convertCondition(cond, direction, exec, warnings, nbtSyntax)
+            if (tokens.isEmpty()) return null
+            commands.add(
+                "execute as $base ${tokens.joinToString(" ")} run tag @s add ${tags[index]}"
+            )
+        }
+        val finalTarget = if (tellrawTarget == "@s") base else tellrawTarget
+        commands.add("tellraw ${withTags(finalTarget, tags)} $tellrawJson")
+        tags.forEach { tag ->
+            commands.add("tag ${withTags(base, listOf(tag))} remove $tag")
+        }
+        return MultiCommandPlan(commands, tags)
+    }
+
+    private fun isPerEntityCondition(cond: Seg.Cond): Boolean = when (cond.name) {
+        "entity" -> cond.args.getOrNull(0)?.startsWith("@s") == true
+        "items" -> cond.args.getOrNull(0) == "entity" &&
+            cond.args.getOrNull(1)?.startsWith("@s") == true
+        "data" -> cond.args.getOrNull(0) == "entity" &&
+            cond.args.getOrNull(1)?.startsWith("@s") == true
+        "score" -> cond.args.getOrNull(0)?.startsWith("@s") == true
+        else -> false
+    }
+
+    private fun withTags(selector: String, tags: List<String>): String {
+        val params = tags.joinToString(",") { "tag=$it" }
+        return if (selector.endsWith("]")) {
+            selector.dropLast(1) + "," + params + "]"
+        } else {
+            "$selector[$params]"
+        }
+    }
+
     // ---------------------- Java -> 基岩 ----------------------
 
     /** `if|unless items entity <target> <slots> <item_predicate>` -> `if|unless entity <target>[hasitem=…]` */
@@ -691,7 +781,16 @@ object ExecuteConverter {
             ?: return dropAnd(reminders, "物品谓词无法映射到 hasitem")
 
         // 极性：unless + 无数量约束 = "没有该物品" -> 基岩 quantity=0（execute需求 A5/C18）
+        // 但仅限单一执行者：对 @a/@e 而言，基岩 quantity=0 选择“某一个没有该物品的目标”，
+        // 与 Java "没有任何目标有该物品" 量词不同。
         if (cond.unless && pred.count == null) {
+            if (target != "@s" && !target.startsWith("@s[")) {
+                return dropAnd(
+                    reminders,
+                    "\"unless items\" 的目标不是单一执行者 @s：基岩 quantity=0 会选择\"某一个没有该物品的目标\"，" +
+                        "与 Java 的\"所有目标都没有\"量词不同，已舍弃该条件"
+                )
+            }
             reminders.add("\"没有该物品\"已用基岩 quantity=0 表示（execute需求 A5/C18）")
             return foldEntity("if", target, "hasitem={$obj,quantity=0}")
         }
@@ -999,6 +1098,14 @@ object ExecuteConverter {
                     if (objs.size > 1 && cond.unless) {
                         // unless entity @s[hasitem=[{A},{B}]] = NOT(A∧B)，Java 无法用顺序条件表达
                         return dropAnd(reminders, "\"unless + hasitem 数组\"语义为 NOT(A∧B)，Java 无可对应写法")
+                    }
+                    if (objs.size > 1 && varName != "@s") {
+                        // 数组要求同一个目标同时满足 A 和 B；拆成多条 if items entity @a 会允许不同目标各满足一项
+                        return dropAnd(
+                            reminders,
+                            "\"hasitem 数组\"要求同一个目标同时满足全部项目；Java 对 $varName 这类多目标选择器" +
+                                "无法保持同一实体约束，已舍弃该条件"
+                        )
                     }
                     for (obj in objs) {
                         // 条件目标用选择器本身（可能是 @a 等），不能一律折成 @s（修正 C：同一单一实体）

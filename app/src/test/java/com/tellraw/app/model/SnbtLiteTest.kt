@@ -5,6 +5,20 @@ import org.junit.Test
 
 class SnbtLiteTest {
 
+    @Test
+    fun itemIdsDoNotUseEntityAliases() {
+        val query = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{Inventory:[{id:"minecraft:splash_potion"}]}""")!!)
+        val actual = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{Inventory:[{id:"minecraft:potion"}]}""")!!)
+        assertFalse(SnbtLite.matches(query, actual))
+        val equipQ = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{equipment:{mainhand:{id:"minecraft:trident"}}}""")!!)
+        val equipA = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{equipment:{mainhand:{id:"minecraft:thrown_trident"}}}""")!!)
+        assertFalse(SnbtLite.matches(equipQ, equipA))
+        // 实体顶层 id 仍按别名匹配
+        val entityQ = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{id:"minecraft:zombie_pigman"}""")!!)
+        val entityA = SnbtLite.Value.Compound(SnbtLite.parseCompound("""{id:"minecraft:zombified_piglin"}""")!!)
+        assertTrue(SnbtLite.matches(entityQ, entityA))
+    }
+
     private fun q(s: String) = SnbtLite.parseCompound(s)!!
     private fun m(query: String, actual: String): Boolean =
         SnbtLite.matches(

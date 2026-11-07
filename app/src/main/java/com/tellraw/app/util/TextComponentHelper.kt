@@ -923,7 +923,7 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb, target = target)
+            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb, target = target, parseMarkers = false)
         }
 
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
@@ -968,12 +968,14 @@ object TextComponentHelper {
                                 item.json
                             } else {
                                 val param = item.raw
-                                val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                                if (subFormatMap.isEmpty()) param
-                                else {
-                                    val mutableMap = subFormatMap.toMutableMap()
-                                    mutableMap["text"] = param
-                                    mutableMap
+                                val map = plainTextComponentMap(
+                                    param, mNHandling, mnCFEnabled, context, warnings,
+                                    separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                                )
+                                if (map.keys.all { it == "text" }) {
+                                    map["text"] as? String ?: param
+                                } else {
+                                    map
                                 }
                             }
                         }
@@ -1078,12 +1080,14 @@ object TextComponentHelper {
                                         item.json
                                     } else {
                                         val param = item.raw
-                                        val subFormatMap = processSectionCodesToJson(param, mNHandling, mnCFEnabled, bedrockColorToRgb)
-                                        if (subFormatMap.isEmpty()) param
-                                        else {
-                                            val mutableMap = subFormatMap.toMutableMap()
-                                            mutableMap["text"] = param
-                                            mutableMap
+                                        val map = plainTextComponentMap(
+                                            param, mNHandling, mnCFEnabled, context, warnings,
+                                            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                                        )
+                                        if (map.keys.all { it == "text" }) {
+                                            map["text"] as? String ?: param
+                                        } else {
+                                            map
                                         }
                                     }
                                 }

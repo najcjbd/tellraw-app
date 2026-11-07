@@ -109,6 +109,8 @@ class TellrawViewModel @Inject constructor(
 
     private val _asSensitive = MutableStateFlow(true)
     val asSensitive: StateFlow<Boolean> = _asSensitive.asStateFlow()
+    private val _allowMultiCmdTag = MutableStateFlow(false)
+    val allowMultiCmdTag: StateFlow<Boolean> = _allowMultiCmdTag.asStateFlow()
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -229,8 +231,9 @@ class TellrawViewModel @Inject constructor(
                 }
             }
             
-            // 加载JAVA/基岩混合模式
+            // 加载JAVA/基岩混合模式（同时恢复合并逻辑，否则重启后行为变化）
             _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
+            SelectorConverter.setMergeLogicMode(loadedSettings.javaBedrockMixedMode)
             
             // 加载默认使用text文本组件设置
             _defaultUseText.value = loadedSettings.defaultUseText
@@ -244,6 +247,7 @@ class TellrawViewModel @Inject constructor(
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
             _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
             _asSensitive.value = loadedSettings.asSensitive
+            _allowMultiCmdTag.value = loadedSettings.allowMultiCmdTag
             _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
@@ -384,7 +388,6 @@ class TellrawViewModel @Inject constructor(
         )
 
     fun updateMessage(message: String) {
-        versionOverride = null
         _messageInput.value = message
         
         // 如果关闭了"默认使用text"，需要在后台同步处理带标记符的文本
@@ -857,6 +860,12 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
 
+    fun setAllowMultiCmdTag(enabled: Boolean) {
+        _allowMultiCmdTag.value = enabled
+        viewModelScope.launch { settingsRepository.setAllowMultiCmdTag(enabled) }
+        generateCommands()
+    }
+
     fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
         viewModelScope.launch {
@@ -892,7 +901,11 @@ class TellrawViewModel @Inject constructor(
         }
         val nbtSyntax = syntaxOverride
             ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
-        val r = com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+        val r = try {
+            com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+        } catch (e: Exception) {
+            null
+        }
         if (r == null) {
             _rawConvertJava.value = ""
             _rawConvertBedrock.value = ""
@@ -901,17 +914,45 @@ class TellrawViewModel @Inject constructor(
         }
         val jTellraw = "tellraw ${r.javaSelector ?: "@a"} ${r.javaJson}"
         val bTellraw = "tellraw ${r.bedrockSelector ?: "@a"} ${r.bedrockJson}"
-        _rawConvertJava.value =
-            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, jTellraw) else jTellraw
-        _rawConvertBedrock.value =
-            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, bTellraw) else bTellraw
-        _rawConvertWarnings.value = r.warnings
+        val prefix = r.executePrefix
+        val javaTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+            ExecuteConverter.buildMultiCommandTagPlan(
+                prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                r.javaSelector ?: "@a", r.javaJson, nbtSyntax
+            )
+        } else null
+        val bedrockTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+            ExecuteConverter.buildMultiCommandTagPlan(
+                prefix, ExecuteConverter.Direction.JAVA_TO_BEDROCK,
+                r.bedrockSelector ?: "@a", r.bedrockJson, nbtSyntax
+            )
+        } else null
+        _rawConvertJava.value = if (javaTagPlan != null) {
+            javaTagPlan.commands.joinToString("\n")
+        } else if (prefix != null) {
+            ExecuteConverter.composeTellrawCommand(prefix, jTellraw)
+        } else jTellraw
+        _rawConvertBedrock.value = if (bedrockTagPlan != null) {
+            bedrockTagPlan.commands.joinToString("\n")
+        } else if (prefix != null) {
+            ExecuteConverter.composeTellrawCommand(prefix, bTellraw)
+        } else bTellraw
+        _rawConvertWarnings.value = buildList {
+            addAll(r.warnings)
+            if (javaTagPlan != null) add("已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove")
+            if (bedrockTagPlan != null) add("已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove")
+        }
     }
 
     /** 把解析结果填回生成器：选择器 / 消息（组件）/ execute 前缀；转换时生成的 if/unless 由生成器既有逻辑重算。 */
     fun applyRawConvertToGenerator() {
         val nbtSyntax = syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
-        val r = com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax) ?: return
+        val r = try {
+            com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax)
+        } catch (e: Exception) {
+            _rawConvertWarnings.value = listOf(applicationContext.getString(R.string.raw_convert_unrecognized))
+            return
+        } ?: return
         syntaxOverride = null
 
         if (r.selector != null) {
@@ -987,22 +1028,32 @@ class TellrawViewModel @Inject constructor(
             }
             
             try {
+                // 混合模式的后台文本是扁平文本；消息里有组件时必须优先保留组件结构
+                val hasStructuredComponents = !_defaultUseText.value &&
+                    TextComponentHelper.parseTextComponents(messageWithMarkers).any {
+                        it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+                    }
+                val mixedPlainOnly = _mnMixedMode.value && !hasStructuredComponents
+
                 // 确定要使用的消息
                 val messageToUse = when {
-                    _mnMixedMode.value -> backendMessageContent  // 混合模式下使用后台存储
-                    _defaultUseText.value -> message  // 默认使用text模式，使用纯文本
-                    else -> messageWithMarkers  // 使用带标记符的文本
+                    mixedPlainOnly -> backendMessageContent
+                    _defaultUseText.value -> message
+                    else -> messageWithMarkers
                 }
                 
                 // 确定m_n_handling参数
                 val mNHandling = when {
-                    _mnMixedMode.value -> "font"  // 混合模式下使用font模式，因为已经转换为§m_f/§m_c/§n_f/§n_c
+                    mixedPlainOnly -> "font"
                     _useJavaFontStyle.value -> "font"
                     else -> "color"
                 }
                 
                 // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
                 val allReminders = mutableListOf<String>()
+                if (_mnMixedMode.value && hasStructuredComponents) {
+                    allReminders.add("混合模式只处理纯文本；当前消息含文本组件，已保留组件结构（§m/§n 的 _c/_f 会话选择不作用于该消息）")
+                }
 
                 // 版本策略要在选择器/文本组件转换**之前**定出来：混合模式与组件内嵌 selector 都要按它过滤。
                 // 具体目标版本是硬约束：Java 目标决定物品 NBT 语法（旧 NBT / 数据组件 / 装备走 items）。
@@ -1117,7 +1168,25 @@ class TellrawViewModel @Inject constructor(
                     else -> null
                 }
                 val javaPlain = "tellraw $finalJavaTarget $javaJson"
-                val javaCommand = when {
+                val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                    javaUserPrefix != null && _executePrefixInput.value.isNotBlank() &&
+                    finalJavaInnerTokens == null && contentAs == null
+                ) {
+                    ExecuteConverter.buildMultiCommandTagPlan(
+                        _executePrefixInput.value,
+                        ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                        finalJavaTarget,
+                        javaJson,
+                        nbtSyntax
+                    )
+                } else null
+                val javaCommand = if (javaTagPlan != null) {
+                    allReminders.add(
+                        "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove；" +
+                            "请按顺序执行全部命令，中途停止会残留标签"
+                    )
+                    javaTagPlan.commands.joinToString("\n")
+                } else when {
                     finalJavaInnerTokens == null ->
                         if (javaUserPrefix != null) {
                             ExecuteConverter.composeTellrawCommand(javaUserPrefix, javaPlain)
@@ -1142,12 +1211,28 @@ class TellrawViewModel @Inject constructor(
                     target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
-                val bedrockCommand =
-                    if (bedrockUserPrefix != null) {
-                        ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
-                    } else {
-                        bedrockPlain
-                    }
+                val bedrockTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                    bedrockUserPrefix != null && _executePrefixInput.value.isNotBlank()
+                ) {
+                    ExecuteConverter.buildMultiCommandTagPlan(
+                        _executePrefixInput.value,
+                        ExecuteConverter.Direction.JAVA_TO_BEDROCK,
+                        bedrockFilteredSelector,
+                        bedrockJson,
+                        nbtSyntax
+                    )
+                } else null
+                val bedrockCommand = if (bedrockTagPlan != null) {
+                    allReminders.add(
+                        "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove；" +
+                            "请按顺序执行全部命令，中途停止会残留标签"
+                    )
+                    bedrockTagPlan.commands.joinToString("\n")
+                } else if (bedrockUserPrefix != null) {
+                    ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
+                } else {
+                    bedrockPlain
+                }
                 
                 // 新旧写法混用 -> 问一嘴（版本差异规范 2.4）。
                 // 只在"从没混用 -> 出现混用"这一刻问一次；用户在对话框里的选择会覆盖本次输出。
@@ -1420,7 +1505,9 @@ class TellrawViewModel @Inject constructor(
         _bedrockCommand.value = ""
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
-        _useJavaFontStyle.value = true
+        _selectedTextComponent.value = null
+        _selectedSubComponent.value = null
+        _expandedSubComponents.value = emptySet()
         
         // 重置§m和§n计数器
         _mCodeCount.value = 0
@@ -1485,6 +1572,11 @@ class TellrawViewModel @Inject constructor(
         }
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
+        _warnings.value = emptyList()
+        _hoveredComponentType.value = null
+        _hoveredComponentContent.value = null
+        _selectedTextComponent.value = null
+        _selectedSubComponent.value = null
         detectSelectorType()
         
         // 重置§m和§n计数器

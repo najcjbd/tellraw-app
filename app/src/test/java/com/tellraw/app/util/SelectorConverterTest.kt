@@ -3936,6 +3936,16 @@ class SelectorConverterTest {
     }
 
     @Test
+    fun testMixedModeStripsBedrockScoreNegationFromJavaOutput() {
+        val reminders = mutableListOf<String>()
+        val (javaOut, _) = SelectorConverter.convertForMixedMode(
+            "@a[distance=..5,c=3,team=red,scores={k=!1}]", context, reminders
+        )
+        assertFalse("Java 选择器不能保留 =!：$javaOut", javaOut.contains("=!"))
+        assertTrue("应提醒 scores 反选被移除：$reminders", reminders.any { it.contains("scores") })
+    }
+
+    @Test
     fun testBedrockDropsTypeTagsAndAttributes() {
         val (tagSel, _, tagReminders) = SelectorConverter.filterSelectorParameters(
             "@e[type=#minecraft:skeletons]", SelectorType.BEDROCK, context

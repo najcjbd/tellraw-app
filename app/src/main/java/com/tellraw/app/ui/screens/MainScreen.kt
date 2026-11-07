@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -62,6 +63,7 @@ fun MainScreen(
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
     val asSensitive by viewModel.asSensitive.collectAsState()
+    val allowMultiCmdTag by viewModel.allowMultiCmdTag.collectAsState()
     val showRawConvertDialog by viewModel.showRawConvertDialog.collectAsState()
     val rawConvertInput by viewModel.rawConvertInput.collectAsState()
     val rawConvertJava by viewModel.rawConvertJava.collectAsState()
@@ -76,7 +78,7 @@ fun MainScreen(
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showDisableCheckDialog by viewModel.showDisableCheckDialog.collectAsState()
     val showJavaBedrockMixedModeWarningDialog by viewModel.showJavaBedrockMixedModeWarningDialog.collectAsState()
-    var showCommaChoiceDialog by remember { mutableStateOf(false) }
+    var showCommaChoiceDialog by rememberSaveable { mutableStateOf(false) }
     
     // 文本组件相关状态
     val selectedTextComponent by viewModel.selectedTextComponent.collectAsState()
@@ -96,10 +98,12 @@ fun MainScreen(
     val writeFileMessage by viewModel.writeFileMessage.collectAsState()
     
     // 文件选择器相关状态
-    val showDirectoryPickerDialog = remember { mutableStateOf(false) }
+    val showDirectoryPickerDialog = rememberSaveable { mutableStateOf(false) }
     
     // 用于跟踪光标位置的状态
-    val messageTextFieldValue = remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
+    val messageTextFieldValue = rememberSaveable(
+        stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver
+    ) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(messageInput)) }
     
     // 当messageInput变化时，同步更新messageTextFieldValue
     LaunchedEffect(messageInput) {
@@ -118,8 +122,8 @@ fun MainScreen(
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val searchResults by viewModel.searchResults.collectAsState(initial = emptyList())
-    val showHistoryDialog = remember { mutableStateOf(false) }
-    val showSettingsDialog = remember { mutableStateOf(false) }
+    val showHistoryDialog = rememberSaveable { mutableStateOf(false) }
+    val showSettingsDialog = rememberSaveable { mutableStateOf(false) }
 
     // 初始化ViewModel（只在首次组合时调用一次，屏幕旋转时不会重复初始化）
     LaunchedEffect(Unit) {
@@ -280,6 +284,7 @@ fun MainScreen(
             separatorAsTextComponent = separatorAsTextComponent,
             bedrockColorToRgb = bedrockColorToRgb,
             asSensitive = asSensitive,
+            allowMultiCmdTag = allowMultiCmdTag,
             nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
@@ -308,6 +313,9 @@ fun MainScreen(
             },
             onAsSensitiveChanged = { enabled ->
                 viewModel.setAsSensitive(enabled)
+            },
+            onAllowMultiCmdTagChanged = { enabled ->
+                viewModel.setAllowMultiCmdTag(enabled)
             },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)
@@ -387,7 +395,9 @@ fun MainScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                    if (selectedTextComponent != TextComponentHelper.ComponentType.TRANSLATE) {
+                        viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                    }
                     viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH)
                     viewModel.insertTextWithComponent(
                         messageTextFieldValue.value.selection.start, "\\,"
@@ -398,7 +408,9 @@ fun MainScreen(
             dismissButton = {
                 Column(horizontalAlignment = Alignment.End) {
                     TextButton(onClick = {
-                        viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                        if (selectedTextComponent != TextComponentHelper.ComponentType.TRANSLATE) {
+                            viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
+                        }
                         viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH_JSON)
                         viewModel.insertTextWithComponent(
                             messageTextFieldValue.value.selection.start, ","

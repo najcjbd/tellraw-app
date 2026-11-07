@@ -53,8 +53,8 @@ object VersionDiff {
     enum class InputShape { ONLY_LEGACY, ONLY_MODERN, MIXED, NEITHER }
 
     fun shapeOf(text: String): InputShape {
-        val old = "tag:{" in text
-        val modern = "components:{" in text
+        val old = findUnquoted(text, LEGACY_TAG_RE) != null
+        val modern = findUnquoted(text, MODERN_COMPONENTS_RE) != null
         return when {
             old && modern -> InputShape.MIXED
             old -> InputShape.ONLY_LEGACY
@@ -143,7 +143,36 @@ object VersionDiff {
      */
     fun routesEquipmentViaItems(syntax: NbtSyntax): Boolean = syntax == NbtSyntax.MODERN_PRE_1_21_5
 
-    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */
+    private val LEGACY_TAG_RE = Regex("""\btag\s*:\s*\{""")
+    private val MODERN_COMPONENTS_RE = Regex("""\bcomponents\s*:\s*\{""")
+
+    fun findLegacyTagStart(text: String): Int? =
+        findUnquoted(text, LEGACY_TAG_RE)?.range?.first
+
+    fun findModernComponentsStart(text: String): Int? =
+        findUnquoted(text, MODERN_COMPONENTS_RE)?.range?.first
+
+    /** 只在引号外查找；SNBT 字符串里出现的同名文本不能改写。 */
+    private fun findUnquoted(s: String, re: Regex, start: Int = 0): MatchResult? {
+        var quote: Char? = null
+        var i = start
+        while (i < s.length) {
+            val c = s[i]
+            if (quote != null) {
+                if (c == '\\' && i + 1 < s.length) { i += 2; continue }
+                if (c == quote) quote = null
+                i++
+                continue
+            }
+            if (c == '"' || c == '\'') { quote = c; i++; continue }
+            val m = re.find(s, i)
+            if (m != null && m.range.first == i) return m
+            i++
+        }
+        return null
+    }
+
+    /** 旧写法里"自定义数据"的整体搬运规则：`tag:{…}` -> `components:{"minecraft:custom_data":{…}}`。 */
     const val LEGACY_CUSTOM_DATA_TAG = "tag:"
     const val MODERN_CUSTOM_DATA_KEY = "custom_data"
 

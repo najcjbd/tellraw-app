@@ -280,3 +280,38 @@ class VersionDiffTest {
         assertNull(VersionDiff.syntaxForTarget(com.tellraw.app.model.VersionSpec.LATEST))
     }
 }
+
+class VersionDiffQuoteAwareTest {
+    @Test
+    fun shapeOfUnderstandsWhitespaceAndIgnoresQuotedText() {
+        assertEquals(VersionDiff.InputShape.ONLY_LEGACY, VersionDiff.shapeOf("{tag: {Damage:5b}}"))
+        assertEquals(
+            VersionDiff.InputShape.ONLY_MODERN,
+            VersionDiff.shapeOf("{components: {minecraft:damage:5}}")
+        )
+        assertEquals(VersionDiff.InputShape.NEITHER, VersionDiff.shapeOf("{display:{Name:'tag:{x}'}}"))
+    }
+
+    @Test
+    fun rewriteLegacyTagHandlesWhitespaceButNotQuotedStrings() {
+        val (a, changedA) = ExecCondSupport.rewriteLegacyTag("{tag: {Damage:5b}}")
+        assertTrue(changedA)
+        assertTrue(a, a.contains("components:"))
+        assertFalse(a, a.contains("tag: {"))
+
+        val input = """{display:{Name:'tag:{x}'},tag:{Damage:1b}}"""
+        val (b, changedB) = ExecCondSupport.rewriteLegacyTag(input)
+        assertTrue(changedB)
+        assertTrue("引号内的文本不能被改写：$b", b.contains("'tag:{x}'"))
+        assertTrue(b, b.contains("components:"))
+    }
+
+    @Test
+    fun rewriteModernComponentsDoesNotTouchQuotedText() {
+        val input = """{display:{Name:'components:{x}'},components:{minecraft:damage:5}}"""
+        val r = ExecCondSupport.rewriteModernComponents(input)
+        assertTrue(r.changed)
+        assertTrue("引号内的文本不能被改写：${r.text}", r.text.contains("'components:{x}'"))
+        assertTrue(r.text, r.text.contains("tag:"))
+    }
+}
