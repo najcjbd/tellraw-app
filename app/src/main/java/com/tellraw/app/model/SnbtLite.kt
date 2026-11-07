@@ -53,13 +53,23 @@ object SnbtLite {
         return parseCompound(if (t.startsWith("{")) t else "{$t}")
     }
 
-    fun matches(query: Value, actual: Value): Boolean {
+    fun matches(query: Value, actual: Value): Boolean = matches(query, actual, itemContext = false)
+
+    /** 物品栏/装备等容器内的 id 是物品 ID，不能套用实体 ID 别名。 */
+    private val ITEM_CONTAINER_KEYS = setOf(
+        "Inventory", "EnderItems", "Items", "SelectedItem", "equipment",
+        "Item", "items", "container", "contents", "ChargedProjectiles", "book"
+    )
+
+    private fun matches(query: Value, actual: Value, itemContext: Boolean): Boolean {
         return when (query) {
         is Value.Compound -> {
             val a = actual as? Value.Compound ?: return false
             query.map.all { (k, v) ->
                 a.map[k]?.let { actualValue ->
-                    if (k == "id") matchesId(v, actualValue) else matches(v, actualValue)
+                    val childItem = itemContext || k in ITEM_CONTAINER_KEYS
+                    if (k == "id") matchesId(v, actualValue, itemContext)
+                    else matches(v, actualValue, childItem)
                 } == true
             }
         }
@@ -69,7 +79,7 @@ object SnbtLite {
             query.items.all { q ->
                 var found = false
                 for (i in a.items.indices) {
-                    if (!used[i] && matches(q, a.items[i])) {
+                    if (!used[i] && matches(q, a.items[i], itemContext)) {
                         used[i] = true; found = true; break
                     }
                 }
@@ -91,10 +101,10 @@ object SnbtLite {
     }
 
     /** 物品/实体 ID：`diamond_sword` 与 `minecraft:diamond_sword` 等价。 */
-    private fun matchesId(a: Value, b: Value): Boolean {
-        if (a !is Value.Str || b !is Value.Str) return matches(a, b)
-        // 同一实体的 Java/基岩 ID 视为相同（如 zombified_piglin / zombie_pigman）
-        if (EntityIdAliases.isKnown(a.v) || EntityIdAliases.isKnown(b.v)) {
+    private fun matchesId(a: Value, b: Value, itemContext: Boolean): Boolean {
+        if (a !is Value.Str || b !is Value.Str) return matches(a, b, itemContext)
+        // 只有实体 NBT 的顶层 id 才套用实体别名；物品栏里的 id 是物品 ID
+        if (!itemContext && (EntityIdAliases.isKnown(a.v) || EntityIdAliases.isKnown(b.v))) {
             return EntityIdAliases.canonical(a.v) == EntityIdAliases.canonical(b.v)
         }
         fun norm(x: String) = if (x.contains(':')) x else "minecraft:$x"

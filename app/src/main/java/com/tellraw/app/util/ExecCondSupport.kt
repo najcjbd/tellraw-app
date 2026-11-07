@@ -96,9 +96,9 @@ internal object ExecCondSupport {
         var out = text
         var changed = false
         while (true) {
-            val start = out.indexOf("tag:{")
-            if (start < 0) break
-            val open = start + 4
+            val start = VersionDiff.findLegacyTagStart(out) ?: break
+            val open = out.indexOf('{', start)
+            if (open < 0) break
             val end = matchBrace(out, open) ?: break
             val body = out.substring(open + 1, end)
             val replacement = VersionDiff.legacyTagBodyToComponents(body)
@@ -135,9 +135,9 @@ internal object ExecCondSupport {
         val unshaped = mutableListOf<String>()
         val unmappable = mutableListOf<String>()
         while (true) {
-            val start = out.indexOf("components:{")
-            if (start < 0) break
-            val open = start + "components:".length
+            val start = VersionDiff.findModernComponentsStart(out) ?: break
+            val open = out.indexOf('{', start)
+            if (open < 0) break
             val end = matchBrace(out, open) ?: break
             val body = out.substring(open + 1, end)
             val r = VersionDiff.modernComponentsToLegacyTag(body) ?: break

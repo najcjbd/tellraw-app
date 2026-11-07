@@ -377,21 +377,8 @@ class HistoryRepository @Inject constructor(
         return history.sortedByDescending { it.timestamp }
     }
     
-    /**
-     * 从命令中提取选择器
-     */
-    private fun extractSelectorFromCommand(command: String): String {
-        try {
-            // 命令格式：tellraw @a {...}
-            val parts = command.split(" ", limit = 3)
-            if (parts.size >= 2) {
-                return parts[1]
-            }
-        } catch (e: Exception) {
-            // 提取失败
-        }
-        return "@a"
-    }
+    /** 从生成的命令中提取真正的 tellraw 收信人（execute/run/say 都能处理）。 */
+    private fun extractSelectorFromCommand(command: String): String = selectorFromCommand(command)
     
     /**
      * 解析时间戳
@@ -602,6 +589,29 @@ class HistoryRepository @Inject constructor(
     suspend fun buildHistoryContent(item: HistoryItem): String {
         return withContext(Dispatchers.IO) {
             buildSingleHistoryItem(item)
+        }
+    }
+}
+
+
+internal fun selectorFromCommand(command: String): String {
+    val cmd = command.trim()
+    if (cmd.isEmpty()) return "@a"
+    val body = when {
+        cmd.startsWith("execute") -> {
+            val idx = cmd.lastIndexOf(" run ")
+            if (idx < 0) return "@a"
+            cmd.substring(idx + " run ".length).trim()
+        }
+        else -> cmd
+    }
+    return when {
+        body.startsWith("tellraw ") ->
+            body.removePrefix("tellraw ").trimStart().substringBefore(' ').ifBlank { "@a" }
+        body == "say" || body.startsWith("say ") -> "@a"
+        else -> {
+            val parts = cmd.split(" ", limit = 3)
+            if (parts.size >= 2 && parts[1].startsWith("@")) parts[1] else "@a"
         }
     }
 }

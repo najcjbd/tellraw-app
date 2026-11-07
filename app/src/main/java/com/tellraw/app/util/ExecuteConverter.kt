@@ -691,7 +691,16 @@ object ExecuteConverter {
             ?: return dropAnd(reminders, "物品谓词无法映射到 hasitem")
 
         // 极性：unless + 无数量约束 = "没有该物品" -> 基岩 quantity=0（execute需求 A5/C18）
+        // 但仅限单一执行者：对 @a/@e 而言，基岩 quantity=0 选择“某一个没有该物品的目标”，
+        // 与 Java "没有任何目标有该物品" 量词不同。
         if (cond.unless && pred.count == null) {
+            if (target != "@s" && !target.startsWith("@s[")) {
+                return dropAnd(
+                    reminders,
+                    "\"unless items\" 的目标不是单一执行者 @s：基岩 quantity=0 会选择\"某一个没有该物品的目标\"，" +
+                        "与 Java 的\"所有目标都没有\"量词不同，已舍弃该条件"
+                )
+            }
             reminders.add("\"没有该物品\"已用基岩 quantity=0 表示（execute需求 A5/C18）")
             return foldEntity("if", target, "hasitem={$obj,quantity=0}")
         }
@@ -999,6 +1008,14 @@ object ExecuteConverter {
                     if (objs.size > 1 && cond.unless) {
                         // unless entity @s[hasitem=[{A},{B}]] = NOT(A∧B)，Java 无法用顺序条件表达
                         return dropAnd(reminders, "\"unless + hasitem 数组\"语义为 NOT(A∧B)，Java 无可对应写法")
+                    }
+                    if (objs.size > 1 && varName != "@s") {
+                        // 数组要求同一个目标同时满足 A 和 B；拆成多条 if items entity @a 会允许不同目标各满足一项
+                        return dropAnd(
+                            reminders,
+                            "\"hasitem 数组\"要求同一个目标同时满足全部项目；Java 对 $varName 这类多目标选择器" +
+                                "无法保持同一实体约束，已舍弃该条件"
+                        )
                     }
                     for (obj in objs) {
                         // 条件目标用选择器本身（可能是 @a 等），不能一律折成 @s（修正 C：同一单一实体）

@@ -229,8 +229,9 @@ class TellrawViewModel @Inject constructor(
                 }
             }
             
-            // 加载JAVA/基岩混合模式
+            // 加载JAVA/基岩混合模式（同时恢复合并逻辑，否则重启后行为变化）
             _javaBedrockMixedMode.value = loadedSettings.javaBedrockMixedMode
+            SelectorConverter.setMergeLogicMode(loadedSettings.javaBedrockMixedMode)
             
             // 加载默认使用text文本组件设置
             _defaultUseText.value = loadedSettings.defaultUseText
@@ -384,7 +385,6 @@ class TellrawViewModel @Inject constructor(
         )
 
     fun updateMessage(message: String) {
-        versionOverride = null
         _messageInput.value = message
         
         // 如果关闭了"默认使用text"，需要在后台同步处理带标记符的文本
@@ -892,7 +892,11 @@ class TellrawViewModel @Inject constructor(
         }
         val nbtSyntax = syntaxOverride
             ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
-        val r = com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+        val r = try {
+            com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+        } catch (e: Exception) {
+            null
+        }
         if (r == null) {
             _rawConvertJava.value = ""
             _rawConvertBedrock.value = ""
@@ -911,7 +915,12 @@ class TellrawViewModel @Inject constructor(
     /** 把解析结果填回生成器：选择器 / 消息（组件）/ execute 前缀；转换时生成的 if/unless 由生成器既有逻辑重算。 */
     fun applyRawConvertToGenerator() {
         val nbtSyntax = syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
-        val r = com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax) ?: return
+        val r = try {
+            com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax)
+        } catch (e: Exception) {
+            _rawConvertWarnings.value = listOf(applicationContext.getString(R.string.raw_convert_unrecognized))
+            return
+        } ?: return
         syntaxOverride = null
 
         if (r.selector != null) {
@@ -987,22 +996,32 @@ class TellrawViewModel @Inject constructor(
             }
             
             try {
+                // 混合模式的后台文本是扁平文本；消息里有组件时必须优先保留组件结构
+                val hasStructuredComponents = !_defaultUseText.value &&
+                    TextComponentHelper.parseTextComponents(messageWithMarkers).any {
+                        it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+                    }
+                val mixedPlainOnly = _mnMixedMode.value && !hasStructuredComponents
+
                 // 确定要使用的消息
                 val messageToUse = when {
-                    _mnMixedMode.value -> backendMessageContent  // 混合模式下使用后台存储
-                    _defaultUseText.value -> message  // 默认使用text模式，使用纯文本
-                    else -> messageWithMarkers  // 使用带标记符的文本
+                    mixedPlainOnly -> backendMessageContent
+                    _defaultUseText.value -> message
+                    else -> messageWithMarkers
                 }
                 
                 // 确定m_n_handling参数
                 val mNHandling = when {
-                    _mnMixedMode.value -> "font"  // 混合模式下使用font模式，因为已经转换为§m_f/§m_c/§n_f/§n_c
+                    mixedPlainOnly -> "font"
                     _useJavaFontStyle.value -> "font"
                     else -> "color"
                 }
                 
                 // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
                 val allReminders = mutableListOf<String>()
+                if (_mnMixedMode.value && hasStructuredComponents) {
+                    allReminders.add("混合模式只处理纯文本；当前消息含文本组件，已保留组件结构（§m/§n 的 _c/_f 会话选择不作用于该消息）")
+                }
 
                 // 版本策略要在选择器/文本组件转换**之前**定出来：混合模式与组件内嵌 selector 都要按它过滤。
                 // 具体目标版本是硬约束：Java 目标决定物品 NBT 语法（旧 NBT / 数据组件 / 装备走 items）。
@@ -1420,7 +1439,9 @@ class TellrawViewModel @Inject constructor(
         _bedrockCommand.value = ""
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
-        _useJavaFontStyle.value = true
+        _selectedTextComponent.value = null
+        _selectedSubComponent.value = null
+        _expandedSubComponents.value = emptySet()
         
         // 重置§m和§n计数器
         _mCodeCount.value = 0
@@ -1485,6 +1506,11 @@ class TellrawViewModel @Inject constructor(
         }
         _javaCommand.value = history.javaCommand
         _bedrockCommand.value = history.bedrockCommand
+        _warnings.value = emptyList()
+        _hoveredComponentType.value = null
+        _hoveredComponentContent.value = null
+        _selectedTextComponent.value = null
+        _selectedSubComponent.value = null
         detectSelectorType()
         
         // 重置§m和§n计数器

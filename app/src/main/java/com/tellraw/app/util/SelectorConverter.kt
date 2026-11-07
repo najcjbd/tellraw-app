@@ -4145,9 +4145,15 @@ object SelectorConverter {
             bedrockOutput
         }
         
+        // 混合后的 Java 选择器也要过一遍 Java 过滤：common 参数里的 scores=! 等基岩写法必须处理
+        val (javaFiltered, _, filterReminders) = filterSelectorParameters(
+            javaOutputWithMergedParams, SelectorType.JAVA, context, nbtSyntax, null, realEntityKind
+        )
+        reminders.addAll(filterReminders)
+
         // 添加提醒信息
         reminders.add(getStringSafely(context, R.string.java_bedrock_mixed_mode_active))
 
-        return javaOutputWithMergedParams to bedrockOutputWithMergedParams
+        return javaFiltered to bedrockOutputWithMergedParams
     }
 }

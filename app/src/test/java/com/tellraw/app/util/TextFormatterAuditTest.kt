@@ -60,6 +60,27 @@ class TextFormatterAuditTest {
     }
 
     @Test
+    fun literalMarkersInTextComponentAreNotParsed() {
+        val components = listOf(TextComponent(ComponentType.TEXT, "a\u0FC8text\u0F34b"))
+        val json = TextComponentHelper.convertToJavaJson(components, context = null)
+        assertTrue(json, json.contains("a\u0FC8text\u0F34b"))
+    }
+
+    @Test
+    fun plainWithSectionsAreStyledNotLiteral() {
+        val components = listOf(
+            TextComponent(
+                ComponentType.TRANSLATE, "k",
+                mutableListOf(TextComponentHelper.SubComponent(TextComponentHelper.SubComponentType.WITH, "§cApple"))
+            )
+        )
+        val json = TextComponentHelper.convertToJavaJson(components, context = null)
+        assertFalse(json, json.contains("§cApple"))
+        assertTrue(json, json.contains("\"text\":\"Apple\""))
+        assertTrue(json, json.contains("\"color\":\"red\""))
+    }
+
+    @Test
     fun nonTextSiblingsDoNotInheritRootTextStyles() {
         val components = listOf(
             TextComponent(ComponentType.TEXT, "§c§lA"),

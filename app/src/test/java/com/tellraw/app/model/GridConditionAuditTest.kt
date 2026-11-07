@@ -36,6 +36,16 @@ class GridConditionAuditTest {
     }
 
     @Test
+    fun bedrockBlockConditionUsesWorldData() {
+        val world = GridConditionEvaluator.GridWorld(
+            blocks = mapOf("0,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"))
+        )
+        val bedrock = VersionSpec.parse("1.21.100")
+        assertTrue(eval("if block 0 -60 0 stone", world = world, target = bedrock).ok)
+        assertFalse(eval("if block 0 -60 0 dirt", world = world, target = bedrock).ok)
+    }
+
+    @Test
     fun unlessEntityWithUnsupportedSelectorParamIsNeutral() {
         // Bedrock 目标下 nbt= 不参与筛选；unless 不能把它反转为“全部排除”
         val r = eval(

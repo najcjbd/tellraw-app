@@ -139,12 +139,7 @@ object GridConditionEvaluator {
                     }
                 }
                 "block", "blocks" -> {
-                    if (target != null && target.edition == VersionSpec.Edition.BEDROCK) {
-                        notes.add("基岩没有 $name 条件；未参与筛选")
-                        ok = true
-                        neutral = true
-                        consumed = conditionSpan(tokens, i + 1)
-                    } else if (world.blocks.isEmpty()) {
+                    if (world.blocks.isEmpty()) {
                         notes.add("未提供方块数据，$name 条件未参与筛选（可在“世界条件”里填写）")
                         ok = true
                         neutral = true

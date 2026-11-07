@@ -253,7 +253,8 @@ fun GridEditorScreen(
     val parsedCommand = remember(selectorText) {
         val t = selectorText.trim()
         if (t.startsWith("execute") || t.startsWith("tellraw")) {
-            CommandInputParser.parse(selectorText, context)
+            // 非法数值等可能抛异常；粘贴整条命令不应让网格页面崩溃
+            runCatching { CommandInputParser.parse(selectorText, context) }.getOrNull()
         } else null
     }
     val effectiveSelector = parsedCommand?.selector?.takeIf { it.isNotBlank() } ?: selectorText
@@ -524,6 +525,7 @@ fun GridEditorScreen(
                                         camZ = vp.camZ - pan.y / b,
                                         zoom = nz
                                     )
+                                    if (draggedUid != null) persistEntities()
                                     draggedUid = null
                                     ev.changes.forEach { it.consume() }
                                 } else if (pressed.size == 1) {

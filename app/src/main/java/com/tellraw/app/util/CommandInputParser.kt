@@ -195,9 +195,21 @@ object CommandInputParser {
 
     private fun decodeComponentArray(arr: JsonArray, warnings: MutableList<String>): List<TextComponent> {
         val out = mutableListOf<TextComponent>()
+        var previousStyled = false
         for (e in arr) {
-            if (e.isJsonObject) out.addAll(decodeComponent(e.asJsonObject, warnings))
-            else if (e.isJsonPrimitive) out.add(TextComponent(ComponentType.TEXT, e.asString))
+            val decoded = when {
+                e.isJsonObject -> decodeComponent(e.asJsonObject, warnings)
+                e.isJsonPrimitive -> listOf(TextComponent(ComponentType.TEXT, e.asString))
+                else -> emptyList()
+            }
+            // JSON 数组的兄弟组件互不继承；平铺成 TEXT 模型时用 §r 隔开
+            if (previousStyled && decoded.isNotEmpty()) {
+                out.add(TextComponent(ComponentType.TEXT, "§r"))
+            }
+            out.addAll(decoded)
+            previousStyled = decoded.any {
+                it.type == ComponentType.TEXT && '§' in it.content
+            }
         }
         return out
     }
@@ -223,6 +235,7 @@ object CommandInputParser {
                 if (losesStyle) warnings.add("translate 组件上的样式字段暂未保留（会作用于 extra 子组件）")
                 val comp = TextComponent(ComponentType.TRANSLATE, str(obj, "translate"))
                 obj.get("fallback")?.let {
+                    warnStyleLoss(it, "fallback", warnings)
                     comp.subComponents.add(
                         SubComponent(SubComponentType.FALLBACK, plainTextOf(it, warnings))
                     )
@@ -268,6 +281,7 @@ object CommandInputParser {
                 if (losesStyle) warnings.add("selector 组件上的样式字段暂未保留")
                 val comp = TextComponent(ComponentType.SELECTOR, str(obj, "selector"))
                 obj.get("separator")?.let { sep ->
+                    warnStyleLoss(sep, "separator", warnings)
                     comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, plainTextOf(sep, warnings)))
                 }
                 out.add(comp)
@@ -287,6 +301,16 @@ object CommandInputParser {
             }
         }
         return out
+    }
+
+    /** 子组件目前只能存纯文本；有样式时明确提醒，不再静默丢掉。 */
+    private fun warnStyleLoss(e: JsonElement, label: String, warnings: MutableList<String>) {
+        if (!e.isJsonObject) return
+        val keys = listOf("color", "bold", "italic", "underlined", "strikethrough", "obfuscated", "font", "clickEvent", "hoverEvent")
+            .filter { e.asJsonObject.has(it) }
+        if (keys.isNotEmpty()) {
+            warnings.add("$label 的样式字段 ${keys.joinToString("、")} 暂未保留（只能存纯文本）")
+        }
     }
 
     /** `with` 里的一项 -> 纯文本（非文本组件给出去壳文字，并提醒）。 */
