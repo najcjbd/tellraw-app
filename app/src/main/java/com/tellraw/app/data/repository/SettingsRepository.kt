@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -34,6 +36,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_EXECUTE_PREFIX_INPUT = "execute_prefix_input"
         private const val KEY_BEDROCK_COLOR_TO_RGB = "bedrock_color_to_rgb"
         private const val KEY_AS_SENSITIVE = "as_sensitive"
+        private const val KEY_ALLOW_MULTI_CMD_TAG = "allow_multi_cmd_tag"
         private const val KEY_TARGET_VERSION = "target_version"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
@@ -82,6 +85,10 @@ class SettingsRepository @Inject constructor(
     private val _asSensitive = MutableStateFlow(true)
     val asSensitive: Flow<Boolean> = _asSensitive.asStateFlow()
 
+    /** 是否允许用“临时 tag + 多命令”表达单条 execute 链无法表达的条件（默认否）。 */
+    private val _allowMultiCmdTag = MutableStateFlow(false)
+    val allowMultiCmdTag: Flow<Boolean> = _allowMultiCmdTag.asStateFlow()
+
     /** 目标版本（配置文件里输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: Flow<String> = _targetVersion.asStateFlow()
@@ -126,6 +133,7 @@ class SettingsRepository @Inject constructor(
                         executePrefixInput = _executePrefixInput.value,
                         bedrockColorToRgb = _bedrockColorToRgb.value,
                         asSensitive = _asSensitive.value,
+                        allowMultiCmdTag = _allowMultiCmdTag.value,
                         targetVersion = _targetVersion.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
@@ -148,6 +156,7 @@ class SettingsRepository @Inject constructor(
                     executePrefixInput = _executePrefixInput.value,
                     bedrockColorToRgb = _bedrockColorToRgb.value,
                     asSensitive = _asSensitive.value,
+                    allowMultiCmdTag = _allowMultiCmdTag.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -166,6 +175,7 @@ class SettingsRepository @Inject constructor(
                     executePrefixInput = _executePrefixInput.value,
                     bedrockColorToRgb = _bedrockColorToRgb.value,
                     asSensitive = _asSensitive.value,
+                    allowMultiCmdTag = _allowMultiCmdTag.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -189,6 +199,7 @@ class SettingsRepository @Inject constructor(
         val executePrefixInput: String,
         val bedrockColorToRgb: Boolean,
         val asSensitive: Boolean,
+        val allowMultiCmdTag: Boolean,
         val targetVersion: String,
         val historyStorageUri: String?,
         val historyStorageFilename: String
@@ -202,7 +213,9 @@ class SettingsRepository @Inject constructor(
             try {
                 val json = exportSettingsAsJson()
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
-                configFile.writeText(json)
+                configFileMutex.withLock {
+                    writeFileAtomically(configFile, json)
+                }
                 true
             } catch (e: Exception) {
                 false
@@ -234,6 +247,7 @@ class SettingsRepository @Inject constructor(
                 val executePrefixInput = extractJsonValue(jsonString, KEY_EXECUTE_PREFIX_INPUT) ?: ""
                 val bedrockColorToRgb = extractJsonValue(jsonString, KEY_BEDROCK_COLOR_TO_RGB) != "false"
                 val asSensitive = extractJsonValue(jsonString, KEY_AS_SENSITIVE) != "false"
+                val allowMultiCmdTag = extractJsonValue(jsonString, KEY_ALLOW_MULTI_CMD_TAG) == "true"
                 // -1 = 最新；其余必须能被 VersionSpec 解析，否则回落 -1
                 val targetVersion = extractJsonValue(jsonString, KEY_TARGET_VERSION)
                     ?.takeIf { it == "-1" || com.tellraw.app.model.VersionSpec.parse(it) != null } ?: "-1"
@@ -249,6 +263,7 @@ class SettingsRepository @Inject constructor(
                 _executePrefixInput.value = executePrefixInput
                 _bedrockColorToRgb.value = bedrockColorToRgb
                 _asSensitive.value = asSensitive
+                _allowMultiCmdTag.value = allowMultiCmdTag
                 _targetVersion.value = targetVersion
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
@@ -275,6 +290,7 @@ class SettingsRepository @Inject constructor(
         val executePrefixInput = _executePrefixInput.value
         val bedrockColorToRgb = _bedrockColorToRgb.value
         val asSensitive = _asSensitive.value
+        val allowMultiCmdTag = _allowMultiCmdTag.value
         val targetVersion = _targetVersion.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
@@ -292,6 +308,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_EXECUTE_PREFIX_INPUT": "${jsonEscape(executePrefixInput)}",
               "$KEY_BEDROCK_COLOR_TO_RGB": $bedrockColorToRgb,
               "$KEY_AS_SENSITIVE": $asSensitive,
+              "$KEY_ALLOW_MULTI_CMD_TAG": $allowMultiCmdTag,
               "$KEY_TARGET_VERSION": "${jsonEscape(targetVersion)}",
               "$KEY_HISTORY_STORAGE_URI": "${jsonEscape(historyStorageUri)}",
               "$KEY_HISTORY_STORAGE_FILENAME": "${jsonEscape(historyStorageFilename)}"
@@ -464,6 +481,14 @@ class SettingsRepository @Inject constructor(
         saveConfig()
     }
 
+    /** 是否允许“临时 tag + 多命令”方案（默认 false）。 */
+    fun getAllowMultiCmdTag(): Boolean = _allowMultiCmdTag.value
+
+    suspend fun setAllowMultiCmdTag(enabled: Boolean) {
+        _allowMultiCmdTag.value = enabled
+        saveConfig()
+    }
+
     /** 目标版本（-1 = 最新）。 */
     fun getTargetVersion(): String = _targetVersion.value
 
@@ -578,4 +603,17 @@ internal fun extractConfigValue(jsonString: String, key: String): String? {
     val raw = Regex("\"${Regex.escape(key)}\"\\s*:\\s*([^,\\s}]+)")
         .find(jsonString)
     return raw?.groupValues?.get(1)?.trim()
+}
+
+
+/** 设置/历史共用 tellraw_config.json，写入必须串行且原子，避免互相清空或断电留下半截文件。 */
+internal val configFileMutex = Mutex()
+
+internal fun writeFileAtomically(target: File, content: String) {
+    val tmp = File(target.parentFile, target.name + ".tmp")
+    tmp.writeText(content)
+    if (!tmp.renameTo(target)) {
+        target.writeText(content)
+        tmp.delete()
+    }
 }

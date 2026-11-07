@@ -72,6 +72,8 @@
     <string name="bedrock_color_to_rgb">Bedrock-only § colors → exact Java RGB</string>
     <string name="as_sensitive">Target selector args are as-sensitive</string>
     <string name="as_sensitive_description">On: only the tellraw target selector drives as. Off: if the target needs no as, content selectors may drive it</string>
+    <string name="allow_multi_cmd_tag">Allow multi-command tag</string>
+    <string name="allow_multi_cmd_tag_description">When one execute chain cannot express the conditions, use temporary tags and multiple commands; off by default</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>

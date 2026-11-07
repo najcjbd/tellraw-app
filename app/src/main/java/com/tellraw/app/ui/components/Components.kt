@@ -678,6 +678,7 @@ fun SettingsDialog(
     separatorAsTextComponent: Boolean,
     bedrockColorToRgb: Boolean,
     asSensitive: Boolean = true,
+    allowMultiCmdTag: Boolean = false,
     nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
@@ -689,6 +690,7 @@ fun SettingsDialog(
     onSeparatorAsTextComponentChanged: (Boolean) -> Unit,
     onBedrockColorToRgbChanged: (Boolean) -> Unit,
     onAsSensitiveChanged: (Boolean) -> Unit = {},
+    onAllowMultiCmdTagChanged: (Boolean) -> Unit = {},
     onNbtSyntaxChanged: (String) -> Unit,
     onOpenRawConvert: () -> Unit = {}
 ) {
@@ -992,6 +994,28 @@ fun SettingsDialog(
                         }
                     }
 
+                    // 单条 execute 链无法表达时，允许用临时 tag + 多命令
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = allowMultiCmdTag,
+                            onCheckedChange = onAllowMultiCmdTagChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.allow_multi_cmd_tag),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.allow_multi_cmd_tag_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口
@@ -1269,6 +1293,28 @@ fun SettingsDialog(
                             )
                             Text(
                                 text = stringResource(R.string.as_sensitive_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // 单条 execute 链无法表达时，允许用临时 tag + 多命令
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = allowMultiCmdTag,
+                            onCheckedChange = onAllowMultiCmdTagChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.allow_multi_cmd_tag),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.allow_multi_cmd_tag_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

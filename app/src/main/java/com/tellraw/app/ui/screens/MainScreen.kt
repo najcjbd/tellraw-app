@@ -63,6 +63,7 @@ fun MainScreen(
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
     val asSensitive by viewModel.asSensitive.collectAsState()
+    val allowMultiCmdTag by viewModel.allowMultiCmdTag.collectAsState()
     val showRawConvertDialog by viewModel.showRawConvertDialog.collectAsState()
     val rawConvertInput by viewModel.rawConvertInput.collectAsState()
     val rawConvertJava by viewModel.rawConvertJava.collectAsState()
@@ -283,6 +284,7 @@ fun MainScreen(
             separatorAsTextComponent = separatorAsTextComponent,
             bedrockColorToRgb = bedrockColorToRgb,
             asSensitive = asSensitive,
+            allowMultiCmdTag = allowMultiCmdTag,
             nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
@@ -311,6 +313,9 @@ fun MainScreen(
             },
             onAsSensitiveChanged = { enabled ->
                 viewModel.setAsSensitive(enabled)
+            },
+            onAllowMultiCmdTagChanged = { enabled ->
+                viewModel.setAllowMultiCmdTag(enabled)
             },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)

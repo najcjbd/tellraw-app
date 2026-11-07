@@ -74,6 +74,8 @@
     <string name="raw_convert_unrecognized">无法识别：请输入 rawtext、Java 文本组件 JSON、tellraw 或 execute+tellraw</string>
     <string name="bedrock_color_to_rgb">基岩版独有 § 颜色码 → Java 精确 RGB color</string>
     <string name="as_sensitive">目标选择器参数对 as 敏感</string>
+    <string name="allow_multi_cmd_tag">允许多命令 tag</string>
+    <string name="allow_multi_cmd_tag_description">单条 execute 链无法表达时，用临时 tag + 多条命令；默认关闭</string>
     <string name="as_sensitive_description">开：只用 tellraw 目标选择器决定 as；关：目标没得改时才会用内容里的选择器做 as</string>
     
     <!-- 颜色代码 -->

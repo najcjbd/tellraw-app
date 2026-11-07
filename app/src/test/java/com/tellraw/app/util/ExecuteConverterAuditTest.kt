@@ -3,6 +3,7 @@ package com.tellraw.app.util
 import com.tellraw.app.util.ExecuteConverter.Direction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,6 +33,36 @@ class ExecuteConverterAuditTest {
         val text = out.orEmpty()
         assertFalse(text, text.contains("scores={a=1,b=2}"))
         assertTrue(reminders.any { it.contains("多个 scores=!") })
+    }
+
+    @Test
+    fun multiCommandTagPlanBuildsAddTellrawRemove() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}",
+            Direction.JAVA_TO_BEDROCK,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"x\"}",
+            requireUnmergeable = false,
+            tagSuffix = "test"
+        )
+        requireNotNull(plan)
+        assertEquals(5, plan.commands.size)
+        assertTrue(plan.commands[0], plan.commands[0].contains("run tag @s add tellraw_a1_test"))
+        assertTrue(plan.commands[1], plan.commands[1].contains("run tag @s add tellraw_a2_test"))
+        assertTrue(plan.commands[2], plan.commands[2].startsWith("tellraw @a[tag=tellraw_a1_test,tag=tellraw_a2_test]"))
+        assertTrue(plan.commands[3], plan.commands[3].contains("remove tellraw_a1_test"))
+        assertTrue(plan.commands[4], plan.commands[4].contains("remove tellraw_a2_test"))
+    }
+
+    @Test
+    fun multiCommandTagPlanOnlyForUnmergeableByDefault() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}",
+            Direction.JAVA_TO_BEDROCK,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"x\"}"
+        )
+        assertNull(plan)
     }
 
     @Test

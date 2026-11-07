@@ -167,7 +167,7 @@ fun GridEditorScreen(
     var manualOY by rememberSaveable { mutableStateOf(savedUi.manualOY) }
     var manualOZ by rememberSaveable { mutableStateOf(savedUi.manualOZ) }
     var showExecutorPicker by remember { mutableStateOf(false) }
-    var showWorldSettings by remember { mutableStateOf(false) }
+    var showWorldSettings by rememberSaveable { mutableStateOf(false) }
 
     var worldDimension by rememberSaveable { mutableStateOf(savedUi.worldDimension) }
     var worldBiome by rememberSaveable { mutableStateOf(savedUi.worldBiome) }
@@ -1511,12 +1511,12 @@ private fun WorldSettingsDialog(
     onChange: (String, String, Boolean, String, String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var d by remember { mutableStateOf(dimension) }
-    var b by remember { mutableStateOf(biome) }
-    var l by remember { mutableStateOf(loaded) }
-    var bl by remember { mutableStateOf(blocks) }
-    var f by remember { mutableStateOf(functions) }
-    var st by remember { mutableStateOf(stopwatches) }
+    var d by rememberSaveable { mutableStateOf(dimension) }
+    var b by rememberSaveable { mutableStateOf(biome) }
+    var l by rememberSaveable { mutableStateOf(loaded) }
+    var bl by rememberSaveable { mutableStateOf(blocks) }
+    var f by rememberSaveable { mutableStateOf(functions) }
+    var st by rememberSaveable { mutableStateOf(stopwatches) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
             Column(

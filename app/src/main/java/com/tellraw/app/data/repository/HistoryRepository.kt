@@ -117,8 +117,10 @@ class HistoryRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
-                val existing = if (configFile.exists()) configFile.readText() else ""
-                configFile.writeText(mergeConfigJson(existing))
+                configFileMutex.withLock {
+                    val existing = if (configFile.exists()) configFile.readText() else ""
+                    writeFileAtomically(configFile, mergeConfigJson(existing))
+                }
             } catch (e: Exception) {
                 // 保存失败
             }

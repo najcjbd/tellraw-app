@@ -109,6 +109,8 @@ class TellrawViewModel @Inject constructor(
 
     private val _asSensitive = MutableStateFlow(true)
     val asSensitive: StateFlow<Boolean> = _asSensitive.asStateFlow()
+    private val _allowMultiCmdTag = MutableStateFlow(false)
+    val allowMultiCmdTag: StateFlow<Boolean> = _allowMultiCmdTag.asStateFlow()
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -245,6 +247,7 @@ class TellrawViewModel @Inject constructor(
             _separatorAsTextComponent.value = loadedSettings.separatorAsTextComponent
             _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
             _asSensitive.value = loadedSettings.asSensitive
+            _allowMultiCmdTag.value = loadedSettings.allowMultiCmdTag
             _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
@@ -857,6 +860,12 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
 
+    fun setAllowMultiCmdTag(enabled: Boolean) {
+        _allowMultiCmdTag.value = enabled
+        viewModelScope.launch { settingsRepository.setAllowMultiCmdTag(enabled) }
+        generateCommands()
+    }
+
     fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
         viewModelScope.launch {
@@ -905,11 +914,34 @@ class TellrawViewModel @Inject constructor(
         }
         val jTellraw = "tellraw ${r.javaSelector ?: "@a"} ${r.javaJson}"
         val bTellraw = "tellraw ${r.bedrockSelector ?: "@a"} ${r.bedrockJson}"
-        _rawConvertJava.value =
-            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, jTellraw) else jTellraw
-        _rawConvertBedrock.value =
-            if (r.executePrefix != null) ExecuteConverter.composeTellrawCommand(r.executePrefix, bTellraw) else bTellraw
-        _rawConvertWarnings.value = r.warnings
+        val prefix = r.executePrefix
+        val javaTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+            ExecuteConverter.buildMultiCommandTagPlan(
+                prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                r.javaSelector ?: "@a", r.javaJson, nbtSyntax
+            )
+        } else null
+        val bedrockTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+            ExecuteConverter.buildMultiCommandTagPlan(
+                prefix, ExecuteConverter.Direction.JAVA_TO_BEDROCK,
+                r.bedrockSelector ?: "@a", r.bedrockJson, nbtSyntax
+            )
+        } else null
+        _rawConvertJava.value = if (javaTagPlan != null) {
+            javaTagPlan.commands.joinToString("\n")
+        } else if (prefix != null) {
+            ExecuteConverter.composeTellrawCommand(prefix, jTellraw)
+        } else jTellraw
+        _rawConvertBedrock.value = if (bedrockTagPlan != null) {
+            bedrockTagPlan.commands.joinToString("\n")
+        } else if (prefix != null) {
+            ExecuteConverter.composeTellrawCommand(prefix, bTellraw)
+        } else bTellraw
+        _rawConvertWarnings.value = buildList {
+            addAll(r.warnings)
+            if (javaTagPlan != null) add("已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove")
+            if (bedrockTagPlan != null) add("已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove")
+        }
     }
 
     /** 把解析结果填回生成器：选择器 / 消息（组件）/ execute 前缀；转换时生成的 if/unless 由生成器既有逻辑重算。 */
@@ -1136,7 +1168,23 @@ class TellrawViewModel @Inject constructor(
                     else -> null
                 }
                 val javaPlain = "tellraw $finalJavaTarget $javaJson"
-                val javaCommand = when {
+                val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixInput.value.isNotBlank() &&
+                    finalJavaInnerTokens == null && contentAs == null
+                ) {
+                    ExecuteConverter.buildMultiCommandTagPlan(
+                        _executePrefixInput.value,
+                        ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                        finalJavaTarget,
+                        javaJson,
+                        nbtSyntax
+                    )
+                } else null
+                val javaCommand = if (javaTagPlan != null) {
+                    allReminders.add(
+                        "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove"
+                    )
+                    javaTagPlan.commands.joinToString("\n")
+                } else when {
                     finalJavaInnerTokens == null ->
                         if (javaUserPrefix != null) {
                             ExecuteConverter.composeTellrawCommand(javaUserPrefix, javaPlain)
@@ -1161,12 +1209,25 @@ class TellrawViewModel @Inject constructor(
                     target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
-                val bedrockCommand =
-                    if (bedrockUserPrefix != null) {
-                        ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
-                    } else {
-                        bedrockPlain
-                    }
+                val bedrockTagPlan = if (_allowMultiCmdTag.value && _executePrefixInput.value.isNotBlank()) {
+                    ExecuteConverter.buildMultiCommandTagPlan(
+                        _executePrefixInput.value,
+                        ExecuteConverter.Direction.JAVA_TO_BEDROCK,
+                        bedrockFilteredSelector,
+                        bedrockJson,
+                        nbtSyntax
+                    )
+                } else null
+                val bedrockCommand = if (bedrockTagPlan != null) {
+                    allReminders.add(
+                        "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove"
+                    )
+                    bedrockTagPlan.commands.joinToString("\n")
+                } else if (bedrockUserPrefix != null) {
+                    ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
+                } else {
+                    bedrockPlain
+                }
                 
                 // 新旧写法混用 -> 问一嘴（版本差异规范 2.4）。
                 // 只在"从没混用 -> 出现混用"这一刻问一次；用户在对话框里的选择会覆盖本次输出。

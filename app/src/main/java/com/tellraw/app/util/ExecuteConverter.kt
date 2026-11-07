@@ -627,6 +627,93 @@ object ExecuteConverter {
         }
     }
 
+    // ==================================================================
+    //  多命令 tag 方案
+    // ==================================================================
+
+    data class MultiCommandPlan(val commands: List<String>, val tags: List<String>)
+
+    /**
+     * 当单条 execute 链无法表达多个“以 @s 为目标”的条件时，用临时 tag 求交集：
+     *   execute as @a <cond_i> run tag @s add <tag_i>
+     *   tellraw <base>[tag=t1,tag=t2,...] <message>
+     *   tag <base>[tag=t_i] remove <tag_i>
+     *
+     * 只支持 `execute as @a/@e ...` + 全部条件都以 @s 为目标、且没有 at/positioned 等修饰；
+     * 其他形态返回 null，由调用方保持原有单命令/舍弃行为。
+     */
+    fun buildMultiCommandTagPlan(
+        prefix: String,
+        direction: Direction,
+        tellrawTarget: String,
+        tellrawJson: String,
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+        requireUnmergeable: Boolean = true,
+        tagSuffix: String? = null
+    ): MultiCommandPlan? {
+        val segs = parseSegments(prefix, mutableListOf()) ?: return null
+        if (segs.isEmpty()) return null
+        val first = segs.first() as? Seg.Mod ?: return null
+        if (first.tokens.size != 2 || first.tokens[0] != "as") return null
+        val base = first.tokens[1]
+        if (!(base.startsWith("@a") || base.startsWith("@e"))) return null
+        if (tellrawTarget != "@s" && tellrawTarget != base &&
+            !tellrawTarget.startsWith("$base[")
+        ) return null
+
+        val conditions = segs.drop(1)
+        if (conditions.size < 2) return null
+        if (conditions.any { it !is Seg.Cond }) return null
+        val conds = conditions.map { it as Seg.Cond }
+        if (conds.any { !isPerEntityCondition(it) }) return null
+
+        if (requireUnmergeable) {
+            val probe = mutableListOf<String>()
+            val single = convertExecutePrefix(prefix, direction, probe, nbtSyntax) ?: return null
+            if (single.isBlank()) return null
+            val markers = listOf("已舍弃", "无法", "量词不同", "同一目标", "未通过", "不做任何合并")
+            if (markers.none { marker -> probe.any { it.contains(marker) } }) return null
+        }
+
+        val exec = applyModifier(first.tokens, ExecState(isPlayer = true, changed = false))
+        val suffix = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
+        val tags = conds.indices.map { "tellraw_a${it + 1}_$suffix" }
+        val commands = mutableListOf<String>()
+        conds.forEachIndexed { index, cond ->
+            val warnings = mutableListOf<String>()
+            val tokens = convertCondition(cond, direction, exec, warnings, nbtSyntax)
+            if (tokens.isEmpty()) return null
+            commands.add(
+                "execute as $base ${tokens.joinToString(" ")} run tag @s add ${tags[index]}"
+            )
+        }
+        val finalTarget = if (tellrawTarget == "@s") base else tellrawTarget
+        commands.add("tellraw ${withTags(finalTarget, tags)} $tellrawJson")
+        tags.forEach { tag ->
+            commands.add("tag ${withTags(base, listOf(tag))} remove $tag")
+        }
+        return MultiCommandPlan(commands, tags)
+    }
+
+    private fun isPerEntityCondition(cond: Seg.Cond): Boolean = when (cond.name) {
+        "entity" -> cond.args.getOrNull(0)?.startsWith("@s") == true
+        "items" -> cond.args.getOrNull(0) == "entity" &&
+            cond.args.getOrNull(1)?.startsWith("@s") == true
+        "data" -> cond.args.getOrNull(0) == "entity" &&
+            cond.args.getOrNull(1)?.startsWith("@s") == true
+        "score" -> cond.args.getOrNull(0)?.startsWith("@s") == true
+        else -> false
+    }
+
+    private fun withTags(selector: String, tags: List<String>): String {
+        val params = tags.joinToString(",") { "tag=$it" }
+        return if (selector.endsWith("]")) {
+            selector.dropLast(1) + "," + params + "]"
+        } else {
+            "$selector[$params]"
+        }
+    }
+
     // ---------------------- Java -> 基岩 ----------------------
 
     /** `if|unless items entity <target> <slots> <item_predicate>` -> `if|unless entity <target>[hasitem=…]` */
