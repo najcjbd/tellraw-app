@@ -599,7 +599,10 @@ class HistoryRepository @Inject constructor(
 internal fun selectorFromCommand(command: String): String {
     val cmd = command.trim()
     if (cmd.isEmpty()) return "@a"
+    // 多命令 tag 方案：取真正的 tellraw 那一行
+    val tellrawLine = cmd.lines().firstOrNull { it.trimStart().startsWith("tellraw ") }
     val body = when {
+        tellrawLine != null -> tellrawLine.trim()
         cmd.startsWith("execute") -> {
             val idx = cmd.lastIndexOf(" run ")
             if (idx < 0) return "@a"

@@ -1168,7 +1168,8 @@ class TellrawViewModel @Inject constructor(
                     else -> null
                 }
                 val javaPlain = "tellraw $finalJavaTarget $javaJson"
-                val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixInput.value.isNotBlank() &&
+                val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                    javaUserPrefix != null && _executePrefixInput.value.isNotBlank() &&
                     finalJavaInnerTokens == null && contentAs == null
                 ) {
                     ExecuteConverter.buildMultiCommandTagPlan(
@@ -1181,7 +1182,8 @@ class TellrawViewModel @Inject constructor(
                 } else null
                 val javaCommand = if (javaTagPlan != null) {
                     allReminders.add(
-                        "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove"
+                        "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove；" +
+                            "请按顺序执行全部命令，中途停止会残留标签"
                     )
                     javaTagPlan.commands.joinToString("\n")
                 } else when {
@@ -1209,7 +1211,9 @@ class TellrawViewModel @Inject constructor(
                     target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
-                val bedrockTagPlan = if (_allowMultiCmdTag.value && _executePrefixInput.value.isNotBlank()) {
+                val bedrockTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                    bedrockUserPrefix != null && _executePrefixInput.value.isNotBlank()
+                ) {
                     ExecuteConverter.buildMultiCommandTagPlan(
                         _executePrefixInput.value,
                         ExecuteConverter.Direction.JAVA_TO_BEDROCK,
@@ -1220,7 +1224,8 @@ class TellrawViewModel @Inject constructor(
                 } else null
                 val bedrockCommand = if (bedrockTagPlan != null) {
                     allReminders.add(
-                        "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove"
+                        "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove；" +
+                            "请按顺序执行全部命令，中途停止会残留标签"
                     )
                     bedrockTagPlan.commands.joinToString("\n")
                 } else if (bedrockUserPrefix != null) {

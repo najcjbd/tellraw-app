@@ -211,10 +211,10 @@ class SettingsRepository @Inject constructor(
     suspend fun saveConfig(): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val json = exportSettingsAsJson()
                 val configFile = File(context.filesDir, CONFIG_FILENAME)
                 configFileMutex.withLock {
-                    writeFileAtomically(configFile, json)
+                    // 快照必须在锁内取，否则会和 HistoryRepository 的合并写互相覆盖
+                    writeFileAtomically(configFile, exportSettingsAsJson())
                 }
                 true
             } catch (e: Exception) {

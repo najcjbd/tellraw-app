@@ -656,7 +656,8 @@ object ExecuteConverter {
         val first = segs.first() as? Seg.Mod ?: return null
         if (first.tokens.size != 2 || first.tokens[0] != "as") return null
         val base = first.tokens[1]
-        if (!(base.startsWith("@a") || base.startsWith("@e"))) return null
+        // 只支持无参数的玩家选择器：避免把 Java 的 nbt=/scores=! 等原样带进基岩，且 tellraw 只收玩家
+        if (base != "@a" && base != "@p") return null
         if (tellrawTarget != "@s" && tellrawTarget != base &&
             !tellrawTarget.startsWith("$base[")
         ) return null
@@ -671,12 +672,14 @@ object ExecuteConverter {
             val probe = mutableListOf<String>()
             val single = convertExecutePrefix(prefix, direction, probe, nbtSyntax) ?: return null
             if (single.isBlank()) return null
-            val markers = listOf("已舍弃", "无法", "量词不同", "同一目标", "未通过", "不做任何合并")
+            val markers = listOf("量词不同", "同一目标", "无法保持同一实体", "不做任何合并", "NOT(")
             if (markers.none { marker -> probe.any { it.contains(marker) } }) return null
         }
 
         val exec = applyModifier(first.tokens, ExecState(isPlayer = true, changed = false))
-        val suffix = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
+        val rawSuffix = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
+        // Java 版 tag 名只允许 -+._A-Za-z0-9；这里统一只保留字母数字下划线
+        val suffix = rawSuffix.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "tag" }
         val tags = conds.indices.map { "tellraw_a${it + 1}_$suffix" }
         val commands = mutableListOf<String>()
         conds.forEachIndexed { index, cond ->

@@ -55,6 +55,29 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
+    fun multiCommandTagPlanRejectsUnsafeBasesAndSanitizesTags() {
+        val conditions = "if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}"
+        assertNull(
+            ExecuteConverter.buildMultiCommandTagPlan(
+                "execute as @a[tag=base] $conditions", Direction.JAVA_TO_BEDROCK,
+                "@s", "{\"text\":\"x\"}", requireUnmergeable = false
+            )
+        )
+        assertNull(
+            ExecuteConverter.buildMultiCommandTagPlan(
+                "execute as @e $conditions", Direction.JAVA_TO_BEDROCK,
+                "@s", "{\"text\":\"x\"}", requireUnmergeable = false
+            )
+        )
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a $conditions", Direction.JAVA_TO_BEDROCK,
+            "@s", "{\"text\":\"x\"}", requireUnmergeable = false, tagSuffix = "a b:c"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.tags.all { it.matches(Regex("[A-Za-z0-9_]+")) })
+    }
+
+    @Test
     fun multiCommandTagPlanOnlyForUnmergeableByDefault() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}",
