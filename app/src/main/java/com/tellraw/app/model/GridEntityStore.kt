@@ -76,9 +76,41 @@ object GridRelations {
     fun applyReciprocal(
         entities: List<EditableGridEntity>,
         old: EditableGridEntity?,
-        updated: EditableGridEntity
+        updatedRaw: EditableGridEntity
     ): List<EditableGridEntity> {
-        val byUid = entities.associateBy { it.uid }.toMutableMap()
+        val originalByUid = entities.associateBy { it.uid }
+
+        fun vehicleOf(uid: String): String? =
+            decode(originalByUid[uid]?.relations)["vehicle"]?.firstOrNull()
+
+        fun reachesFrom(start: String, target: String): Boolean {
+            var cur: String? = start
+            val seen = mutableSetOf<String>()
+            while (cur != null && seen.add(cur)) {
+                if (cur == target) return true
+                cur = vehicleOf(cur)
+            }
+            return false
+        }
+
+        fun sanitizeCycles(e: EditableGridEntity): EditableGridEntity {
+            val map = decode(e.relations).toMutableMap()
+            val vehicles = map["vehicle"].orEmpty().filter {
+                it != e.uid && !reachesFrom(it, e.uid)
+            }
+            val passengers = map["passengers"].orEmpty().filter {
+                it != e.uid && !reachesFrom(e.uid, it)
+            }
+            if (vehicles == map["vehicle"].orEmpty() && passengers == map["passengers"].orEmpty()) {
+                return e
+            }
+            if (vehicles.isEmpty()) map.remove("vehicle") else map["vehicle"] = vehicles
+            if (passengers.isEmpty()) map.remove("passengers") else map["passengers"] = passengers
+            return e.copy(relations = encode(map))
+        }
+
+        val updated = sanitizeCycles(updatedRaw)
+        val byUid = originalByUid.toMutableMap()
         byUid[updated.uid] = updated
 
         fun relationSet(raw: String?, key: String): Set<String> =

@@ -1475,7 +1475,10 @@ object ExecuteConverter {
             CondOut.Out(
                 listOf(
                     kw, "entity",
-                    foldParam("@e", "name=" + quoteSelectorValue(target) + "," + param)
+                    foldParam(
+                        "@e",
+                        "type=player,name=" + quoteSelectorValue(target) + "," + param
+                    )
                 )
             )
         }

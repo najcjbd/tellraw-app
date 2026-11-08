@@ -327,7 +327,7 @@ jobs:
 - **items 谓词**：支持 id/`*`/`!`、`count`/`count~{min,max}`、`damage`、`custom_data~{...}` 等；**不覆盖 `#物品标签`**，附魔/属性等复杂组件只做 SNBT 子集匹配。
 - **slots 条件**：按文档语义判断"是否有匹配槽位源的槽位"；支持内置槽位名/通配符，**26.3 的自定义 slot_source（命名空间 ID / SNBT）未建模**。
 - **内容驱动 as**：scores=!、hasitem 空气/quantity=0 等可驱动 as；**多个内容选择器负条件不一致时只改写第一组**（单条 tellraw 无法无损拆分多组）。
-- **网格求值**：按原顺序逐步模拟 `as/on/at/positioned/rotated/facing/align/anchored/in`，并用 yaw/pitch 处理 `^ ^ ^` 局部坐标；`on` 关系需在实体编辑器里设置。`@r` / `sort=random` 使用运行时真随机（界面有“重新随机”）；`summon` 生成物仍未建模；`in` 会切换执行维度，但方块/群系世界数据目前仍是一张表，不按维度拆分；判定箱为近似值；`block/biome/dimension/function/stopwatch` 需要手填世界条件，未填时明确提示"未参与筛选"。
+- **网格求值**：按原顺序逐步模拟 `as/on/at/positioned/rotated/facing/align/anchored/in`，并用 yaw/pitch 处理 `^ ^ ^` 局部坐标；`on` 关系需在实体编辑器里设置。`@r` / `sort=random` 使用运行时真随机（界面有“重新随机”）；`summon` 生成物仍未建模；`in` 会切换执行维度，世界条件（方块/群系/loaded/函数/stopwatch）按维度分别存储并使用；判定箱为近似值；`block/biome/dimension/function/stopwatch` 需要手填世界条件，未填时明确提示"未参与筛选"。
 - **translate**：
   - Java 支持 fallback；基岩不支持 fallback（提醒）。
   - translate 自身的 color/bold 等样式不保留。

@@ -118,6 +118,22 @@ class GridCommandPlanParserTest {
     }
 
     @Test
+    fun relationCycleIsRejectedOnSave() {
+        val a = EditableGridEntity(uid = "a")
+        val b = EditableGridEntity(uid = "b")
+        val firstA = a.copy(relations = "passengers=b")
+        val first = GridRelations.applyReciprocal(listOf(a, b), a, firstA)
+        val bNow = first.first { it.uid == "b" }
+        val bCyclic = bNow.copy(relations = "passengers=a")
+        val second = GridRelations.applyReciprocal(first, bNow, bCyclic).associateBy { it.uid }
+        val aRel = GridRelations.decode(second.getValue("a").relations)
+        val bRel = GridRelations.decode(second.getValue("b").relations)
+        assertFalse(
+            aRel["vehicle"].orEmpty().contains("b") && bRel["vehicle"].orEmpty().contains("a")
+        )
+    }
+
+    @Test
     fun savingReverseSideRepairsOneWayRelation() {
         val a = EditableGridEntity(uid = "a", relations = "passengers=b")
         val b = EditableGridEntity(uid = "b")
@@ -292,6 +308,26 @@ class GridCommandPlanParserTest {
         val p = player("p")
         val r = GridConditionEvaluator.evaluate("if score @s obj matches 1", p, listOf(p))
         assertFalse(r.ok)
+    }
+
+    @Test
+    fun inDimensionUsesThatDimensionsBlockData() {
+        val p = player("p")
+        val world = GridConditionEvaluator.GridWorld(
+            dimension = "minecraft:overworld",
+            blocks = mapOf("0,0,0" to GridConditionEvaluator.GridBlock("minecraft:dirt")),
+            dimensions = mapOf(
+                "minecraft:the_nether" to GridConditionEvaluator.DimensionWorld(
+                    blocks = mapOf("0,0,0" to GridConditionEvaluator.GridBlock("minecraft:stone"))
+                )
+            )
+        )
+        val result = GridCommandPlanParser.evaluateChain(
+            "in minecraft:the_nether if block 0 0 0 minecraft:stone",
+            "@a", listOf(p), world = world
+        )
+        assertNotNull(result)
+        assertEquals(listOf("p"), result!!.matched.map { it.uid })
     }
 
     @Test

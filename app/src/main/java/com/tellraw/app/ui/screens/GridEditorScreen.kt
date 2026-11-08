@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
@@ -74,6 +75,7 @@ import com.tellraw.app.model.GridConditionEvaluator
 import com.tellraw.app.model.GridCommandPlanParser
 import com.tellraw.app.model.GridEntityStore
 import com.tellraw.app.model.GridRelations
+import com.tellraw.app.model.GridDimensionState
 import com.tellraw.app.model.GridSettingsStore
 import com.tellraw.app.model.GridUiSettings
 import com.tellraw.app.model.GridItem
@@ -83,7 +85,9 @@ import com.tellraw.app.model.SelectorEvaluator
 import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.ImageFilePickerDialog
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.google.gson.Gson
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
 import com.tellraw.app.util.TranslatePreview
@@ -146,6 +150,18 @@ private val QuickNbtMapSaver = listSaver<SnapshotStateMap<String, String>, Strin
         mutableStateMapOf<String, String>().apply {
             flat.chunked(2).forEach { if (it.size == 2) put(it[0], it[1]) }
         }
+    }
+)
+
+private val DimensionStatesSaver = Saver<Map<String, GridDimensionState>, String>(
+    save = { states -> Gson().toJson(states) },
+    restore = { raw ->
+        runCatching {
+            Gson().fromJson(
+                raw,
+                object : TypeToken<Map<String, GridDimensionState>>() {}.type
+            ) as? Map<String, GridDimensionState> ?: emptyMap()
+        }.getOrDefault(emptyMap())
     }
 )
 
@@ -272,6 +288,20 @@ fun GridEditorScreen(
     var worldBlocks by rememberSaveable { mutableStateOf(savedUi.worldBlocks) }
     var worldFunctions by rememberSaveable { mutableStateOf(savedUi.worldFunctions) }
     var worldStopwatches by rememberSaveable { mutableStateOf(savedUi.worldStopwatches) }
+    val initialDimensionStates = remember(savedUi) {
+        savedUi.worldDimensionStates.toMutableMap().apply {
+            this[savedUi.worldDimension] = GridDimensionState(
+                biome = savedUi.worldBiome,
+                loaded = savedUi.worldLoaded,
+                blocks = savedUi.worldBlocks,
+                functions = savedUi.worldFunctions,
+                stopwatches = savedUi.worldStopwatches
+            )
+        }
+    }
+    var dimensionStates by rememberSaveable(stateSaver = DimensionStatesSaver) {
+        mutableStateOf(initialDimensionStates)
+    }
 
     fun currentUiSettings() = GridUiSettings(
         selector = selectorText,
@@ -282,6 +312,15 @@ fun GridEditorScreen(
         worldBlocks = worldBlocks,
         worldFunctions = worldFunctions,
         worldStopwatches = worldStopwatches,
+        worldDimensionStates = dimensionStates + (
+            worldDimension to GridDimensionState(
+                biome = worldBiome,
+                loaded = worldLoaded,
+                blocks = worldBlocks,
+                functions = worldFunctions,
+                stopwatches = worldStopwatches
+            )
+        ),
         executorUid = executorUid,
         useExecutorOrigin = useExecutorOrigin,
         manualOX = manualOX,
@@ -295,7 +334,7 @@ fun GridEditorScreen(
     // 网格设置持久化（防抖；输入过程中不会每个字符都写盘）
     LaunchedEffect(
         selectorText, conditions, worldDimension, worldBiome, worldLoaded,
-        worldBlocks, worldFunctions, worldStopwatches, executorUid,
+        worldBlocks, worldFunctions, worldStopwatches, dimensionStates, executorUid,
         useExecutorOrigin, manualOX, manualOY, manualOZ, viewport
     ) {
         kotlinx.coroutines.delay(400)
@@ -383,8 +422,31 @@ fun GridEditorScreen(
         )
     }
     val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
+    val dimensionWorlds = remember(
+        dimensionStates, worldDimension, worldBiome, worldLoaded,
+        worldBlocks, worldFunctions, worldStopwatches
+    ) {
+        val states = dimensionStates.toMutableMap()
+        states[worldDimension] = GridDimensionState(
+            biome = worldBiome,
+            loaded = worldLoaded,
+            blocks = worldBlocks,
+            functions = worldFunctions,
+            stopwatches = worldStopwatches
+        )
+        states.mapValues { (_, s) ->
+            GridConditionEvaluator.DimensionWorld(
+                biome = s.biome,
+                loaded = s.loaded,
+                blocks = parseWorldBlocks(s.blocks),
+                functions = splitList(s.functions).toSet(),
+                stopwatches = parseStopwatches(s.stopwatches)
+            )
+        }
+    }
     val worldState = remember(
-        worldDimension, worldBiome, worldLoaded, worldBlocks, worldFunctions, worldStopwatches
+        worldDimension, worldBiome, worldLoaded, worldBlocks, worldFunctions, worldStopwatches,
+        dimensionWorlds
     ) {
         GridConditionEvaluator.GridWorld(
             dimension = worldDimension.ifBlank { "minecraft:overworld" },
@@ -392,7 +454,8 @@ fun GridEditorScreen(
             loaded = worldLoaded,
             blocks = parseWorldBlocks(worldBlocks),
             functions = splitList(worldFunctions).toSet(),
-            stopwatches = parseStopwatches(worldStopwatches)
+            stopwatches = parseStopwatches(worldStopwatches),
+            dimensions = dimensionWorlds
         )
     }
     val resolvedOrigin = remember(effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec) {
@@ -940,13 +1003,15 @@ fun GridEditorScreen(
             blocks = worldBlocks,
             functions = worldFunctions,
             stopwatches = worldStopwatches,
-            onChange = { d, b, l, bl, f, st ->
+            dimensionStates = dimensionStates,
+            onChange = { d, b, l, bl, f, st, states ->
                 worldDimension = d
                 worldBiome = b
                 worldLoaded = l
                 worldBlocks = bl
                 worldFunctions = f
                 worldStopwatches = st
+                dimensionStates = states
             },
             onDismiss = { showWorldSettings = false }
         )
@@ -1931,7 +1996,8 @@ private fun WorldSettingsDialog(
     blocks: String,
     functions: String,
     stopwatches: String,
-    onChange: (String, String, Boolean, String, String, String) -> Unit,
+    dimensionStates: Map<String, GridDimensionState>,
+    onChange: (String, String, Boolean, String, String, String, Map<String, GridDimensionState>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var d by rememberSaveable { mutableStateOf(dimension) }
@@ -1940,6 +2006,25 @@ private fun WorldSettingsDialog(
     var bl by rememberSaveable { mutableStateOf(blocks) }
     var f by rememberSaveable { mutableStateOf(functions) }
     var st by rememberSaveable { mutableStateOf(stopwatches) }
+    var states by rememberSaveable(stateSaver = DimensionStatesSaver) {
+        mutableStateOf(dimensionStates)
+    }
+    var newDimension by rememberSaveable { mutableStateOf("") }
+
+    fun persistCurrent() {
+        states = states + (d to GridDimensionState(b, l, bl, f, st))
+    }
+
+    fun switchTo(target: String) {
+        persistCurrent()
+        d = target
+        val data = states[target] ?: GridDimensionState()
+        b = data.biome
+        l = data.loaded
+        bl = data.blocks
+        f = data.functions
+        st = data.stopwatches
+    }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
             Column(
@@ -1947,6 +2032,49 @@ private fun WorldSettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("世界条件", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "方块/群系/loaded/函数/stopwatch 按维度分别保存；in 切换维度时使用对应数据。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    (states.keys + d).distinct().forEach { dim ->
+                        FilterChip(
+                            selected = d == dim,
+                            onClick = { if (d != dim) switchTo(dim) },
+                            label = { Text(dim.substringAfterLast(':')) }
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        newDimension,
+                        { newDimension = it },
+                        label = { Text("新增维度 ID") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedButton(
+                        enabled = newDimension.isNotBlank(),
+                        onClick = {
+                            val target = newDimension.trim()
+                            persistCurrent()
+                            states = states + (target to GridDimensionState())
+                            newDimension = ""
+                            d = target
+                            b = ""
+                            l = true
+                            bl = ""
+                            f = ""
+                            st = ""
+                        }
+                    ) { Text("添加") }
+                }
                 OutlinedTextField(d, { d = it }, label = { Text("维度 dimension") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(b, { b = it }, label = { Text("生物群系 biome（可空）") },
@@ -1969,7 +2097,10 @@ private fun WorldSettingsDialog(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("取消") }
                     Button(onClick = {
-                        onChange(d, b, l, bl, f, st)
+                        onChange(
+                            d, b, l, bl, f, st,
+                            states + (d to GridDimensionState(b, l, bl, f, st))
+                        )
                         onDismiss()
                     }) { Text("应用") }
                 }

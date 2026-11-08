@@ -27,14 +27,36 @@ object GridConditionEvaluator {
     )
 
     /** 网格的世界状态（用于 block/biome/dimension/function/stopwatch/items/slots 等条件）。 */
+    data class DimensionWorld(
+        val biome: String = "",
+        val loaded: Boolean = true,
+        val blocks: Map<String, GridBlock> = emptyMap(),
+        val functions: Set<String> = emptySet(),
+        val stopwatches: Map<String, Double> = emptyMap()
+    )
+
     data class GridWorld(
         val dimension: String = "minecraft:overworld",
         val biome: String = "",
         val loaded: Boolean = true,
         val blocks: Map<String, GridBlock> = emptyMap(),   // "x,y,z" -> 方块
         val functions: Set<String> = emptySet(),
-        val stopwatches: Map<String, Double> = emptyMap()
-    )
+        val stopwatches: Map<String, Double> = emptyMap(),
+        val dimensions: Map<String, DimensionWorld> = emptyMap()
+    ) {
+        /** 按执行维度取对应世界数据；没有配置该维度时保留空间表但标明维度。 */
+        fun forDimension(dim: String): GridWorld {
+            val data = dimensions[dim] ?: return copy(dimension = dim)
+            return copy(
+                dimension = dim,
+                biome = data.biome,
+                loaded = data.loaded,
+                blocks = data.blocks,
+                functions = data.functions,
+                stopwatches = data.stopwatches
+            )
+        }
+    }
 
     fun evaluate(
         conditionText: String,

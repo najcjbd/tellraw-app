@@ -316,7 +316,7 @@ object GridCommandPlanParser {
             val conditionText = part.conditionText
             if (conditionText != null) {
                 contexts = contexts.mapNotNull { ctx ->
-                    val worldForCtx = world.copy(dimension = ctx.dimension)
+                    val worldForCtx = world.forDimension(ctx.dimension)
                     val r = GridConditionEvaluator.evaluate(
                         conditionText, ctx.entity, entities, target, worldForCtx, ctx.origin,
                         ctx.yaw, ctx.pitch, ctx.anchorEyes
