@@ -11,16 +11,16 @@ object KnownNbt {
      * INT = 旧目录沿用的 short 写法（写回 `xxx s`）；INT32 = 真正的 int（无后缀）。
      * 新增真 int 键请用 INT32，不要复用 INT。
      */
-    enum class Kind { BOOL, BYTE, FLOAT, INT, INT32, STRING, LIST, COMPOUND }
+    enum class Kind { BOOL, BYTE, FLOAT, DOUBLE, INT, INT32, STRING, LIST, COMPOUND }
 
     data class Spec(val key: String, val label: String, val kind: Kind, val hint: String = "")
 
     val ALL: List<Spec> = listOf(
         Spec("Health", "血量 Health", Kind.FLOAT, "例如 20.0"),
-        Spec("Absorption", "伤害吸收 Absorption", Kind.FLOAT, "黄心"),
+        Spec("AbsorptionAmount", "伤害吸收 AbsorptionAmount", Kind.FLOAT, "黄心"),
         Spec("Fire", "着火时间 Fire", Kind.INT, "刻；负值=防火"),
         Spec("Air", "氧气 Air", Kind.INT, "刻"),
-        Spec("FallDistance", "下落距离 FallDistance", Kind.FLOAT, ""),
+        Spec("fall_distance", "下落距离 fall_distance", Kind.DOUBLE, "1.21.5+"),
         Spec("NoAI", "无 AI", Kind.BOOL, ""),
         Spec("Silent", "无声", Kind.BOOL, ""),
         Spec("Invulnerable", "无敌", Kind.BOOL, ""),
@@ -55,6 +55,7 @@ object KnownNbt {
             Kind.INT -> t.toLongOrNull()?.let { "${it}s" } ?: "\"$t\""
             Kind.INT32 -> t.toLongOrNull()?.toString() ?: "\"$t\""
             Kind.FLOAT -> t.toDoubleOrNull()?.let { "${it}f" } ?: "\"$t\""
+            Kind.DOUBLE -> t.toDoubleOrNull()?.let { "${it}d" } ?: "\"$t\""
             Kind.STRING -> "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
             Kind.LIST ->
                 if (SnbtLite.parseValue(t) is SnbtLite.Value.ListV) t else null

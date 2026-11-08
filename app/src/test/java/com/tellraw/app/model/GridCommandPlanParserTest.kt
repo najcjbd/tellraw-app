@@ -256,6 +256,32 @@ class GridCommandPlanParserTest {
     }
 
     @Test
+    fun singleChainEvaluationUsesSameContextModel() {
+        val p = player("p")
+        val world = GridConditionEvaluator.GridWorld(
+            dimension = "minecraft:overworld",
+            blocks = mapOf("-1,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"))
+        )
+        val rotated = GridCommandPlanParser.evaluateChain(
+            prefix = "as @a at @s rotated 90 0 if block ^ ^ ^1 minecraft:stone",
+            targetSelector = "@a",
+            entities = listOf(p),
+            world = world
+        )
+        assertNotNull(rotated)
+        assertEquals(listOf("p"), rotated!!.matched.map { it.uid })
+
+        val nether = GridCommandPlanParser.evaluateChain(
+            prefix = "in minecraft:the_nether if dimension minecraft:the_nether",
+            targetSelector = "@a",
+            entities = listOf(p),
+            world = world
+        )
+        assertNotNull(nether)
+        assertEquals(listOf("p"), nether!!.matched.map { it.uid })
+    }
+
+    @Test
     fun localCoordinatesUseRotatedContext() {
         val input = """
             execute as @a at @s rotated 0 0 if block ^ ^ ^1 minecraft:stone run tag @s add t1

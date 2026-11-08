@@ -220,7 +220,7 @@ fun GridEditorScreen(
     }
 
     /** 同坐标的 vehicle/passengers 是一个整体，拖动任意一个成员都移动整组。 */
-    fun moveRelationGroup(uid: String, dx: Double, dz: Double) {
+    fun moveRelationGroup(uid: String, dx: Double, dy: Double, dz: Double) {
         val byUid = entities.associateBy { it.uid }
         val group = linkedSetOf(uid)
         val queue = ArrayDeque<String>()
@@ -237,7 +237,7 @@ fun GridEditorScreen(
         for (i in entities.indices) {
             if (entities[i].uid in group) {
                 val e = entities[i]
-                entities[i] = e.copy(x = e.x + dx, z = e.z + dz)
+                entities[i] = e.copy(x = e.x + dx, y = e.y + dy, z = e.z + dz)
             }
         }
     }
@@ -411,14 +411,31 @@ fun GridEditorScreen(
             )
         }
     }
+    val chainEvaluation = remember(
+        effectiveConditions, effectiveSelector, allGridEntities, targetSpec, worldState,
+        baseOrigin, executorEntity, randomNonce
+    ) {
+        if (planEvaluation == null && effectiveConditions.isNotBlank()) {
+            GridCommandPlanParser.evaluateChain(
+                prefix = effectiveConditions,
+                targetSelector = effectiveSelector,
+                entities = allGridEntities,
+                executor = executorEntity,
+                target = targetSpec,
+                world = worldState,
+                baseOrigin = baseOrigin,
+                edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java"
+            )
+        } else null
+    }
     val evaluation = remember(
         effectiveSelector, allGridEntities, targetSpec,
-        executorUid, resolvedOrigin, planEvaluation, randomNonce
+        executorUid, resolvedOrigin, planEvaluation, chainEvaluation, randomNonce
     ) {
-        if (planEvaluation != null) {
-            SelectorEvaluator.Result(planEvaluation.matched, planEvaluation.notes)
-        } else {
-            SelectorEvaluator.evaluate(
+        when {
+            planEvaluation != null -> SelectorEvaluator.Result(planEvaluation.matched, planEvaluation.notes)
+            chainEvaluation != null -> SelectorEvaluator.Result(chainEvaluation.matched, chainEvaluation.notes)
+            else -> SelectorEvaluator.evaluate(
                 selector = effectiveSelector,
                 entities = allGridEntities,
                 executor = executorEntity,
@@ -429,15 +446,23 @@ fun GridEditorScreen(
         }
     }
     val conditionResults = remember(
-        evaluation, effectiveConditions, allGridEntities, targetSpec, worldState, evaluationOrigin
+        evaluation, effectiveConditions, allGridEntities, targetSpec, worldState, evaluationOrigin, chainEvaluation
     ) {
-        evaluation.matched.map { ge ->
-            GridConditionEvaluator.evaluate(
-                effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
-            ) to ge
+        if (planEvaluation == null && chainEvaluation != null) {
+            emptyList()
+        } else {
+            evaluation.matched.map { ge ->
+                GridConditionEvaluator.evaluate(
+                    effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
+                ) to ge
+            }
         }
     }
-    val filteredMatched = conditionResults.filter { it.first.ok }.map { it.second }
+    val filteredMatched = if (planEvaluation == null && chainEvaluation != null) {
+        chainEvaluation.matched
+    } else {
+        conditionResults.filter { it.first.ok }.map { it.second }
+    }
     val conditionNotes = (
         conditionResults.flatMap { it.first.notes } +
             resolvedOrigin.notes +
@@ -669,7 +694,7 @@ fun GridEditorScreen(
                                         val b = baseBlockPx * vp.zoom
                                         val uid = draggedUid
                                         if (uid != null) {
-                                            moveRelationGroup(uid, (delta.x / b).toDouble(), (delta.y / b).toDouble())
+                                            moveRelationGroup(uid, (delta.x / b).toDouble(), 0.0, (delta.y / b).toDouble())
                                         } else {
                                             viewport = vp.copy(
                                                 camX = vp.camX - delta.x / b,
@@ -979,6 +1004,15 @@ fun GridEditorScreen(
                 onConfirm = { rawUpdated ->
                     var updated = rawUpdated
                     val old = entities.firstOrNull { it.uid == updated.uid }
+                    // 有关系组时，编辑器里改坐标应移动整组，而不是被同步逻辑静默改回。
+                    if (old != null) {
+                        val dx = rawUpdated.x - old.x
+                        val dy = rawUpdated.y - old.y
+                        val dz = rawUpdated.z - old.z
+                        if (dx != 0.0 || dy != 0.0 || dz != 0.0) {
+                            moveRelationGroup(updated.uid, dx, dy, dz)
+                        }
+                    }
                     val rel = GridRelations.decode(updated.relations)
                     // 骑手跟随载具：保存时把当前实体移到所选载具坐标
                     val vehicle = rel["vehicle"]?.firstOrNull()?.let { uid ->
@@ -1008,8 +1042,17 @@ fun GridEditorScreen(
                 entity = current,
                 onDismiss = { showCoordEditor = false; editing = null },
                 onConfirm = { updated ->
-                    val i = entities.indexOfFirst { it.uid == updated.uid }
-                    if (i >= 0) entities[i] = updated
+                    val old = entities.firstOrNull { it.uid == updated.uid }
+                    if (old != null) {
+                        moveRelationGroup(
+                            updated.uid,
+                            updated.x - old.x,
+                            updated.y - old.y,
+                            updated.z - old.z
+                        )
+                    } else {
+                        entities.add(updated)
+                    }
                     syncRelationPositions()
                     persistEntities()
                     showCoordEditor = false
@@ -1607,33 +1650,13 @@ private fun EntityNbtPreviewDialog(
 }
 
 private fun entityNbtText(e: EditableGridEntity): String = buildString {
-    fun q(s: String) = s.replace("\\", "\\\\").replace("\"", "\\\"")
     append("{\n")
-    append("  id: \"${e.id}\",\n")
-    if (e.name.isNotBlank()) append("  CustomName: \"${q(e.name)}\",\n")
-    if (e.tags.isNotBlank()) {
-        append("  Tags: [${e.tagSet().joinToString(", ") { "\"${q(it)}\"" }}],\n")
-    }
-    if (e.team.isNotBlank()) append("  Team: \"${q(e.team)}\",\n")
-    append("  Pos: [${e.x}d, ${e.y}d, ${e.z}d],\n")
-    if (e.scores.isNotBlank()) append("  // scores: ${e.scores}\n")
-    if (e.equipment.isNotBlank()) append("  // equipment: ${e.equipment}\n")
-    if (e.inventory.isNotBlank()) append("  // inventory: ${e.inventory}\n")
-    if (e.gamemode.isNotBlank()) append("  // gamemode: ${e.gamemode}\n")
-    if (e.level.isNotBlank()) append("  // level: ${e.level}\n")
-    if (e.rotationX.isNotBlank() || e.rotationY.isNotBlank()) {
-        append("  // rotation: ${e.rotationX} / ${e.rotationY}\n")
-    }
-    if (e.properties.isNotBlank()) append("  // bedrock properties: ${e.properties}\n")
-    if (e.permissions.isNotBlank()) append("  // bedrock permissions: ${e.permissions}\n")
-    if (e.predicates.isNotBlank()) append("  // predicates: ${e.predicates}\n")
-    if (e.advancements.isNotBlank()) append("  // advancements: ${e.advancements}\n")
-    if (e.nbt.isNotBlank()) append("  // 手动 NBT: ${e.nbt}\n")
+    append(SelectorEvaluator.derivedNbtText(e.toGridEntity()).prependIndent("  "))
     val rel = e.relationMap()
     if (rel.isNotEmpty()) {
-        append("  // execute on: ${rel.entries.joinToString("; ") { (k, v) -> "$k=${v.joinToString("|")}" }}\n")
+        append("\n  // execute on: ${rel.entries.joinToString("; ") { (k, v) -> "$k=${v.joinToString("|")}" }}")
     }
-    append("}")
+    append("\n}")
 }
 
 /**
@@ -1733,7 +1756,7 @@ private fun QuickNbtDialog(
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = when (spec.kind) {
                                     KnownNbt.Kind.INT, KnownNbt.Kind.INT32, KnownNbt.Kind.BYTE -> KeyboardType.Number
-                                    KnownNbt.Kind.FLOAT -> KeyboardType.Decimal
+                                    KnownNbt.Kind.FLOAT, KnownNbt.Kind.DOUBLE -> KeyboardType.Decimal
                                     else -> KeyboardType.Text
                                 }
                             ),

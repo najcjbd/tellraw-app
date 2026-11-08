@@ -109,6 +109,76 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
+    fun inDimensionIsCarriedToFinalAndCleanup() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a in minecraft:the_nether if block 0 0 0 minecraft:stone " +
+                "if block 0 0 0 minecraft:dirt",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "dim"
+        )
+        requireNotNull(plan)
+        assertEquals(2, plan.tags.size)
+        assertTrue(
+            plan.commands[2].startsWith(
+                "execute in minecraft:the_nether as @a[tag=tellraw_a1_dim,tag=tellraw_a2_dim] run tellraw @a"
+            )
+        )
+        assertTrue(plan.commands[3].startsWith("execute in minecraft:the_nether run tag @a[tag=tellraw_a1_dim] remove"))
+    }
+
+    @Test
+    fun modifierRandomSelectorUsesWholeChain() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a at @r if block ~ ~ ~ minecraft:stone if block ~ ~ ~ minecraft:dirt",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "atr"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(
+            plan.commands[0].startsWith(
+                "execute as @a at @r if block ~ ~ ~ minecraft:stone " +
+                    "if block ~ ~ ~ minecraft:dirt run tag @s add tellraw_all_atr"
+            )
+        )
+    }
+
+    @Test
+    fun noAsPrefixFallsBackSingleChain() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute if block ~ ~ ~ minecraft:stone if block ~ ~ ~ minecraft:dirt",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "noas"
+        )
+        assertNull(plan)
+    }
+
+    @Test
+    fun nearestBaseUsesWholeChain() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @p if block ~ ~ ~ minecraft:stone if block ~ ~ ~ minecraft:dirt",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "p"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].startsWith("execute as @p "))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_p] run tellraw @s"))
+    }
+
+    @Test
     fun nonSelfTargetFoldsIntoExecutorAndRunsTellrawPerExecutor() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",

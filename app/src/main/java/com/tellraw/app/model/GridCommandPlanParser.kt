@@ -100,6 +100,38 @@ object GridCommandPlanParser {
         return TagPlan(selector, conditions, notes.distinct(), finalPrefix)
     }
 
+    /**
+     * 单条 execute 链的逐步求值（供网格普通命令使用），与 tag 方案共用同一 context 引擎。
+     * 返回最终收信人集合；无法解析返回 null。
+     */
+    fun evaluateChain(
+        prefix: String,
+        targetSelector: String,
+        entities: List<GridEntity>,
+        executor: GridEntity? = null,
+        target: VersionSpec? = null,
+        world: GridConditionEvaluator.GridWorld = GridConditionEvaluator.GridWorld(),
+        baseOrigin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0),
+        edition: String = "java"
+    ): Result? {
+        if (prefix.isBlank()) return null
+        val notes = mutableListOf<String>()
+        val contexts = evaluateParts(
+            prefix, entities, executor, edition, baseOrigin, target, world, notes
+        )
+        val matched = contexts.flatMap { ctx ->
+            SelectorEvaluator.evaluate(
+                selector = targetSelector,
+                entities = entities,
+                executor = ctx.entity,
+                edition = edition,
+                origin = ctx.origin,
+                target = target
+            ).also { notes.addAll(it.notes) }.matched
+        }.distinctBy { it.uid }
+        return Result(matched, notes.distinct())
+    }
+
     fun evaluate(
         plan: TagPlan,
         entities: List<GridEntity>,
@@ -201,6 +233,9 @@ object GridCommandPlanParser {
         val anchorEyes: Boolean = false
     )
 
+    private fun ExecContext.contextKey(): String =
+        "${entity.uid}|${origin.first}|${origin.second}|${origin.third}|$yaw|$pitch|$dimension|$anchorEyes"
+
     /**
      * 逐步执行 execute 前缀：as/on 换执行者，at/positioned/rotated/facing/align/anchored 更新
      * 执行位置、旋转、维度和锚点，if/unless 立即对当时上下文求值。
@@ -283,7 +318,7 @@ object GridCommandPlanParser {
                             selectEntities(selector, ctx).map {
                                 ctx.copy(entity = it)
                             }
-                        }.distinctBy { it.entity.uid }
+                        }.distinctBy { it.contextKey() }
                         if (contexts.isEmpty()) notes.add("as $selector 没有选中网格实体")
                     }
                 }
@@ -308,7 +343,7 @@ object GridCommandPlanParser {
                             }
                         }
                         if (missing > 0) notes.add("$missing 个执行者没有设置 on $relation 关系")
-                        contexts = next.distinctBy { it.entity.uid }
+                        contexts = next.distinctBy { it.contextKey() }
                     }
                 }
                 "at" -> {

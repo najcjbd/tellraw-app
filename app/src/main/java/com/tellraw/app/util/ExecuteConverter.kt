@@ -738,6 +738,14 @@ object ExecuteConverter {
                             toks.add(t)
                         }
                     }
+                    val positionOnly = seg.tokens.firstOrNull() in POSITION_MODIFIERS
+                    if (positionOnly && extra.isNotEmpty()) {
+                        warnings.add(
+                            "位置修饰子命令 \"${seg.tokens.firstOrNull()}\" 的选择器带否定条件，无法在不改变执行者的情况下表达，" +
+                                "tag 方案已忽略这些条件（与单链一致，结果不等价）"
+                        )
+                        extra = emptyList()
+                    }
                     steps.add(Seg.Mod(toks))
                     if (extra.isNotEmpty()) {
                         val parsed = parseSegments("execute " + extra.joinToString(" "), warnings)
@@ -757,14 +765,16 @@ object ExecuteConverter {
 
         val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
         val asCount = asMods.size
+        // 没有 as 时执行者是命令源，tag @s 在命令方块/控制台无效；回退单链。
+        if (asCount == 0) return null
         val hasOn = mods.any { it.tokens.firstOrNull() == "on" }
         val executorChanged = hasOn || asCount > 1
 
-        // @r/limit/sort 的 as 会在每条 tag 命令里重抽，必须整链。
-        if (asMods.any { baseNeedsWholeChain(it.tokens.getOrNull(1)) }) {
+        // 任何会重新抽取执行者/位置的修饰选择器（@r/@p/@n、limit/sort）都必须整链。
+        if (mods.any { modifierNeedsWholeChain(it) }) {
             return buildWholeChainTagPlan(
                 prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
-                "基选择器含 @r/limit/sort，逐条件 tag 会重新抽取执行者"
+                "修饰子命令选择器含 @r/@p/@n/limit/sort，逐条件 tag 会重新抽取执行者/位置"
             )
         }
         // predicate/function/stopwatch 有随机/副作用/时序；逐条件拆开会改变求值次数或顺序。
@@ -858,9 +868,14 @@ object ExecuteConverter {
         val executorWithTags = appendSelectorParam(
             finalExecutor, tags.joinToString(",") { "tag=$it" }
         ) ?: return null
-        commands.add("execute as $executorWithTags run tellraw $target $tellrawJson")
+        val dimension = lastInDimension(prefix)
+        val dimPrefix = dimension?.let { "in $it " }.orEmpty()
+        commands.add("execute ${dimPrefix}as $executorWithTags run tellraw $target $tellrawJson")
         tags.forEach { tag ->
-            commands.add("tag ${withTags(executorBase, listOf(tag))} remove $tag")
+            val cleanup = "tag ${withTags(executorBase, listOf(tag))} remove $tag"
+            commands.add(
+                if (dimension != null) "execute in $dimension run $cleanup" else cleanup
+            )
         }
 
         if (maySelectNonPlayer(target)) {
@@ -869,10 +884,12 @@ object ExecuteConverter {
                     "（选择器已按你的要求原样保留，未强制过滤）。"
             )
         }
-        warnings.add(
-            "tag 方案按最终执行者合并重复执行：同一最终执行者被多个 base 分支命中时，tellraw 次数可能减少" +
-                "（你选择的 tag 优先策略）。"
-        )
+        if (executorChanged || target != "@s") {
+            warnings.add(
+                "tag 方案按最终执行者合并重复执行：同一最终执行者被多个 base 分支命中时，tellraw 次数可能减少" +
+                    "（你选择的 tag 优先策略）。"
+            )
+        }
         if (folded > 0) {
             warnings.add("可折进最终执行者选择器的条件已折叠；其余条件拆成 tag（${tags.joinToString()}）")
         }
@@ -911,10 +928,13 @@ object ExecuteConverter {
         val suffix = makeTagSuffix(tagSuffix)
         val tag = "tellraw_all_$suffix"
         val withTag = withTags("@e", listOf(tag))
+        val dimension = lastInDimension(prefix)
+        val dimPrefix = dimension?.let { "in $it " }.orEmpty()
+        val cleanup = "tag $withTag remove $tag"
         val commands = listOf(
             "$converted run tag @s add $tag",
-            "execute as $withTag run tellraw $target $tellrawJson",
-            "tag $withTag remove $tag"
+            "execute ${dimPrefix}as $withTag run tellraw $target $tellrawJson",
+            if (dimension != null) "execute in $dimension run $cleanup" else cleanup
         )
         warnings.add(
             "执行者链使用整链 tag（$tag）：$reason；原链条件顺序/短路保持，所有命令必须按顺序执行，中途停止会残留 tag"
@@ -938,6 +958,12 @@ object ExecuteConverter {
         return raw.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "tag" }
     }
 
+    /** 最终/清理命令必须回到原链最后显式 in 的维度，否则 selectors/tag 找不到实体。 */
+    private fun lastInDimension(prefix: String): String? {
+        val parts = parseExecuteParts(prefix, mutableListOf()) ?: return null
+        return parts.lastOrNull { it.tokens.firstOrNull() == "in" }?.tokens?.getOrNull(1)
+    }
+
     private fun selectorHasSpatialParams(selector: String): Boolean {
         if ('[' !in selector || !selector.endsWith("]")) return false
         val body = selector.substringAfter('[').dropLast(1)
@@ -946,16 +972,30 @@ object ExecuteConverter {
             .any { it in setOf("x", "y", "z", "distance", "dx", "dy", "dz") }
     }
 
-    /** @r / limit / sort 会在每条命令里重新抽取执行者，不能逐条件 tag。 */
+    /** @r/@p/@n、limit/sort 会在每条命令里重新抽取执行者/位置，不能逐条件 tag。 */
     private fun baseNeedsWholeChain(selector: String?): Boolean {
         if (selector == null) return false
         val varName = selector.substringBefore('[').trim()
-        if (varName == "@r") return true
+        if (varName in setOf("@r", "@p", "@n")) return true
         if ('[' !in selector || !selector.endsWith("]")) return false
         val body = selector.substringAfter('[').dropLast(1)
         return ExecCondSupport.splitTopLevel(body, ',')
             .map { it.substringBefore('=').trim() }
             .any { it in setOf("limit", "sort", "c") }
+    }
+
+    /** 修饰子命令里凡是会重新抽样执行者/位置的 selector 都要求整链。 */
+    private fun modifierNeedsWholeChain(mod: Seg.Mod): Boolean {
+        val tokens = mod.tokens
+        val selector = when (tokens.firstOrNull()) {
+            "as", "at" -> tokens.getOrNull(1)
+            "positioned", "rotated" ->
+                if (tokens.getOrNull(1) == "as") tokens.getOrNull(2) else null
+            "facing" ->
+                if (tokens.getOrNull(1) == "entity") tokens.getOrNull(2) else null
+            else -> null
+        }
+        return baseNeedsWholeChain(selector)
     }
 
     /** 收信人是否依赖原执行位置/随机/选择数量；这类目标无法用独立 final execute 保证同一上下文。 */
@@ -973,7 +1013,7 @@ object ExecuteConverter {
     /** 这个收信人选择器是否可能选到非玩家（@a/@p 是玩家；@e/@n/@r/@c/@v/@initiator 不一定）。 */
     private fun maySelectNonPlayer(selector: String): Boolean {
         val v = selector.trim().substringBefore('[')
-        return v !in setOf("@a", "@p")
+        return v !in setOf("@a", "@p", "@s")
     }
 
     /**

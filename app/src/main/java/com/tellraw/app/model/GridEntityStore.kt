@@ -378,6 +378,11 @@ class GridEntityStore(private val file: File) {
 
     fun save(list: List<EditableGridEntity>) {
         file.parentFile?.mkdirs()
-        file.writeText(gson.toJson(list))
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeText(gson.toJson(list))
+        if (!tmp.renameTo(file)) {
+            file.writeText(gson.toJson(list))
+            tmp.delete()
+        }
     }
 }

@@ -534,6 +534,12 @@ object SelectorEvaluator {
         return m
     }
 
+    /** 供关系选择器/NBT 预览使用的派生 NBT 文本（与 nbt= 求值同一来源）。 */
+    fun derivedNbtText(e: GridEntity): String =
+        effectiveNbt(e).entries.joinToString(",\n") {
+            "${it.key}: ${SnbtLite.serialize(it.value)}"
+        }
+
     private fun effectiveNbt(e: GridEntity): Map<String, SnbtLite.Value> {
         val m = linkedMapOf<String, SnbtLite.Value>()
         m["id"] = SnbtLite.Value.Str(e.id)
@@ -542,7 +548,7 @@ object SelectorEvaluator {
         }
         e.name?.takeIf { it.isNotBlank() }?.let { m["CustomName"] = SnbtLite.Value.Str(it) }
         e.team?.takeIf { it.isNotBlank() }?.let { m["Team"] = SnbtLite.Value.Str(it) }
-        e.gamemode?.lowercase()?.let { g ->
+        e.gamemode?.lowercase()?.takeIf { e.isPlayer }?.let { g ->
             m["playerGameType"] = SnbtLite.Value.Num(
                 when (g) {
                     "survival" -> 0.0
@@ -553,7 +559,9 @@ object SelectorEvaluator {
                 }
             )
         }
-        e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
+        if (e.isPlayer) {
+            e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
+        }
         // 坐标 / 视角与 NBT 的 Pos / Rotation（Rotation 顺序是 [yaw, pitch]）统一
         m["Pos"] = SnbtLite.Value.ListV(
             listOf(
@@ -572,13 +580,22 @@ object SelectorEvaluator {
         }
 
         val inv = mutableListOf<SnbtLite.Value>()
-        for ((slot, item) in e.items) {
-            val n = inventorySlotNumber(slot) ?: continue
-            inv.add(
-                SnbtLite.Value.Compound(
-                    itemNbt(item) + mapOf("Slot" to SnbtLite.Value.Num(n.toDouble()))
+        if (e.isPlayer) {
+            val slots = linkedMapOf<Int, GridItem>()
+            for ((slot, item) in e.items) {
+                if (slot == "weapon.mainhand") continue
+                val n = inventorySlotNumber(slot) ?: continue
+                slots.putIfAbsent(n, item)
+            }
+            // 实测：玩家选中快捷栏会同时出现在 SelectedItem 与 Inventory；显式 inventory/hotbar 优先。
+            e.items["weapon.mainhand"]?.let { slots.putIfAbsent(0, it) }
+            for ((n, item) in slots) {
+                inv.add(
+                    SnbtLite.Value.Compound(
+                        itemNbt(item) + mapOf("Slot" to SnbtLite.Value.Num(n.toDouble()))
+                    )
                 )
-            )
+            }
         }
         if (inv.isNotEmpty()) m["Inventory"] = SnbtLite.Value.ListV(inv)
 
@@ -606,18 +623,12 @@ object SelectorEvaluator {
         return m
     }
 
-    /** 槽位名 -> NBT 数字槽（装备沿用旧版 100..103 / -106；hotbar/inventory 用数字）。 */
-    private fun inventorySlotNumber(slot: String): Int? = when (slot) {
-        "armor.head" -> 103
-        "armor.chest" -> 102
-        "armor.legs" -> 101
-        "armor.feet" -> 100
-        "weapon.offhand" -> -106
-        else -> when {
-            slot.startsWith("hotbar.") || slot.startsWith("inventory.") ->
-                slot.substringAfterLast('.').toIntOrNull()
-            else -> null
-        }
+    /** 玩家 Inventory 数字槽：只映射 hotbar/inventory 与主手（Slot 0）；装备走 equipment。 */
+    private fun inventorySlotNumber(slot: String): Int? = when {
+        slot == "weapon.mainhand" -> 0
+        slot.startsWith("hotbar.") || slot.startsWith("inventory.") ->
+            slot.substringAfterLast('.').toIntOrNull()
+        else -> null
     }
 
     private fun matchHasProperty(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
