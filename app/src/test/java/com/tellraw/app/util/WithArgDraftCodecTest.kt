@@ -156,6 +156,27 @@ class WithArgDraftCodecTest {
     }
 
     @Test
+    fun visualCompletenessRejectsEmptyRequiredNestedFields() {
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Selector(""))))
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Score("", "obj"))))
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Nbt(""))))
+        assertFalse(
+            WithArgCodec.isComplete(
+                listOf(WithArgDraft.Translate("", args = listOf(WithArgDraft.Text("x"))))
+            )
+        )
+        assertTrue(
+            WithArgCodec.isComplete(
+                listOf(
+                    WithArgDraft.Text("x"),
+                    WithArgDraft.Selector("@a"),
+                    WithArgDraft.Nbt("Health")
+                )
+            )
+        )
+    }
+
+    @Test
     fun prettyPrintParsesBackToSameJson() {
         val args = listOf(
             WithArgDraft.Translate("k", args = listOf(WithArgDraft.Text("a", bold = true))),

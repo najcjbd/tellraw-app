@@ -116,8 +116,28 @@ object GridCommandPlanParser {
     ): Result? {
         if (prefix.isBlank()) return null
         val notes = mutableListOf<String>()
+        val trimmed = prefix.trimStart()
+        if (trimmed.startsWith("if ") || trimmed.startsWith("unless ")) {
+            // 只写条件的“附加条件”：按收信人逐个过滤，而不是先用命令源门控再让 @a 选全部。
+            val recipients = SelectorEvaluator.evaluate(
+                selector = targetSelector,
+                entities = entities,
+                executor = executor,
+                edition = edition,
+                origin = baseOrigin,
+                target = target
+            ).also { notes.addAll(it.notes) }.matched
+            val matched = recipients.filter { e ->
+                val r = GridConditionEvaluator.evaluate(
+                    trimmed, e, entities, target, world, baseOrigin
+                )
+                notes.addAll(r.notes)
+                r.ok
+            }
+            return Result(matched, notes.distinct())
+        }
         val contexts = evaluateParts(
-            prefix, entities, executor, edition, baseOrigin, target, world, notes
+            trimmed, entities, executor, edition, baseOrigin, target, world, notes
         )
         val matched = contexts.flatMap { ctx ->
             SelectorEvaluator.evaluate(
@@ -351,19 +371,21 @@ object GridCommandPlanParser {
                     if (selector == null) {
                         notes.add("at 缺少选择器，已忽略")
                     } else {
-                        contexts = contexts.map { ctx ->
-                            val first = selectEntities(selector, ctx).firstOrNull()
-                            if (first == null) {
-                                notes.add("at $selector 没有选中实体，上下文保持不变")
-                                ctx
+                        contexts = contexts.flatMap { ctx ->
+                            val targets = selectEntities(selector, ctx)
+                            if (targets.isEmpty()) {
+                                notes.add("at $selector 没有选中实体，分支终止")
+                                emptyList()
                             } else {
-                                ctx.copy(
-                                    origin = Triple(first.x, first.y, first.z),
-                                    yaw = first.rotationY ?: ctx.yaw,
-                                    pitch = first.rotationX ?: ctx.pitch
-                                )
+                                targets.map { first ->
+                                    ctx.copy(
+                                        origin = Triple(first.x, first.y, first.z),
+                                        yaw = first.rotationY ?: ctx.yaw,
+                                        pitch = first.rotationX ?: ctx.pitch
+                                    )
+                                }
                             }
-                        }
+                        }.distinctBy { it.contextKey() }
                     }
                 }
                 "positioned" -> {
@@ -374,19 +396,22 @@ object GridCommandPlanParser {
                             if (selector == null) {
                                 notes.add("positioned as 缺少选择器，已忽略")
                             } else {
-                                contexts = contexts.map { ctx ->
-                                    val targetEntity = selectEntities(selector, ctx).firstOrNull()
-                                    if (targetEntity == null) {
-                                        notes.add("positioned as $selector 没有选中实体，原点保持不变")
-                                        ctx
+                                contexts = contexts.flatMap { ctx ->
+                                    val targets = selectEntities(selector, ctx)
+                                    if (targets.isEmpty()) {
+                                        notes.add("positioned as $selector 没有选中实体，分支终止")
+                                        emptyList()
                                     } else {
-                                        ctx.copy(
-                                            origin = Triple(
-                                                targetEntity.x, targetEntity.y, targetEntity.z
+                                        targets.map { targetEntity ->
+                                            ctx.copy(
+                                                origin = Triple(
+                                                    targetEntity.x, targetEntity.y, targetEntity.z
+                                                ),
+                                                anchorEyes = false
                                             )
-                                        )
+                                        }
                                     }
-                                }
+                                }.distinctBy { it.contextKey() }
                             }
                         }
                         "over" -> notes.add("execute positioned over（高度图）未建模，原点保持不变")
@@ -400,7 +425,7 @@ object GridCommandPlanParser {
                             ) {
                                 contexts = contexts.map { ctx ->
                                     val p = localToWorld(first, ys, zs, ctx, notes)
-                                    ctx.copy(origin = p)
+                                    ctx.copy(origin = p, anchorEyes = false)
                                 }
                             } else {
                                 contexts = contexts.map { ctx ->
@@ -409,7 +434,8 @@ object GridCommandPlanParser {
                                             coord(first, ctx.origin.first, notes),
                                             coord(ys, ctx.origin.second, notes),
                                             coord(zs, ctx.origin.third, notes)
-                                        )
+                                        ),
+                                        anchorEyes = false
                                     )
                                 }
                             }
@@ -423,21 +449,25 @@ object GridCommandPlanParser {
                         if (selector == null) {
                             notes.add("rotated as 缺少选择器，已忽略")
                         } else {
-                            contexts = contexts.map { ctx ->
-                                val targetEntity = selectEntities(selector, ctx).firstOrNull()
-                                if (targetEntity == null) {
-                                    notes.add("rotated as $selector 没有选中实体，旋转保持不变")
-                                    ctx
-                                } else if (targetEntity.rotationY == null && targetEntity.rotationX == null) {
-                                    notes.add("rotated as 的目标没有设置视角，旋转保持不变")
-                                    ctx
+                            contexts = contexts.flatMap { ctx ->
+                                val targets = selectEntities(selector, ctx)
+                                if (targets.isEmpty()) {
+                                    notes.add("rotated as $selector 没有选中实体，分支终止")
+                                    emptyList()
                                 } else {
-                                    ctx.copy(
-                                        yaw = targetEntity.rotationY ?: ctx.yaw,
-                                        pitch = targetEntity.rotationX ?: ctx.pitch
-                                    )
+                                    targets.map { targetEntity ->
+                                        if (targetEntity.rotationY == null && targetEntity.rotationX == null) {
+                                            notes.add("rotated as 的目标没有设置视角，旋转保持不变")
+                                            ctx
+                                        } else {
+                                            ctx.copy(
+                                                yaw = targetEntity.rotationY ?: ctx.yaw,
+                                                pitch = targetEntity.rotationX ?: ctx.pitch
+                                            )
+                                        }
+                                    }
                                 }
-                            }
+                            }.distinctBy { it.contextKey() }
                         }
                     } else {
                         val yawText = tokens.getOrNull(1)
@@ -461,17 +491,19 @@ object GridCommandPlanParser {
                         if (selector == null || anchor == null) {
                             notes.add("facing entity 参数不完整，已忽略")
                         } else {
-                            contexts = contexts.map { ctx ->
-                                val targetEntity = selectEntities(selector, ctx).firstOrNull()
-                                if (targetEntity == null) {
-                                    notes.add("facing entity $selector 没有选中实体，旋转保持不变")
-                                    ctx
+                            contexts = contexts.flatMap { ctx ->
+                                val targets = selectEntities(selector, ctx)
+                                if (targets.isEmpty()) {
+                                    notes.add("facing entity $selector 没有选中实体，分支终止")
+                                    emptyList()
                                 } else {
-                                    val targetY = targetEntity.y +
-                                        if (anchor == "eyes") 1.62 else 0.0
-                                    ctx.copyFromFacing(targetEntity.x, targetY, targetEntity.z)
+                                    targets.map { targetEntity ->
+                                        val targetY = targetEntity.y +
+                                            if (anchor == "eyes") eyeHeight(targetEntity) else 0.0
+                                        ctx.copyFromFacing(targetEntity.x, targetY, targetEntity.z)
+                                    }
                                 }
-                            }
+                            }.distinctBy { it.contextKey() }
                         }
                     } else {
                         val xs = tokens.getOrNull(1)
@@ -533,9 +565,13 @@ object GridCommandPlanParser {
         return contexts
     }
 
+    private fun eyeHeight(e: GridEntity): Double =
+        if (e.isPlayer) 1.62 else e.hitboxHeight * 0.85
+
     private fun ExecContext.copyFromFacing(tx: Double, ty: Double, tz: Double): ExecContext {
+        val fromY = origin.second + if (anchorEyes) eyeHeight(entity) else 0.0
         val dx = tx - origin.first
-        val dy = ty - origin.second
+        val dy = ty - fromY
         val dz = tz - origin.third
         val horizontal = sqrt(dx * dx + dz * dz)
         if (horizontal < 1e-9 && kotlin.math.abs(dy) < 1e-9) return this
@@ -563,7 +599,7 @@ object GridCommandPlanParser {
             ?: return ctx.origin
         val yaw = Math.toRadians(ctx.yaw)
         val pitch = Math.toRadians(ctx.pitch)
-        val baseY = ctx.origin.second + if (ctx.anchorEyes) 1.62 else 0.0
+        val baseY = ctx.origin.second + if (ctx.anchorEyes) eyeHeight(ctx.entity) else 0.0
         val fx = -sin(yaw) * cos(pitch)
         val fy = -sin(pitch)
         val fz = cos(yaw) * cos(pitch)

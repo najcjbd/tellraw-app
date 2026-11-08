@@ -109,7 +109,7 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
-    fun inDimensionIsCarriedToFinalAndCleanup() {
+    fun inDimensionFallsBackSingleChain() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a in minecraft:the_nether if block 0 0 0 minecraft:stone " +
                 "if block 0 0 0 minecraft:dirt",
@@ -119,14 +119,8 @@ class ExecuteConverterAuditTest {
             requireUnmergeable = false,
             tagSuffix = "dim"
         )
-        requireNotNull(plan)
-        assertEquals(2, plan.tags.size)
-        assertTrue(
-            plan.commands[2].startsWith(
-                "execute in minecraft:the_nether as @a[tag=tellraw_a1_dim,tag=tellraw_a2_dim] run tellraw @a"
-            )
-        )
-        assertTrue(plan.commands[3].startsWith("execute in minecraft:the_nether run tag @a[tag=tellraw_a1_dim] remove"))
+        // 维度作用域依赖 as/in 顺序；tag 的 final/cleanup 无法通用保真，退回单链。
+        assertNull(plan)
     }
 
     @Test

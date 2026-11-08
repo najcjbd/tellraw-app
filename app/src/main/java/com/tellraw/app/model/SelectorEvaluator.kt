@@ -548,18 +548,17 @@ object SelectorEvaluator {
         }
         e.name?.takeIf { it.isNotBlank() }?.let { m["CustomName"] = SnbtLite.Value.Str(it) }
         e.team?.takeIf { it.isNotBlank() }?.let { m["Team"] = SnbtLite.Value.Str(it) }
-        e.gamemode?.lowercase()?.takeIf { e.isPlayer }?.let { g ->
-            m["playerGameType"] = SnbtLite.Value.Num(
-                when (g) {
+        if (e.isPlayer) {
+            e.gamemode?.lowercase()?.let { g ->
+                val id = when (g) {
                     "survival" -> 0.0
                     "creative" -> 1.0
                     "adventure" -> 2.0
                     "spectator" -> 3.0
-                    else -> 0.0
+                    else -> null
                 }
-            )
-        }
-        if (e.isPlayer) {
+                if (id != null) m["playerGameType"] = SnbtLite.Value.Num(id)
+            }
             e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
         }
         // 坐标 / 视角与 NBT 的 Pos / Rotation（Rotation 顺序是 [yaw, pitch]）统一
@@ -621,6 +620,22 @@ object SelectorEvaluator {
 
         SnbtLite.parseCompoundBody(e.extraNbt)?.let { m.putAll(it) }
         return m
+    }
+
+    /** Bedrock slot.inventory / Java items inventory 的外部槽号 0-26 -> 内部 NBT 槽 9-35。 */
+    private fun translateInventorySlotSpec(slot: String): String {
+        fun shift(text: String): String {
+            val n = text.toIntOrNull() ?: return text
+            return (n + 9).toString()
+        }
+        if (slot.startsWith("!")) return "!" + shift(slot.substring(1))
+        if (".." in slot) {
+            val lo = slot.substringBefore("..")
+            val hi = slot.substringAfter("..")
+            return (if (lo.isBlank()) "" else shift(lo)) + ".." +
+                (if (hi.isBlank()) "" else shift(hi))
+        }
+        return shift(slot)
     }
 
     /** 玩家 Inventory 数字槽：只映射 hotbar/inventory 与主手（Slot 0）；装备走 equipment。 */
@@ -777,35 +792,38 @@ object SelectorEvaluator {
             return true
         }
         val loc = location?.removePrefix("slot.")
+        val slotSpec = if (loc == "inventory" && slot != null) {
+            translateInventorySlotSpec(slot)
+        } else slot
         fun slotMatches(key: String): Boolean {
             if (loc != null) {
                 val locOk = key == loc || key.startsWith("$loc.") ||
                     (loc == "hotbar" && key == "hotbar")
                 if (!locOk) return false
             }
-            if (slot != null && loc != null &&
+            if (slotSpec != null && loc != null &&
                 ExecCondSupport.isSingleSlotItemLocation("slot.$loc")
             ) {
                 // 单槽位 location：数字槽位固定按 0 处理（armor.head 等）
-                return slotAccepts(0, slot)
+                return slotAccepts(0, slotSpec!!)
             }
-            if (slot != null) {
+            if (slotSpec != null) {
                 val idx = key.substringAfterLast('.', "")
                 val idxNum = idx.toIntOrNull()
-                if (slot.startsWith("!")) {
-                    val bad = slot.substring(1)
+                if (slotSpec.startsWith("!")) {
+                    val bad = slotSpec.substring(1)
                     val badNum = bad.toIntOrNull()
                     if (idx == bad || (badNum != null && idxNum == badNum)) return false
-                } else if (".." in slot) {
+                } else if (".." in slotSpec) {
                     if (idxNum == null) return false
-                    val (lo, hi) = parseRange(slot)
+                    val (lo, hi) = parseRange(slotSpec)
                     if (lo != null && idxNum < lo) return false
                     if (hi != null && idxNum > hi) return false
                 } else {
-                    val wanted = slot.toIntOrNull()
+                    val wanted = slotSpec.toIntOrNull()
                     if (wanted != null) {
                         if (idxNum != wanted) return false
-                    } else if (idx != slot) {
+                    } else if (idx != slotSpec) {
                         return false
                     }
                 }

@@ -415,7 +415,12 @@ fun GridEditorScreen(
         effectiveConditions, effectiveSelector, allGridEntities, targetSpec, worldState,
         baseOrigin, executorEntity, randomNonce
     ) {
-        if (planEvaluation == null && effectiveConditions.isNotBlank()) {
+        val ec = effectiveConditions.trimStart()
+        val chainLike = ec.startsWith("execute ") ||
+            ec.substringBefore(' ').lowercase() in setOf(
+                "as", "at", "in", "on", "positioned", "rotated", "facing", "align", "anchored", "summon"
+            )
+        if (planEvaluation == null && chainLike) {
             GridCommandPlanParser.evaluateChain(
                 prefix = effectiveConditions,
                 targetSelector = effectiveSelector,
@@ -1200,9 +1205,9 @@ private fun CoordEditorDialog(
     onDismiss: () -> Unit,
     onConfirm: (EditableGridEntity) -> Unit
 ) {
-    var x by rememberSaveable(entity.uid) { mutableStateOf(fmt(entity.x)) }
-    var y by rememberSaveable(entity.uid) { mutableStateOf(fmt(entity.y)) }
-    var z by rememberSaveable(entity.uid) { mutableStateOf(fmt(entity.z)) }
+    var x by rememberSaveable(entity.uid) { mutableStateOf(entity.x.toString()) }
+    var y by rememberSaveable(entity.uid) { mutableStateOf(entity.y.toString()) }
+    var z by rememberSaveable(entity.uid) { mutableStateOf(entity.z.toString()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("修改坐标") },
@@ -1252,9 +1257,9 @@ private fun EntityEditorDialog(
     var name by rememberSaveable(initial.uid) { mutableStateOf(initial.name) }
     var tags by rememberSaveable(initial.uid) { mutableStateOf(initial.tags) }
     var team by rememberSaveable(initial.uid) { mutableStateOf(initial.team) }
-    var x by rememberSaveable(initial.uid) { mutableStateOf(fmt(initial.x)) }
-    var y by rememberSaveable(initial.uid) { mutableStateOf(fmt(initial.y)) }
-    var z by rememberSaveable(initial.uid) { mutableStateOf(fmt(initial.z)) }
+    var x by rememberSaveable(initial.uid) { mutableStateOf(initial.x.toString()) }
+    var y by rememberSaveable(initial.uid) { mutableStateOf(initial.y.toString()) }
+    var z by rememberSaveable(initial.uid) { mutableStateOf(initial.z.toString()) }
     var scores by rememberSaveable(initial.uid) { mutableStateOf(initial.scores) }
     var equipment by rememberSaveable(initial.uid) { mutableStateOf(initial.equipment) }
     var inventory by rememberSaveable(initial.uid) { mutableStateOf(initial.inventory) }
@@ -1398,13 +1403,13 @@ private fun EntityEditorDialog(
                     val names = selectedUids.mapNotNull { uid ->
                         allEntities.firstOrNull { it.uid == uid }?.let { displayNameOf(it, customs) }
                     }
-                    val dangling = selectedUids.isNotEmpty() && names.isEmpty()
+                    val dangling = names.size != selectedUids.size
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(GridRelations.label(key), style = MaterialTheme.typography.bodySmall)
                             Text(
                                 when {
-                                    dangling -> "引用的实体已不存在（可清除）"
+                                    dangling -> "有引用已失效（可清除）"
                                     names.isEmpty() -> "未设置"
                                     else -> names.joinToString("、")
                                 },

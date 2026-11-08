@@ -46,6 +46,23 @@ class SelectorEvaluatorAuditTest {
     }
 
     @Test
+    fun mainInventorySlotTranslationMatchesNbtSlot() {
+        val item = GridItem("minecraft:netherite_ingot")
+        val p = GridEntity("p", "minecraft:player", items = mapOf("inventory.21" to item))
+        val hasitem = eval(
+            "@a[hasitem={item=netherite_ingot,location=slot.inventory,slot=12}]",
+            listOf(p),
+            edition = "bedrock"
+        )
+        assertEquals(listOf("p"), hasitem.matched.map { it.uid })
+        val items = GridConditionEvaluator.evaluate(
+            "if items entity @s inventory.12 minecraft:netherite_ingot",
+            p, listOf(p)
+        )
+        assertTrue(items.ok)
+    }
+
+    @Test
     fun playerMainhandIsSelectedItemNotEquipment() {
         val sword = GridItem("minecraft:diamond_sword")
         val player = GridEntity(

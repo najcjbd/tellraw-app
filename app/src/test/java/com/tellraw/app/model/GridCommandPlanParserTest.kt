@@ -2,6 +2,7 @@ package com.tellraw.app.model
 
 import com.tellraw.app.util.ExecuteConverter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -253,6 +254,44 @@ class GridCommandPlanParserTest {
         )
         val result = GridCommandPlanParser.evaluate(parsed!!, entities, Triple(0.0, -60.0, 0.0))
         assertEquals(listOf("wolf"), result.matched.map { it.uid })
+    }
+
+    @Test
+    fun bareConditionsAndAtForksAreEvaluatedCorrectly() {
+        val vip = player("vip", tags = setOf("vip"))
+        val p2 = player("p2")
+        val bare = GridCommandPlanParser.evaluateChain(
+            "if entity @s[tag=vip]", "@a", listOf(vip, p2)
+        )
+        assertNotNull(bare)
+        assertEquals(listOf("vip"), bare!!.matched.map { it.uid })
+
+        val p = player("p")
+        val near = GridEntity("near", "minecraft:zombie", x = 5.0)
+        val far = GridEntity("far", "minecraft:zombie", x = 100.0)
+        val world = GridConditionEvaluator.GridWorld(
+            blocks = mapOf("5,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone"))
+        )
+        val forked = GridCommandPlanParser.evaluateChain(
+            "as @a at @e[type=zombie] if block ~ ~ ~ minecraft:stone",
+            "@a", listOf(p, far, near), world = world
+        )
+        assertNotNull(forked)
+        assertEquals(listOf("p"), forked!!.matched.map { it.uid })
+
+        val empty = GridCommandPlanParser.evaluateChain(
+            "as @a at @e[type=skeleton] if block 0 -60 0 minecraft:stone",
+            "@a", listOf(p), world = world
+        )
+        assertNotNull(empty)
+        assertTrue(empty!!.matched.isEmpty())
+    }
+
+    @Test
+    fun missingScoreFailsInsteadOfNeutral() {
+        val p = player("p")
+        val r = GridConditionEvaluator.evaluate("if score @s obj matches 1", p, listOf(p))
+        assertFalse(r.ok)
     }
 
     @Test

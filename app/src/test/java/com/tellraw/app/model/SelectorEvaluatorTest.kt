@@ -254,7 +254,7 @@ class SelectorEvaluatorTest {
                 .matched.map { it.uid }
         )
         // hasitem data= 与物品 damage / NBT damage 组件统一
-        val p = steve.copy(items = mapOf("inventory.0" to GridItem("minecraft:diamond_sword", 1, 5)))
+        val p = steve.copy(items = mapOf("inventory.9" to GridItem("minecraft:diamond_sword", 1, 5)))
         val bTarget = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 20, 80))
         assertEquals(
             listOf("p1"),
@@ -266,7 +266,7 @@ class SelectorEvaluatorTest {
         assertEquals(
             listOf("p1"),
             SelectorEvaluator.evaluate(
-                """@a[nbt={Inventory:[{Slot:0b,id:"minecraft:diamond_sword",components:{"minecraft:damage":5}}]}]""",
+                """@a[nbt={Inventory:[{Slot:9b,id:"minecraft:diamond_sword",components:{"minecraft:damage":5}}]}]""",
                 listOf(p)
             ).matched.map { it.uid }
         )

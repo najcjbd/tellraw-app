@@ -164,6 +164,14 @@ fun WithBuilderDialog(
                 BedrockNotes(parsedForNotes)
                 JsonPreview(state)
 
+                val argsForValidation = remember(state.mode, state.args, state.rawJson) {
+                    when (state.mode) {
+                        WithBuilderMode.VISUAL -> state.args
+                        WithBuilderMode.JSON -> runCatching {
+                            WithArgCodec.parseArgs(state.rawJson)
+                        }.getOrNull()
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -173,6 +181,8 @@ fun WithBuilderDialog(
                     Button(
                         onClick = onApply,
                         enabled = state.key.isNotBlank() &&
+                            argsForValidation != null &&
+                            WithArgCodec.isComplete(argsForValidation) &&
                             if (state.mode == WithBuilderMode.VISUAL) {
                                 visualRawError == null
                             } else {
@@ -1301,7 +1311,7 @@ private fun JsonPreview(state: WithBuilderState) {
             overflow = TextOverflow.Ellipsis
         )
     }
-    if (state.args.any { it is WithArgDraft.Text && '§' in it.text }) {
+    if (state.args.any { containsSectionSign(it) }) {
         Text(
             stringResource(R.string.with_builder_section_plain_hint),
             style = MaterialTheme.typography.labelSmall,
@@ -1392,7 +1402,7 @@ private fun TriStateChip(labelRes: Int, value: Boolean?, onChange: (Boolean?) ->
                 }
             )
         },
-        label = { Text("${stringResource(labelRes)}：$stateText") }
+        label = { Text("${stringResource(labelRes)}: $stateText") }
     )
 }
 
@@ -1423,9 +1433,14 @@ private fun defaultDraft(kind: AddKind): WithArgDraft = when (kind) {
     AddKind.RAW -> WithArgDraft.Raw(com.google.gson.JsonObject())
 }
 
+private fun containsSectionSign(draft: WithArgDraft): Boolean = when (draft) {
+    is WithArgDraft.Text -> '§' in draft.text
+    is WithArgDraft.Translate -> draft.args.any { containsSectionSign(it) }
+    else -> false
+}
+
 @Composable
-private fun kindLabel(draft: WithArgDraft): String = stringResource(
-    when (draft) {
+private fun kindLabel(draft: WithArgDraft): String = stringResource(    when (draft) {
         is WithArgDraft.Text -> R.string.with_builder_kind_text
         is WithArgDraft.Translate -> R.string.with_builder_kind_translate
         is WithArgDraft.Selector -> R.string.with_builder_kind_selector

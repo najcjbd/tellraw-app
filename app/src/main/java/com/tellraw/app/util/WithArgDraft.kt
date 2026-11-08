@@ -325,6 +325,19 @@ object WithArgCodec {
     fun serializePretty(args: List<WithArgDraft>): String =
         prettyGson.toJson(JsonArray().apply { args.forEach { add(it.toJson()) } })
 
+    /** 递归检查可视化字段是否足以生成不会被原版直接拒绝的组件。 */
+    fun isComplete(args: List<WithArgDraft>): Boolean = args.all { arg ->
+        when (arg) {
+            is WithArgDraft.Text -> true
+            is WithArgDraft.Translate -> arg.key.isNotBlank() && isComplete(arg.args)
+            is WithArgDraft.Selector -> arg.selector.isNotBlank()
+            is WithArgDraft.Score -> arg.name.isNotBlank() && arg.objective.isNotBlank()
+            is WithArgDraft.Keybind -> arg.keybind.isNotBlank()
+            is WithArgDraft.Nbt -> arg.path.isNotBlank()
+            is WithArgDraft.Raw -> true
+        }
+    }
+
     fun prettyJson(el: JsonElement): String = prettyGson.toJson(el)
 
     // ---------- 基岩兼容提示 ----------

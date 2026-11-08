@@ -140,8 +140,9 @@ object ExecuteConverter {
                     //    （Java 的选择器不支持 =!；拆出来后 @s 就是刚切过去的执行者，语义不变）
                     val toks = mutableListOf<String>()
                     val extra = mutableListOf<String>()
+                    val selectorIndex = modifierSelectorIndex(seg.tokens)
                     seg.tokens.forEachIndexed { i, t ->
-                        if (i == 1 && t.startsWith("@")) {
+                        if (i == selectorIndex && t.startsWith("@")) {
                             val (conv, cond) = convertModifierSelector(t, direction, reminders, nbtSyntax)
                             toks.add(conv)
                             extra.addAll(cond)
@@ -149,8 +150,11 @@ object ExecuteConverter {
                             toks.add(t)
                         }
                     }
-                    out.addAll(toks)
                     val modName = seg.tokens.firstOrNull()
+                    if (modName == "in" && toks.size > 1) {
+                        toks[1] = convertDimension(toks[1], direction)
+                    }
+                    out.addAll(toks)
                     if (direction == Direction.JAVA_TO_BEDROCK && modName in setOf("on", "summon")) {
                         reminders.add(
                             "基岩 execute 没有 \"$modName\" 修饰（仅 Java 版）；已原样保留，基岩会解析失败。"
@@ -729,8 +733,9 @@ object ExecuteConverter {
                 is Seg.Mod -> {
                     val toks = mutableListOf<String>()
                     var extra = emptyList<String>()
+                    val selectorIndex = modifierSelectorIndex(seg.tokens)
                     seg.tokens.forEachIndexed { i, t ->
-                        if (i == 1 && t.startsWith("@")) {
+                        if (i == selectorIndex && t.startsWith("@")) {
                             val (conv, cond) = convertModifierSelector(t, direction, warnings, nbtSyntax)
                             toks.add(conv)
                             extra = cond
@@ -762,6 +767,8 @@ object ExecuteConverter {
 
         // summon 每次生成新实体；无法在网格/独立 final 里确定，回退单链。
         if (mods.any { it.tokens.firstOrNull() == "summon" }) return null
+        // in 的维度作用域依赖 as/in 的先后；独立 final/cleanup 无法通用保真，回退单链。
+        if (mods.any { it.tokens.firstOrNull() == "in" }) return null
 
         val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
         val asCount = asMods.size
@@ -987,12 +994,9 @@ object ExecuteConverter {
     /** 修饰子命令里凡是会重新抽样执行者/位置的 selector 都要求整链。 */
     private fun modifierNeedsWholeChain(mod: Seg.Mod): Boolean {
         val tokens = mod.tokens
+        if (tokens.firstOrNull() in setOf("at", "positioned", "rotated", "facing")) return true
         val selector = when (tokens.firstOrNull()) {
-            "as", "at" -> tokens.getOrNull(1)
-            "positioned", "rotated" ->
-                if (tokens.getOrNull(1) == "as") tokens.getOrNull(2) else null
-            "facing" ->
-                if (tokens.getOrNull(1) == "entity") tokens.getOrNull(2) else null
+            "as" -> tokens.getOrNull(1)
             else -> null
         }
         return baseNeedsWholeChain(selector)
@@ -1466,7 +1470,14 @@ object ExecuteConverter {
         return if (target.startsWith("@")) {
             CondOut.Out(listOf(kw, "entity", foldParam(target, param)))
         } else {
-            CondOut.Out(listOf("as", target, kw, "entity", "@s[$param]"))
+            // 玩家名/UUID 目标：不能 `as <name>` 再测 @s，否则后续条件会换成该玩家。
+            // 选择器 name= 能保持原执行者；Bedrock 支持 name=。
+            CondOut.Out(
+                listOf(
+                    kw, "entity",
+                    foldParam("@e", "name=" + quoteSelectorValue(target) + "," + param)
+                )
+            )
         }
     }
 
@@ -1947,13 +1958,39 @@ object ExecuteConverter {
         }
     }
 
+    /** 修饰子命令里可带目标选择器的位置。 */
+    private fun modifierSelectorIndex(tokens: List<String>): Int = when (tokens.firstOrNull()) {
+        "as", "at" -> 1
+        "positioned", "rotated" -> if (tokens.getOrNull(1) == "as") 2 else -1
+        "facing" -> if (tokens.getOrNull(1) == "entity") 2 else -1
+        else -> -1
+    }
+
+    private fun convertDimension(value: String, direction: Direction): String {
+        val id = value.trim()
+        val plain = id.removePrefix("minecraft:")
+        return when (direction) {
+            Direction.JAVA_TO_BEDROCK -> when (plain) {
+                "the_nether" -> "nether"
+                "overworld" -> "overworld"
+                "the_end" -> "the_end"
+                else -> id
+            }
+            Direction.BEDROCK_TO_JAVA -> when (plain) {
+                "nether" -> "minecraft:the_nether"
+                "overworld" -> "minecraft:overworld"
+                "the_end" -> "minecraft:the_end"
+                else -> id
+            }
+        }
+    }
+
     private fun convertModifierSelector(
         token: String,
         direction: Direction,
         reminders: MutableList<String>,
         nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
-    ): Pair<String, List<String>> {
-        val unchanged = token to emptyList<String>()
+    ): Pair<String, List<String>> {        val unchanged = token to emptyList<String>()
         if (!token.startsWith("@") || !token.contains('[') || !token.endsWith("]")) return unchanged
         val varName = token.substringBefore('[')
         val paramsPart = token.substringAfter('[').dropLast(1)

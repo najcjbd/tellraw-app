@@ -127,12 +127,16 @@ object GridConditionEvaluator {
                         val range = tokens.getOrNull(i + 5)
                         val (lo, hi) = parseRange(range ?: "")
                         val v = entity.scores[obj]
-                        if (tgt == "@s" && v != null) {
-                            ok = v.toDouble() >= (lo ?: Double.NEGATIVE_INFINITY) &&
+                        if (tgt == "@s") {
+                            ok = v != null &&
+                                v.toDouble() >= (lo ?: Double.NEGATIVE_INFINITY) &&
                                 v.toDouble() <= (hi ?: Double.POSITIVE_INFINITY)
+                            if (v == null) {
+                                notes.add("score 条件的目标没有记分项 $obj，按失败处理")
+                            }
                             consumed = 6
                         } else {
-                            notes.add("score 条件的目标不是 @s 或实体没有该分数，按候选近似未筛选")
+                            notes.add("score 条件的目标不是 @s，按候选近似未筛选")
                             ok = true
                             neutral = true
                             consumed = 6
@@ -506,11 +510,31 @@ object GridConditionEvaluator {
         return null
     }
 
+    /** Java items/slots 的 inventory.N 是 0-26 外部槽；网格内部键/NBT 是 9-35。 */
+    private fun translateInventorySlotSource(source: String): String {
+        if (!source.startsWith("inventory.") && source != "inventory") return source
+        val rest = source.removePrefix("inventory.").ifEmpty { return source }
+        if (rest == "*") return source
+        fun shift(text: String): String = text.toIntOrNull()?.let { (it + 9).toString() } ?: text
+        val body = if (rest.startsWith("!")) "!" + shift(rest.substring(1)) else rest
+        val translated = if (".." in body) {
+            val lo = body.substringBefore("..")
+            val hi = body.substringAfter("..")
+            (if (lo.isBlank()) "" else shift(lo.removePrefix("!"))) + ".." +
+                (if (hi.isBlank()) "" else shift(hi))
+        } else if (body.startsWith("!")) {
+            "!" + shift(body.substring(1))
+        } else {
+            shift(body)
+        }
+        return "inventory.$translated"
+    }
+
     private fun blockItems(block: GridBlock): Map<String, GridItem> =
         block.items.mapKeys { "container.${it.key}" }
 
     private fun slotMatches(source: String, key: String): Boolean {
-        val src = source.removePrefix("slot.")
+        val src = translateInventorySlotSource(source.removePrefix("slot."))
         val k = key.removePrefix("slot.")
         if (src == "*") return true
         if (src.endsWith(".*")) return k.startsWith(src.dropLast(1)) || k == src.dropLast(2)

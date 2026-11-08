@@ -138,7 +138,7 @@ object GridRelations {
         // 补全旧存档/手动单向关系：vehicle 的反向 passengers、passengers 的反向 vehicle。
         var changed = true
         var guard = 0
-        while (changed && guard++ < 12) {
+        while (changed && guard++ < maxOf(12, entities.size * 4)) {
             changed = false
             for (e in byUid.values.toList()) {
                 val vehicles = decode(e.relations)["vehicle"].orEmpty()
@@ -181,7 +181,7 @@ object GridRelations {
         var changedAny = false
         var guard = 0
         var changed = true
-        while (changed && guard++ < 12) {
+        while (changed && guard++ < maxOf(12, list.size * 4)) {
             changed = false
             for (e in list) {
                 val cur = byUid[e.uid] ?: continue
@@ -373,16 +373,22 @@ class GridEntityStore(private val file: File) {
         else gson.fromJson(file.readText(), Array<EditableGridEntity>::class.java)?.toList()
             ?: emptyList()
     } catch (e: Exception) {
+        // 读取失败时先保留一份备份，避免下一次保存把原文件直接覆盖掉。
+        runCatching {
+            if (file.exists()) file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+        }
         emptyList()
     }
 
     fun save(list: List<EditableGridEntity>) {
         file.parentFile?.mkdirs()
+        val json = gson.toJson(list)
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(gson.toJson(list))
-        if (!tmp.renameTo(file)) {
-            file.writeText(gson.toJson(list))
-            tmp.delete()
-        }
+        runCatching {
+            tmp.writeText(json)
+            if (!tmp.renameTo(file)) {
+                file.writeText(json)
+            }
+        }.also { tmp.delete() }
     }
 }
