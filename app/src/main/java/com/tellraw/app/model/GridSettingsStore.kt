@@ -3,6 +3,15 @@ package com.tellraw.app.model
 import com.google.gson.GsonBuilder
 import java.io.File
 
+/** 单个维度的世界条件（UI 里保存为字符串，求值时再解析）。 */
+data class GridDimensionState(
+    val biome: String = "",
+    val loaded: Boolean = true,
+    val blocks: String = "",
+    val functions: String = "",
+    val stopwatches: String = ""
+)
+
 /** 网格编辑器的界面/世界设置（持久化，避免每次重开都要重填）。 */
 data class GridUiSettings(
     val selector: String = "",
@@ -13,6 +22,7 @@ data class GridUiSettings(
     val worldBlocks: String = "",
     val worldFunctions: String = "",
     val worldStopwatches: String = "",
+    val worldDimensionStates: Map<String, GridDimensionState> = emptyMap(),
     val executorUid: String? = null,
     val useExecutorOrigin: Boolean = true,
     val manualOX: String = "0",

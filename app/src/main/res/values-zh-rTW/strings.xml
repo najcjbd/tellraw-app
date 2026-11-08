@@ -75,7 +75,7 @@
     <string name="bedrock_color_to_rgb">基岩版獨有 § 顏色碼 → Java 精確 RGB color</string>
     <string name="as_sensitive">目標選擇器參數對 as 敏感</string>
     <string name="allow_multi_cmd_tag">允許多命令 tag</string>
-    <string name="allow_multi_cmd_tag_description">單條 execute 鏈無法表達時，用臨時 tag + 多條命令；預設關閉</string>
+    <string name="allow_multi_cmd_tag_description">對必須用 execute、不能摺進目標選擇器的條件，用臨時 tag + 多條命令；預設關閉</string>
     <string name="as_sensitive_description">開：只用 tellraw 目標選擇器決定 as；關：目標沒得改時才會用內容裡的選擇器做 as</string>
     
     <!-- 顏色代碼 -->
@@ -359,7 +359,13 @@
     <string name="with_builder_key">翻譯鍵</string>
     <string name="with_builder_fallback">回退文字 fallback（可空）</string>
     <string name="with_builder_args">參數列表</string>
-    <string name="with_builder_args_empty">還沒有參數，點擊下方「新增參數」。</string>
+    <string name="with_builder_args_empty">沒有參數，點擊上方「新增參數」。</string>
+    <string name="with_builder_tree_hint">點節點選中，在下方檢查器編輯；translate 節點可展開子參數。</string>
+    <string name="with_builder_inspector">檢查器</string>
+    <string name="with_builder_inspector_hint">選擇上方參數節點；根 translate 的 key/fallback 在上方編輯。</string>
+    <string name="with_builder_add_child">新增子參數</string>
+    <string name="with_builder_duplicate">複製</string>
+    <string name="with_builder_child_count">子參數 %1$d 個</string>
     <string name="with_builder_add">新增參數</string>
     <string name="with_builder_kind_text">純文字</string>
     <string name="with_builder_kind_translate">translate</string>

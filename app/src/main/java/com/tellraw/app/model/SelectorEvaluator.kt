@@ -3,6 +3,7 @@ package com.tellraw.app.model
 import com.tellraw.app.util.ExecCondSupport
 import kotlin.math.abs
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 /**
  * 网格里的实体（供目标选择器求值）。
@@ -43,7 +44,9 @@ data class GridEntity(
     /** Java predicate：该实体匹配的谓词 ID 集合。 */
     val predicates: Set<String> = emptySet(),
     /** Java advancements：已完成的 `id` 或 `id|criterion`。 */
-    val advancements: Set<String> = emptySet()
+    val advancements: Set<String> = emptySet(),
+    /** execute on 关系：关系名 -> 实体 uid（passengers 可多个）。 */
+    val relations: Map<String, Set<String>> = emptyMap()
 ) {
     val isPlayer: Boolean get() = id == "minecraft:player"
 }
@@ -82,7 +85,8 @@ object SelectorEvaluator {
         edition: String = "java",
         version: Long? = null,
         origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0),
-        target: VersionSpec? = null
+        target: VersionSpec? = null,
+        random: Random = Random.Default
     ): Result {
         val notes = mutableListOf<String>()
         // 同一条选择器里两版实体 ID 同时出现 -> 提醒（不改变求值，只提示可能写重/混用）
@@ -352,7 +356,8 @@ object SelectorEvaluator {
         val sorted = when (sort ?: defaultSort(base)) {
             "nearest" -> candidates.sortedBy { dist2(it, ox, oy, oz) }
             "furthest" -> candidates.sortedByDescending { dist2(it, ox, oy, oz) }
-            "random", "arbitrary" -> candidates
+            "random" -> candidates.shuffled(random)
+            "arbitrary" -> candidates
             else -> candidates
         }
         // @p/@r/@n 本身就是"一个目标"，没写 limit 时按 1 处理（@a/@e 不设默认上限）。
@@ -529,6 +534,12 @@ object SelectorEvaluator {
         return m
     }
 
+    /** 供关系选择器/NBT 预览使用的派生 NBT 文本（与 nbt= 求值同一来源）。 */
+    fun derivedNbtText(e: GridEntity): String =
+        effectiveNbt(e).entries.joinToString(",\n") {
+            "${it.key}: ${SnbtLite.serialize(it.value)}"
+        }
+
     private fun effectiveNbt(e: GridEntity): Map<String, SnbtLite.Value> {
         val m = linkedMapOf<String, SnbtLite.Value>()
         m["id"] = SnbtLite.Value.Str(e.id)
@@ -537,18 +548,19 @@ object SelectorEvaluator {
         }
         e.name?.takeIf { it.isNotBlank() }?.let { m["CustomName"] = SnbtLite.Value.Str(it) }
         e.team?.takeIf { it.isNotBlank() }?.let { m["Team"] = SnbtLite.Value.Str(it) }
-        e.gamemode?.lowercase()?.let { g ->
-            m["playerGameType"] = SnbtLite.Value.Num(
-                when (g) {
+        if (e.isPlayer) {
+            e.gamemode?.lowercase()?.let { g ->
+                val id = when (g) {
                     "survival" -> 0.0
                     "creative" -> 1.0
                     "adventure" -> 2.0
                     "spectator" -> 3.0
-                    else -> 0.0
+                    else -> null
                 }
-            )
+                if (id != null) m["playerGameType"] = SnbtLite.Value.Num(id)
+            }
+            e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
         }
-        e.level?.let { m["XpLevel"] = SnbtLite.Value.Num(it.toDouble()) }
         // 坐标 / 视角与 NBT 的 Pos / Rotation（Rotation 顺序是 [yaw, pitch]）统一
         m["Pos"] = SnbtLite.Value.ListV(
             listOf(
@@ -567,18 +579,28 @@ object SelectorEvaluator {
         }
 
         val inv = mutableListOf<SnbtLite.Value>()
-        for ((slot, item) in e.items) {
-            val n = inventorySlotNumber(slot) ?: continue
-            inv.add(
-                SnbtLite.Value.Compound(
-                    itemNbt(item) + mapOf("Slot" to SnbtLite.Value.Num(n.toDouble()))
+        if (e.isPlayer) {
+            val slots = linkedMapOf<Int, GridItem>()
+            for ((slot, item) in e.items) {
+                if (slot == "weapon.mainhand") continue
+                val n = inventorySlotNumber(slot) ?: continue
+                slots.putIfAbsent(n, item)
+            }
+            // 实测：玩家选中快捷栏会同时出现在 SelectedItem 与 Inventory；显式 inventory/hotbar 优先。
+            e.items["weapon.mainhand"]?.let { slots.putIfAbsent(0, it) }
+            for ((n, item) in slots) {
+                inv.add(
+                    SnbtLite.Value.Compound(
+                        itemNbt(item) + mapOf("Slot" to SnbtLite.Value.Num(n.toDouble()))
+                    )
                 )
-            )
+            }
         }
         if (inv.isNotEmpty()) m["Inventory"] = SnbtLite.Value.ListV(inv)
 
         e.items["weapon.mainhand"]?.let { item ->
-            m["SelectedItem"] = SnbtLite.Value.Compound(itemNbt(item))
+            // 实测 26.2/26.3：玩家主手在 SelectedItem；非玩家主手在 equipment.mainhand。
+            if (e.isPlayer) m["SelectedItem"] = SnbtLite.Value.Compound(itemNbt(item))
         }
         val eq = linkedMapOf<String, SnbtLite.Value>()
         for ((slot, item) in e.items) {
@@ -591,6 +613,7 @@ object SelectorEvaluator {
                 "armor.feet" -> "feet"
                 else -> null
             } ?: continue
+            if (e.isPlayer && slot == "weapon.mainhand") continue
             eq[key] = SnbtLite.Value.Compound(itemNbt(item))
         }
         if (eq.isNotEmpty()) m["equipment"] = SnbtLite.Value.Compound(eq)
@@ -599,18 +622,28 @@ object SelectorEvaluator {
         return m
     }
 
-    /** 槽位名 -> NBT 数字槽（装备沿用旧版 100..103 / -106；hotbar/inventory 用数字）。 */
-    private fun inventorySlotNumber(slot: String): Int? = when (slot) {
-        "armor.head" -> 103
-        "armor.chest" -> 102
-        "armor.legs" -> 101
-        "armor.feet" -> 100
-        "weapon.offhand" -> -106
-        else -> when {
-            slot.startsWith("hotbar.") || slot.startsWith("inventory.") ->
-                slot.substringAfterLast('.').toIntOrNull()
-            else -> null
+    /** Bedrock slot.inventory / Java items inventory 的外部槽号 0-26 -> 内部 NBT 槽 9-35。 */
+    private fun translateInventorySlotSpec(slot: String): String {
+        fun shift(text: String): String {
+            val n = text.toIntOrNull() ?: return text
+            return (n + 9).toString()
         }
+        if (slot.startsWith("!")) return "!" + shift(slot.substring(1))
+        if (".." in slot) {
+            val lo = slot.substringBefore("..")
+            val hi = slot.substringAfter("..")
+            return (if (lo.isBlank()) "" else shift(lo)) + ".." +
+                (if (hi.isBlank()) "" else shift(hi))
+        }
+        return shift(slot)
+    }
+
+    /** 玩家 Inventory 数字槽：只映射 hotbar/inventory 与主手（Slot 0）；装备走 equipment。 */
+    private fun inventorySlotNumber(slot: String): Int? = when {
+        slot == "weapon.mainhand" -> 0
+        slot.startsWith("hotbar.") || slot.startsWith("inventory.") ->
+            slot.substringAfterLast('.').toIntOrNull()
+        else -> null
     }
 
     private fun matchHasProperty(e: GridEntity, raw: String, notes: MutableList<String>): Boolean {
@@ -759,35 +792,38 @@ object SelectorEvaluator {
             return true
         }
         val loc = location?.removePrefix("slot.")
+        val slotSpec = if (loc == "inventory" && slot != null) {
+            translateInventorySlotSpec(slot)
+        } else slot
         fun slotMatches(key: String): Boolean {
             if (loc != null) {
                 val locOk = key == loc || key.startsWith("$loc.") ||
                     (loc == "hotbar" && key == "hotbar")
                 if (!locOk) return false
             }
-            if (slot != null && loc != null &&
+            if (slotSpec != null && loc != null &&
                 ExecCondSupport.isSingleSlotItemLocation("slot.$loc")
             ) {
                 // 单槽位 location：数字槽位固定按 0 处理（armor.head 等）
-                return slotAccepts(0, slot)
+                return slotAccepts(0, slotSpec!!)
             }
-            if (slot != null) {
+            if (slotSpec != null) {
                 val idx = key.substringAfterLast('.', "")
                 val idxNum = idx.toIntOrNull()
-                if (slot.startsWith("!")) {
-                    val bad = slot.substring(1)
+                if (slotSpec.startsWith("!")) {
+                    val bad = slotSpec.substring(1)
                     val badNum = bad.toIntOrNull()
                     if (idx == bad || (badNum != null && idxNum == badNum)) return false
-                } else if (".." in slot) {
+                } else if (".." in slotSpec) {
                     if (idxNum == null) return false
-                    val (lo, hi) = parseRange(slot)
+                    val (lo, hi) = parseRange(slotSpec)
                     if (lo != null && idxNum < lo) return false
                     if (hi != null && idxNum > hi) return false
                 } else {
-                    val wanted = slot.toIntOrNull()
+                    val wanted = slotSpec.toIntOrNull()
                     if (wanted != null) {
                         if (idxNum != wanted) return false
-                    } else if (idx != slot) {
+                    } else if (idx != slotSpec) {
                         return false
                     }
                 }

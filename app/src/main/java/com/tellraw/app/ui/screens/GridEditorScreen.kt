@@ -8,12 +8,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,8 +33,11 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +55,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -63,7 +72,10 @@ import com.tellraw.app.model.EntityIdAliases
 import com.tellraw.app.model.EntityRegistry
 import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.GridConditionEvaluator
+import com.tellraw.app.model.GridCommandPlanParser
 import com.tellraw.app.model.GridEntityStore
+import com.tellraw.app.model.GridRelations
+import com.tellraw.app.model.GridDimensionState
 import com.tellraw.app.model.GridSettingsStore
 import com.tellraw.app.model.GridUiSettings
 import com.tellraw.app.model.GridItem
@@ -73,7 +85,9 @@ import com.tellraw.app.model.SelectorEvaluator
 import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.ImageFilePickerDialog
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.google.gson.Gson
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
 import com.tellraw.app.util.TranslatePreview
@@ -88,6 +102,68 @@ private const val GRID_BASE_BLOCK_DP = 16f
 private const val LONG_PRESS_MS = 500L
 
 private data class Viewport(val camX: Double = 0.0, val camZ: Double = 0.0, val zoom: Float = 1f)
+
+/** 旋转/进程内重建时保住正在编辑的实体草稿。 */
+private val EditableGridEntitySaver: Saver<EditableGridEntity?, List<Any>> = Saver(
+    save = { e ->
+        if (e == null) emptyList()
+        else listOf(
+            e.uid, e.id, e.name, e.tags, e.team,
+            e.x, e.y, e.z, e.scores, e.equipment, e.inventory,
+            e.gamemode, e.level, e.rotationX, e.rotationY, e.nbt,
+            e.properties, e.permissions, e.predicates, e.advancements,
+            e.customKey ?: "", e.relations ?: ""
+        )
+    },
+    restore = { v ->
+        if (v.isEmpty()) null
+        else EditableGridEntity(
+            uid = v[0] as String,
+            id = v[1] as String,
+            name = v[2] as String,
+            tags = v[3] as String,
+            team = v[4] as String,
+            x = v[5] as Double,
+            y = v[6] as Double,
+            z = v[7] as Double,
+            scores = v[8] as String,
+            equipment = v[9] as String,
+            inventory = v[10] as String,
+            gamemode = v[11] as String,
+            level = v[12] as String,
+            rotationX = v[13] as String,
+            rotationY = v[14] as String,
+            nbt = v[15] as String,
+            properties = v[16] as String,
+            permissions = v[17] as String,
+            predicates = v[18] as String,
+            advancements = v[19] as String,
+            customKey = (v[20] as String).ifBlank { null },
+            relations = (v.getOrNull(21) as? String).orEmpty()
+        )
+    }
+)
+
+private val QuickNbtMapSaver = listSaver<SnapshotStateMap<String, String>, String>(
+    save = { map -> map.entries.flatMap { listOf(it.key, it.value) } },
+    restore = { flat ->
+        mutableStateMapOf<String, String>().apply {
+            flat.chunked(2).forEach { if (it.size == 2) put(it[0], it[1]) }
+        }
+    }
+)
+
+private val DimensionStatesSaver = Saver<Map<String, GridDimensionState>, String>(
+    save = { states -> Gson().toJson(states) },
+    restore = { raw ->
+        runCatching {
+            Gson().fromJson(
+                raw,
+                object : TypeToken<Map<String, GridDimensionState>>() {}.type
+            ) as? Map<String, GridDimensionState> ?: emptyMap()
+        }.getOrDefault(emptyMap())
+    }
+)
 
 private fun snap(v: Double): Double = round(v * 2.0) / 2.0
 
@@ -147,8 +223,44 @@ fun GridEditorScreen(
         customStore.save(customs.toList())
     }
 
+    /**
+     * 载具/乘客同坐标：骑手（有 vehicle 关系的实体）跟随载具；乘客（passengers 关系里的实体）跟随载具。
+     * 只在显式保存/拖动结束后调用，避免拖动过程中每帧级联。
+     */
+    fun syncRelationPositions() {
+        val synced = GridRelations.syncPositions(entities.toList())
+        if (synced != entities.toList()) {
+            entities.clear()
+            entities.addAll(synced)
+        }
+    }
+
+    /** 同坐标的 vehicle/passengers 是一个整体，拖动任意一个成员都移动整组。 */
+    fun moveRelationGroup(uid: String, dx: Double, dy: Double, dz: Double) {
+        val byUid = entities.associateBy { it.uid }
+        val group = linkedSetOf(uid)
+        val queue = ArrayDeque<String>()
+        queue.add(uid)
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            val relations = GridRelations.decode(byUid[current]?.relations)
+            for (key in listOf("vehicle", "passengers")) {
+                for (other in relations[key].orEmpty()) {
+                    if (group.add(other)) queue.add(other)
+                }
+            }
+        }
+        for (i in entities.indices) {
+            if (entities[i].uid in group) {
+                val e = entities[i]
+                entities[i] = e.copy(x = e.x + dx, y = e.y + dy, z = e.z + dz)
+            }
+        }
+    }
+
     var selectorText by rememberSaveable { mutableStateOf(selectorFromMain.ifBlank { savedUi.selector }) }
     var conditions by rememberSaveable { mutableStateOf(savedUi.conditions) }
+    var randomNonce by rememberSaveable { mutableStateOf(0) }
     LaunchedEffect(selectorFromMain) {
         if (selectorFromMain.isNotBlank()) selectorText = selectorFromMain
     }
@@ -166,8 +278,9 @@ fun GridEditorScreen(
     var manualOX by rememberSaveable { mutableStateOf(savedUi.manualOX) }
     var manualOY by rememberSaveable { mutableStateOf(savedUi.manualOY) }
     var manualOZ by rememberSaveable { mutableStateOf(savedUi.manualOZ) }
-    var showExecutorPicker by remember { mutableStateOf(false) }
+    var showExecutorPicker by rememberSaveable { mutableStateOf(false) }
     var showWorldSettings by rememberSaveable { mutableStateOf(false) }
+    var showDimensionMenu by remember { mutableStateOf(false) }
 
     var worldDimension by rememberSaveable { mutableStateOf(savedUi.worldDimension) }
     var worldBiome by rememberSaveable { mutableStateOf(savedUi.worldBiome) }
@@ -175,6 +288,20 @@ fun GridEditorScreen(
     var worldBlocks by rememberSaveable { mutableStateOf(savedUi.worldBlocks) }
     var worldFunctions by rememberSaveable { mutableStateOf(savedUi.worldFunctions) }
     var worldStopwatches by rememberSaveable { mutableStateOf(savedUi.worldStopwatches) }
+    val initialDimensionStates = remember(savedUi) {
+        savedUi.worldDimensionStates.toMutableMap().apply {
+            this[savedUi.worldDimension] = GridDimensionState(
+                biome = savedUi.worldBiome,
+                loaded = savedUi.worldLoaded,
+                blocks = savedUi.worldBlocks,
+                functions = savedUi.worldFunctions,
+                stopwatches = savedUi.worldStopwatches
+            )
+        }
+    }
+    var dimensionStates by rememberSaveable(stateSaver = DimensionStatesSaver) {
+        mutableStateOf(initialDimensionStates)
+    }
 
     fun currentUiSettings() = GridUiSettings(
         selector = selectorText,
@@ -185,6 +312,15 @@ fun GridEditorScreen(
         worldBlocks = worldBlocks,
         worldFunctions = worldFunctions,
         worldStopwatches = worldStopwatches,
+        worldDimensionStates = dimensionStates + (
+            worldDimension to GridDimensionState(
+                biome = worldBiome,
+                loaded = worldLoaded,
+                blocks = worldBlocks,
+                functions = worldFunctions,
+                stopwatches = worldStopwatches
+            )
+        ),
         executorUid = executorUid,
         useExecutorOrigin = useExecutorOrigin,
         manualOX = manualOX,
@@ -198,7 +334,7 @@ fun GridEditorScreen(
     // 网格设置持久化（防抖；输入过程中不会每个字符都写盘）
     LaunchedEffect(
         selectorText, conditions, worldDimension, worldBiome, worldLoaded,
-        worldBlocks, worldFunctions, worldStopwatches, executorUid,
+        worldBlocks, worldFunctions, worldStopwatches, dimensionStates, executorUid,
         useExecutorOrigin, manualOX, manualOY, manualOZ, viewport
     ) {
         kotlinx.coroutines.delay(400)
@@ -210,13 +346,15 @@ fun GridEditorScreen(
         onDispose { settingsStore.save(currentUiSettings()) }
     }
 
-    var showEditor by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<EditableGridEntity?>(null) }
-    var editingIsNew by remember { mutableStateOf(false) }
-    var showCoordEditor by remember { mutableStateOf(false) }
-    var showCustomManager by remember { mutableStateOf(false) }
-    var showAvatarPicker by remember { mutableStateOf(false) }
-    var pickedAvatarPath by remember { mutableStateOf<String?>(null) }
+    var showEditor by rememberSaveable { mutableStateOf(false) }
+    var editing by rememberSaveable(stateSaver = EditableGridEntitySaver) {
+        mutableStateOf<EditableGridEntity?>(null)
+    }
+    var editingIsNew by rememberSaveable { mutableStateOf(false) }
+    var showCoordEditor by rememberSaveable { mutableStateOf(false) }
+    var showCustomManager by rememberSaveable { mutableStateOf(false) }
+    var showAvatarPicker by rememberSaveable { mutableStateOf(false) }
+    var pickedAvatarPath by rememberSaveable { mutableStateOf<String?>(null) }
     val activity = context as? MainActivity
 
     val density = LocalDensity.current
@@ -249,7 +387,8 @@ fun GridEditorScreen(
         }
     }
 
-    // 允许直接粘贴整条 execute … run tellraw … / tellraw …；能解析时用命令里的选择器与前缀
+    // 允许直接粘贴整条 execute … run tellraw … / tellraw …；能解析时用命令里的选择器与前缀。
+    // 多行输入优先按“tag add + tellraw + tag remove”方案模拟。
     val parsedCommand = remember(selectorText) {
         val t = selectorText.trim()
         if (t.startsWith("execute") || t.startsWith("tellraw")) {
@@ -257,11 +396,19 @@ fun GridEditorScreen(
             runCatching { CommandInputParser.parse(selectorText, context) }.getOrNull()
         } else null
     }
-    val effectiveSelector = parsedCommand?.selector?.takeIf { it.isNotBlank() } ?: selectorText
-    val effectiveConditions = listOfNotNull(
-        parsedCommand?.executePrefix?.takeIf { it.isNotBlank() },
-        conditions.takeIf { it.isNotBlank() }
-    ).joinToString(" ")
+    val tagPlan = remember(selectorText) { GridCommandPlanParser.parse(selectorText) }
+    val effectiveSelector = tagPlan?.tellrawSelector
+        ?: parsedCommand?.selector?.takeIf { it.isNotBlank() }
+        ?: selectorText
+    val effectiveConditions = if (tagPlan != null) {
+        // 多命令 tag 方案已包含命令前缀；附加条件仍作为额外筛选叠加，不静默忽略。
+        conditions
+    } else {
+        listOfNotNull(
+            parsedCommand?.executePrefix?.takeIf { it.isNotBlank() },
+            conditions.takeIf { it.isNotBlank() }
+        ).joinToString(" ")
+    }
 
     val executorEntity = entities.firstOrNull { it.uid == executorUid }?.toGridEntity()
     val baseOrigin: Triple<Double, Double, Double> = when {
@@ -275,8 +422,31 @@ fun GridEditorScreen(
         )
     }
     val allGridEntities = remember(entities.toList()) { entities.map { it.toGridEntity() } }
+    val dimensionWorlds = remember(
+        dimensionStates, worldDimension, worldBiome, worldLoaded,
+        worldBlocks, worldFunctions, worldStopwatches
+    ) {
+        val states = dimensionStates.toMutableMap()
+        states[worldDimension] = GridDimensionState(
+            biome = worldBiome,
+            loaded = worldLoaded,
+            blocks = worldBlocks,
+            functions = worldFunctions,
+            stopwatches = worldStopwatches
+        )
+        states.mapValues { (_, s) ->
+            GridConditionEvaluator.DimensionWorld(
+                biome = s.biome,
+                loaded = s.loaded,
+                blocks = parseWorldBlocks(s.blocks),
+                functions = splitList(s.functions).toSet(),
+                stopwatches = parseStopwatches(s.stopwatches)
+            )
+        }
+    }
     val worldState = remember(
-        worldDimension, worldBiome, worldLoaded, worldBlocks, worldFunctions, worldStopwatches
+        worldDimension, worldBiome, worldLoaded, worldBlocks, worldFunctions, worldStopwatches,
+        dimensionWorlds
     ) {
         GridConditionEvaluator.GridWorld(
             dimension = worldDimension.ifBlank { "minecraft:overworld" },
@@ -284,7 +454,8 @@ fun GridEditorScreen(
             loaded = worldLoaded,
             blocks = parseWorldBlocks(worldBlocks),
             functions = splitList(worldFunctions).toSet(),
-            stopwatches = parseStopwatches(worldStopwatches)
+            stopwatches = parseStopwatches(worldStopwatches),
+            dimensions = dimensionWorlds
         )
     }
     val resolvedOrigin = remember(effectiveConditions, allGridEntities, executorEntity, baseOrigin, targetSpec) {
@@ -293,29 +464,73 @@ fun GridEditorScreen(
         )
     }
     val evaluationOrigin = resolvedOrigin.origin
-    val evaluation = remember(
-        effectiveSelector, allGridEntities, targetSpec,
-        executorUid, resolvedOrigin
+    val planEvaluation = remember(
+        tagPlan, allGridEntities, targetSpec, worldState, baseOrigin, executorEntity, randomNonce
     ) {
-        SelectorEvaluator.evaluate(
-            selector = effectiveSelector,
-            entities = allGridEntities,
-            executor = executorEntity,
-            edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
-            origin = evaluationOrigin,
-            target = targetSpec
-        )
-    }
-    val conditionResults = remember(
-        evaluation, effectiveConditions, allGridEntities, targetSpec, worldState, evaluationOrigin
-    ) {
-        evaluation.matched.map { ge ->
-            GridConditionEvaluator.evaluate(
-                effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
-            ) to ge
+        tagPlan?.let {
+            GridCommandPlanParser.evaluate(
+                it, allGridEntities, baseOrigin,
+                executor = executorEntity, target = targetSpec, world = worldState
+            )
         }
     }
-    val filteredMatched = conditionResults.filter { it.first.ok }.map { it.second }
+    val chainEvaluation = remember(
+        effectiveConditions, effectiveSelector, allGridEntities, targetSpec, worldState,
+        baseOrigin, executorEntity, randomNonce
+    ) {
+        val ec = effectiveConditions.trimStart()
+        val chainLike = ec.startsWith("execute ") ||
+            ec.substringBefore(' ').lowercase() in setOf(
+                "as", "at", "in", "on", "positioned", "rotated", "facing", "align", "anchored", "summon"
+            )
+        if (planEvaluation == null && chainLike) {
+            GridCommandPlanParser.evaluateChain(
+                prefix = effectiveConditions,
+                targetSelector = effectiveSelector,
+                entities = allGridEntities,
+                executor = executorEntity,
+                target = targetSpec,
+                world = worldState,
+                baseOrigin = baseOrigin,
+                edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java"
+            )
+        } else null
+    }
+    val evaluation = remember(
+        effectiveSelector, allGridEntities, targetSpec,
+        executorUid, resolvedOrigin, planEvaluation, chainEvaluation, randomNonce
+    ) {
+        when {
+            planEvaluation != null -> SelectorEvaluator.Result(planEvaluation.matched, planEvaluation.notes)
+            chainEvaluation != null -> SelectorEvaluator.Result(chainEvaluation.matched, chainEvaluation.notes)
+            else -> SelectorEvaluator.evaluate(
+                selector = effectiveSelector,
+                entities = allGridEntities,
+                executor = executorEntity,
+                edition = if (targetSpec?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java",
+                origin = evaluationOrigin,
+                target = targetSpec
+            )
+        }
+    }
+    val conditionResults = remember(
+        evaluation, effectiveConditions, allGridEntities, targetSpec, worldState, evaluationOrigin, chainEvaluation
+    ) {
+        if (planEvaluation == null && chainEvaluation != null) {
+            emptyList()
+        } else {
+            evaluation.matched.map { ge ->
+                GridConditionEvaluator.evaluate(
+                    effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
+                ) to ge
+            }
+        }
+    }
+    val filteredMatched = if (planEvaluation == null && chainEvaluation != null) {
+        chainEvaluation.matched
+    } else {
+        conditionResults.filter { it.first.ok }.map { it.second }
+    }
     val conditionNotes = (
         conditionResults.flatMap { it.first.notes } +
             resolvedOrigin.notes +
@@ -525,7 +740,10 @@ fun GridEditorScreen(
                                         camZ = vp.camZ - pan.y / b,
                                         zoom = nz
                                     )
-                                    if (draggedUid != null) persistEntities()
+                                    if (draggedUid != null) {
+                                        syncRelationPositions()
+                                        persistEntities()
+                                    }
                                     draggedUid = null
                                     ev.changes.forEach { it.consume() }
                                 } else if (pressed.size == 1) {
@@ -544,14 +762,7 @@ fun GridEditorScreen(
                                         val b = baseBlockPx * vp.zoom
                                         val uid = draggedUid
                                         if (uid != null) {
-                                            val i = entities.indexOfFirst { it.uid == uid }
-                                            if (i >= 0) {
-                                                val e = entities[i]
-                                                entities[i] = e.copy(
-                                                    x = e.x + delta.x / b,
-                                                    z = e.z + delta.y / b
-                                                )
-                                            }
+                                            moveRelationGroup(uid, (delta.x / b).toDouble(), 0.0, (delta.y / b).toDouble())
                                         } else {
                                             viewport = vp.copy(
                                                 camX = vp.camX - delta.x / b,
@@ -570,6 +781,7 @@ fun GridEditorScreen(
                                     showCoordEditor = true
                                 }
                             } else if (draggedUid != null) {
+                                syncRelationPositions()
                                 persistEntities()
                             }
                         }
@@ -663,8 +875,10 @@ fun GridEditorScreen(
             OutlinedTextField(
                 value = selectorText,
                 onValueChange = { selectorText = it },
-                label = { Text("tellraw 目标选择器 / 整条 execute…run tellraw 命令") },
-                singleLine = true,
+                label = { Text("tellraw 选择器 / 整条命令 / 多行 tag 方案（tag add + tellraw + tag remove）") },
+                singleLine = false,
+                minLines = 1,
+                maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     TextButton(onClick = { viewModel.updateSelector(selectorText) }) {
@@ -681,6 +895,29 @@ fun GridEditorScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = { showWorldSettings = true }) { Text("世界条件…") }
                 Spacer(Modifier.width(8.dp))
+                Box {
+                    OutlinedButton(onClick = { showDimensionMenu = true }) {
+                        Text("维度：${worldDimension.ifBlank { "minecraft:overworld" }}")
+                    }
+                    DropdownMenu(
+                        expanded = showDimensionMenu,
+                        onDismissRequest = { showDimensionMenu = false }
+                    ) {
+                        listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")
+                            .forEach { dim ->
+                                DropdownMenuItem(
+                                    text = { Text(dim) },
+                                    onClick = {
+                                        worldDimension = dim
+                                        showDimensionMenu = false
+                                    }
+                                )
+                            }
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = { randomNonce++ }) { Text("重新随机") }
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "维度=${worldState.dimension} 群系=${worldState.biome.ifBlank { "未设置" }} " +
                         "方块=${worldState.blocks.size} 函数=${worldState.functions.size}",
@@ -689,7 +926,8 @@ fun GridEditorScreen(
             }
             Text(
                 "将选中 ${filteredMatched.size} / ${entities.size} 个实体" +
-                    (if (conditions.isNotBlank()) "（已按附加条件筛选）" else ""),
+                    (if (tagPlan != null) "（按多命令 tag 方案模拟）"
+                    else if (conditions.isNotBlank()) "（已按附加条件筛选）" else ""),
                 style = MaterialTheme.typography.titleSmall
             )
             if (conditionNotes.isNotEmpty()) {
@@ -723,6 +961,11 @@ fun GridEditorScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clickable {
+                                        editing = editable
+                                        editingIsNew = false
+                                        showEditor = true
+                                    }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -760,13 +1003,15 @@ fun GridEditorScreen(
             blocks = worldBlocks,
             functions = worldFunctions,
             stopwatches = worldStopwatches,
-            onChange = { d, b, l, bl, f, st ->
+            dimensionStates = dimensionStates,
+            onChange = { d, b, l, bl, f, st, states ->
                 worldDimension = d
                 worldBiome = b
                 worldLoaded = l
                 worldBlocks = bl
                 worldFunctions = f
                 worldStopwatches = st
+                dimensionStates = states
             },
             onDismiss = { showWorldSettings = false }
         )
@@ -811,16 +1056,46 @@ fun GridEditorScreen(
                 initial = current,
                 isNew = editingIsNew,
                 customs = customs.toList(),
+                allEntities = entities.toList(),
+                avatarMap = avatarMap,
                 onDismiss = { showEditor = false; editing = null },
                 onDelete = {
                     entities.removeAll { it.uid == current.uid }
+                    for (i in entities.indices) {
+                        val e = entities[i]
+                        val cleaned = GridRelations.removeUid(e.relations, current.uid)
+                        if (cleaned != e.relations.orEmpty()) entities[i] = e.copy(relations = cleaned)
+                    }
+                    syncRelationPositions()
                     persistEntities()
                     showEditor = false
                     editing = null
                 },
-                onConfirm = { updated ->
-                    val i = entities.indexOfFirst { it.uid == updated.uid }
-                    if (i >= 0) entities[i] = updated else entities.add(updated)
+                onConfirm = { rawUpdated ->
+                    var updated = rawUpdated
+                    val old = entities.firstOrNull { it.uid == updated.uid }
+                    // 有关系组时，编辑器里改坐标应移动整组，而不是被同步逻辑静默改回。
+                    if (old != null) {
+                        val dx = rawUpdated.x - old.x
+                        val dy = rawUpdated.y - old.y
+                        val dz = rawUpdated.z - old.z
+                        if (dx != 0.0 || dy != 0.0 || dz != 0.0) {
+                            moveRelationGroup(updated.uid, dx, dy, dz)
+                        }
+                    }
+                    val rel = GridRelations.decode(updated.relations)
+                    // 骑手跟随载具：保存时把当前实体移到所选载具坐标
+                    val vehicle = rel["vehicle"]?.firstOrNull()?.let { uid ->
+                        entities.firstOrNull { it.uid == uid }
+                    }
+                    if (vehicle != null) {
+                        updated = updated.copy(x = vehicle.x, y = vehicle.y, z = vehicle.z)
+                    }
+                    // vehicle ↔ passengers 双向引用；坐标同步统一交给 syncRelationPositions
+                    val next = GridRelations.applyReciprocal(entities.toList(), old, updated)
+                    entities.clear()
+                    entities.addAll(next)
+                    syncRelationPositions()
                     persistEntities()
                     showEditor = false
                     editing = null
@@ -837,8 +1112,18 @@ fun GridEditorScreen(
                 entity = current,
                 onDismiss = { showCoordEditor = false; editing = null },
                 onConfirm = { updated ->
-                    val i = entities.indexOfFirst { it.uid == updated.uid }
-                    if (i >= 0) entities[i] = updated
+                    val old = entities.firstOrNull { it.uid == updated.uid }
+                    if (old != null) {
+                        moveRelationGroup(
+                            updated.uid,
+                            updated.x - old.x,
+                            updated.y - old.y,
+                            updated.z - old.z
+                        )
+                    } else {
+                        entities.add(updated)
+                    }
+                    syncRelationPositions()
                     persistEntities()
                     showCoordEditor = false
                     editing = null
@@ -947,7 +1232,8 @@ private fun SmallAvatar(id: String, path: String?, sizeDp: Int = 24) {
 private fun EntityAvatar(
     entity: EditableGridEntity,
     customs: List<CustomEntity>,
-    avatarMap: Map<String, androidx.compose.ui.graphics.ImageBitmap>
+    avatarMap: Map<String, androidx.compose.ui.graphics.ImageBitmap>,
+    size: Dp = 30.dp
 ) {
     val ctx = LocalContext.current
     val builtin = remember(entity.id) { EntityAvatars.load(ctx, entity.id) }
@@ -958,13 +1244,13 @@ private fun EntityAvatar(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(30.dp)
+                .size(size)
                 .clip(CircleShape)
         )
     } else {
         Box(
             modifier = Modifier
-                .size(30.dp)
+                .size(size)
                 .clip(CircleShape)
                 .background(entityColor(EntityRegistry.categoryOf(entity.id))),
             contentAlignment = Alignment.Center
@@ -984,9 +1270,9 @@ private fun CoordEditorDialog(
     onDismiss: () -> Unit,
     onConfirm: (EditableGridEntity) -> Unit
 ) {
-    var x by remember(entity.uid) { mutableStateOf(fmt(entity.x)) }
-    var y by remember(entity.uid) { mutableStateOf(fmt(entity.y)) }
-    var z by remember(entity.uid) { mutableStateOf(fmt(entity.z)) }
+    var x by rememberSaveable(entity.uid) { mutableStateOf(entity.x.toString()) }
+    var y by rememberSaveable(entity.uid) { mutableStateOf(entity.y.toString()) }
+    var z by rememberSaveable(entity.uid) { mutableStateOf(entity.z.toString()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("修改坐标") },
@@ -1026,26 +1312,28 @@ private fun EntityEditorDialog(
     initial: EditableGridEntity,
     isNew: Boolean,
     customs: List<CustomEntity>,
+    allEntities: List<EditableGridEntity>,
+    avatarMap: Map<String, androidx.compose.ui.graphics.ImageBitmap>,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
     onConfirm: (EditableGridEntity) -> Unit
 ) {
-    var id by remember(initial.uid) { mutableStateOf(initial.id) }
-    var name by remember(initial.uid) { mutableStateOf(initial.name) }
-    var tags by remember(initial.uid) { mutableStateOf(initial.tags) }
-    var team by remember(initial.uid) { mutableStateOf(initial.team) }
-    var x by remember(initial.uid) { mutableStateOf(fmt(initial.x)) }
-    var y by remember(initial.uid) { mutableStateOf(fmt(initial.y)) }
-    var z by remember(initial.uid) { mutableStateOf(fmt(initial.z)) }
-    var scores by remember(initial.uid) { mutableStateOf(initial.scores) }
-    var equipment by remember(initial.uid) { mutableStateOf(initial.equipment) }
-    var inventory by remember(initial.uid) { mutableStateOf(initial.inventory) }
-    var gamemode by remember(initial.uid) { mutableStateOf(initial.gamemode) }
-    var level by remember(initial.uid) { mutableStateOf(initial.level) }
-    var rotationX by remember(initial.uid) { mutableStateOf(initial.rotationX) }
-    var rotationY by remember(initial.uid) { mutableStateOf(initial.rotationY) }
-    var nbt by remember(initial.uid) { mutableStateOf(initial.nbt) }
-    var showQuickNbt by remember { mutableStateOf(false) }
+    var id by rememberSaveable(initial.uid) { mutableStateOf(initial.id) }
+    var name by rememberSaveable(initial.uid) { mutableStateOf(initial.name) }
+    var tags by rememberSaveable(initial.uid) { mutableStateOf(initial.tags) }
+    var team by rememberSaveable(initial.uid) { mutableStateOf(initial.team) }
+    var x by rememberSaveable(initial.uid) { mutableStateOf(initial.x.toString()) }
+    var y by rememberSaveable(initial.uid) { mutableStateOf(initial.y.toString()) }
+    var z by rememberSaveable(initial.uid) { mutableStateOf(initial.z.toString()) }
+    var scores by rememberSaveable(initial.uid) { mutableStateOf(initial.scores) }
+    var equipment by rememberSaveable(initial.uid) { mutableStateOf(initial.equipment) }
+    var inventory by rememberSaveable(initial.uid) { mutableStateOf(initial.inventory) }
+    var gamemode by rememberSaveable(initial.uid) { mutableStateOf(initial.gamemode) }
+    var level by rememberSaveable(initial.uid) { mutableStateOf(initial.level) }
+    var rotationX by rememberSaveable(initial.uid) { mutableStateOf(initial.rotationX) }
+    var rotationY by rememberSaveable(initial.uid) { mutableStateOf(initial.rotationY) }
+    var nbt by rememberSaveable(initial.uid) { mutableStateOf(initial.nbt) }
+    var showQuickNbt by rememberSaveable { mutableStateOf(false) }
 
     // 手动 NBT 里若写了 Tags/CustomName/Team，同步到上方字段（与 NBT 同一份数据）
     LaunchedEffect(nbt) {
@@ -1054,12 +1342,14 @@ private fun EntityEditorDialog(
         ext.name?.let { name = it }
         ext.team?.let { team = it }
     }
-    var properties by remember(initial.uid) { mutableStateOf(initial.properties) }
-    var permissions by remember(initial.uid) { mutableStateOf(initial.permissions) }
-    var predicates by remember(initial.uid) { mutableStateOf(initial.predicates) }
-    var advancements by remember(initial.uid) { mutableStateOf(initial.advancements) }
-    var customKey by remember(initial.uid) { mutableStateOf(initial.customKey) }
-    var showPicker by remember { mutableStateOf(false) }
+    var properties by rememberSaveable(initial.uid) { mutableStateOf(initial.properties) }
+    var permissions by rememberSaveable(initial.uid) { mutableStateOf(initial.permissions) }
+    var predicates by rememberSaveable(initial.uid) { mutableStateOf(initial.predicates) }
+    var advancements by rememberSaveable(initial.uid) { mutableStateOf(initial.advancements) }
+    var customKey by rememberSaveable(initial.uid) { mutableStateOf(initial.customKey.orEmpty()) }
+    var relationsText by rememberSaveable(initial.uid) { mutableStateOf(initial.relations.orEmpty()) }
+    var relationPickerKey by rememberSaveable { mutableStateOf("") }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1167,7 +1457,45 @@ private fun EntityEditorDialog(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true, modifier = Modifier.weight(1f))
                 }
-                if (customKey != null) {
+                val relationMap = GridRelations.decode(relationsText)
+                Text("execute on 关系", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "关系指向场上的实体；vehicle 的骑手会移到载具坐标，passengers 的乘客会移到当前载体坐标。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                for (key in GridRelations.KEYS) {
+                    val selectedUids = relationMap[key].orEmpty()
+                    val names = selectedUids.mapNotNull { uid ->
+                        allEntities.firstOrNull { it.uid == uid }?.let { displayNameOf(it, customs) }
+                    }
+                    val dangling = names.size != selectedUids.size
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(GridRelations.label(key), style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                when {
+                                    dangling -> "有引用已失效（可清除）"
+                                    names.isEmpty() -> "未设置"
+                                    else -> names.joinToString("、")
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = when {
+                                    dangling -> MaterialTheme.colorScheme.error
+                                    names.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                            )
+                        }
+                        TextButton(onClick = { relationPickerKey = key }) { Text("选择…") }
+                        if (selectedUids.isNotEmpty()) {
+                            TextButton(onClick = {
+                                relationsText = GridRelations.withSelection(relationsText, key, emptyList())
+                            }) { Text("清除") }
+                        }
+                    }
+                }
+
+                if (customKey.isNotBlank()) {
                     Text("自定义条目：$customKey", style = MaterialTheme.typography.labelSmall)
                 }
 
@@ -1205,7 +1533,8 @@ private fun EntityEditorDialog(
                                 permissions = permissions,
                                 predicates = predicates,
                                 advancements = advancements,
-                                customKey = customKey
+                                customKey = customKey.ifBlank { null },
+                                relations = relationsText.ifBlank { null }
                             )
                         )
                     }) { Text("保存") }
@@ -1229,7 +1558,7 @@ private fun EntityEditorDialog(
             onDismiss = { showPicker = false },
             onPickBuiltin = { entity ->
                 id = entity.id
-                customKey = null
+                customKey = ""
                 showPicker = false
             },
             onPickCustom = { custom ->
@@ -1240,6 +1569,164 @@ private fun EntityEditorDialog(
             }
         )
     }
+
+    if (relationPickerKey.isNotBlank()) {
+        val key = relationPickerKey
+        EntityRelationPickerDialog(
+            relationKey = key,
+            selectedUids = GridRelations.decode(relationsText)[key].orEmpty(),
+            entities = allEntities.filter { it.uid != initial.uid },
+            customs = customs,
+            avatarMap = avatarMap,
+            multi = key == "passengers",
+            onDismiss = { relationPickerKey = "" },
+            onConfirm = { uids ->
+                relationsText = GridRelations.withSelection(relationsText, key, uids)
+                relationPickerKey = ""
+            }
+        )
+    }
+}
+
+@Composable
+private fun EntityRelationPickerDialog(
+    relationKey: String,
+    selectedUids: List<String>,
+    entities: List<EditableGridEntity>,
+    customs: List<CustomEntity>,
+    avatarMap: Map<String, androidx.compose.ui.graphics.ImageBitmap>,
+    multi: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>) -> Unit
+) {
+    var selectedRaw by rememberSaveable(relationKey) {
+        mutableStateOf(selectedUids.distinct().joinToString("|"))
+    }
+    val selected = remember(selectedRaw) {
+        selectedRaw.split('|').filter { it.isNotBlank() }.toSet()
+    }
+    var nbtEntity by remember { mutableStateOf<EditableGridEntity?>(null) }
+
+    fun toggle(uid: String) {
+        val next = if (multi) {
+            if (uid in selected) selected - uid else selected + uid
+        } else {
+            if (uid in selected) emptySet() else setOf(uid)
+        }
+        selectedRaw = next.joinToString("|")
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(Modifier.padding(12.dp)) {
+                Text("选择 ${GridRelations.label(relationKey)}", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "大头照下面是自定义名/生物名。点按头像查看该实体的 NBT；勾选框决定关系。" +
+                        if (multi) "passengers 可多选。" else "此关系只能选一个实体。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(Modifier.height(8.dp))
+                if (entities.isEmpty()) {
+                    Text("场上没有其他可选实体", style = MaterialTheme.typography.bodySmall)
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 116.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 460.dp)
+                ) {
+                    items(entities, key = { it.uid }) { e ->
+                        val isSelected = e.uid in selected
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { nbtEntity = e }
+                            ) {
+                                EntityAvatar(e, customs, avatarMap, size = 64.dp)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                displayNameOf(e, customs),
+                                style = MaterialTheme.typography.labelLarge,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                maxLines = 2
+                            )
+                            Text(
+                                EntityRegistry.displayName(e.id),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                maxLines = 1
+                            )
+                            Checkbox(checked = isSelected, onCheckedChange = { toggle(e.uid) })
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Button(onClick = {
+                        // 失效引用不应被“确定”重新写回。
+                        onConfirm(selected.filter { uid -> entities.any { it.uid == uid } })
+                    }) { Text("确定") }
+                }
+            }
+        }
+    }
+
+    val preview = nbtEntity
+    if (preview != null) {
+        EntityNbtPreviewDialog(preview, customs, onDismiss = { nbtEntity = null })
+    }
+}
+
+@Composable
+private fun EntityNbtPreviewDialog(
+    entity: EditableGridEntity,
+    customs: List<CustomEntity>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
+            Column(Modifier.padding(16.dp)) {
+                Text(displayNameOf(entity, customs), style = MaterialTheme.typography.titleMedium)
+                Text(entity.id, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    "NBT 预览（由网格字段/关系生成，不是服务端实时 data get）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    entityNbtText(entity),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp)
+                        .verticalScroll(rememberScrollState())
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("关闭") }
+                }
+            }
+        }
+    }
+}
+
+private fun entityNbtText(e: EditableGridEntity): String = buildString {
+    append("{\n")
+    append(SelectorEvaluator.derivedNbtText(e.toGridEntity()).prependIndent("  "))
+    val rel = e.relationMap()
+    if (rel.isNotEmpty()) {
+        append("\n  // execute on: ${rel.entries.joinToString("; ") { (k, v) -> "$k=${v.joinToString("|")}" }}")
+    }
+    append("\n}")
 }
 
 /**
@@ -1255,12 +1742,12 @@ private fun QuickNbtDialog(
     onDismiss: () -> Unit,
     onApply: (String) -> Unit
 ) {
-    var text by remember { mutableStateOf(nbtText) }
-    var invalid by remember { mutableStateOf(false) }
-    val quick = remember {
+    var text by rememberSaveable { mutableStateOf(nbtText) }
+    var invalid by rememberSaveable { mutableStateOf(false) }
+    val quick = rememberSaveable(entityId, nbtText, saver = QuickNbtMapSaver) {
         mutableStateMapOf<String, String>().apply { KnownNbt.fillQuick(nbtText, this, entityId) }
     }
-    var branchSpec by remember { mutableStateOf<KnownNbt.Spec?>(null) }
+    var branchKey by rememberSaveable { mutableStateOf("") }
 
     fun rebuild() {
         val merged = KnownNbt.merge(text, quick, entityId)
@@ -1325,7 +1812,7 @@ private fun QuickNbtDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            OutlinedButton(onClick = { branchSpec = spec }) { Text("编辑…") }
+                            OutlinedButton(onClick = { branchKey = spec.key }) { Text("编辑…") }
                         }
                     } else {
                         OutlinedTextField(
@@ -1338,8 +1825,8 @@ private fun QuickNbtDialog(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = when (spec.kind) {
-                                    KnownNbt.Kind.INT, KnownNbt.Kind.BYTE -> KeyboardType.Number
-                                    KnownNbt.Kind.FLOAT -> KeyboardType.Decimal
+                                    KnownNbt.Kind.INT, KnownNbt.Kind.INT32, KnownNbt.Kind.BYTE -> KeyboardType.Number
+                                    KnownNbt.Kind.FLOAT, KnownNbt.Kind.DOUBLE -> KeyboardType.Decimal
                                     else -> KeyboardType.Text
                                 }
                             ),
@@ -1373,15 +1860,16 @@ private fun QuickNbtDialog(
         }
     }
 
-    branchSpec?.let { spec ->
+    val branchSpec = KnownNbt.specsFor(entityId).firstOrNull { it.key == branchKey }
+    if (branchSpec != null) {
         NbtBranchDialog(
-            spec = spec,
-            value = quick[spec.key].orEmpty(),
-            onDismiss = { branchSpec = null },
+            spec = branchSpec,
+            value = quick[branchSpec.key].orEmpty(),
+            onDismiss = { branchKey = "" },
             onApply = { raw ->
-                quick[spec.key] = raw
+                quick[branchSpec.key] = raw
                 rebuild()
-                branchSpec = null
+                branchKey = ""
             }
         )
     }
@@ -1395,7 +1883,7 @@ private fun NbtBranchDialog(
     onDismiss: () -> Unit,
     onApply: (String) -> Unit
 ) {
-    var text by remember { mutableStateOf(value) }
+    var text by rememberSaveable(value) { mutableStateOf(value) }
     val valid = text.isBlank() || SnbtLite.parseValue(text) != null
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
@@ -1508,7 +1996,8 @@ private fun WorldSettingsDialog(
     blocks: String,
     functions: String,
     stopwatches: String,
-    onChange: (String, String, Boolean, String, String, String) -> Unit,
+    dimensionStates: Map<String, GridDimensionState>,
+    onChange: (String, String, Boolean, String, String, String, Map<String, GridDimensionState>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var d by rememberSaveable { mutableStateOf(dimension) }
@@ -1517,6 +2006,25 @@ private fun WorldSettingsDialog(
     var bl by rememberSaveable { mutableStateOf(blocks) }
     var f by rememberSaveable { mutableStateOf(functions) }
     var st by rememberSaveable { mutableStateOf(stopwatches) }
+    var states by rememberSaveable(stateSaver = DimensionStatesSaver) {
+        mutableStateOf(dimensionStates)
+    }
+    var newDimension by rememberSaveable { mutableStateOf("") }
+
+    fun persistCurrent() {
+        states = states + (d to GridDimensionState(b, l, bl, f, st))
+    }
+
+    fun switchTo(target: String) {
+        persistCurrent()
+        d = target
+        val data = states[target] ?: GridDimensionState()
+        b = data.biome
+        l = data.loaded
+        bl = data.blocks
+        f = data.functions
+        st = data.stopwatches
+    }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
             Column(
@@ -1524,6 +2032,49 @@ private fun WorldSettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("世界条件", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "方块/群系/loaded/函数/stopwatch 按维度分别保存；in 切换维度时使用对应数据。",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    (states.keys + d).distinct().forEach { dim ->
+                        FilterChip(
+                            selected = d == dim,
+                            onClick = { if (d != dim) switchTo(dim) },
+                            label = { Text(dim.substringAfterLast(':')) }
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        newDimension,
+                        { newDimension = it },
+                        label = { Text("新增维度 ID") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedButton(
+                        enabled = newDimension.isNotBlank(),
+                        onClick = {
+                            val target = newDimension.trim()
+                            persistCurrent()
+                            states = states + (target to GridDimensionState())
+                            newDimension = ""
+                            d = target
+                            b = ""
+                            l = true
+                            bl = ""
+                            f = ""
+                            st = ""
+                        }
+                    ) { Text("添加") }
+                }
                 OutlinedTextField(d, { d = it }, label = { Text("维度 dimension") },
                     singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(b, { b = it }, label = { Text("生物群系 biome（可空）") },
@@ -1546,7 +2097,10 @@ private fun WorldSettingsDialog(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("取消") }
                     Button(onClick = {
-                        onChange(d, b, l, bl, f, st)
+                        onChange(
+                            d, b, l, bl, f, st,
+                            states + (d to GridDimensionState(b, l, bl, f, st))
+                        )
                         onDismiss()
                     }) { Text("应用") }
                 }
@@ -1562,7 +2116,7 @@ private fun EntityPickerDialog(
     onPickBuiltin: (EntityRegistry.Entity) -> Unit,
     onPickCustom: (CustomEntity) -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp) {
             Column(Modifier.padding(12.dp)) {
@@ -1618,10 +2172,10 @@ private fun CustomEntityManagerDialog(
     onDismiss: () -> Unit,
     onChange: (List<CustomEntity>) -> Unit
 ) {
-    var officialId by remember { mutableStateOf("") }
-    var displayName by remember { mutableStateOf("") }
-    var builtinId by remember { mutableStateOf("minecraft:player") }
-    var avatarPath by remember { mutableStateOf("") }
+    var officialId by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
+    var builtinId by rememberSaveable { mutableStateOf("minecraft:player") }
+    var avatarPath by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(pickedAvatarPath) {
         if (!pickedAvatarPath.isNullOrBlank()) {
             avatarPath = pickedAvatarPath

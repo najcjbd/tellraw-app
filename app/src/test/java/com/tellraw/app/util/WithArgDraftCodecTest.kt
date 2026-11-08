@@ -140,6 +140,43 @@ class WithArgDraftCodecTest {
     }
 
     @Test
+    fun nestedNullWithRejectedAtAnyDepth() {
+        val bads = listOf(
+            """[{"translate":"k","with":[null]}]""",
+            """[{"translate":"k","with":[{"translate":"n","with":[null]}]}]"""
+        )
+        for (bad in bads) {
+            assertThrows(bad, WithArgCodec.WithArgsFormatException::class.java) {
+                WithArgCodec.normalizeArgsJson(bad)
+            }
+            assertThrows(bad, WithArgCodec.WithArgsFormatException::class.java) {
+                WithArgCodec.parseArgs(bad)
+            }
+        }
+    }
+
+    @Test
+    fun visualCompletenessRejectsEmptyRequiredNestedFields() {
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Selector(""))))
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Score("", "obj"))))
+        assertFalse(WithArgCodec.isComplete(listOf(WithArgDraft.Nbt(""))))
+        assertFalse(
+            WithArgCodec.isComplete(
+                listOf(WithArgDraft.Translate("", args = listOf(WithArgDraft.Text("x"))))
+            )
+        )
+        assertTrue(
+            WithArgCodec.isComplete(
+                listOf(
+                    WithArgDraft.Text("x"),
+                    WithArgDraft.Selector("@a"),
+                    WithArgDraft.Nbt("Health")
+                )
+            )
+        )
+    }
+
+    @Test
     fun prettyPrintParsesBackToSameJson() {
         val args = listOf(
             WithArgDraft.Translate("k", args = listOf(WithArgDraft.Text("a", bold = true))),

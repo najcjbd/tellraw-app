@@ -73,7 +73,7 @@
     <string name="as_sensitive">Target selector args are as-sensitive</string>
     <string name="as_sensitive_description">On: only the tellraw target selector drives as. Off: if the target needs no as, content selectors may drive it</string>
     <string name="allow_multi_cmd_tag">Allow multi-command tag</string>
-    <string name="allow_multi_cmd_tag_description">When one execute chain cannot express the conditions, use temporary tags and multiple commands; off by default</string>
+    <string name="allow_multi_cmd_tag_description">For conditions that must use execute and cannot be folded into the selector, use temporary tags and multiple commands; off by default</string>
     
     <!-- Color Codes -->
     <string name="color_black">Black</string>
@@ -384,7 +384,13 @@
     <string name="with_builder_key">Translation key</string>
     <string name="with_builder_fallback">Fallback text (optional)</string>
     <string name="with_builder_args">Arguments</string>
-    <string name="with_builder_args_empty">No arguments yet. Tap “Add argument” below.</string>
+    <string name="with_builder_args_empty">No arguments yet. Tap “Add argument” above.</string>
+    <string name="with_builder_tree_hint">Tap a node to select it and edit it in the inspector below; translate nodes can expand children.</string>
+    <string name="with_builder_inspector">Inspector</string>
+    <string name="with_builder_inspector_hint">Select an argument node above; the root translate key/fallback are edited above.</string>
+    <string name="with_builder_add_child">Add child argument</string>
+    <string name="with_builder_duplicate">Duplicate</string>
+    <string name="with_builder_child_count">%1$d child argument(s)</string>
     <string name="with_builder_add">Add argument</string>
     <string name="with_builder_kind_text">Plain text</string>
     <string name="with_builder_kind_translate">translate</string>

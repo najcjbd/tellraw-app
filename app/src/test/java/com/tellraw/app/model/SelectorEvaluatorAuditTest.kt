@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 /** 复核审计报告中的选择器求值问题。 */
 class SelectorEvaluatorAuditTest {
@@ -28,6 +29,76 @@ class SelectorEvaluatorAuditTest {
 
         val r = eval("@a[hasitem=[{item=stone},{item=diamond}]]", listOf(onlyStone, both), edition = "bedrock")
         assertEquals(listOf("b"), r.matched.map { it.uid })
+    }
+
+    @Test
+    fun randomSelectorsUseProvidedRandom() {
+        val p1 = GridEntity("p1", "minecraft:player")
+        val p2 = GridEntity("p2", "minecraft:player")
+        val r = SelectorEvaluator.evaluate(
+            "@r", listOf(p1, p2), random = Random(1234)
+        )
+        assertEquals(1, r.matched.size)
+        val limited = SelectorEvaluator.evaluate(
+            "@a[sort=random,limit=1]", listOf(p1, p2), random = Random(5678)
+        )
+        assertEquals(1, limited.matched.size)
+    }
+
+    @Test
+    fun mainInventorySlotTranslationMatchesNbtSlot() {
+        val item = GridItem("minecraft:netherite_ingot")
+        val p = GridEntity("p", "minecraft:player", items = mapOf("inventory.21" to item))
+        val hasitem = eval(
+            "@a[hasitem={item=netherite_ingot,location=slot.inventory,slot=12}]",
+            listOf(p),
+            edition = "bedrock"
+        )
+        assertEquals(listOf("p"), hasitem.matched.map { it.uid })
+        val items = GridConditionEvaluator.evaluate(
+            "if items entity @s inventory.12 minecraft:netherite_ingot",
+            p, listOf(p)
+        )
+        assertTrue(items.ok)
+    }
+
+    @Test
+    fun playerMainhandIsSelectedItemNotEquipment() {
+        val sword = GridItem("minecraft:diamond_sword")
+        val player = GridEntity(
+            "p", "minecraft:player",
+            items = mapOf("weapon.mainhand" to sword)
+        )
+        val zombie = GridEntity(
+            "z", "minecraft:zombie",
+            items = mapOf("weapon.mainhand" to sword)
+        )
+        assertEquals(
+            listOf("p"),
+            eval(
+                "@a[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}}]",
+                listOf(player, zombie)
+            ).matched.map { it.uid }
+        )
+        assertTrue(
+            eval(
+                "@a[nbt={equipment:{mainhand:{id:\"minecraft:diamond_sword\"}}}]",
+                listOf(player)
+            ).matched.isEmpty()
+        )
+        assertEquals(
+            listOf("z"),
+            eval(
+                "@e[nbt={equipment:{mainhand:{id:\"minecraft:diamond_sword\"}}}]",
+                listOf(player, zombie)
+            ).matched.map { it.uid }
+        )
+        assertTrue(
+            eval(
+                "@e[nbt={SelectedItem:{id:\"minecraft:diamond_sword\"}}]",
+                listOf(zombie)
+            ).matched.isEmpty()
+        )
     }
 
     @Test
