@@ -2,7 +2,7 @@ package com.tellraw.app.model
 
 /**
  * 每个实体的“专属已知 NBT”目录（由 26.3 服务端 data get 实测生成）。
- * 玩家来自 1.21.11 假人 bot（26.3 bot 协议未支持）；列表/复合键走分支编辑。
+ * 玩家在 26.2 / 26.3 真实服务端实测（DataVersion 4903 / 5023）；列表/复合键走分支编辑。
  * 与 [KnownNbt.ALL] 的通用键合并使用。
  */
 object EntityNbtCatalog {
@@ -1128,28 +1128,33 @@ object EntityNbtCatalog {
             s("LeftHanded", "LeftHanded", KnownNbt.Kind.BOOL, ""),
             s("anger_end_time", "anger_end_time", KnownNbt.Kind.INT, ""),
         ),
-        // 玩家：用 1.21.11 假人 bot 实测（26.x 的 bot 协议尚未支持；26.2 新增键按已知变更补）
+        // 玩家：26.2（DataVersion 4903）/ 26.3（DataVersion 5023）真实服务端 + data get 实测
+        // （上游 mineflayer 尚未收录 26.2/26.3 协议，采样客户端用兼容协议数据连入；服务端数据是原生的）。
+        // 实测要点：主手在 SelectedItem；玩家 equipment 只有 head/chest/offhand，没有 mainhand；
+        // Inventory 含当前选中的快捷栏；EnderItems 独立。26.3 新增顶层键 post_effects。
         "minecraft:player" to listOf(
-            s("XpLevel", "经验等级 XpLevel", KnownNbt.Kind.INT, ""),
+            s("XpLevel", "经验等级 XpLevel", KnownNbt.Kind.INT32, ""),
             s("XpP", "经验进度 XpP", KnownNbt.Kind.FLOAT, "0.0-1.0"),
-            s("XpTotal", "总经验 XpTotal", KnownNbt.Kind.INT, ""),
-            s("XpSeed", "附魔种子 XpSeed", KnownNbt.Kind.INT, ""),
-            s("Score", "分数 Score", KnownNbt.Kind.INT, ""),
-            s("SelectedItemSlot", "选中快捷栏 SelectedItemSlot", KnownNbt.Kind.INT, "0-8"),
-            s("SleepTimer", "睡眠计时 SleepTimer", KnownNbt.Kind.INT, "刻"),
-            s("foodLevel", "饥饿值 foodLevel", KnownNbt.Kind.INT, "0-20"),
+            s("XpTotal", "总经验 XpTotal", KnownNbt.Kind.INT32, ""),
+            s("XpSeed", "附魔种子 XpSeed", KnownNbt.Kind.INT32, ""),
+            s("Score", "分数 Score", KnownNbt.Kind.INT32, ""),
+            s("SelectedItemSlot", "选中快捷栏 SelectedItemSlot", KnownNbt.Kind.INT32, "0-8"),
+            s("SleepTimer", "睡眠计时 SleepTimer", KnownNbt.Kind.INT32, "刻"),
+            s("foodLevel", "饥饿值 foodLevel", KnownNbt.Kind.INT32, "0-20"),
             s("foodSaturationLevel", "饱和度 foodSaturationLevel", KnownNbt.Kind.FLOAT, ""),
             s("foodExhaustionLevel", "消耗度 foodExhaustionLevel", KnownNbt.Kind.FLOAT, ""),
-            s("foodTickTimer", "饥饿计时 foodTickTimer", KnownNbt.Kind.INT, ""),
-            s("playerGameType", "游戏模式 playerGameType", KnownNbt.Kind.INT, "0/1/2/3"),
+            s("foodTickTimer", "饥饿计时 foodTickTimer", KnownNbt.Kind.INT32, ""),
+            s("playerGameType", "游戏模式 playerGameType", KnownNbt.Kind.INT32, "0/1/2/3"),
             s("seenCredits", "看过终末之诗 seenCredits", KnownNbt.Kind.BOOL, ""),
             s("spawn_extra_particles_on_fall", "落地粒子 spawn_extra_particles_on_fall", KnownNbt.Kind.BOOL, ""),
             s("ignore_fall_damage_from_current_explosion", "忽略爆炸摔伤", KnownNbt.Kind.BOOL, ""),
+            s("current_impulse_context_reset_grace_time", "冲量上下文宽限 current_impulse_context_reset_grace_time", KnownNbt.Kind.INT32, "26.2+ 实测"),
+            s("post_effects", "后置效果 post_effects（列表）", KnownNbt.Kind.LIST, "26.3+ 实测"),
             s("Dimension", "维度 Dimension", KnownNbt.Kind.STRING, "minecraft:overworld 等"),
             s("Inventory", "物品栏 Inventory（列表）", KnownNbt.Kind.LIST, ""),
             s("EnderItems", "末影箱 EnderItems（列表）", KnownNbt.Kind.LIST, ""),
             s("SelectedItem", "主手 SelectedItem（复合）", KnownNbt.Kind.COMPOUND, ""),
-            s("equipment", "装备 equipment（复合）", KnownNbt.Kind.COMPOUND, ""),
+            s("equipment", "装备 equipment（复合；玩家无 mainhand）", KnownNbt.Kind.COMPOUND, ""),
             s("abilities", "能力 abilities（复合）", KnownNbt.Kind.COMPOUND, ""),
             s("recipeBook", "配方书 recipeBook（复合）", KnownNbt.Kind.COMPOUND, ""),
             s("warden_spawn_tracker", "监守者生成 warden_spawn_tracker（复合）", KnownNbt.Kind.COMPOUND, ""),

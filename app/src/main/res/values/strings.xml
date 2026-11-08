@@ -75,7 +75,7 @@
     <string name="bedrock_color_to_rgb">基岩版独有 § 颜色码 → Java 精确 RGB color</string>
     <string name="as_sensitive">目标选择器参数对 as 敏感</string>
     <string name="allow_multi_cmd_tag">允许多命令 tag</string>
-    <string name="allow_multi_cmd_tag_description">单条 execute 链无法表达时，用临时 tag + 多条命令；默认关闭</string>
+    <string name="allow_multi_cmd_tag_description">对必须用 execute、不能折进目标选择器的条件，用临时 tag + 多条命令；默认关闭</string>
     <string name="as_sensitive_description">开：只用 tellraw 目标选择器决定 as；关：目标没得改时才会用内容里的选择器做 as</string>
     
     <!-- 颜色代码 -->
@@ -359,7 +359,13 @@
     <string name="with_builder_key">翻译键</string>
     <string name="with_builder_fallback">回退文本 fallback（可空）</string>
     <string name="with_builder_args">参数列表</string>
-    <string name="with_builder_args_empty">还没有参数，点击下方“添加参数”。</string>
+    <string name="with_builder_args_empty">还没有参数，点击上方“添加参数”。</string>
+    <string name="with_builder_tree_hint">点节点选中，在下方检查器编辑；translate 节点可展开子参数。</string>
+    <string name="with_builder_inspector">检查器</string>
+    <string name="with_builder_inspector_hint">选择上方参数节点；根 translate 的 key/fallback 在上方编辑。</string>
+    <string name="with_builder_add_child">添加子参数</string>
+    <string name="with_builder_duplicate">复制</string>
+    <string name="with_builder_child_count">子参数 %1$d 个</string>
     <string name="with_builder_add">添加参数</string>
     <string name="with_builder_kind_text">纯文本</string>
     <string name="with_builder_kind_translate">translate</string>

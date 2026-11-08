@@ -149,13 +149,17 @@ object WithArgCodec {
 
     // ---------- 解析 ----------
 
-    fun parseArgs(text: String): List<WithArgDraft> =
-        argsOf(parseStrict(text))
+    fun parseArgs(text: String): List<WithArgDraft> {
+        val el = parseStrict(text)
+        rejectNullWithItems(el)
+        return argsOf(el)
+    }
 
     /** 原始 JSON 项编辑器：允许任何非 null 的 JSON 值。 */
     fun parseRaw(text: String): JsonElement {
         val el = parseStrict(text)
         if (el.isJsonNull) throw WithArgsFormatException(FormatError.NULL_ITEM, "null item")
+        rejectNullWithItems(el)
         return el
     }
 
@@ -166,7 +170,23 @@ object WithArgCodec {
         if (arr.any { it.isJsonNull }) {
             throw WithArgsFormatException(FormatError.NULL_ITEM, "null item")
         }
+        rejectNullWithItems(el)
         return arr.toString()
+    }
+
+    /** 任意层级的 translate.with 数组里出现 null 都是无效组件，提前拒绝。 */
+    private fun rejectNullWithItems(el: JsonElement) {
+        when {
+            el.isJsonArray -> el.asJsonArray.forEach { rejectNullWithItems(it) }
+            el.isJsonObject -> {
+                val o = el.asJsonObject
+                val withEl = o.get("with")
+                if (withEl != null && withEl.isJsonArray && withEl.asJsonArray.any { it.isJsonNull }) {
+                    throw WithArgsFormatException(FormatError.NULL_ITEM, "null item")
+                }
+                o.entrySet().forEach { rejectNullWithItems(it.value) }
+            }
+        }
     }
 
     private fun argsOf(el: JsonElement): List<WithArgDraft> =

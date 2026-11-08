@@ -1,6 +1,9 @@
 package com.tellraw.app.model
 
 import com.tellraw.app.util.ExecCondSupport
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.sin
 
 /**
  * 网格里的 execute 条件求值（近似）：把 `if/unless` 条件作用到**候选实体**上，
@@ -39,7 +42,10 @@ object GridConditionEvaluator {
         all: List<GridEntity>,
         target: VersionSpec? = null,
         world: GridWorld = GridWorld(),
-        origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0)
+        origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0),
+        yaw: Double = 0.0,
+        pitch: Double = 0.0,
+        anchorEyes: Boolean = false
     ): Result {
         val notes = mutableListOf<String>()
         val tokens = tokenize(conditionText)
@@ -145,7 +151,7 @@ object GridConditionEvaluator {
                         neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else if (name == "block") {
-                        val p = readPos(tokens, i + 2, origin, notes)
+                        val p = readPos(tokens, i + 2, origin, notes, yaw, pitch, anchorEyes)
                         val want = tokens.getOrNull(i + 5)
                         if (p == null || want == null) {
                             notes.add("block 条件参数不完整，已忽略")
@@ -157,9 +163,9 @@ object GridConditionEvaluator {
                             consumed = 6
                         }
                     } else {
-                        val a = readPos(tokens, i + 2, origin, notes)
-                        val b = readPos(tokens, i + 5, origin, notes)
-                        val dest = readPos(tokens, i + 8, origin, notes)
+                        val a = readPos(tokens, i + 2, origin, notes, yaw, pitch, anchorEyes)
+                        val b = readPos(tokens, i + 5, origin, notes, yaw, pitch, anchorEyes)
+                        val dest = readPos(tokens, i + 8, origin, notes, yaw, pitch, anchorEyes)
                         val mode = tokens.getOrNull(i + 11)
                         if (a == null || b == null || dest == null || mode == null) {
                             notes.add("blocks 条件参数不完整，已忽略")
@@ -244,7 +250,7 @@ object GridConditionEvaluator {
                         neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else {
-                        val r = evalItems(tokens, i, entity, world, origin, notes)
+                        val r = evalItems(tokens, i, entity, world, origin, notes, yaw, pitch, anchorEyes)
                         if (r == null) {
                             notes.add("items 条件参数不完整，已忽略")
                             ok = true
@@ -267,7 +273,7 @@ object GridConditionEvaluator {
                         neutral = true
                         consumed = conditionSpan(tokens, i + 1)
                     } else {
-                        val r = evalSlots(tokens, i, entity, world, origin, notes)
+                        val r = evalSlots(tokens, i, entity, world, origin, notes, yaw, pitch, anchorEyes)
                         if (r == null) {
                             notes.add("slots 条件参数不完整，已忽略")
                             ok = true
@@ -432,7 +438,10 @@ object GridConditionEvaluator {
         entity: GridEntity,
         world: GridWorld,
         origin: Triple<Double, Double, Double>,
-        notes: MutableList<String>
+        notes: MutableList<String>,
+        yaw: Double,
+        pitch: Double,
+        anchorEyes: Boolean
     ): CondEval? {
         val source = tokens.getOrNull(i + 2) ?: return null
         if (source == "entity") {
@@ -448,7 +457,7 @@ object GridConditionEvaluator {
             return CondEval(ok, 6)
         }
         if (source == "block") {
-            val pos = readPos(tokens, i + 3, origin, notes) ?: return null
+            val pos = readPos(tokens, i + 3, origin, notes, yaw, pitch, anchorEyes) ?: return null
             val slots = tokens.getOrNull(i + 6) ?: return null
             val predicate = tokens.getOrNull(i + 7) ?: return null
             val block = world.blocks[posKey(pos)]
@@ -467,7 +476,10 @@ object GridConditionEvaluator {
         entity: GridEntity,
         world: GridWorld,
         origin: Triple<Double, Double, Double>,
-        notes: MutableList<String>
+        notes: MutableList<String>,
+        yaw: Double,
+        pitch: Double,
+        anchorEyes: Boolean
     ): CondEval? {
         val source = tokens.getOrNull(i + 2) ?: return null
         if (source == "entity") {
@@ -482,7 +494,7 @@ object GridConditionEvaluator {
             return CondEval(ok, 5)
         }
         if (source == "block") {
-            val pos = readPos(tokens, i + 3, origin, notes) ?: return null
+            val pos = readPos(tokens, i + 3, origin, notes, yaw, pitch, anchorEyes) ?: return null
             val slots = tokens.getOrNull(i + 6) ?: return null
             val block = world.blocks[posKey(pos)]
             if (block == null) {
@@ -700,18 +712,42 @@ object GridConditionEvaluator {
         tokens: List<String>,
         start: Int,
         origin: Triple<Double, Double, Double>,
-        notes: MutableList<String>
+        notes: MutableList<String>,
+        yaw: Double = 0.0,
+        pitch: Double = 0.0,
+        anchorEyes: Boolean = false
     ): Triple<Int, Int, Int>? {
         val x = tokens.getOrNull(start) ?: return null
         val y = tokens.getOrNull(start + 1) ?: return null
         val z = tokens.getOrNull(start + 2) ?: return null
+        if (x.startsWith("^") || y.startsWith("^") || z.startsWith("^")) {
+            val left = x.trim().removePrefix("^").toDoubleOrNull() ?: 0.0
+            val up = y.trim().removePrefix("^").toDoubleOrNull() ?: 0.0
+            val forward = z.trim().removePrefix("^").toDoubleOrNull() ?: 0.0
+            val yawRad = Math.toRadians(yaw)
+            val pitchRad = Math.toRadians(pitch)
+            val baseY = origin.second + if (anchorEyes) 1.62 else 0.0
+            val fx = -sin(yawRad) * cos(pitchRad)
+            val fy = -sin(pitchRad)
+            val fz = cos(yawRad) * cos(pitchRad)
+            val lx = cos(yawRad)
+            val lz = sin(yawRad)
+            val ux = sin(yawRad) * sin(pitchRad)
+            val uy = cos(pitchRad)
+            val uz = -cos(yawRad) * sin(pitchRad)
+            return Triple(
+                floor(origin.first + left * lx + up * ux + forward * fx).toInt(),
+                floor(baseY + up * uy + forward * fy).toInt(),
+                floor(origin.third + left * lz + up * uz + forward * fz).toInt()
+            )
+        }
         fun c(v: String, base: Double): Int {
             val t = v.trim()
             return when {
-                t == "~" -> kotlin.math.floor(base).toInt()
-                t.startsWith("~") -> kotlin.math.floor(base + (t.substring(1).toDoubleOrNull() ?: 0.0)).toInt()
-                else -> t.toDoubleOrNull()?.let { kotlin.math.floor(it).toInt() }
-                    ?: kotlin.math.floor(base).toInt()
+                t == "~" -> floor(base).toInt()
+                t.startsWith("~") -> floor(base + (t.substring(1).toDoubleOrNull() ?: 0.0)).toInt()
+                else -> t.toDoubleOrNull()?.let { floor(it).toInt() }
+                    ?: floor(base).toInt()
             }
         }
         return Triple(c(x, origin.first), c(y, origin.second), c(z, origin.third))

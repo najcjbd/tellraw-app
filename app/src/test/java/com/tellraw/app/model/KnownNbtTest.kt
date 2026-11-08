@@ -75,7 +75,8 @@ class KnownNbtTest {
 
     @Test fun playerAndStructuredKeys() {
         val p = KnownNbt.specsFor("minecraft:player")
-        assertTrue(p.any { it.key == "XpLevel" && it.kind == KnownNbt.Kind.INT })
+        assertTrue(p.any { it.key == "XpLevel" && it.kind == KnownNbt.Kind.INT32 })
+        assertEquals("30", KnownNbt.nbtTextOf(p.first { it.key == "XpLevel" }, "30"))
         assertTrue(p.any { it.key == "Inventory" && it.kind == KnownNbt.Kind.LIST })
 
         val merged = KnownNbt.merge(

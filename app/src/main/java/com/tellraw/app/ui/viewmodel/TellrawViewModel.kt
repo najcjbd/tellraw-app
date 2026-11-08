@@ -939,8 +939,14 @@ class TellrawViewModel @Inject constructor(
         } else bTellraw
         _rawConvertWarnings.value = buildList {
             addAll(r.warnings)
-            if (javaTagPlan != null) add("已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove")
-            if (bedrockTagPlan != null) add("已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove")
+            javaTagPlan?.let {
+                addAll(it.warnings)
+                add("已使用多命令 tag 方案（Java）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")
+            }
+            bedrockTagPlan?.let {
+                addAll(it.warnings)
+                add("已使用多命令 tag 方案（基岩）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")
+            }
         }
     }
 
@@ -1181,6 +1187,7 @@ class TellrawViewModel @Inject constructor(
                     )
                 } else null
                 val javaCommand = if (javaTagPlan != null) {
+                    allReminders.addAll(javaTagPlan.warnings)
                     allReminders.add(
                         "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove；" +
                             "请按顺序执行全部命令，中途停止会残留标签"
@@ -1223,6 +1230,7 @@ class TellrawViewModel @Inject constructor(
                     )
                 } else null
                 val bedrockCommand = if (bedrockTagPlan != null) {
+                    allReminders.addAll(bedrockTagPlan.warnings)
                     allReminders.add(
                         "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove；" +
                             "请按顺序执行全部命令，中途停止会残留标签"

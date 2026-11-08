@@ -27,6 +27,15 @@ object ExecuteConverter {
         "align", "anchored", "as", "at", "facing", "in", "on", "positioned", "rotated", "summon"
     )
 
+    private val POSITION_MODIFIERS = setOf(
+        "align", "anchored", "at", "facing", "in", "positioned", "rotated"
+    )
+
+    // Java execute on 的全部合法关系（wiki“命令/execute § on”）；passengers 可能对应多个实体。
+    private val ON_RELATIONS = setOf(
+        "attacker", "controller", "leasher", "origin", "owner", "passengers", "target", "vehicle"
+    )
+
     // 所有子命令关键字。用于判断"参数位置是否出现了关键字"——参数不可能是关键字，
     // 一旦出现说明该子命令参数缺失，借此把 `execute as if ...` 这类退化输入判为不完整而非吞掉下一个子命令。
     private val KEYWORDS = MODIFIERS + setOf("execute", "if", "unless", "run")
@@ -64,6 +73,32 @@ object ExecuteConverter {
      *         `execute`（只有它）返回空列表，表示"合法但没有可保留的子命令"；
      *         空输入同样返回 null，因为空串并不是一个合法的 execute 前缀。
      */
+    /**
+     * 供网格逐步模拟使用的公开解析结果：修饰子命令原样 token，条件子命令带完整条件文本。
+     * 顺序与输入一致；格式非法返回 null。
+     */
+    data class ExecutePart(val tokens: List<String>, val conditionText: String? = null)
+
+    fun parseExecuteParts(
+        prefix: String,
+        reminders: MutableList<String> = mutableListOf()
+    ): List<ExecutePart>? {
+        val segs = parseSegments(prefix, reminders) ?: return null
+        return segs.map { seg ->
+            when (seg) {
+                is Seg.Mod -> ExecutePart(seg.tokens)
+                is Seg.Cond -> {
+                    val tokens = buildList {
+                        add(if (seg.unless) "unless" else "if")
+                        add(seg.name)
+                        addAll(seg.args)
+                    }
+                    ExecutePart(tokens, conditionText = tokens.joinToString(" "))
+                }
+            }
+        }
+    }
+
     fun parseExecutePrefix(prefix: String, reminders: MutableList<String>): List<String>? {
         val segs = parseSegments(prefix, reminders) ?: return null
         val kept = mutableListOf<String>()
@@ -116,6 +151,11 @@ object ExecuteConverter {
                     }
                     out.addAll(toks)
                     val modName = seg.tokens.firstOrNull()
+                    if (direction == Direction.JAVA_TO_BEDROCK && modName in setOf("on", "summon")) {
+                        reminders.add(
+                            "基岩 execute 没有 \"$modName\" 修饰（仅 Java 版）；已原样保留，基岩会解析失败。"
+                        )
+                    }
                     val positionOnly = modName in setOf(
                         "at", "positioned", "rotated", "facing", "anchored", "align", "in"
                     )
@@ -351,6 +391,12 @@ object ExecuteConverter {
             if (name in MODIFIERS) {
                 val span = modifierSpan(tokens, idx)
                 if (span != null) {
+                    if (name == "on" && tokens.getOrNull(idx + 1) !in ON_RELATIONS) {
+                        reminders.add(
+                            "未知的 on 关系 \"${tokens.getOrNull(idx + 1)}\"；Java 只接受 " +
+                                ON_RELATIONS.joinToString("/") + "，已原样保留"
+                        )
+                    }
                     segs.add(Seg.Mod(tokens.subList(idx, idx + span).toList()))
                     idx += span
                     continue
@@ -510,13 +556,6 @@ object ExecuteConverter {
                 "block" -> 1 + POSITION_TOKENS + 1 + 1
                 else -> 4
             }
-            //   slots block <source> <slots>   = 1 + 3 + 1 = 5（**没有** item_predicate！）
-            //   slots entity <source> <slots>  = 3
-            "slots" -> when (source) {
-                null -> null
-                "block" -> 1 + POSITION_TOKENS + 1
-                else -> 3
-            }
             else -> null
         }
     }
@@ -631,16 +670,34 @@ object ExecuteConverter {
     //  多命令 tag 方案
     // ==================================================================
 
-    data class MultiCommandPlan(val commands: List<String>, val tags: List<String>)
+    data class MultiCommandPlan(
+        val commands: List<String>,
+        val tags: List<String>,
+        val warnings: List<String> = emptyList()
+    )
 
     /**
-     * 当单条 execute 链无法表达多个“以 @s 为目标”的条件时，用临时 tag 求交集：
-     *   execute as @a <cond_i> run tag @s add <tag_i>
-     *   tellraw <base>[tag=t1,tag=t2,...] <message>
-     *   tag <base>[tag=t_i] remove <tag_i>
+     * 多命令 tag 方案：用多条命令复现“一条链同时满足多个 execute 条件”的结果。
      *
-     * 只支持 `execute as @a/@e ...` + 全部条件都以 @s 为目标、且没有 at/positioned 等修饰；
-     * 其他形态返回 null，由调用方保持原有单命令/舍弃行为。
+     * 判定口径（zh.minecraft.wiki“目标选择器”/“命令/execute”）：
+     *  - `score @s <obj> matches <range>` -> 最终执行者选择器 `scores={<obj>=<range>}`；
+     *  - `data entity @s {根复合标签}` -> `nbt={…}`；
+     *  - `entity @s[<纯属性参数>]` -> 并进最终执行者选择器；`distance/dx/dy/dz`
+     *    只在条件之前没有 at/positioned/rotated/facing/anchored/align/in 时折；
+     *    `x/y/z`、`limit/sort/c` 一律走 tag；
+     *  - `items`、`slots`、`block`、`blocks`、`biome`、`loaded`、`dimension`、
+     *    `score` 的比较形式等逐条件 `run tag @s add <tag>`；
+     *  - `predicate/function/stopwatch` 属顺序/随机/副作用敏感条件，走整链 tag；
+     *  - `unless` 一律不折。
+     *
+     * 每个 tag 子命令都带上**该条件之前**写过的修饰子命令（as/at/positioned/on/...），
+     * 条件之后的修饰不提前带。tag 永远加在最终执行者上，最终用
+     * `execute as <带 tag 的最终执行者> run tellraw <原收信人>` 逐执行者发送；
+     * 这样同一执行者必须满足全部条件，且纯条件下收信人集合/次数与原链一致。
+     * 同一最终执行者被多个 base 分支命中时重复次数会合并（tag 优先策略，输出会警告）。
+     * `@p/@n/@r`、距离坐标或 limit/sort 收信人、`@s[...]` 无法在独立 final execute 保真，回退单链。
+     * 条件之间还有修饰、或条件转换生成 as 时，退回整链 tag；`summon` 回退单链。
+     * 目标版本缺少某条件时继续生成但明确标注“结果不等价”。
      */
     fun buildMultiCommandTagPlan(
         prefix: String,
@@ -648,64 +705,372 @@ object ExecuteConverter {
         tellrawTarget: String,
         tellrawJson: String,
         nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
-        requireUnmergeable: Boolean = true,
+        @Suppress("UNUSED_PARAMETER") requireUnmergeable: Boolean = false,
         tagSuffix: String? = null
     ): MultiCommandPlan? {
-        val segs = parseSegments(prefix, mutableListOf()) ?: return null
-        if (segs.isEmpty()) return null
-        val first = segs.first() as? Seg.Mod ?: return null
-        if (first.tokens.size != 2 || first.tokens[0] != "as") return null
-        val base = first.tokens[1]
-        // 只支持无参数的玩家选择器：避免把 Java 的 nbt=/scores=! 等原样带进基岩，且 tellraw 只收玩家
-        if (base != "@a" && base != "@p") return null
-        if (tellrawTarget != "@s" && tellrawTarget != base &&
-            !tellrawTarget.startsWith("$base[")
-        ) return null
-
-        val conditions = segs.drop(1)
-        if (conditions.size < 2) return null
-        if (conditions.any { it !is Seg.Cond }) return null
-        val conds = conditions.map { it as Seg.Cond }
-        if (conds.any { !isPerEntityCondition(it) }) return null
-
-        if (requireUnmergeable) {
-            val probe = mutableListOf<String>()
-            val single = convertExecutePrefix(prefix, direction, probe, nbtSyntax) ?: return null
-            if (single.isBlank()) return null
-            val markers = listOf("量词不同", "同一目标", "无法保持同一实体", "不做任何合并", "NOT(")
-            if (markers.none { marker -> probe.any { it.contains(marker) } }) return null
+        val parseReminders = mutableListOf<String>()
+        val rawSegs = parseSegments(prefix, parseReminders) ?: return null
+        if (rawSegs.filterIsInstance<Seg.Cond>().size < 2) return null
+        val target = tellrawTarget.trim()
+        // @s[...] / @p / @n / @r / 距离坐标目标需要原执行上下文；独立 final execute 无法保证同一上下文。
+        if (target.startsWith("@s[") || !target.startsWith("@") || targetRequiresOriginalContext(target)) {
+            return null
         }
 
-        val exec = applyModifier(first.tokens, ExecState(isPlayer = true, changed = false))
-        val rawSuffix = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
-        // Java 版 tag 名只允许 -+._A-Za-z0-9；这里统一只保留字母数字下划线
-        val suffix = rawSuffix.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "tag" }
-        val tags = conds.indices.map { "tellraw_a${it + 1}_$suffix" }
-        val commands = mutableListOf<String>()
-        conds.forEachIndexed { index, cond ->
-            val warnings = mutableListOf<String>()
-            val tokens = convertCondition(cond, direction, exec, warnings, nbtSyntax)
-            if (tokens.isEmpty()) return null
-            commands.add(
-                "execute as $base ${tokens.joinToString(" ")} run tag @s add ${tags[index]}"
+        val warnings = mutableListOf<String>()
+        warnings.addAll(parseReminders)
+
+        // 先把修饰子命令里的选择器互转；转换产生的额外条件（如基岩 scores=!）
+        // 插在该修饰子命令之后，保持与单链转换相同的顺序。
+        val steps = mutableListOf<Seg>()
+        for (seg in rawSegs) {
+            when (seg) {
+                is Seg.Cond -> steps.add(seg)
+                is Seg.Mod -> {
+                    val toks = mutableListOf<String>()
+                    var extra = emptyList<String>()
+                    seg.tokens.forEachIndexed { i, t ->
+                        if (i == 1 && t.startsWith("@")) {
+                            val (conv, cond) = convertModifierSelector(t, direction, warnings, nbtSyntax)
+                            toks.add(conv)
+                            extra = cond
+                        } else {
+                            toks.add(t)
+                        }
+                    }
+                    steps.add(Seg.Mod(toks))
+                    if (extra.isNotEmpty()) {
+                        val parsed = parseSegments("execute " + extra.joinToString(" "), warnings)
+                            ?: return null
+                        steps.addAll(parsed.filterIsInstance<Seg.Cond>())
+                    }
+                }
+            }
+        }
+
+        val conds = steps.filterIsInstance<Seg.Cond>()
+        if (conds.size < 2) return null
+        val mods = steps.filterIsInstance<Seg.Mod>()
+
+        // summon 每次生成新实体；无法在网格/独立 final 里确定，回退单链。
+        if (mods.any { it.tokens.firstOrNull() == "summon" }) return null
+
+        val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
+        val asCount = asMods.size
+        val hasOn = mods.any { it.tokens.firstOrNull() == "on" }
+        val executorChanged = hasOn || asCount > 1
+
+        // @r/limit/sort 的 as 会在每条 tag 命令里重抽，必须整链。
+        if (asMods.any { baseNeedsWholeChain(it.tokens.getOrNull(1)) }) {
+            return buildWholeChainTagPlan(
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                "基选择器含 @r/limit/sort，逐条件 tag 会重新抽取执行者"
             )
         }
-        val finalTarget = if (tellrawTarget == "@s") base else tellrawTarget
-        commands.add("tellraw ${withTags(finalTarget, tags)} $tellrawJson")
-        tags.forEach { tag ->
-            commands.add("tag ${withTags(base, listOf(tag))} remove $tag")
+        // predicate/function/stopwatch 有随机/副作用/时序；逐条件拆开会改变求值次数或顺序。
+        val orderSensitive = setOf("function", "predicate", "stopwatch")
+        if (conds.any { it.name in orderSensitive }) {
+            return buildWholeChainTagPlan(
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                "条件含 predicate/function/stopwatch，逐条件求值会改变随机/副作用/时序"
+            )
         }
-        return MultiCommandPlan(commands, tags)
+
+        var seenCondition = false
+        var modifierAfterCondition = false
+        for (step in steps) {
+            when (step) {
+                is Seg.Cond -> seenCondition = true
+                is Seg.Mod -> if (seenCondition) modifierAfterCondition = true
+            }
+        }
+        if (modifierAfterCondition) {
+            return buildWholeChainTagPlan(
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                "检测到条件之间还有 as/on/at/... 修饰，无法逐条件求交"
+            )
+        }
+
+        val simpleBaseOnly = asCount == 1 && !executorChanged
+        val base = asMods.firstOrNull()?.tokens?.getOrNull(1)
+        if (simpleBaseOnly && (base == null || !base.startsWith("@"))) return null
+        val executorBase = if (simpleBaseOnly) base!! else "@e"
+
+        var finalExecutor = executorBase
+        var folded = 0
+        var posChanged = false
+        var exec = ExecState(isPlayer = true, changed = false)
+        val prefixMods = mutableListOf<List<String>>()
+        val tagEntries = mutableListOf<Pair<List<String>, List<String>>>()
+
+        for (step in steps) {
+            when (step) {
+                is Seg.Mod -> {
+                    prefixMods.add(step.tokens)
+                    if (step.tokens.firstOrNull() in POSITION_MODIFIERS) posChanged = true
+                    exec = applyModifier(step.tokens, exec)
+                }
+                is Seg.Cond -> {
+                    val condWarnings = mutableListOf<String>()
+                    val tokens = convertCondition(step, direction, exec, condWarnings, nbtSyntax)
+                    warnings.addAll(condWarnings)
+                    if (tokens.isEmpty()) {
+                        if (condWarnings.isEmpty()) {
+                            warnings.add("条件 ${step.name} 在目标版本无对应写法，已跳过（tag 方案不等价）")
+                        } else {
+                            warnings.add("条件 ${step.name} 已被舍弃：多命令 tag 方案结果与原命令不等价")
+                        }
+                        continue
+                    }
+                    if (tokens.contains("as")) {
+                        return buildWholeChainTagPlan(
+                            prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                            "条件转换生成了额外的 as，无法逐条件求交"
+                        )
+                    }
+                    val foldParam = selectorFoldParam(step, tokens, posChanged)
+                    if (foldParam != null) {
+                        val merged = appendSelectorParam(finalExecutor, foldParam)
+                        if (merged != null) {
+                            finalExecutor = merged
+                            folded++
+                            continue
+                        }
+                    }
+                    tagEntries.add(tokens to prefixMods.flatten())
+                }
+            }
+        }
+
+        if (tagEntries.isEmpty() || tagEntries.size + folded < 2) return null
+
+        val suffix = makeTagSuffix(tagSuffix)
+        val tags = tagEntries.indices.map { "tellraw_a${it + 1}_$suffix" }
+        val commands = mutableListOf<String>()
+        tagEntries.forEachIndexed { index, (tokens, prefixTokens) ->
+            val head = if (prefixTokens.isEmpty()) {
+                "execute"
+            } else {
+                "execute ${prefixTokens.joinToString(" ")}"
+            }
+            commands.add("$head ${tokens.joinToString(" ")} run tag @s add ${tags[index]}")
+        }
+        val executorWithTags = appendSelectorParam(
+            finalExecutor, tags.joinToString(",") { "tag=$it" }
+        ) ?: return null
+        commands.add("execute as $executorWithTags run tellraw $target $tellrawJson")
+        tags.forEach { tag ->
+            commands.add("tag ${withTags(executorBase, listOf(tag))} remove $tag")
+        }
+
+        if (maySelectNonPlayer(target)) {
+            warnings.add(
+                "最终 tellraw 目标 $target 可能包含非玩家；原版 tellraw 只接受玩家，非玩家会导致命令失败" +
+                    "（选择器已按你的要求原样保留，未强制过滤）。"
+            )
+        }
+        warnings.add(
+            "tag 方案按最终执行者合并重复执行：同一最终执行者被多个 base 分支命中时，tellraw 次数可能减少" +
+                "（你选择的 tag 优先策略）。"
+        )
+        if (folded > 0) {
+            warnings.add("可折进最终执行者选择器的条件已折叠；其余条件拆成 tag（${tags.joinToString()}）")
+        }
+        warnings.add(
+            "逐条件 tag 对纯条件是等价交集；含 predicate/function/stopwatch 等顺序敏感条件时已自动走整链。"
+        )
+        return MultiCommandPlan(commands, tags, warnings)
     }
 
-    private fun isPerEntityCondition(cond: Seg.Cond): Boolean = when (cond.name) {
-        "entity" -> cond.args.getOrNull(0)?.startsWith("@s") == true
-        "items" -> cond.args.getOrNull(0) == "entity" &&
-            cond.args.getOrNull(1)?.startsWith("@s") == true
-        "data" -> cond.args.getOrNull(0) == "entity" &&
-            cond.args.getOrNull(1)?.startsWith("@s") == true
-        "score" -> cond.args.getOrNull(0)?.startsWith("@s") == true
-        else -> false
+    /**
+     * 整链 tag：保留完整的转换后 execute 前缀，只打一次 tag 到最终执行者；
+     * 最终再用 `execute as @e[tag] run tellraw ...` 逐最终执行者执行 tellraw。
+     * 这样同一执行者满足全部条件才发，且尽量保留原链的执行次数（同最终执行者仍会合并）。
+     */
+    private fun buildWholeChainTagPlan(
+        prefix: String,
+        direction: Direction,
+        tellrawTarget: String,
+        tellrawJson: String,
+        warnings: MutableList<String>,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        tagSuffix: String?,
+        reason: String
+    ): MultiCommandPlan? {
+        val target = tellrawTarget.trim()
+        if (!target.startsWith("@") || target.startsWith("@s[") || targetRequiresOriginalContext(target)) {
+            return null
+        }
+        val warningStart = warnings.size
+        val converted = convertExecutePrefix(prefix, direction, warnings, nbtSyntax) ?: return null
+        if (converted.isBlank()) return null
+        if (warnings.drop(warningStart).any { it.contains("舍弃") || it.contains("无对应") }) {
+            warnings.add("整链 tag 方案结果与原命令不等价：目标版本缺少某些条件")
+        }
+
+        val suffix = makeTagSuffix(tagSuffix)
+        val tag = "tellraw_all_$suffix"
+        val withTag = withTags("@e", listOf(tag))
+        val commands = listOf(
+            "$converted run tag @s add $tag",
+            "execute as $withTag run tellraw $target $tellrawJson",
+            "tag $withTag remove $tag"
+        )
+        warnings.add(
+            "执行者链使用整链 tag（$tag）：$reason；原链条件顺序/短路保持，所有命令必须按顺序执行，中途停止会残留 tag"
+        )
+        warnings.add(
+            "tag 方案按最终执行者合并重复执行：同一最终执行者被多个 base 分支命中时，tellraw 次数可能减少" +
+                "（你选择的 tag 优先策略）。"
+        )
+        if (maySelectNonPlayer(target)) {
+            warnings.add(
+                "最终 tellraw 目标 $target 可能包含非玩家；原版 tellraw 只接受玩家，非玩家会导致命令失败" +
+                    "（选择器已按你的要求原样保留，未强制过滤）。"
+            )
+        }
+        return MultiCommandPlan(commands, listOf(tag), warnings)
+    }
+
+    private fun makeTagSuffix(tagSuffix: String?): String {
+        val raw = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
+        // Java tag 名只允许 -+._A-Za-z0-9；这里统一只保留字母数字下划线。
+        return raw.filter { it.isLetterOrDigit() || it == '_' }.ifEmpty { "tag" }
+    }
+
+    private fun selectorHasSpatialParams(selector: String): Boolean {
+        if ('[' !in selector || !selector.endsWith("]")) return false
+        val body = selector.substringAfter('[').dropLast(1)
+        return ExecCondSupport.splitTopLevel(body, ',')
+            .map { it.substringBefore('=').trim() }
+            .any { it in setOf("x", "y", "z", "distance", "dx", "dy", "dz") }
+    }
+
+    /** @r / limit / sort 会在每条命令里重新抽取执行者，不能逐条件 tag。 */
+    private fun baseNeedsWholeChain(selector: String?): Boolean {
+        if (selector == null) return false
+        val varName = selector.substringBefore('[').trim()
+        if (varName == "@r") return true
+        if ('[' !in selector || !selector.endsWith("]")) return false
+        val body = selector.substringAfter('[').dropLast(1)
+        return ExecCondSupport.splitTopLevel(body, ',')
+            .map { it.substringBefore('=').trim() }
+            .any { it in setOf("limit", "sort", "c") }
+    }
+
+    /** 收信人是否依赖原执行位置/随机/选择数量；这类目标无法用独立 final execute 保证同一上下文。 */
+    private fun targetRequiresOriginalContext(selector: String): Boolean {
+        val varName = selector.trim().substringBefore('[')
+        if (varName in setOf("@p", "@n", "@r", "@c", "@v", "@initiator")) return true
+        if (selectorHasSpatialParams(selector)) return true
+        if ('[' !in selector || !selector.endsWith("]")) return false
+        val body = selector.substringAfter('[').dropLast(1)
+        return ExecCondSupport.splitTopLevel(body, ',')
+            .map { it.substringBefore('=').trim() }
+            .any { it in setOf("limit", "sort", "c") }
+    }
+
+    /** 这个收信人选择器是否可能选到非玩家（@a/@p 是玩家；@e/@n/@r/@c/@v/@initiator 不一定）。 */
+    private fun maySelectNonPlayer(selector: String): Boolean {
+        val v = selector.trim().substringBefore('[')
+        return v !in setOf("@a", "@p")
+    }
+
+    /**
+     * 能等价折进收信人选择器时返回参数串；否则 null（走 tag）。
+     * 只处理 Java 输出的原生条件（score/data/entity）；items/slots/位置/函数等返回 null。
+     */
+    private fun selectorFoldParam(
+        cond: Seg.Cond,
+        convertedTokens: List<String>,
+        posChanged: Boolean
+    ): String? {
+        if (cond.unless) return null
+        return when (cond.name) {
+            "score" -> {
+                if (convertedTokens.size != 6 || convertedTokens[1] != "score") return null
+                if (convertedTokens[2] != "@s" || convertedTokens[4] != "matches") return null
+                "scores={${convertedTokens[3]}=${convertedTokens[5]}}"
+            }
+            "data" -> {
+                if (convertedTokens.size != 5 || convertedTokens[1] != "data") return null
+                if (convertedTokens[2] != "entity" || convertedTokens[3] != "@s") return null
+                val nbt = convertedTokens[4].trim()
+                if (!nbt.startsWith("{") || !nbt.endsWith("}")) return null
+                "nbt=$nbt"
+            }
+            "entity" -> {
+                if (convertedTokens.size != 3 || convertedTokens[1] != "entity") return null
+                val selector = convertedTokens[2]
+                if (!selector.startsWith("@s[") || !selector.endsWith("]")) return null
+                val body = selector.substringAfter('[').dropLast(1)
+                if (body.isBlank() || "hasitem=" in body) return null
+                val params = ExecCondSupport.splitTopLevel(body, ',')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                // limit/sort/c 是“选几个/按什么排序”，不是实体属性；x/y/z 会改变选择器原点，
+                // 折进收信人选择器会影响其它参数/后续条件，必须走 tag。
+                if (params.any {
+                        it.substringBefore('=').trim() in setOf("limit", "sort", "c", "x", "y", "z")
+                    }
+                ) {
+                    return null
+                }
+                val spatial = setOf("distance", "dx", "dy", "dz")
+                if (posChanged && params.any { it.substringBefore('=').trim() in spatial }) return null
+                // predicate= 在选择器里和 execute if predicate 的执行上下文不完全一致，保守地不折。
+                if (params.any { it.substringBefore('=').trim() == "predicate" }) return null
+                params.joinToString(",")
+            }
+            else -> null
+        }
+    }
+
+    /**
+     * 把参数并进选择器；scores 合并，tag 可重复，其余同名参数冲突时返回 null（调用方改走 tag）。
+     */
+    private fun appendSelectorParam(selector: String, param: String): String? {
+        if (param.isBlank()) return selector
+        val varName = selector.substringBefore('[').trim()
+        if (!varName.startsWith("@")) return null
+        val existing = if ('[' in selector && selector.endsWith("]")) {
+            ExecCondSupport.splitTopLevel(selector.substringAfter('[').dropLast(1), ',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toMutableList()
+        } else {
+            mutableListOf()
+        }
+
+        for (p in ExecCondSupport.splitTopLevel(param, ',')) {
+            val entry = p.trim()
+            if (entry.isEmpty()) continue
+            val key = entry.substringBefore('=').trim()
+            if (key == "scores") {
+                val newContent = entry.substringAfter("scores=").trim().removeSurrounding("{", "}")
+                val newEntries = ExecCondSupport.splitTopLevel(newContent, ',')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                val idx = existing.indexOfFirst { it.startsWith("scores=") }
+                if (idx >= 0) {
+                    val oldContent = existing[idx].substringAfter("scores=").trim().removeSurrounding("{", "}")
+                    val oldEntries = ExecCondSupport.splitTopLevel(oldContent, ',')
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                    val oldKeys = oldEntries.map { it.substringBefore('=').trim() }.toSet()
+                    if (newEntries.any { it.substringBefore('=').trim() in oldKeys }) return null
+                    existing[idx] = "scores={${(oldEntries + newEntries).joinToString(",")}}"
+                } else {
+                    existing.add("scores={${newEntries.joinToString(",")}}")
+                }
+            } else if (key == "tag") {
+                existing.add(entry)
+            } else {
+                if (existing.any { it.substringBefore('=').trim() == key }) return null
+                existing.add(entry)
+            }
+        }
+        return if (existing.isEmpty()) varName else "$varName[${existing.joinToString(",")}]"
     }
 
     private fun withTags(selector: String, tags: List<String>): String {

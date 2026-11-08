@@ -140,6 +140,22 @@ class WithArgDraftCodecTest {
     }
 
     @Test
+    fun nestedNullWithRejectedAtAnyDepth() {
+        val bads = listOf(
+            """[{"translate":"k","with":[null]}]""",
+            """[{"translate":"k","with":[{"translate":"n","with":[null]}]}]"""
+        )
+        for (bad in bads) {
+            assertThrows(bad, WithArgCodec.WithArgsFormatException::class.java) {
+                WithArgCodec.normalizeArgsJson(bad)
+            }
+            assertThrows(bad, WithArgCodec.WithArgsFormatException::class.java) {
+                WithArgCodec.parseArgs(bad)
+            }
+        }
+    }
+
+    @Test
     fun prettyPrintParsesBackToSameJson() {
         val args = listOf(
             WithArgDraft.Translate("k", args = listOf(WithArgDraft.Text("a", bold = true))),

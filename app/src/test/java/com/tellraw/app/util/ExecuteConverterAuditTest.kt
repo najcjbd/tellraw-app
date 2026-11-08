@@ -36,56 +36,278 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
-    fun multiCommandTagPlanBuildsAddTellrawRemove() {
+    fun multiCommandTagPlanFoldsSelectorExpressibleConditionsAndCarriesPrefix() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
-            "execute as @a if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}",
-            Direction.JAVA_TO_BEDROCK,
+            "execute as @a at @s " +
+                "if items entity @s hotbar.* minecraft:diamond " +
+                "if score @s kills matches 5.. " +
+                "if data entity @s {foo:1b} " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
             tellrawTarget = "@s",
-            tellrawJson = "{\"text\":\"x\"}",
+            tellrawJson = "{\"text\":\"ok\"}",
             requireUnmergeable = false,
             tagSuffix = "test"
         )
         requireNotNull(plan)
-        assertEquals(5, plan.commands.size)
-        assertTrue(plan.commands[0], plan.commands[0].contains("run tag @s add tellraw_a1_test"))
-        assertTrue(plan.commands[1], plan.commands[1].contains("run tag @s add tellraw_a2_test"))
-        assertTrue(plan.commands[2], plan.commands[2].startsWith("tellraw @a[tag=tellraw_a1_test,tag=tellraw_a2_test]"))
-        assertTrue(plan.commands[3], plan.commands[3].contains("remove tellraw_a1_test"))
-        assertTrue(plan.commands[4], plan.commands[4].contains("remove tellraw_a2_test"))
+        // predicate 属顺序/随机敏感条件：整链 tag，保持原链求值次数与顺序
+        assertEquals(1, plan.tags.size)
+        assertEquals(3, plan.commands.size)
+        assertTrue(
+            plan.commands[0],
+            plan.commands[0].startsWith(
+                "execute as @a at @s if items entity @s hotbar.* minecraft:diamond " +
+                    "if score @s kills matches 5.. if data entity @s {foo:1b} " +
+                    "if predicate my:is_special run tag @s add tellraw_all_test"
+            )
+        )
+        assertEquals(
+            "execute as @e[tag=tellraw_all_test] run tellraw @s {\"text\":\"ok\"}",
+            plan.commands[1]
+        )
+        assertEquals("tag @e[tag=tellraw_all_test] remove tellraw_all_test", plan.commands[2])
     }
 
     @Test
-    fun multiCommandTagPlanRejectsUnsafeBasesAndSanitizesTags() {
-        val conditions = "if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}"
-        assertNull(
-            ExecuteConverter.buildMultiCommandTagPlan(
-                "execute as @a[tag=base] $conditions", Direction.JAVA_TO_BEDROCK,
-                "@s", "{\"text\":\"x\"}", requireUnmergeable = false
-            )
-        )
-        assertNull(
-            ExecuteConverter.buildMultiCommandTagPlan(
-                "execute as @e $conditions", Direction.JAVA_TO_BEDROCK,
-                "@s", "{\"text\":\"x\"}", requireUnmergeable = false
-            )
-        )
+    fun multiCommandTagPlanNotUsedWhenEverythingFoldsIntoSelector() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
-            "execute as @a $conditions", Direction.JAVA_TO_BEDROCK,
+            "execute as @a if score @s kills matches 5.. if data entity @s {foo:1b}",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false
+        )
+        assertNull(plan)
+    }
+
+    @Test
+    fun allOnRelationsAndSummonAreParsed() {
+        val relations = listOf(
+            "attacker", "controller", "leasher", "origin", "owner", "passengers", "target", "vehicle"
+        )
+        for (relation in relations) {
+            val (out, _) = conv("execute on $relation if score @s obj matches 1..2")
+            assertEquals(
+                "execute on $relation if score @s obj matches 1..2",
+                out
+            )
+        }
+        val (summoned, _) = conv("execute summon minecraft:pig if score @s obj matches 1..2")
+        assertEquals(
+            "execute summon minecraft:pig if score @s obj matches 1..2",
+            summoned
+        )
+
+        val (_, invalidOn) = conv("execute on bogus if score @s obj matches 1..2")
+        assertTrue(invalidOn.any { it.contains("未知的 on 关系") })
+
+        val (_, bedrockOn) = convDir(
+            "execute on owner if score @s obj matches 1..2",
+            Direction.JAVA_TO_BEDROCK
+        )
+        assertTrue(bedrockOn.any { it.contains("基岩 execute 没有 \"on\"") })
+    }
+
+    @Test
+    fun nonSelfTargetFoldsIntoExecutorAndRunsTellrawPerExecutor() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "fold"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[1].startsWith("execute as @a[nbt={foo:1b},tag=tellraw_a1_fold] run tellraw @a"))
+        assertTrue(plan.commands[2].startsWith("tag @a[tag=tellraw_a1_fold] remove"))
+        assertTrue(plan.warnings.any { it.contains("重复执行") })
+    }
+
+    @Test
+    fun onExecutorUsesFinalExecutorTag() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a on owner at @s if items entity @s hotbar.* minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "on"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].startsWith("execute as @a on owner at @s if items entity @s"))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_on] run tellraw @s"))
+        assertTrue(plan.commands[2].startsWith("tag @e[tag=tellraw_all_on] remove"))
+    }
+
+    @Test
+    fun onExecutorTagsRecipientSelectorWhenTargetIsNotS() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a on owner if items entity @s hotbar.* minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "on"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].contains("run tag @s add tellraw_all_on"))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_on] run tellraw @a"))
+        assertTrue(plan.commands[2].startsWith("tag @e[tag=tellraw_all_on] remove"))
+    }
+
+    @Test
+    fun selfSelectorWithParamsFallsBackToSingleChain() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s[tag=x]",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "self"
+        )
+        assertNull(plan)
+    }
+
+    @Test
+    fun randomOrLimitedBaseUsesWholeChainTag() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @r if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "r"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].startsWith("execute as @r "))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_r] run tellraw @s"))
+    }
+
+    @Test
+    fun multipleAsUsesFinalExecutorTag() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a as @e[type=zombie] if items entity @s weapon.mainhand minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "as"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].startsWith("execute as @a as @e[type=zombie] if items entity @s"))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag="))
+        assertTrue(plan.commands[2].startsWith("tag @e[tag="))
+    }
+
+    @Test
+    fun interleavedModifierUsesWholeChainTag() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond at @s " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "all"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.tags[0].startsWith("tellraw_all_"))
+        assertTrue(
+            plan.commands[0].startsWith(
+                "execute as @a if items entity @s hotbar.* minecraft:diamond at @s " +
+                    "if predicate my:is_special run tag @s add "
+            )
+        )
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_"))
+        assertTrue(plan.commands[2].startsWith("tag @e[tag=tellraw_all_"))
+    }
+
+    @Test
+    fun summonChainFallsBackToSingleCommandPlan() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a summon pig if items entity @s hotbar.* minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "summon"
+        )
+        assertNull(plan)
+    }
+
+    @Test
+    fun entityLimitIsNotFoldedIntoTellrawTarget() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if entity @s[limit=1] if items entity @s hotbar.* minecraft:diamond",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "test"
+        )
+        requireNotNull(plan)
+        // limit 是“选几个”，不能折进最终执行者选择器，否则只会发给一个实体
+        assertFalse(plan.commands.any { it.contains("limit=") && it.contains("run tellraw") })
+        assertTrue(plan.commands[2].startsWith("execute as @a[tag="))
+        assertTrue(plan.commands[2].contains(" run tellraw @s "))
+    }
+
+    @Test
+    fun multiCommandTagPlanAllowsSelectorParamsAndEntityBase() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @e[type=zombie] if items entity @s weapon.mainhand minecraft:diamond " +
+                "unless predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "test"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.commands[0].startsWith("execute as @e[type=zombie] if items entity @s"))
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag="))
+        assertTrue(plan.commands.last().startsWith("tag @e[tag="))
+    }
+
+    @Test
+    fun multiCommandTagPlanPreservesNonPlayerRecipientSelector() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@e",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "test"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[1].startsWith("execute as @e[tag="))
+        assertTrue(plan.commands[1].contains(" run tellraw @e "))
+        assertTrue(plan.warnings.any { it.contains("可能包含非玩家") })
+    }
+
+    @Test
+    fun multiCommandTagPlanAllowsBaseParamsAndSanitizesTags() {
+        val conditions = "if items entity @s hotbar.* minecraft:diamond unless predicate my:is_special " +
+            "run tellraw @s {\"text\":\"x\"}"
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a[tag=base] $conditions", Direction.BEDROCK_TO_JAVA,
             "@s", "{\"text\":\"x\"}", requireUnmergeable = false, tagSuffix = "a b:c"
         )
         requireNotNull(plan)
+        assertTrue(plan.commands[0].startsWith("execute as @a[tag=base] "))
         assertTrue(plan.tags.all { it.matches(Regex("[A-Za-z0-9_]+")) })
-    }
-
-    @Test
-    fun multiCommandTagPlanOnlyForUnmergeableByDefault() {
-        val plan = ExecuteConverter.buildMultiCommandTagPlan(
-            "execute as @a if entity @s[tag=x] unless entity @s[tag=y] run tellraw @s {\"text\":\"x\"}",
-            Direction.JAVA_TO_BEDROCK,
-            tellrawTarget = "@s",
-            tellrawJson = "{\"text\":\"x\"}"
-        )
-        assertNull(plan)
     }
 
     @Test

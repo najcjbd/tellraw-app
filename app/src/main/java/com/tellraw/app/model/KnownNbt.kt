@@ -7,7 +7,11 @@ package com.tellraw.app.model
  */
 object KnownNbt {
 
-    enum class Kind { BOOL, BYTE, FLOAT, INT, STRING, LIST, COMPOUND }
+    /**
+     * INT = 旧目录沿用的 short 写法（写回 `xxx s`）；INT32 = 真正的 int（无后缀）。
+     * 新增真 int 键请用 INT32，不要复用 INT。
+     */
+    enum class Kind { BOOL, BYTE, FLOAT, INT, INT32, STRING, LIST, COMPOUND }
 
     data class Spec(val key: String, val label: String, val kind: Kind, val hint: String = "")
 
@@ -49,6 +53,7 @@ object KnownNbt {
             }
             Kind.BYTE -> t.toLongOrNull()?.let { "${it}b" } ?: "\"$t\""
             Kind.INT -> t.toLongOrNull()?.let { "${it}s" } ?: "\"$t\""
+            Kind.INT32 -> t.toLongOrNull()?.toString() ?: "\"$t\""
             Kind.FLOAT -> t.toDoubleOrNull()?.let { "${it}f" } ?: "\"$t\""
             Kind.STRING -> "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
             Kind.LIST ->

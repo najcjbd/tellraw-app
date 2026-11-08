@@ -3,6 +3,7 @@ package com.tellraw.app.model
 import com.tellraw.app.util.ExecCondSupport
 import kotlin.math.abs
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 /**
  * 网格里的实体（供目标选择器求值）。
@@ -43,7 +44,9 @@ data class GridEntity(
     /** Java predicate：该实体匹配的谓词 ID 集合。 */
     val predicates: Set<String> = emptySet(),
     /** Java advancements：已完成的 `id` 或 `id|criterion`。 */
-    val advancements: Set<String> = emptySet()
+    val advancements: Set<String> = emptySet(),
+    /** execute on 关系：关系名 -> 实体 uid（passengers 可多个）。 */
+    val relations: Map<String, Set<String>> = emptyMap()
 ) {
     val isPlayer: Boolean get() = id == "minecraft:player"
 }
@@ -82,7 +85,8 @@ object SelectorEvaluator {
         edition: String = "java",
         version: Long? = null,
         origin: Triple<Double, Double, Double> = Triple(0.0, -60.0, 0.0),
-        target: VersionSpec? = null
+        target: VersionSpec? = null,
+        random: Random = Random.Default
     ): Result {
         val notes = mutableListOf<String>()
         // 同一条选择器里两版实体 ID 同时出现 -> 提醒（不改变求值，只提示可能写重/混用）
@@ -352,7 +356,8 @@ object SelectorEvaluator {
         val sorted = when (sort ?: defaultSort(base)) {
             "nearest" -> candidates.sortedBy { dist2(it, ox, oy, oz) }
             "furthest" -> candidates.sortedByDescending { dist2(it, ox, oy, oz) }
-            "random", "arbitrary" -> candidates
+            "random" -> candidates.shuffled(random)
+            "arbitrary" -> candidates
             else -> candidates
         }
         // @p/@r/@n 本身就是"一个目标"，没写 limit 时按 1 处理（@a/@e 不设默认上限）。
@@ -578,7 +583,8 @@ object SelectorEvaluator {
         if (inv.isNotEmpty()) m["Inventory"] = SnbtLite.Value.ListV(inv)
 
         e.items["weapon.mainhand"]?.let { item ->
-            m["SelectedItem"] = SnbtLite.Value.Compound(itemNbt(item))
+            // 实测 26.2/26.3：玩家主手在 SelectedItem；非玩家主手在 equipment.mainhand。
+            if (e.isPlayer) m["SelectedItem"] = SnbtLite.Value.Compound(itemNbt(item))
         }
         val eq = linkedMapOf<String, SnbtLite.Value>()
         for ((slot, item) in e.items) {
@@ -591,6 +597,7 @@ object SelectorEvaluator {
                 "armor.feet" -> "feet"
                 else -> null
             } ?: continue
+            if (e.isPlayer && slot == "weapon.mainhand") continue
             eq[key] = SnbtLite.Value.Compound(itemNbt(item))
         }
         if (eq.isNotEmpty()) m["equipment"] = SnbtLite.Value.Compound(eq)
