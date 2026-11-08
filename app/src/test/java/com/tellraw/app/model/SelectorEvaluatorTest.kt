@@ -91,8 +91,12 @@ class SelectorEvaluatorTest {
         )
         assertEquals(
             listOf("p1"),
-            sel("@a[nbt={equipment:{mainhand:{id:\"diamond_sword\"},head:{id:\"diamond_helmet\"}}}]")
+            sel("@a[nbt={equipment:{head:{id:\"diamond_helmet\"}}}]")
                 .matched.map { it.uid }
+        )
+        // 玩家主手不在 equipment.mainhand（26.2/26.3 实测），而在 SelectedItem
+        assertTrue(
+            sel("@a[nbt={equipment:{mainhand:{id:\"diamond_sword\"}}}]").matched.isEmpty()
         )
         assertEquals(
             listOf("p1"),
