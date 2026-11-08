@@ -1,5 +1,9 @@
 package com.tellraw.app.util
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.tellraw.app.model.EntityIdAliases
 import com.tellraw.app.model.SnbtLite
 
@@ -712,16 +716,61 @@ object ExecuteConverter {
         @Suppress("UNUSED_PARAMETER") requireUnmergeable: Boolean = false,
         tagSuffix: String? = null
     ): MultiCommandPlan? {
+        val suffix = makeTagSuffix(tagSuffix)
+        val warnings = mutableListOf<String>()
+        val recipient = planSelectorTag(
+            tellrawTarget, direction, "tellraw_recv_$suffix", nbtSyntax, warnings
+        )
+        val message = planMessageSelectors(
+            tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings
+        )
+        val executor = buildExecutorTagPlan(
+            prefix, direction, recipient.selector, message.json,
+            nbtSyntax, suffix, warnings
+        )
+        if (executor != null) {
+            return MultiCommandPlan(
+                commands = recipient.commands + message.commands +
+                    executor.commands + recipient.cleanup + message.cleanup,
+                tags = executor.tags + recipient.tags + message.tags,
+                warnings = warnings
+            )
+        }
+        if (recipient.tags.isEmpty() && message.tags.isEmpty()) return null
+
+        // 没有执行者 tag，但只要执行者链能在目标版本单链表达，就保留单链。
+        val converted = convertExecutePrefix(prefix, direction, warnings, nbtSyntax) ?: return null
+        val finalLine = if (converted.isBlank() || converted == "execute") {
+            "tellraw ${recipient.selector} ${message.json}"
+        } else {
+            "$converted run tellraw ${recipient.selector} ${message.json}"
+        }
+        warnings.add("收信人/消息 selector 使用了 tag，但执行者链未拆 tag：已保留单链，请核对等价性")
+        return MultiCommandPlan(
+            commands = recipient.commands + message.commands + finalLine +
+                recipient.cleanup + message.cleanup,
+            tags = recipient.tags + message.tags,
+            warnings = warnings.distinct()
+        )
+    }
+
+    private fun buildExecutorTagPlan(
+        prefix: String,
+        direction: Direction,
+        tellrawTarget: String,
+        tellrawJson: String,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        suffix: String,
+        warnings: MutableList<String>
+    ): MultiCommandPlan? {
         val parseReminders = mutableListOf<String>()
         val rawSegs = parseSegments(prefix, parseReminders) ?: return null
         if (rawSegs.filterIsInstance<Seg.Cond>().size < 2) return null
         val target = tellrawTarget.trim()
-        // @s[...] / @p / @n / @r / 距离坐标目标需要原执行上下文；独立 final execute 无法保证同一上下文。
         if (target.startsWith("@s[") || !target.startsWith("@") || targetRequiresOriginalContext(target)) {
             return null
         }
 
-        val warnings = mutableListOf<String>()
         warnings.addAll(parseReminders)
 
         // 先把修饰子命令里的选择器互转；转换产生的额外条件（如基岩 scores=!）
@@ -780,7 +829,7 @@ object ExecuteConverter {
         // 任何会重新抽取执行者/位置的修饰选择器（@r/@p/@n、limit/sort）都必须整链。
         if (mods.any { modifierNeedsWholeChain(it) }) {
             return buildWholeChainTagPlan(
-                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, suffix,
                 "修饰子命令选择器含 @r/@p/@n/limit/sort，逐条件 tag 会重新抽取执行者/位置"
             )
         }
@@ -788,7 +837,7 @@ object ExecuteConverter {
         val orderSensitive = setOf("function", "predicate", "stopwatch")
         if (conds.any { it.name in orderSensitive }) {
             return buildWholeChainTagPlan(
-                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, suffix,
                 "条件含 predicate/function/stopwatch，逐条件求值会改变随机/副作用/时序"
             )
         }
@@ -803,7 +852,7 @@ object ExecuteConverter {
         }
         if (modifierAfterCondition) {
             return buildWholeChainTagPlan(
-                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, suffix,
                 "检测到条件之间还有 as/on/at/... 修饰，无法逐条件求交"
             )
         }
@@ -841,7 +890,7 @@ object ExecuteConverter {
                     }
                     if (tokens.contains("as")) {
                         return buildWholeChainTagPlan(
-                            prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, tagSuffix,
+                            prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, suffix,
                             "条件转换生成了额外的 as，无法逐条件求交"
                         )
                     }
@@ -861,7 +910,6 @@ object ExecuteConverter {
 
         if (tagEntries.isEmpty() || tagEntries.size + folded < 2) return null
 
-        val suffix = makeTagSuffix(tagSuffix)
         val tags = tagEntries.indices.map { "tellraw_a${it + 1}_$suffix" }
         val commands = mutableListOf<String>()
         tagEntries.forEachIndexed { index, (tokens, prefixTokens) ->
@@ -957,6 +1005,106 @@ object ExecuteConverter {
             )
         }
         return MultiCommandPlan(commands, listOf(tag), warnings)
+    }
+
+    private data class SelectorTagResult(
+        val selector: String,
+        val commands: List<String>,
+        val cleanup: List<String>,
+        val tags: List<String>
+    )
+
+    private data class MessageTagResult(
+        val json: String,
+        val commands: List<String>,
+        val cleanup: List<String>,
+        val tags: List<String>
+    )
+
+    /**
+     * 收信人/消息内 selector 的按需 tag：
+     * 只把目标版本选择器表达不了的否定条件拆成 execute 条件，命中实体打 tag，
+     * selector 改写为 base[tag=...]（@p/@n/@r 改写为 @e[tag=...] 避免二次抽样）。
+     */
+    private fun planSelectorTag(
+        selector: String,
+        direction: Direction,
+        tag: String,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        warnings: MutableList<String>
+    ): SelectorTagResult {
+        val original = selector.trim()
+        val unchanged = SelectorTagResult(original, emptyList(), emptyList(), emptyList())
+        if (direction != Direction.BEDROCK_TO_JAVA) return unchanged
+        if (!original.startsWith("@") || original.startsWith("@s")) return unchanged
+        val neg = bedrockSelectorNegation(original, warnings, nbtSyntax = nbtSyntax) ?: return unchanged
+        val (base, condTokens) = neg
+        if (condTokens.isEmpty() || !base.startsWith("@")) return unchanged
+        if (condTokens.contains("as")) {
+            warnings.add("selector $original 的条件转换生成了 as，无法安全打 tag")
+            return unchanged
+        }
+        val baseVar = base.substringBefore('[')
+        if (baseVar == "@s") return unchanged
+        val finalBase = if (baseVar in setOf("@p", "@n", "@r")) "@e" else base
+        val taggedSelector = appendSelectorParam(finalBase, "tag=$tag") ?: return unchanged
+        val command = "execute as $base ${condTokens.joinToString(" ")} run tag @s add $tag"
+        val cleanup = "tag ${appendSelectorParam(finalBase, "tag=$tag") ?: return unchanged} remove $tag"
+        warnings.add("selector $original 的目标版本否定条件已拆 tag：$tag")
+        return SelectorTagResult(
+            selector = taggedSelector,
+            commands = listOf(command),
+            cleanup = listOf(cleanup),
+            tags = listOf(tag)
+        )
+    }
+
+    /** 递归改写 tellraw 消息 JSON 内所有 selector 组件。 */
+    private fun planMessageSelectors(
+        json: String,
+        direction: Direction,
+        tagPrefix: String,
+        suffix: String,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        warnings: MutableList<String>
+    ): MessageTagResult {
+        val root = try {
+            JsonParser.parseString(json)
+        } catch (e: Exception) {
+            warnings.add("tellraw 消息 JSON 无法解析，消息内 selector 未处理")
+            return MessageTagResult(json, emptyList(), emptyList(), emptyList())
+        }
+        val commands = mutableListOf<String>()
+        val cleanup = mutableListOf<String>()
+        val tags = mutableListOf<String>()
+        var index = 0
+
+        fun visit(element: JsonElement) {
+            when {
+                element.isJsonObject -> {
+                    val obj = element.asJsonObject
+                    val selectorEl = obj.get("selector")
+                    if (selectorEl != null && selectorEl.isJsonPrimitive && selectorEl.asJsonPrimitive.isString) {
+                        val tag = "${tagPrefix}_${index}_$suffix"
+                        val plan = planSelectorTag(
+                            selectorEl.asString, direction, tag, nbtSyntax, warnings
+                        )
+                        if (plan.tags.isNotEmpty()) {
+                            obj.addProperty("selector", plan.selector)
+                            commands.addAll(plan.commands)
+                            cleanup.addAll(plan.cleanup)
+                            tags.addAll(plan.tags)
+                            index++
+                        }
+                    }
+                    obj.entrySet().forEach { visit(it.value) }
+                }
+                element.isJsonArray -> element.asJsonArray.forEach { visit(it) }
+            }
+        }
+        visit(root)
+        if (tags.isEmpty()) return MessageTagResult(json, emptyList(), emptyList(), emptyList())
+        return MessageTagResult(root.toString(), commands, cleanup, tags)
     }
 
     private fun makeTagSuffix(tagSuffix: String?): String {

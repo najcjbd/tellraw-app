@@ -173,6 +173,75 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
+    fun recipientSelectorGetsItsOwnTagSet() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a[scores={n=!5}]",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "recv"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.tags.contains("tellraw_recv_recv"))
+        assertTrue(plan.commands.any { it.contains("run tag @s add tellraw_recv_recv") })
+        assertTrue(plan.commands.any { it.contains("tellraw @a[tag=tellraw_recv_recv]") })
+        assertTrue(plan.commands.any { it.contains("remove tellraw_recv_recv") })
+    }
+
+    @Test
+    fun messageSelectorGetsItsOwnTagSetAndJsonIsRewritten() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"目标：\",\"extra\":[{\"selector\":\"@a[scores={n=!5}]\"}]}",
+            requireUnmergeable = false,
+            tagSuffix = "msg"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.tags.contains("tellraw_msg_0_msg"))
+        assertTrue(plan.commands.any { it.contains("run tag @s add tellraw_msg_0_msg") })
+        assertTrue(plan.commands.any { it.contains("\"selector\":\"@a[tag=tellraw_msg_0_msg]\"") })
+        assertTrue(plan.commands.any { it.contains("remove tellraw_msg_0_msg") })
+    }
+
+    @Test
+    fun executorRecipientAndMessageSelectorsUseSeparateTags() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a[scores={n=!5}]",
+            tellrawJson = "{\"text\":\"目标：\",\"extra\":[{\"selector\":\"@a[scores={n=!5}]\"}]}",
+            requireUnmergeable = false,
+            tagSuffix = "multi"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.tags.any { it.startsWith("tellraw_a") })
+        assertTrue(plan.tags.contains("tellraw_recv_multi"))
+        assertTrue(plan.tags.contains("tellraw_msg_0_multi"))
+        assertTrue(plan.commands.any { it.contains("tellraw @a[tag=tellraw_recv_multi]") })
+        assertTrue(plan.commands.any { it.contains("\"selector\":\"@a[tag=tellraw_msg_0_multi]\"") })
+        assertTrue(plan.commands.any { it.contains("remove tellraw_recv_multi") })
+        assertTrue(plan.commands.any { it.contains("remove tellraw_msg_0_multi") })
+    }
+
+    @Test
+    fun selectorOnlyTagsKeepStandaloneExecutorChain() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a[scores={n=!5}]",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "only"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.tags.contains("tellraw_recv_only"))
+        assertTrue(plan.commands.any { it.contains("execute as @a run tellraw @a[tag=tellraw_recv_only]") })
+    }
+
+    @Test
     fun nonSelfTargetFoldsIntoExecutorAndRunsTellrawPerExecutor() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a if items entity @s hotbar.* minecraft:diamond if data entity @s {foo:1b}",
