@@ -149,4 +149,23 @@ class TranslateComponentTest {
         assertEquals("100%", TranslatePreview.render("100%%", emptyList()))
     }
 
+
+    @Test
+    fun bedrockSupportsSnowballMenuConditionalRawtext() {
+        val comp = TextComponent(
+            ComponentType.TRANSLATE, "%%2『传送主城』",
+            mutableListOf(
+                SubComponent(
+                    SubComponentType.WITH_JSON,
+                    """[{"selector":"@s[scores={menu=1}]"},{"text":"   §g➮§c"},{"text":"§r     "}]"""
+                )
+            )
+        )
+        val bedrock = TextComponentHelper.convertToBedrockJson(listOf(comp))
+        assertTrue(bedrock, bedrock.contains("%%2『传送主城』"))
+        assertTrue(bedrock, bedrock.contains("\"with\":{\"rawtext\""))
+        assertTrue(bedrock, bedrock.contains("@s[scores={menu=1}]"))
+        assertTrue(bedrock, bedrock.contains("§g➮§c"))
+    }
+
 }

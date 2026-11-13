@@ -2056,6 +2056,9 @@ object TextComponentHelper {
         o.get("extra")?.takeIf { it.isJsonArray }?.let { ex ->
             for (e in ex.asJsonArray) sb.append(jsonPlainText(e))
         }
+        o.get("rawtext")?.takeIf { it.isJsonArray }?.let { ex ->
+            for (e in ex.asJsonArray) sb.append(jsonPlainText(e))
+        }
         return sb.toString()
     }
 
@@ -2110,6 +2113,10 @@ object TextComponentHelper {
                     .firstOrNull { o.has(it) }
                 if (unsupportedStyle != null) {
                     warnings?.add("基岩 with 的嵌套组件样式未保留（$unsupportedStyle）")
+                }
+                // 兼容已经写成基岩 rawtext 对象的嵌套组件。
+                o.get("rawtext")?.takeIf { it.isJsonArray }?.let {
+                    jsonWithToBedrock(it, warnings, out)
                 }
                 when {
                     o.has("text") -> {
