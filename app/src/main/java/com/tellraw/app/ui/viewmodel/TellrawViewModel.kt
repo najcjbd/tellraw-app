@@ -2220,9 +2220,22 @@ class TellrawViewModel @Inject constructor(
      * 光标命中已有 translate 时编辑它；否则应用时在光标处新建。
      */
     fun openWithBuilder(insertPosition: Int) {
+        openWithBuilderInternal(insertPosition, forcedTranslateOrdinal = null)
+    }
+
+    /** 点击 TranslateN 令牌时按序号强制选中，避免相邻组件在边界位置命中前一个。 */
+    fun openWithBuilderForTranslate(insertPosition: Int, ordinal: Int) {
+        openWithBuilderInternal(insertPosition, forcedTranslateOrdinal = ordinal)
+    }
+
+    private fun openWithBuilderInternal(insertPosition: Int, forcedTranslateOrdinal: Int?) {
         val markers = _messageInputWithMarkers.value
         val components = TextComponentHelper.parseTextComponents(markers)
-        val index = TextComponentHelper.findTranslateIndexAt(components, insertPosition)
+        val index = forcedTranslateOrdinal?.let { wanted ->
+            components.withIndex()
+                .filter { it.value.type == TextComponentHelper.ComponentType.TRANSLATE }
+                .getOrNull(wanted - 1)?.index
+        } ?: TextComponentHelper.findTranslateIndexAt(components, insertPosition)
         val component = index?.let { components[it] }
         val key = component?.content.orEmpty()
         val fallbackSub = component?.subComponents

@@ -634,7 +634,9 @@ private fun PortraitLayout(
                 if (simpleTranslate) {
                     TranslateTokenBar(
                         markers = messageMarkers,
-                        onOpen = { position -> viewModel.openWithBuilder(position) }
+                        onOpen = { position, ordinal ->
+                            viewModel.openWithBuilderForTranslate(position, ordinal)
+                        }
                     )
                 }
                 TextButton(onClick = onOpenTellrawPreview) {
@@ -937,7 +939,7 @@ private fun TellrawPreviewDialog(
 }
 
 @Composable
-private fun TranslateTokenBar(markers: String, onOpen: (Int) -> Unit) {
+private fun TranslateTokenBar(markers: String, onOpen: (Int, Int) -> Unit) {
     val tokens = remember(markers) {
         TextComponentHelper.componentTokens(markers)
             .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
@@ -957,7 +959,7 @@ private fun TranslateTokenBar(markers: String, onOpen: (Int) -> Unit) {
         ) {
             tokens.forEach { token ->
                 AssistChip(
-                    onClick = { onOpen(token.start) },
+                    onClick = { onOpen(token.start, token.ordinal) },
                     label = {
                         Text(stringResource(R.string.translate_token_label, token.ordinal))
                     },
@@ -1135,7 +1137,9 @@ private fun LandscapeLayout(
                         if (simpleTranslate) {
                             TranslateTokenBar(
                                 markers = messageMarkers,
-                                onOpen = { position -> viewModel.openWithBuilder(position) }
+                                onOpen = { position, ordinal ->
+                                    viewModel.openWithBuilderForTranslate(position, ordinal)
+                                }
                             )
                         }
                                                 TextButton(onClick = onOpenTellrawPreview) {
