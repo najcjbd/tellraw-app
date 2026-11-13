@@ -719,6 +719,26 @@ object ExecuteConverter {
     ): MultiCommandPlan? {
         val suffix = makeTagSuffix(tagSuffix)
         val warnings = mutableListOf<String>()
+        if (hasConditionalRawtext(tellrawJson)) {
+            warnings.add("消息含 Bedrock conditional with.rawtext；不进入多链 tag，保留原单链/条件结构")
+            return null
+        }
+        val candidate = planRecipientCandidate(
+            prefix, tellrawTarget, tellrawJson, direction, suffix, nbtSyntax, warnings, filterJavaSelector
+        )
+        if (candidate != null) {
+            val message = planMessageSelectors(
+                tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings,
+                filterJavaSelector
+            )
+            if (message.unsafe) return null
+            return MultiCommandPlan(
+                commands = candidate.pre + message.commands + candidate.finalLine +
+                    candidate.cleanup + message.cleanup,
+                tags = candidate.tags + message.tags,
+                warnings = warnings.distinct()
+            )
+        }
         val recipient = planSelectorTag(
             tellrawTarget, direction, "tellraw_recv_$suffix", nbtSyntax, warnings,
             filterJavaSelector
@@ -1069,6 +1089,13 @@ object ExecuteConverter {
         return MultiCommandPlan(commands, listOf(tag), warnings)
     }
 
+    private data class RecipientCandidatePlan(
+        val pre: List<String>,
+        val finalLine: String,
+        val cleanup: List<String>,
+        val tags: List<String>
+    )
+
     private data class SelectorTagResult(
         val selector: String,
         val commands: List<String>,
@@ -1090,6 +1117,70 @@ object ExecuteConverter {
      * 只把目标版本选择器表达不了的否定条件拆成 execute 条件，命中实体打 tag，
      * selector 改写为 base[tag=...]（@p/@n/@r 改写为 @e[tag=...] 避免二次抽样）。
      */
+    /**
+     * @p/@n/@r 收信人带否定条件时，先抽样一个 candidate，再对 candidate 做条件判断。
+     * 这样不会变成“先筛全部再随机”。
+     */
+    private fun hasConditionalRawtext(json: String): Boolean {
+        val root = runCatching { JsonParser.parseString(json) }.getOrNull() ?: return false
+        fun scan(el: com.google.gson.JsonElement): Boolean {
+            return when {
+                el.isJsonArray -> el.asJsonArray.any { scan(it) }
+                el.isJsonObject -> {
+                    val o = el.asJsonObject
+                    val with = o.get("with")
+                    (with != null && with.isJsonObject && with.asJsonObject.has("rawtext")) ||
+                        o.entrySet().any { scan(it.value) }
+                }
+                else -> false
+            }
+        }
+        return scan(root)
+    }
+
+    private fun planRecipientCandidate(
+        prefix: String,
+        target: String,
+        tellrawJson: String,
+        direction: Direction,
+        suffix: String,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        warnings: MutableList<String>,
+        filterJavaSelector: ((String) -> String)? = null
+    ): RecipientCandidatePlan? {
+        if (direction != Direction.BEDROCK_TO_JAVA) return null
+        val raw = target.trim()
+        val varName = raw.substringBefore('[')
+        if (varName !in setOf("@p", "@n", "@r")) return null
+        val (base, condTokens) = bedrockSelectorNegation(raw, warnings, nbtSyntax = nbtSyntax)
+            ?: return null
+        if (condTokens.isEmpty() || !base.startsWith("@")) return null
+        val filteredBase = filterJavaSelector?.invoke(base)?.trim()?.takeIf { it.startsWith("@") } ?: base
+        val cand = "tellraw_cand_$suffix"
+        val recv = "tellraw_recv_$suffix"
+        val pre = listOf(
+            if (prefix.isBlank()) "tag $filteredBase add $cand"
+            else "$prefix run tag $filteredBase add $cand",
+            if (prefix.isBlank()) "execute as @e[tag=$cand] ${condTokens.joinToString(" ")} run tag @s add $recv"
+            else "$prefix as @e[tag=$cand] ${condTokens.joinToString(" ")} run tag @s add $recv"
+        )
+        val finalLine = if (prefix.isBlank()) {
+            "tellraw @e[tag=$recv] $tellrawJson"
+        } else {
+            "$prefix run tellraw @e[tag=$recv] $tellrawJson"
+        }
+        warnings.add("收信人 $raw 使用 candidate 预采样 tag：先抽一个目标，再判断否定条件")
+        return RecipientCandidatePlan(
+            pre = pre,
+            finalLine = finalLine,
+            cleanup = listOf(
+                "tag @e[tag=$cand] remove $cand",
+                "tag @e[tag=$recv] remove $recv"
+            ),
+            tags = listOf(cand, recv)
+        )
+    }
+
     private fun planSelectorTag(
         selector: String,
         direction: Direction,

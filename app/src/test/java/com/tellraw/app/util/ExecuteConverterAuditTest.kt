@@ -488,22 +488,24 @@ class ExecuteConverterAuditTest {
 
     @Test
     fun recipientSelectorsThatNeedOriginalContextFallBack() {
+        val prefix = "execute as @a if items entity @s hotbar.* minecraft:diamond " +
+            "if predicate my:is_special"
+        for (target in listOf("@p[scores={n=!5}]", "@n[scores={n=!5}]", "@r[scores={n=!5}]")) {
+            val plan = ExecuteConverter.buildMultiCommandTagPlan(
+                prefix, Direction.BEDROCK_TO_JAVA, target,
+                "{\"text\":\"ok\"}", tagSuffix = "ctx"
+            )
+            requireNotNull(plan)
+            assertTrue(plan.commands.any { it.contains("tag @p") || it.contains("tag @n") || it.contains("tag @r") })
+        }
         for (target in listOf(
-            "@p[scores={n=!5}]",
-            "@n[scores={n=!5}]",
-            "@r[scores={n=!5}]",
             "@a[distance=..5,scores={n=!5}]",
             "@a[limit=1,scores={n=!5}]",
             "@a[sort=nearest,scores={n=!5}]"
         )) {
             val plan = ExecuteConverter.buildMultiCommandTagPlan(
-                "execute as @a if items entity @s hotbar.* minecraft:diamond " +
-                    "if predicate my:is_special",
-                Direction.BEDROCK_TO_JAVA,
-                tellrawTarget = target,
-                tellrawJson = "{\"text\":\"ok\"}",
-                requireUnmergeable = false,
-                tagSuffix = "ctx"
+                prefix, Direction.BEDROCK_TO_JAVA, target,
+                "{\"text\":\"ok\"}", tagSuffix = "ctx"
             )
             assertNull("$target 不应拆出会二次抽样的 tag", plan)
         }
@@ -604,6 +606,19 @@ class ExecuteConverterAuditTest {
         requireNotNull(plan)
         val finalLine = plan.commands.first { it.contains("run tellraw") }
         assertTrue(finalLine, finalLine.contains("at @s") && finalLine.contains("if entity @s[tag="))
+    }
+
+
+    @Test
+    fun conditionalRawtextDoesNotEnterTagPlan() {
+        val json = "{\"rawtext\":[{\"translate\":\"%%2\",\"with\":{" +
+            "\"rawtext\":[{\"selector\":\"@s[scores={menu=1}]\"},{\"text\":\"x\"}]}}]}"
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            "@a", json, tagSuffix = "condraw"
+        )
+        assertNull(plan)
     }
 
 }
