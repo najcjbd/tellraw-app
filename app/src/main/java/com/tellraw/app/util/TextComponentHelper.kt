@@ -985,6 +985,9 @@ object TextComponentHelper {
                     val withSubComponent = withSubComponent(mainComponent, warnings)
                     if (withSubComponent != null) {
                         val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
+                        if (withSubComponent.content.contains("rawtext")) {
+                            warnings?.add("基岩 conditional with.rawtext 不能直接等价转 Java；请改用 execute/多条 tellraw 或保留基岩版")
+                        }
                         val items = parseWithItems(withSubComponent.content, jsonMode)
                         if (jsonMode && items.isEmpty() && withSubComponent.content.isNotBlank()) {
                             warnings?.add("with(JSON) 解析失败，已忽略该 with")
@@ -1097,6 +1100,9 @@ object TextComponentHelper {
                             val withSubComponent = withSubComponent(sub, warnings)
                             if (withSubComponent != null) {
                                 val jsonMode = withSubComponent.type == SubComponentType.WITH_JSON
+                        if (withSubComponent.content.contains("rawtext")) {
+                            warnings?.add("基岩 conditional with.rawtext 不能直接等价转 Java；请改用 execute/多条 tellraw 或保留基岩版")
+                        }
                                 val items = parseWithItems(withSubComponent.content, jsonMode)
                                 if (jsonMode && items.isEmpty() && withSubComponent.content.isNotBlank()) {
                                     warnings?.add("with(JSON) 解析失败，已忽略该 with")
