@@ -54,6 +54,8 @@ jobs:
             sleep 2
             adb exec-out screencap -p > 03-simple-translate-table.png
             adb shell input keyevent 4
+            adb shell am start -n com.tellraw.app/.MainActivity
+            sleep 3
             adb shell input tap 597 184
             sleep 3
             adb exec-out screencap -p > 04-grid.png
