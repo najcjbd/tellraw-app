@@ -726,7 +726,7 @@ object ExecuteConverter {
         val message = planMessageSelectors(
             tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings,
             filterJavaSelector,
-            prefixChangesExecutionContext(prefix)
+            prefixChangesExecutionContext(prefix) && finalContext(prefix, "@e") == null
         )
         if (recipient.unsafe || message.unsafe) return null
         val executor = buildExecutorTagPlan(
@@ -759,6 +759,31 @@ object ExecuteConverter {
         )
     }
 
+    /**
+     * 把原 execute 前缀里的修饰子命令重放到最终 tellraw：
+     * - 只处理单个 as、且没有 on/summon 的常见链；
+     * - 把 as 的选择器替换为带 tag 的最终执行者；
+     * - 保留 at/positioned/rotated/facing/align/anchored/in 的原始顺序。
+     */
+    private fun finalContext(prefix: String, taggedExecutor: String): String? {
+        val segs = parseSegments(prefix, mutableListOf()) ?: return null
+        val mods = segs.filterIsInstance<Seg.Mod>()
+        if (mods.any { it.tokens.firstOrNull() in setOf("on", "summon") }) return null
+        val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
+        if (asMods.size != 1) return null
+        val tokens = mutableListOf<String>()
+        for (mod in mods) {
+            if (mod.tokens.firstOrNull() == "as") {
+                tokens.add("as")
+                tokens.add(taggedExecutor)
+            } else {
+                tokens.addAll(mod.tokens)
+            }
+        }
+        if (tokens.isEmpty()) return null
+        return "execute ${tokens.joinToString(" ")}"
+    }
+
     private fun buildExecutorTagPlan(
         prefix: String,
         direction: Direction,
@@ -772,7 +797,10 @@ object ExecuteConverter {
         val rawSegs = parseSegments(prefix, parseReminders) ?: return null
         if (rawSegs.filterIsInstance<Seg.Cond>().size < 2) return null
         val target = tellrawTarget.trim()
-        if (target.startsWith("@s[") || !target.startsWith("@") || targetRequiresOriginalContext(target)) {
+        val canReplayContext = finalContext(prefix, "@e") != null
+        if (target.startsWith("@s[") || !target.startsWith("@") ||
+            (targetRequiresOriginalContext(target) && !canReplayContext)
+        ) {
             return null
         }
 
@@ -821,8 +849,8 @@ object ExecuteConverter {
 
         // summon 每次生成新实体；无法在网格/独立 final 里确定，回退单链。
         if (mods.any { it.tokens.firstOrNull() == "summon" }) return null
-        // in 的维度作用域依赖 as/in 的先后；独立 final/cleanup 无法通用保真，回退单链。
-        if (mods.any { it.tokens.firstOrNull() == "in" }) return null
+        // in / 位置修饰能否重放由 finalContext 决定；不能重放时回退单链。
+        if (mods.any { it.tokens.firstOrNull() == "in" } && finalContext(prefix, "@e") == null) return null
 
         val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
         val asCount = asMods.size
@@ -929,8 +957,8 @@ object ExecuteConverter {
             finalExecutor, tags.joinToString(",") { "tag=$it" }
         ) ?: return null
         val dimension = lastInDimension(prefix)
-        val dimPrefix = dimension?.let { "in $it " }.orEmpty()
-        commands.add("execute ${dimPrefix}as $executorWithTags run tellraw $target $tellrawJson")
+        val finalExecute = finalContext(prefix, executorWithTags) ?: "execute as $executorWithTags"
+        commands.add("$finalExecute run tellraw $target $tellrawJson")
         tags.forEach { tag ->
             val cleanup = "tag ${withTags(executorBase, listOf(tag))} remove $tag"
             commands.add(
@@ -975,7 +1003,10 @@ object ExecuteConverter {
         reason: String
     ): MultiCommandPlan? {
         val target = tellrawTarget.trim()
-        if (!target.startsWith("@") || target.startsWith("@s[") || targetRequiresOriginalContext(target)) {
+        val canReplayContext = finalContext(prefix, "@e") != null
+        if (!target.startsWith("@") || target.startsWith("@s[") ||
+            (targetRequiresOriginalContext(target) && !canReplayContext)
+        ) {
             return null
         }
         val warningStart = warnings.size
@@ -989,11 +1020,11 @@ object ExecuteConverter {
         val tag = "tellraw_all_$suffix"
         val withTag = withTags("@e", listOf(tag))
         val dimension = lastInDimension(prefix)
-        val dimPrefix = dimension?.let { "in $it " }.orEmpty()
         val cleanup = "tag $withTag remove $tag"
+        val finalExecute = finalContext(prefix, withTag) ?: "execute as $withTag"
         val commands = listOf(
             "$converted run tag @s add $tag",
-            "execute ${dimPrefix}as $withTag run tellraw $target $tellrawJson",
+            "$finalExecute run tellraw $target $tellrawJson",
             if (dimension != null) "execute in $dimension run $cleanup" else cleanup
         )
         warnings.add(

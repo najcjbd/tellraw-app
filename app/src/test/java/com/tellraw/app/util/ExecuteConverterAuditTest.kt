@@ -62,7 +62,7 @@ class ExecuteConverterAuditTest {
             )
         )
         assertEquals(
-            "execute as @e[tag=tellraw_all_test] run tellraw @s {\"text\":\"ok\"}",
+            "execute as @e[tag=tellraw_all_test] at @s run tellraw @s {\"text\":\"ok\"}",
             plan.commands[1]
         )
         assertEquals("tag @e[tag=tellraw_all_test] remove tellraw_all_test", plan.commands[2])
@@ -109,7 +109,7 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
-    fun inDimensionFallsBackSingleChain() {
+    fun inDimensionIsCarriedIntoTagAndFinal() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a in minecraft:the_nether if block 0 0 0 minecraft:stone " +
                 "if block 0 0 0 minecraft:dirt",
@@ -119,8 +119,10 @@ class ExecuteConverterAuditTest {
             requireUnmergeable = false,
             tagSuffix = "dim"
         )
-        // 维度作用域依赖 as/in 顺序；tag 的 final/cleanup 无法通用保真，退回单链。
-        assertNull(plan)
+        requireNotNull(plan)
+        assertTrue(plan.commands[0].contains("in minecraft:the_nether"))
+        assertTrue(plan.commands[2].contains("in minecraft:the_nether"))
+        assertTrue(plan.commands.last().contains("in minecraft:the_nether"))
     }
 
     @Test
@@ -570,7 +572,7 @@ class ExecuteConverterAuditTest {
 
 
     @Test
-    fun contextDependentMessageSelectorAbortsTagPlan() {
+    fun contextDependentMessageSelectorUsesReplayedContext() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a at @s if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
             Direction.BEDROCK_TO_JAVA,
@@ -579,7 +581,24 @@ class ExecuteConverterAuditTest {
             requireUnmergeable = false,
             tagSuffix = "ctxmsg"
         )
-        assertNull(plan)
+        requireNotNull(plan)
+        assertTrue(plan.commands.any { it.contains("at @s run tellraw") })
+    }
+
+
+    @Test
+    fun contextDependentRecipientUsesReplayedFinalContext() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a at @s if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@r",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "ctxrecv"
+        )
+        requireNotNull(plan)
+        val finalLine = plan.commands.first { it.contains("run tellraw") }
+        assertTrue(finalLine, finalLine.contains("as @e[tag=") && finalLine.contains("at @s"))
     }
 
 }
