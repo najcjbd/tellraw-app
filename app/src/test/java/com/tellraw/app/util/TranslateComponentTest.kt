@@ -141,4 +141,12 @@ class TranslateComponentTest {
         assertEquals(10, tokens[1].start)
     }
 
+
+    @Test
+    fun translatePreviewSupportsPercentFormatStrings() {
+        assertEquals("A 和 B", TranslatePreview.render("%s 和 %s", listOf("A", "B")))
+        assertEquals("B/A", TranslatePreview.render("%2\$s/%1\$s", listOf("A", "B")))
+        assertEquals("100%", TranslatePreview.render("100%%", emptyList()))
+    }
+
 }

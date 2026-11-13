@@ -26,7 +26,8 @@ object TranslatePreview {
     )
 
     fun render(key: String, args: List<String>): String {
-        val template = TEMPLATES[key]
+        // 自定义键也可能是格式化字符串，例如 "%s 和 %s"。
+        val template = TEMPLATES[key] ?: key.takeIf { "%" in it }
         if (template == null) {
             return if (args.isEmpty()) key else "$key(" + args.joinToString(", ") + ")"
         }
