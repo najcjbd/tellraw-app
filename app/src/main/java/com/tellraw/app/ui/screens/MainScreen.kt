@@ -390,10 +390,19 @@ fun MainScreen(
         )
     }
 
+    if (showTellrawPreview) {
+        TellrawPreviewDialog(
+            input = tellrawPreviewInput,
+            onInputChange = { tellrawPreviewInput = it },
+            onDismiss = { showTellrawPreview = false }
+        )
+    }
+
     // translate 的 with 参数构造器（竖屏/横屏共用）
     withBuilderState?.let { state ->
         WithBuilderDialog(
             state = state,
+            simpleMode = simpleTranslateNesting,
             onDismiss = { viewModel.closeWithBuilder() },
             onKeyChange = { viewModel.updateWithBuilderKey(it) },
             onFallbackChange = { viewModel.updateWithBuilderFallback(it) },
@@ -830,7 +839,7 @@ private fun TellrawPreviewDialog(
         if (uri != null) {
             runCatching {
                 context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()?.let { onInputChange(it) }
+            }.getOrNull()?.removePrefix("\uFEFF")?.let { onInputChange(it) }
         }
     }
     val rows = remember(input, context) {

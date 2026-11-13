@@ -568,4 +568,18 @@ class ExecuteConverterAuditTest {
         assertEquals("execute positioned ~ ~-2 ~ run tag @a[tag=t1] remove t1", anchored[2])
     }
 
+
+    @Test
+    fun contextDependentMessageSelectorAbortsTagPlan() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a at @s if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"selector\":\"@p\"}",
+            requireUnmergeable = false,
+            tagSuffix = "ctxmsg"
+        )
+        assertNull(plan)
+    }
+
 }

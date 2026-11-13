@@ -883,6 +883,8 @@ class TellrawViewModel @Inject constructor(
     fun setChainAnchorEnabled(enabled: Boolean) {
         _chainAnchorEnabled.value = enabled
         viewModelScope.launch { settingsRepository.setChainAnchorEnabled(enabled) }
+        generateCommands()
+        if (_showRawConvertDialog.value) runRawConvert()
     }
 
     private fun renderTagPlanCommands(commands: List<String>): String =

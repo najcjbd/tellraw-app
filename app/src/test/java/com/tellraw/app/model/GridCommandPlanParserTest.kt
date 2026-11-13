@@ -525,4 +525,19 @@ class GridCommandPlanParserTest {
         assertEquals(2, result.matched.size)
     }
 
+
+    @Test
+    fun injectedCommandBlockAnchorIsIgnoredForGridSimulation() {
+        val plan = GridCommandPlanParser.parse(
+            "execute positioned ~ ~ ~ as @a if items entity @s hotbar.* minecraft:diamond run tag @s add t1\n" +
+                "execute positioned ~ ~-1 ~ as @a if block ~ ~ ~ minecraft:stone run tag @s add t2\n" +
+                "execute positioned ~ ~-2 ~ as @e[tag=t1,tag=t2] run tellraw @s {\"text\":\"ok\"}"
+        )
+        requireNotNull(plan)
+        assertEquals(2, plan.conditions.size)
+        assertFalse(plan.conditions[0].prefix.contains("positioned"))
+        assertFalse(plan.conditions[1].prefix.contains("positioned"))
+        assertTrue(plan.finalPrefix?.contains("positioned") != true)
+    }
+
 }

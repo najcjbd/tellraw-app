@@ -282,7 +282,7 @@ fun GridEditorScreen(
         if (uri != null) {
             runCatching {
                 context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()?.takeIf { it.isNotBlank() }?.let { text ->
+            }.getOrNull()?.removePrefix("\uFEFF")?.takeIf { it.isNotBlank() }?.let { text ->
                 selectorText = text.trim()
             }
         }

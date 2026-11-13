@@ -725,7 +725,8 @@ object ExecuteConverter {
         )
         val message = planMessageSelectors(
             tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings,
-            filterJavaSelector
+            filterJavaSelector,
+            prefixChangesExecutionContext(prefix)
         )
         if (recipient.unsafe || message.unsafe) return null
         val executor = buildExecutorTagPlan(
@@ -1089,7 +1090,8 @@ object ExecuteConverter {
         suffix: String,
         nbtSyntax: VersionDiff.NbtSyntax,
         warnings: MutableList<String>,
-        filterJavaSelector: ((String) -> String)? = null
+        filterJavaSelector: ((String) -> String)? = null,
+        requiresOriginalContext: Boolean = false
     ): MessageTagResult {
         val root = try {
             JsonParser.parseString(json)
@@ -1112,6 +1114,11 @@ object ExecuteConverter {
                     if (selectorEl != null && selectorEl.isJsonPrimitive && selectorEl.asJsonPrimitive.isString) {
                         val raw = selectorEl.asString
                         val tag = "${tagPrefix}_${index}_$suffix"
+                        if (requiresOriginalContext && selectorNeedsOriginalContext(raw)) {
+                            warnings.add("消息 selector $raw 依赖原执行位置/随机；tag 方案回退")
+                            unsafe = true
+                            return
+                        }
                         val plan = planSelectorTag(
                             raw, direction, tag, nbtSyntax, warnings,
                             filterJavaSelector
@@ -1206,6 +1213,11 @@ object ExecuteConverter {
     }
 
     /** 收信人是否依赖原执行位置/随机/选择数量；这类目标无法用独立 final execute 保证同一上下文。 */
+    private fun prefixChangesExecutionContext(prefix: String): Boolean =
+        parseExecuteParts(prefix, mutableListOf())?.any {
+            it.tokens.firstOrNull() in setOf("at", "positioned", "align", "anchored", "in")
+        } == true
+
     private fun targetRequiresOriginalContext(selector: String): Boolean {
         val varName = selector.trim().substringBefore('[')
         if (varName in setOf("@p", "@n", "@r", "@c", "@v", "@initiator")) return true

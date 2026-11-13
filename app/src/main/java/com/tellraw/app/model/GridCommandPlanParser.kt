@@ -66,7 +66,7 @@ object GridCommandPlanParser {
                 }
                 line == "execute" || line.startsWith("execute ") -> {
                     val runIdx = findTopLevelRun(line) ?: continue
-                    val prefix = line.substring(0, runIdx).trim()
+                    val prefix = stripInjectedAnchor(line.substring(0, runIdx).trim())
                     val rest = line.substring(runIdx + 3).trimStart()
                     if (rest.startsWith("tag ")) {
                         if (" add " !in rest) continue
@@ -81,7 +81,7 @@ object GridCommandPlanParser {
                         val sel = parseTellrawSelector(rest) ?: continue
                         if (tellrawSelector == null) {
                             tellrawSelector = sel
-                            finalPrefix = prefix
+                            finalPrefix = prefix.takeIf { it != "execute" }
                         } else if (tellrawSelector != sel) {
                             notes.add("检测到多条不同的 tellraw 行，按第一条模拟")
                         }
@@ -752,6 +752,14 @@ object GridCommandPlanParser {
     // ---------- 顶层空格 / run 查找 ----------
 
     /** 第一个括号/引号外、深度为 0 的空格下标；找不到返回 -1。 */
+    /** 生成器为命令方块链注入的定位锚点；网格只有同一个 baseOrigin，模拟时应忽略它。 */
+    private fun stripInjectedAnchor(prefix: String): String {
+        val re = Regex("^execute\\s+positioned\\s+~\\s+~-?\\d*\\s+~\\s+")
+        val m = re.find(prefix.trim()) ?: return prefix.trim()
+        val rest = prefix.trim().substring(m.range.last + 1).trimStart()
+        return if (rest.isEmpty()) "execute" else "execute $rest"
+    }
+
     private fun firstTopLevelSpace(s: String): Int {
         var depth = 0
         var quote: Char? = null

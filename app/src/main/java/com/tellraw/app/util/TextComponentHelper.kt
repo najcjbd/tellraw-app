@@ -425,7 +425,9 @@ object TextComponentHelper {
         var pos = 0
         for ((index, component) in components.withIndex()) {
             val len = component.content.length + component.subComponents.sumOf { it.content.length }
-            if (component.type == ComponentType.TRANSLATE && position in pos..(pos + len)) {
+            if (component.type == ComponentType.TRANSLATE &&
+                (position == pos || position in pos until (pos + len))
+            ) {
                 return index
             }
             pos += len
