@@ -41,7 +41,22 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.tellraw.app/.MainActivity
             sleep 4
-            adb exec-out screencap -p > ui-smoke.png
+            adb exec-out screencap -p > 00-main.png
+            adb shell input tap 840 184
+            sleep 2
+            adb exec-out screencap -p > 01-settings.png
+            adb shell input keyevent 4
+            adb shell input tap 240 870
+            sleep 2
+            adb exec-out screencap -p > 02-tellraw-preview.png
+            adb shell input keyevent 4
+            adb shell input tap 700 870
+            sleep 2
+            adb exec-out screencap -p > 03-simple-translate-table.png
+            adb shell input keyevent 4
+            adb shell input tap 597 184
+            sleep 3
+            adb exec-out screencap -p > 04-grid.png
 
       - name: Upload UI results and screenshot
         if: always()
@@ -49,6 +64,6 @@ jobs:
         with:
           name: ui-smoke-${{ github.run_id }}
           path: |
-            ui-smoke.png
+            *.png
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
