@@ -1973,7 +1973,13 @@ object TextComponentHelper {
             try {
                 val el = JsonParser.parseString(t)
                 if (el.isJsonArray) return el.asJsonArray.map { WithItem(json = it) }
-                if (el.isJsonObject) return listOf(WithItem(json = el))
+                if (el.isJsonObject) {
+                    val rawtext = el.asJsonObject.get("rawtext")
+                    if (rawtext != null && rawtext.isJsonArray) {
+                        return rawtext.asJsonArray.map { WithItem(json = it) }
+                    }
+                    return listOf(WithItem(json = el))
+                }
             } catch (e: Exception) {
                 return emptyList()   // 明确选了 JSON 但解析失败：由调用方提醒
             }

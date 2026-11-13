@@ -241,11 +241,17 @@ object CommandInputParser {
                     )
                 }
                 obj.get("with")?.let { w ->
-                    if (!w.isJsonArray) {
-                        warnings.add("translate 的 with 必须是数组，已忽略")
-                        return@let
-                    }
-                    val arr = w.asJsonArray
+                    val arr = when {
+                        w.isJsonArray -> w.asJsonArray
+                        w.isJsonObject && w.asJsonObject.get("rawtext")?.isJsonArray == true -> {
+                            warnings.add("基岩 translate 的 with.rawtext 已展开为参数；条件显示语义在 Java 下可能不同")
+                            w.asJsonObject.getAsJsonArray("rawtext")
+                        }
+                        else -> {
+                            warnings.add("translate 的 with 必须是数组或带 rawtext 的对象，已忽略")
+                            null
+                        }
+                    } ?: return@let
                     if (arr.size() == 0) return@let
                     val cleaned = JsonArray()
                     for (el in arr) {

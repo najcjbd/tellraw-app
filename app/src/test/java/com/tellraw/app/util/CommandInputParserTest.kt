@@ -103,4 +103,19 @@ class CommandInputParserTest {
         val fb = CommandInputParser.parse("""{"translate":"x","fallback":"y"}""")!!
         assertTrue(fb.warnings.any { it.contains("fallback") })
     }
+
+    @Test
+    fun bedrockTranslateWithRawtextObjectIsPreserved() {
+        val input = """tellraw @a {"rawtext":[{"translate":"%%2『传送主城』","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"   §g➮§c"}]}}]}"""
+        val r = CommandInputParser.parse(input)!!
+        assertEquals(CommandInputParser.SourceEdition.BEDROCK, r.sourceEdition)
+        assertTrue(r.warnings.any { it.contains("with.rawtext") })
+        val comp = r.components.single()
+        assertTrue(comp.subComponents.any { it.type == TextComponentHelper.SubComponentType.WITH_JSON })
+        val bedrock = TextComponentHelper.convertToBedrockJson(r.components)
+        assertTrue(bedrock, bedrock.contains("\"with\":{\"rawtext\""))
+        assertTrue(bedrock, bedrock.contains("@s[scores={menu=1}]"))
+        assertTrue(bedrock, bedrock.contains("§g➮§c"))
+    }
+
 }
