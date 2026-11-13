@@ -38,9 +38,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             ./gradlew connectedDebugAndroidTest
-            adb shell am start -n com.tellraw.app/.MainActivity
-            sleep 3
-            adb exec-out screencap -p > ui-smoke.png
+            adb pull /sdcard/Android/data/com.tellraw.app/files/ui-smoke.png ui-smoke.png || true
 
       - name: Upload UI results and screenshot
         if: always()
