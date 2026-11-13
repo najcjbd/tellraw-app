@@ -34,10 +34,12 @@ import com.tellraw.app.R
 import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
+import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
 import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
+import com.tellraw.app.util.VersionDiff
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +61,9 @@ fun MainScreen(
     val chainAnchorEnabled by viewModel.chainAnchorEnabled.collectAsState()
     var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
     var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
+    var showSimpleTranslateGroups by rememberSaveable { mutableStateOf(false) }
+    val targetVersion by viewModel.targetVersion.collectAsState()
+    val groupedTarget = remember(targetVersion) { VersionSpec.parse(targetVersion) }
     val javaCommand by viewModel.javaCommand.collectAsState()
     val bedrockCommand by viewModel.bedrockCommand.collectAsState()
     val warnings by viewModel.warnings.collectAsState()
@@ -69,6 +74,7 @@ fun MainScreen(
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val defaultUseText by viewModel.defaultUseText.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
+    val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
     val asSensitive by viewModel.asSensitive.collectAsState()
@@ -145,6 +151,7 @@ fun MainScreen(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
             onOpenTellrawPreview = { showTellrawPreview = true },
+            onOpenSimpleTranslate = { showSimpleTranslateGroups = true },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -192,6 +199,7 @@ fun MainScreen(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
             onOpenTellrawPreview = { showTellrawPreview = true },
+            onOpenSimpleTranslate = { showSimpleTranslateGroups = true },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -399,6 +407,17 @@ fun MainScreen(
         )
     }
 
+    if (showSimpleTranslateGroups) {
+        SimpleTranslateGroupDialog(
+            initialPrefix = executePrefixInput,
+            target = groupedTarget,
+            nbtSyntax = VersionDiff.NbtSyntax.from(nbtSyntax),
+            allowMultiCmdTag = allowMultiCmdTag,
+            chainAnchor = chainAnchorEnabled,
+            onDismiss = { showSimpleTranslateGroups = false }
+        )
+    }
+
     // translate 的 with 参数构造器（竖屏/横屏共用）
     withBuilderState?.let { state ->
         WithBuilderDialog(
@@ -533,6 +552,7 @@ private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
     onOpenTellrawPreview: () -> Unit,
+    onOpenSimpleTranslate: () -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -640,8 +660,13 @@ private fun PortraitLayout(
                         }
                     )
                 }
-                TextButton(onClick = onOpenTellrawPreview) {
-                    Text(stringResource(R.string.tellraw_preview))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onOpenTellrawPreview) {
+                        Text(stringResource(R.string.tellraw_preview))
+                    }
+                    TextButton(onClick = onOpenSimpleTranslate) {
+                        Text("简单 translate 收信人表")
+                    }
                 }
 
                 OutlinedTextField(
@@ -987,6 +1012,7 @@ private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
     onOpenTellrawPreview: () -> Unit,
+    onOpenSimpleTranslate: () -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -1146,8 +1172,13 @@ private fun LandscapeLayout(
                                 }
                             )
                         }
-                                                TextButton(onClick = onOpenTellrawPreview) {
-                            Text(stringResource(R.string.tellraw_preview))
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = onOpenTellrawPreview) {
+                                Text(stringResource(R.string.tellraw_preview))
+                            }
+                            TextButton(onClick = onOpenSimpleTranslate) {
+                                Text("简单 translate 收信人表")
+                            }
                         }
                         OutlinedTextField(
                             value = messageTextFieldValue.value,

@@ -247,6 +247,15 @@ fun WithBuilderDialog(
     }
 }
 
+/** 供分组消息复用：编辑一组任意文本组件参数（含嵌套 translate）。 */
+@Composable
+fun MessageContentEditor(
+    args: List<WithArgDraft>,
+    onArgsChange: (List<WithArgDraft>) -> Unit
+) {
+    ArgListSection(args = args, onArgsChange = onArgsChange)
+}
+
 // ---------------- 树形大纲 + 检查器 ----------------
 
 @Composable
