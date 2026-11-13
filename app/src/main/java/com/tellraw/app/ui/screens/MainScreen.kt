@@ -628,7 +628,7 @@ private fun PortraitLayout(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.message_input_hint).substring(0, 4),
+                    text = stringResource(R.string.message_input_title),
                     style = MaterialTheme.typography.titleMedium
                 )
                 

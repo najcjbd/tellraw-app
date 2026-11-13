@@ -15,6 +15,7 @@
     <string name="share_java">Share Java</string>
     <string name="share_bedrock">Share Bedrock</string>
     <string name="input_selector">Enter selector</string>
+    <string name="message_input_title">Message</string>
     <string name="input_text">Enter text</string>
     <string name="history">History</string>
     <string name="settings">Settings</string>

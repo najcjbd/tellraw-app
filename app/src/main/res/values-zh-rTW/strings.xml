@@ -15,6 +15,7 @@
     <string name="share_java">分享Java版</string>
     <string name="share_bedrock">分享基岩版</string>
     <string name="input_selector">輸入選擇器</string>
+    <string name="message_input_title">訊息</string>
     <string name="input_text">輸入文字</string>
     <string name="history">歷史記錄</string>
     <string name="settings">設定</string>
