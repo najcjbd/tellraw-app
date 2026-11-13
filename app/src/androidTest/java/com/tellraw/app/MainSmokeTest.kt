@@ -26,14 +26,16 @@ class MainSmokeTest {
     fun mainInputsAreVisible() {
         compose.onNodeWithTag("selector_input").assertIsDisplayed()
         compose.onNodeWithTag("message_input").assertIsDisplayed()
-        compose.onNodeWithText("Tellraw preview").performClick()
-        compose.onNodeWithText("Import command file").assertIsDisplayed()
 
+        // Capture before opening the dialog: a dialog adds a second Compose root.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val screenshot = File(context.getExternalFilesDir(null), "ui-smoke.png")
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         FileOutputStream(screenshot).use {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+
+        compose.onNodeWithText("Tellraw preview").performClick()
+        compose.onNodeWithText("Import command file").assertIsDisplayed()
     }
 }
