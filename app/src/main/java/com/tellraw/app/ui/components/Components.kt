@@ -680,6 +680,7 @@ fun SettingsDialog(
     asSensitive: Boolean = true,
     allowMultiCmdTag: Boolean = false,
     simpleTranslateNesting: Boolean = true,
+    chainAnchorEnabled: Boolean = true,
     nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
@@ -693,6 +694,7 @@ fun SettingsDialog(
     onAsSensitiveChanged: (Boolean) -> Unit = {},
     onAllowMultiCmdTagChanged: (Boolean) -> Unit = {},
     onSimpleTranslateNestingChanged: (Boolean) -> Unit = {},
+    onChainAnchorEnabledChanged: (Boolean) -> Unit = {},
     onNbtSyntaxChanged: (String) -> Unit,
     onOpenRawConvert: () -> Unit = {}
 ) {
@@ -1040,6 +1042,28 @@ fun SettingsDialog(
                         }
                     }
 
+                    // 多命令 tag 输出按命令方块链锚定
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = chainAnchorEnabled,
+                            onCheckedChange = onChainAnchorEnabledChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.chain_anchor_enabled),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.chain_anchor_enabled_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口
@@ -1361,6 +1385,28 @@ fun SettingsDialog(
                             )
                             Text(
                                 text = stringResource(R.string.simple_translate_nesting_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // 多命令 tag 输出按命令方块链锚定
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = chainAnchorEnabled,
+                            onCheckedChange = onChainAnchorEnabledChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.chain_anchor_enabled),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.chain_anchor_enabled_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

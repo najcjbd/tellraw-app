@@ -553,4 +553,19 @@ class ExecuteConverterAuditTest {
         assertNull(plan)
     }
 
+
+    @Test
+    fun anchorsCommandBlockChainToFirstBlock() {
+        val anchored = ExecuteConverter.anchorCommandChain(
+            listOf(
+                "execute as @a run tag @s add t1",
+                "tellraw @a[tag=t1] {\"text\":\"ok\"}",
+                "tag @a[tag=t1] remove t1"
+            )
+        )
+        assertEquals("execute positioned ~ ~ ~ as @a run tag @s add t1", anchored[0])
+        assertEquals("execute positioned ~ ~-1 ~ run tellraw @a[tag=t1] {\"text\":\"ok\"}", anchored[1])
+        assertEquals("execute positioned ~ ~-2 ~ run tag @a[tag=t1] remove t1", anchored[2])
+    }
+
 }

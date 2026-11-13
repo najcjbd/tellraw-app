@@ -38,6 +38,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_AS_SENSITIVE = "as_sensitive"
         private const val KEY_ALLOW_MULTI_CMD_TAG = "allow_multi_cmd_tag"
         private const val KEY_SIMPLE_TRANSLATE_NESTING = "simple_translate_nesting"
+        private const val KEY_CHAIN_ANCHOR_ENABLED = "chain_anchor_enabled"
         private const val KEY_TARGET_VERSION = "target_version"
         private const val KEY_HISTORY_STORAGE_URI = "history_storage_uri"
         private const val KEY_HISTORY_STORAGE_FILENAME = "history_storage_filename"
@@ -94,6 +95,10 @@ class SettingsRepository @Inject constructor(
     private val _simpleTranslateNesting = MutableStateFlow(true)
     val simpleTranslateNesting: Flow<Boolean> = _simpleTranslateNesting.asStateFlow()
 
+    /** 多命令 tag 输出按命令方块链锚定到第一块（默认开）。 */
+    private val _chainAnchorEnabled = MutableStateFlow(true)
+    val chainAnchorEnabled: Flow<Boolean> = _chainAnchorEnabled.asStateFlow()
+
     /** 目标版本（配置文件里输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: Flow<String> = _targetVersion.asStateFlow()
@@ -140,6 +145,7 @@ class SettingsRepository @Inject constructor(
                         asSensitive = _asSensitive.value,
                         allowMultiCmdTag = _allowMultiCmdTag.value,
                         simpleTranslateNesting = _simpleTranslateNesting.value,
+                        chainAnchorEnabled = _chainAnchorEnabled.value,
                         targetVersion = _targetVersion.value,
                         historyStorageUri = _historyStorageUri.value,
                         historyStorageFilename = _historyStorageFilename.value
@@ -164,6 +170,7 @@ class SettingsRepository @Inject constructor(
                     asSensitive = _asSensitive.value,
                     allowMultiCmdTag = _allowMultiCmdTag.value,
                     simpleTranslateNesting = _simpleTranslateNesting.value,
+                    chainAnchorEnabled = _chainAnchorEnabled.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -184,6 +191,7 @@ class SettingsRepository @Inject constructor(
                     asSensitive = _asSensitive.value,
                     allowMultiCmdTag = _allowMultiCmdTag.value,
                     simpleTranslateNesting = _simpleTranslateNesting.value,
+                    chainAnchorEnabled = _chainAnchorEnabled.value,
                     targetVersion = _targetVersion.value,
                     historyStorageUri = _historyStorageUri.value,
                     historyStorageFilename = _historyStorageFilename.value
@@ -209,6 +217,7 @@ class SettingsRepository @Inject constructor(
         val asSensitive: Boolean,
         val allowMultiCmdTag: Boolean,
         val simpleTranslateNesting: Boolean,
+        val chainAnchorEnabled: Boolean,
         val targetVersion: String,
         val historyStorageUri: String?,
         val historyStorageFilename: String
@@ -258,6 +267,7 @@ class SettingsRepository @Inject constructor(
                 val asSensitive = extractJsonValue(jsonString, KEY_AS_SENSITIVE) != "false"
                 val allowMultiCmdTag = extractJsonValue(jsonString, KEY_ALLOW_MULTI_CMD_TAG) == "true"
                 val simpleTranslateNesting = extractJsonValue(jsonString, KEY_SIMPLE_TRANSLATE_NESTING) != "false"
+                val chainAnchorEnabled = extractJsonValue(jsonString, KEY_CHAIN_ANCHOR_ENABLED) != "false"
                 // -1 = 最新；其余必须能被 VersionSpec 解析，否则回落 -1
                 val targetVersion = extractJsonValue(jsonString, KEY_TARGET_VERSION)
                     ?.takeIf { it == "-1" || com.tellraw.app.model.VersionSpec.parse(it) != null } ?: "-1"
@@ -275,6 +285,7 @@ class SettingsRepository @Inject constructor(
                 _asSensitive.value = asSensitive
                 _allowMultiCmdTag.value = allowMultiCmdTag
                 _simpleTranslateNesting.value = simpleTranslateNesting
+                _chainAnchorEnabled.value = chainAnchorEnabled
                 _targetVersion.value = targetVersion
                 _historyStorageUri.value = historyStorageUri.takeIf { it.isNotEmpty() }
                 _historyStorageFilename.value = historyStorageFilename
@@ -303,6 +314,7 @@ class SettingsRepository @Inject constructor(
         val asSensitive = _asSensitive.value
         val allowMultiCmdTag = _allowMultiCmdTag.value
         val simpleTranslateNesting = _simpleTranslateNesting.value
+        val chainAnchorEnabled = _chainAnchorEnabled.value
         val targetVersion = _targetVersion.value
         val historyStorageUri = _historyStorageUri.value ?: ""
         val historyStorageFilename = _historyStorageFilename.value
@@ -322,6 +334,7 @@ class SettingsRepository @Inject constructor(
               "$KEY_AS_SENSITIVE": $asSensitive,
               "$KEY_ALLOW_MULTI_CMD_TAG": $allowMultiCmdTag,
               "$KEY_SIMPLE_TRANSLATE_NESTING": $simpleTranslateNesting,
+              "$KEY_CHAIN_ANCHOR_ENABLED": $chainAnchorEnabled,
               "$KEY_TARGET_VERSION": "${jsonEscape(targetVersion)}",
               "$KEY_HISTORY_STORAGE_URI": "${jsonEscape(historyStorageUri)}",
               "$KEY_HISTORY_STORAGE_FILENAME": "${jsonEscape(historyStorageFilename)}"
@@ -506,6 +519,13 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setSimpleTranslateNesting(enabled: Boolean) {
         _simpleTranslateNesting.value = enabled
+        saveConfig()
+    }
+
+    fun getChainAnchorEnabled(): Boolean = _chainAnchorEnabled.value
+
+    suspend fun setChainAnchorEnabled(enabled: Boolean) {
+        _chainAnchorEnabled.value = enabled
         saveConfig()
     }
 

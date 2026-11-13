@@ -446,6 +446,8 @@
     <string name="tellraw_preview_recipient">收信人</string>
     <string name="tellraw_preview_content">內容</string>
     <string name="tellraw_preview_empty">沒有可預覽的 tellraw 行</string>
+    <string name="chain_anchor_enabled">命令方塊鏈座標錨定</string>
+    <string name="chain_anchor_enabled_description">多命令 tag 輸出時，第一條在下方，後續每條用 positioned ~ ~-n ~ 回到第一塊座標；預設開啟</string>
     <string name="with_builder_apply">套用</string>
     <string name="with_builder_section_plain_hint">純文字參數裡的 § 顏色碼在 JSON 模式下是字面量，請改用顏色/格式欄位。</string>
     

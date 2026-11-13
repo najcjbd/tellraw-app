@@ -1140,6 +1140,28 @@ object ExecuteConverter {
         return MessageTagResult(root.toString(), commands, cleanup, tags, unsafe)
     }
 
+    /**
+     * 命令方块链锚定：第一块在下方，后续每块向上，执行前回到第一块坐标。
+     * 第 i 行使用 positioned ~ ~-i ~，让所有 tag 命令的初始执行位置一致。
+     */
+    fun anchorCommandChain(commands: List<String>): List<String> {
+        return commands.mapIndexed { index, raw ->
+            val line = raw.trim()
+            if (line.isEmpty()) return@mapIndexed raw
+            val pos = if (index == 0) "~ ~ ~" else "~ ~-$index ~"
+            when {
+                line == "execute" -> "execute positioned $pos"
+                line.startsWith("execute ") ->
+                    "execute positioned $pos " + line.removePrefix("execute ").trimStart()
+                line.startsWith("tellraw") ||
+                    line.startsWith("tag ") ||
+                    line.startsWith("say ") ->
+                    "execute positioned $pos run $line"
+                else -> line
+            }
+        }
+    }
+
     private fun makeTagSuffix(tagSuffix: String?): String {
         val raw = tagSuffix ?: java.lang.Long.toString(System.nanoTime(), 36).takeLast(6)
         // Java tag 名只允许 -+._A-Za-z0-9；这里统一只保留字母数字下划线。

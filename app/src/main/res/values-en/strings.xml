@@ -470,6 +470,8 @@
     <string name="tellraw_preview_recipient">Recipient</string>
     <string name="tellraw_preview_content">Content</string>
     <string name="tellraw_preview_empty">No tellraw lines to preview</string>
+    <string name="chain_anchor_enabled">Command-block chain anchoring</string>
+    <string name="chain_anchor_enabled_description">Anchor every generated tag command to the first block (bottom-up) with positioned ~ ~-n ~. On by default.</string>
     <string name="with_builder_apply">Apply</string>
     <string name="with_builder_section_plain_hint">§ color codes in plain-text arguments are literal in JSON mode; use the color/format fields instead.</string>
     

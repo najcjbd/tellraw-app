@@ -55,6 +55,7 @@ fun MainScreen(
     val messageInput by viewModel.messageInput.collectAsState()
     val messageInputWithMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslateNesting by viewModel.simpleTranslateNesting.collectAsState()
+    val chainAnchorEnabled by viewModel.chainAnchorEnabled.collectAsState()
     var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
     var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
     val javaCommand by viewModel.javaCommand.collectAsState()
@@ -295,6 +296,7 @@ fun MainScreen(
             asSensitive = asSensitive,
             allowMultiCmdTag = allowMultiCmdTag,
             simpleTranslateNesting = simpleTranslateNesting,
+            chainAnchorEnabled = chainAnchorEnabled,
             nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
@@ -329,6 +331,9 @@ fun MainScreen(
             },
             onSimpleTranslateNestingChanged = { enabled ->
                 viewModel.setSimpleTranslateNesting(enabled)
+            },
+            onChainAnchorEnabledChanged = { enabled ->
+                viewModel.setChainAnchorEnabled(enabled)
             },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)

@@ -116,6 +116,9 @@ class TellrawViewModel @Inject constructor(
     private val _simpleTranslateNesting = MutableStateFlow(true)
     val simpleTranslateNesting: StateFlow<Boolean> = _simpleTranslateNesting.asStateFlow()
 
+    private val _chainAnchorEnabled = MutableStateFlow(true)
+    val chainAnchorEnabled: StateFlow<Boolean> = _chainAnchorEnabled.asStateFlow()
+
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: StateFlow<String> = _targetVersion.asStateFlow()
@@ -253,6 +256,7 @@ class TellrawViewModel @Inject constructor(
             _asSensitive.value = loadedSettings.asSensitive
             _allowMultiCmdTag.value = loadedSettings.allowMultiCmdTag
             _simpleTranslateNesting.value = loadedSettings.simpleTranslateNesting
+            _chainAnchorEnabled.value = loadedSettings.chainAnchorEnabled
             _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
@@ -876,6 +880,18 @@ class TellrawViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setSimpleTranslateNesting(enabled) }
     }
 
+    fun setChainAnchorEnabled(enabled: Boolean) {
+        _chainAnchorEnabled.value = enabled
+        viewModelScope.launch { settingsRepository.setChainAnchorEnabled(enabled) }
+    }
+
+    private fun renderTagPlanCommands(commands: List<String>): String =
+        if (_chainAnchorEnabled.value) {
+            ExecuteConverter.anchorCommandChain(commands).joinToString("\n")
+        } else {
+            commands.joinToString("\n")
+        }
+
     fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
         viewModelScope.launch {
@@ -980,12 +996,12 @@ class TellrawViewModel @Inject constructor(
             )
         } else null
         _rawConvertJava.value = if (javaTagPlan != null) {
-            javaTagPlan.commands.joinToString("\n")
+            renderTagPlanCommands(javaTagPlan.commands)
         } else if (javaPrefix != null) {
             ExecuteConverter.composeTellrawCommand(javaPrefix, jTellraw)
         } else jTellraw
         _rawConvertBedrock.value = if (bedrockTagPlan != null) {
-            bedrockTagPlan.commands.joinToString("\n")
+            renderTagPlanCommands(bedrockTagPlan.commands)
         } else if (bedrockPrefix != null) {
             ExecuteConverter.composeTellrawCommand(bedrockPrefix, bTellraw)
         } else bTellraw
@@ -1271,7 +1287,7 @@ class TellrawViewModel @Inject constructor(
                         "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove；" +
                             "请按顺序执行全部命令，中途停止会残留标签"
                     )
-                    javaTagPlan.commands.joinToString("\n")
+                    renderTagPlanCommands(javaTagPlan.commands)
                 } else when {
                     finalJavaInnerTokens == null ->
                         if (javaUserPrefix != null) {
@@ -1314,7 +1330,7 @@ class TellrawViewModel @Inject constructor(
                         "已使用多命令 tag 方案（基岩）：临时标签 ${bedrockTagPlan.tags.joinToString()}，末尾会自动 remove；" +
                             "请按顺序执行全部命令，中途停止会残留标签"
                     )
-                    bedrockTagPlan.commands.joinToString("\n")
+                    renderTagPlanCommands(bedrockTagPlan.commands)
                 } else if (bedrockUserPrefix != null) {
                     ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
                 } else {

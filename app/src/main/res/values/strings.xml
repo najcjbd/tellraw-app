@@ -445,6 +445,8 @@
     <string name="tellraw_preview_recipient">收信人</string>
     <string name="tellraw_preview_content">内容</string>
     <string name="tellraw_preview_empty">没有可预览的 tellraw 行</string>
+    <string name="chain_anchor_enabled">命令方块链坐标锚定</string>
+    <string name="chain_anchor_enabled_description">多命令 tag 输出时，第一条在下方，后续每条用 positioned ~ ~-n ~ 回到第一块坐标；默认开启</string>
     <string name="with_builder_apply">应用</string>
     <string name="with_builder_section_plain_hint">纯文本参数里的 § 颜色码在 JSON 模式下是字面量，请改用颜色/格式字段。</string>
     
