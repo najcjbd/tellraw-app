@@ -5,6 +5,7 @@ import com.tellraw.app.util.TextComponentHelper.SubComponent
 import com.tellraw.app.util.TextComponentHelper.SubComponentType
 import com.tellraw.app.util.TextComponentHelper.TextComponent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -189,6 +190,7 @@ class ApplyTranslateWithTest {
         val warnings = mutableListOf<String>()
         val bedrock = TextComponentHelper.convertToBedrockJson(components, warnings = warnings)
         assertTrue(bedrock.contains("chat.type.text"))
-        assertTrue("应提示嵌套样式被基岩版忽略：$warnings", warnings.any { "样式" in it })
+        assertTrue("基岩 with 的 color 应转成格式化代码：$bedrock", bedrock.contains("§6Alex§r"))
+        assertFalse("基础样式已转换，不应再报警：$warnings", warnings.any { "样式" in it })
     }
 }

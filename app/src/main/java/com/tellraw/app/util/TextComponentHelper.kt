@@ -8,6 +8,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import com.tellraw.app.R
 import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.util.SelectorConverter
@@ -2058,6 +2059,42 @@ object TextComponentHelper {
         return sb.toString()
     }
 
+    private fun hasBasicStyle(o: JsonObject): Boolean {
+        val color = o.get("color") ?: null
+        if (color != null && color.isJsonPrimitive) return true
+        return listOf("bold", "italic", "underlined", "strikethrough", "obfuscated").any { key ->
+            val e = o.get(key) ?: return@any false
+            e.isJsonPrimitive && e.asJsonPrimitive.isBoolean && e.asBoolean
+        }
+    }
+
+    /** 基岩 rawtext 用格式化代码表示样式；嵌套 text 参数也转成 § 前缀。 */
+    private fun bedrockStylePrefix(o: JsonObject, warnings: MutableList<String>?): String {
+        val sb = StringBuilder()
+        val color = o.get("color")?.takeIf { it.isJsonPrimitive }?.asString
+        if (color != null) {
+            val code = mapOf(
+                "black" to "0", "dark_blue" to "1", "dark_green" to "2",
+                "dark_aqua" to "3", "dark_red" to "4", "dark_purple" to "5",
+                "gold" to "6", "gray" to "7", "dark_gray" to "8", "blue" to "9",
+                "green" to "a", "aqua" to "b", "red" to "c", "light_purple" to "d",
+                "yellow" to "e", "white" to "f"
+            )[color.lowercase()]
+            if (code != null) sb.append('§').append(code)
+            else warnings?.add("基岩 with 不支持颜色 $color，已忽略")
+        }
+        fun flag(key: String): Boolean {
+            val e = o.get(key) ?: return false
+            return e.isJsonPrimitive && e.asJsonPrimitive.isBoolean && e.asBoolean
+        }
+        if (flag("bold")) sb.append("§l")
+        if (flag("italic")) sb.append("§o")
+        if (flag("underlined")) sb.append("§n")
+        if (flag("strikethrough")) sb.append("§m")
+        if (flag("obfuscated")) sb.append("§k")
+        return sb.toString()
+    }
+
     /** 把 Java JSON 组件转成基岩 rawtext 项（with 对象形式）。样式字段暂未完全保留。 */
     private fun jsonWithToBedrock(
         el: JsonElement,
@@ -2069,25 +2106,26 @@ object TextComponentHelper {
             el.isJsonArray -> el.asJsonArray.forEach { jsonWithToBedrock(it, warnings, out) }
             el.isJsonObject -> {
                 val o = el.asJsonObject
-                val styleKeys = listOf(
-                    "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
-                    "font", "clickEvent", "hoverEvent", "insertion"
-                )
-                val styleHit = styleKeys.firstOrNull { o.has(it) }
-                if (styleHit != null) {
-                    warnings?.add("基岩 with 的嵌套组件样式暂未完全保留（$styleHit）")
+                val unsupportedStyle = listOf("font", "clickEvent", "hoverEvent", "insertion")
+                    .firstOrNull { o.has(it) }
+                if (unsupportedStyle != null) {
+                    warnings?.add("基岩 with 的嵌套组件样式未保留（$unsupportedStyle）")
                 }
                 when {
                     o.has("text") -> {
                         val t = o.get("text")
-                        if (t.isJsonPrimitive) {
-                            out.add(mapOf("text" to t.asString))
-                        } else {
+                        val style = bedrockStylePrefix(o, warnings)
+                        val body = if (t.isJsonPrimitive) t.asString else {
                             warnings?.add("基岩 with 里的 text 不是字符串，已按 JSON 文本转换")
-                            out.add(mapOf("text" to t.toString()))
+                            t.toString()
                         }
+                        val styled = if (style.isEmpty()) body else style + body + "§r"
+                        out.add(mapOf("text" to styled))
                     }
                     o.has("translate") -> {
+                        if (hasBasicStyle(o)) {
+                            warnings?.add("基岩 with 的 translate 组件样式未保留")
+                        }
                         val keyEl = o.get("translate")
                         val key = if (keyEl.isJsonPrimitive) keyEl.asString else {
                             warnings?.add("基岩 with 里的 translate 键不是字符串，已按 JSON 文本转换")
@@ -2098,6 +2136,9 @@ object TextComponentHelper {
                         out.add(m)
                     }
                     o.has("selector") -> {
+                        if (hasBasicStyle(o)) {
+                            warnings?.add("基岩 with 的 selector 组件样式未保留")
+                        }
                         val selEl = o.get("selector")
                         val sel = if (selEl.isJsonPrimitive) selEl.asString else {
                             warnings?.add("基岩 with 里的 selector 不是字符串，已按 JSON 文本转换")
@@ -2106,6 +2147,9 @@ object TextComponentHelper {
                         out.add(mapOf("selector" to sel))
                     }
                     o.has("score") && o.get("score").isJsonObject -> {
+                        if (hasBasicStyle(o)) {
+                            warnings?.add("基岩 with 的 score 组件样式未保留")
+                        }
                         val sc = o.getAsJsonObject("score")
                         out.add(
                             mapOf(
