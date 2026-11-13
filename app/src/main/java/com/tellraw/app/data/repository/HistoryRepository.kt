@@ -599,24 +599,63 @@ class HistoryRepository @Inject constructor(
 internal fun selectorFromCommand(command: String): String {
     val cmd = command.trim()
     if (cmd.isEmpty()) return "@a"
-    // 多命令 tag 方案：取真正的 tellraw 那一行
-    val tellrawLine = cmd.lines().firstOrNull { it.trimStart().startsWith("tellraw ") }
-    val body = when {
-        tellrawLine != null -> tellrawLine.trim()
-        cmd.startsWith("execute") -> {
-            val idx = cmd.lastIndexOf(" run ")
-            if (idx < 0) return "@a"
-            cmd.substring(idx + " run ".length).trim()
+    val lines = cmd.lines().map { it.trim() }.filter { it.isNotEmpty() }
+
+    fun topLevelRunTellrawIndex(line: String): Int {
+        var depth = 0
+        var quote = false
+        var escape = false
+        var found = -1
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (escape) {
+                escape = false
+            } else if (c == '\\') {
+                escape = true
+            } else if (c == '"') {
+                quote = !quote
+            } else if (!quote) {
+                when (c) {
+                    '{', '[' -> depth++
+                    '}', ']' -> if (depth > 0) depth--
+                }
+                if (depth == 0 && line.regionMatches(i, " run ", 0, 5, ignoreCase = true)) {
+                    val after = line.substring(i + 5).trimStart()
+                    if (after.startsWith("tellraw", ignoreCase = true)) found = i
+                }
+            }
+            i++
         }
+        return found
+    }
+
+    // 多命令 tag 方案：优先取真正执行 tellraw 的那一行，而不是消息文本里出现的 " run "。
+    val tellrawLine = lines.lastOrNull { topLevelRunTellrawIndex(it) >= 0 }
+        ?: lines.firstOrNull { it.startsWith("tellraw ") }
+    val body = when {
+        tellrawLine != null -> {
+            val idx = topLevelRunTellrawIndex(tellrawLine)
+            if (idx >= 0) tellrawLine.substring(idx + " run ".length).trimStart() else tellrawLine
+        }
+        cmd.startsWith("execute") -> return "@a"
         else -> cmd
     }
-    return when {
+    val selector = when {
         body.startsWith("tellraw ") ->
             body.removePrefix("tellraw ").trimStart().substringBefore(' ').ifBlank { "@a" }
         body == "say" || body.startsWith("say ") -> "@a"
         else -> {
-            val parts = cmd.split(" ", limit = 3)
+            val parts = body.split(" ", limit = 3)
             if (parts.size >= 2 && parts[1].startsWith("@")) parts[1] else "@a"
         }
     }
+    // tag 是生成时的临时标记，写进历史后无法再命中；只去掉这些内部 tag。
+    val stripped = selector.replace(
+        Regex(",?tag=tellraw_(?:recv|msg_[0-9]+|all|a[0-9]+)_[A-Za-z0-9_]+"), ""
+    )
+    // 只有真的删掉 tag 后才清理空的选择器括号；不能碰 nbt={Items:[]} 这类内容。
+    return if (stripped != selector) {
+        stripped.replace(Regex("\\[\\s*,?\\s*]\\s*$"), "").ifBlank { "@a" }
+    } else selector.ifBlank { "@a" }
 }

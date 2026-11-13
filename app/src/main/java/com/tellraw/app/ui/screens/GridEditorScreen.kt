@@ -1,6 +1,8 @@
 package com.tellraw.app.ui.screens
 
 import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -55,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -64,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.tellraw.app.MainActivity
+import com.tellraw.app.R
 import com.tellraw.app.model.CustomEntity
 import com.tellraw.app.model.CustomEntityStore
 import com.tellraw.app.model.EditableGridEntity
@@ -261,8 +265,27 @@ fun GridEditorScreen(
     var selectorText by rememberSaveable { mutableStateOf(selectorFromMain.ifBlank { savedUi.selector }) }
     var conditions by rememberSaveable { mutableStateOf(savedUi.conditions) }
     var randomNonce by rememberSaveable { mutableStateOf(0) }
+    // 旋转后 LaunchedEffect 会重跑；记住上次已同步的主选择器，避免把网格内草稿又覆盖掉。
+    var lastSyncedMainSelector by rememberSaveable { mutableStateOf(selectorFromMain) }
     LaunchedEffect(selectorFromMain) {
-        if (selectorFromMain.isNotBlank()) selectorText = selectorFromMain
+        if (selectorFromMain.isBlank()) {
+            lastSyncedMainSelector = ""
+        } else if (selectorFromMain != lastSyncedMainSelector) {
+            selectorText = selectorFromMain
+            lastSyncedMainSelector = selectorFromMain
+        }
+    }
+
+    val importCommandLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull()?.takeIf { it.isNotBlank() }?.let { text ->
+                selectorText = text.trim()
+            }
+        }
     }
 
     var viewport by remember {
@@ -301,6 +324,32 @@ fun GridEditorScreen(
     }
     var dimensionStates by rememberSaveable(stateSaver = DimensionStatesSaver) {
         mutableStateOf(initialDimensionStates)
+    }
+
+    fun switchWorldDimension(target: String) {
+        fun existingKey(map: Map<String, GridDimensionState>, raw: String): String {
+            val normalized = GridConditionEvaluator.GridWorld.normalizeDimension(raw)
+            return map.keys.firstOrNull {
+                GridConditionEvaluator.GridWorld.normalizeDimension(it) == normalized
+            } ?: normalized
+        }
+        val currentKey = existingKey(dimensionStates, worldDimension)
+        val next = dimensionStates + (currentKey to GridDimensionState(
+            biome = worldBiome,
+            loaded = worldLoaded,
+            blocks = worldBlocks,
+            functions = worldFunctions,
+            stopwatches = worldStopwatches
+        ))
+        val targetKey = existingKey(next, target)
+        dimensionStates = next
+        worldDimension = targetKey
+        val data = next[targetKey] ?: GridDimensionState()
+        worldBiome = data.biome
+        worldLoaded = data.loaded
+        worldBlocks = data.blocks
+        worldFunctions = data.functions
+        worldStopwatches = data.stopwatches
     }
 
     fun currentUiSettings() = GridUiSettings(
@@ -895,6 +944,10 @@ fun GridEditorScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(onClick = { showWorldSettings = true }) { Text("世界条件…") }
                 Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = {
+                    importCommandLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
+                }) { Text(stringResource(R.string.grid_import_command)) }
+                Spacer(Modifier.width(8.dp))
                 Box {
                     OutlinedButton(onClick = { showDimensionMenu = true }) {
                         Text("维度：${worldDimension.ifBlank { "minecraft:overworld" }}")
@@ -903,12 +956,12 @@ fun GridEditorScreen(
                         expanded = showDimensionMenu,
                         onDismissRequest = { showDimensionMenu = false }
                     ) {
-                        listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")
-                            .forEach { dim ->
+                        (listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end") +
+                            dimensionStates.keys).distinct().forEach { dim ->
                                 DropdownMenuItem(
                                     text = { Text(dim) },
                                     onClick = {
-                                        worldDimension = dim
+                                        if (dim != worldDimension) switchWorldDimension(dim)
                                         showDimensionMenu = false
                                     }
                                 )
@@ -924,8 +977,10 @@ fun GridEditorScreen(
                     style = MaterialTheme.typography.labelSmall
                 )
             }
+            val summonGhostCount = filteredMatched.count { it.uid.startsWith("__summon_") }
             Text(
-                "将选中 ${filteredMatched.size} / ${entities.size} 个实体" +
+                "将选中 ${filteredMatched.size} / ${entities.size + summonGhostCount} 个实体" +
+                    (if (summonGhostCount > 0) "（含 $summonGhostCount 个 summon 临时实体）" else "") +
                     (if (tagPlan != null) "（按多命令 tag 方案模拟）"
                     else if (conditions.isNotBlank()) "（已按附加条件筛选）" else ""),
                 style = MaterialTheme.typography.titleSmall
@@ -984,6 +1039,27 @@ fun GridEditorScreen(
                                         "显示：" + previewMessage(message, editable, name),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            HorizontalDivider()
+                        } else if (ge.uid.startsWith("__summon_")) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        "summon 临时实体 · ${EntityRegistry.displayName(ge.id)}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        "(${fmt(ge.x)}, ${fmt(ge.y)}, ${fmt(ge.z)})  " +
+                                            "默认 NBT/装备未建模",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -2011,14 +2087,22 @@ private fun WorldSettingsDialog(
     }
     var newDimension by rememberSaveable { mutableStateOf("") }
 
+    fun existingKey(map: Map<String, GridDimensionState>, raw: String): String {
+        val normalized = GridConditionEvaluator.GridWorld.normalizeDimension(raw)
+        return map.keys.firstOrNull {
+            GridConditionEvaluator.GridWorld.normalizeDimension(it) == normalized
+        } ?: normalized
+    }
+
     fun persistCurrent() {
-        states = states + (d to GridDimensionState(b, l, bl, f, st))
+        states = states + (existingKey(states, d) to GridDimensionState(b, l, bl, f, st))
     }
 
     fun switchTo(target: String) {
         persistCurrent()
-        d = target
-        val data = states[target] ?: GridDimensionState()
+        val key = existingKey(states, target)
+        d = key
+        val data = states[key] ?: GridDimensionState()
         b = data.biome
         l = data.loaded
         bl = data.blocks
@@ -2064,14 +2148,22 @@ private fun WorldSettingsDialog(
                         onClick = {
                             val target = newDimension.trim()
                             persistCurrent()
-                            states = states + (target to GridDimensionState())
+                            val normalized = GridConditionEvaluator.GridWorld.normalizeDimension(target)
+                            val existing = states.keys.firstOrNull {
+                                GridConditionEvaluator.GridWorld.normalizeDimension(it) == normalized
+                            }
+                            if (existing != null) {
+                                switchTo(existing)
+                            } else {
+                                states = states + (normalized to GridDimensionState())
+                                d = normalized
+                                b = ""
+                                l = true
+                                bl = ""
+                                f = ""
+                                st = ""
+                            }
                             newDimension = ""
-                            d = target
-                            b = ""
-                            l = true
-                            bl = ""
-                            f = ""
-                            st = ""
                         }
                     ) { Text("添加") }
                 }
@@ -2099,7 +2191,7 @@ private fun WorldSettingsDialog(
                     Button(onClick = {
                         onChange(
                             d, b, l, bl, f, st,
-                            states + (d to GridDimensionState(b, l, bl, f, st))
+                            states + (existingKey(states, d) to GridDimensionState(b, l, bl, f, st))
                         )
                         onDismiss()
                     }) { Text("应用") }

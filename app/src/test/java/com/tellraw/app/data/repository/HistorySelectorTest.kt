@@ -18,4 +18,51 @@ class HistorySelectorTest {
             )
         )
     }
+
+    @Test
+    fun ignoresRunTellrawInsideMessageJson() {
+        assertEquals(
+            "@a",
+            selectorFromCommand("tellraw @a {\"text\":\"seen run tellraw @e here\"}")
+        )
+        assertEquals(
+            "@s",
+            selectorFromCommand("execute as @a run tellraw @s {\"text\":\"a run tellraw @e b\"}")
+        )
+    }
+
+    @Test
+    fun stripsTemporaryGeneratorTags() {
+        assertEquals(
+            "@a[tag=user]",
+            selectorFromCommand("tellraw @a[tag=user,tag=tellraw_recv_x] {\"text\":\"x\"}")
+        )
+        assertEquals(
+            "@e[type=zombie]",
+            selectorFromCommand(
+                "execute as @a if entity @s run tag @s add tellraw_all_x\n" +
+                    "execute as @e[tag=tellraw_all_x] run tellraw @e[type=zombie] {\"text\":\"x\"}\n" +
+                    "tag @e[tag=tellraw_all_x] remove tellraw_all_x"
+            )
+        )
+    }
+
+
+    @Test
+    fun keepsUserTagsThatOnlyLookTemporary() {
+        assertEquals(
+            "@a[tag=tellraw_helper]",
+            selectorFromCommand("tellraw @a[tag=tellraw_helper] {\"text\":\"x\"}")
+        )
+    }
+
+
+    @Test
+    fun doesNotRewriteEmptyNbtLists() {
+        assertEquals(
+            "@e[nbt={Items:[]}]",
+            selectorFromCommand("tellraw @e[nbt={Items:[]}] {\"text\":\"x\"}")
+        )
+    }
+
 }

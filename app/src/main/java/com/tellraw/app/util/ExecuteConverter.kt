@@ -714,16 +714,20 @@ object ExecuteConverter {
         tellrawJson: String,
         nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
         @Suppress("UNUSED_PARAMETER") requireUnmergeable: Boolean = false,
-        tagSuffix: String? = null
+        tagSuffix: String? = null,
+        filterJavaSelector: ((String) -> String)? = null
     ): MultiCommandPlan? {
         val suffix = makeTagSuffix(tagSuffix)
         val warnings = mutableListOf<String>()
         val recipient = planSelectorTag(
-            tellrawTarget, direction, "tellraw_recv_$suffix", nbtSyntax, warnings
+            tellrawTarget, direction, "tellraw_recv_$suffix", nbtSyntax, warnings,
+            filterJavaSelector
         )
         val message = planMessageSelectors(
-            tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings
+            tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings,
+            filterJavaSelector
         )
+        if (recipient.unsafe || message.unsafe) return null
         val executor = buildExecutorTagPlan(
             prefix, direction, recipient.selector, message.json,
             nbtSyntax, suffix, warnings
@@ -733,7 +737,7 @@ object ExecuteConverter {
                 commands = recipient.commands + message.commands +
                     executor.commands + recipient.cleanup + message.cleanup,
                 tags = executor.tags + recipient.tags + message.tags,
-                warnings = warnings
+                warnings = warnings.distinct()
             )
         }
         if (recipient.tags.isEmpty() && message.tags.isEmpty()) return null
@@ -1011,14 +1015,16 @@ object ExecuteConverter {
         val selector: String,
         val commands: List<String>,
         val cleanup: List<String>,
-        val tags: List<String>
+        val tags: List<String>,
+        val unsafe: Boolean = false
     )
 
     private data class MessageTagResult(
         val json: String,
         val commands: List<String>,
         val cleanup: List<String>,
-        val tags: List<String>
+        val tags: List<String>,
+        val unsafe: Boolean = false
     )
 
     /**
@@ -1031,24 +1037,40 @@ object ExecuteConverter {
         direction: Direction,
         tag: String,
         nbtSyntax: VersionDiff.NbtSyntax,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        filterJavaSelector: ((String) -> String)? = null
     ): SelectorTagResult {
         val original = selector.trim()
-        val unchanged = SelectorTagResult(original, emptyList(), emptyList(), emptyList())
+        val filteredOriginal = if (direction == Direction.BEDROCK_TO_JAVA) {
+            filterJavaSelector?.invoke(original)?.trim()?.takeIf { it.startsWith("@") } ?: original
+        } else original
+        val unchanged = SelectorTagResult(filteredOriginal, emptyList(), emptyList(), emptyList())
         if (direction != Direction.BEDROCK_TO_JAVA) return unchanged
-        if (!original.startsWith("@") || original.startsWith("@s")) return unchanged
+        if (!original.startsWith("@")) return unchanged
         val neg = bedrockSelectorNegation(original, warnings, nbtSyntax = nbtSyntax) ?: return unchanged
         val (base, condTokens) = neg
         if (condTokens.isEmpty() || !base.startsWith("@")) return unchanged
+        val unsafe = SelectorTagResult(original, emptyList(), emptyList(), emptyList(), unsafe = true)
+        if (original.startsWith("@s")) {
+            warnings.add("selector $original 的否定条件无法安全打 tag，保留原选择器")
+            return unsafe
+        }
+        // @p/@n/@r、距离/坐标、limit/sort 会二次抽样或依赖原执行上下文；不硬拆。
+        if (selectorNeedsOriginalContext(original)) {
+            warnings.add("selector $original 依赖原执行位置/随机/数量，未拆 tag")
+            return unsafe
+        }
         if (condTokens.contains("as")) {
             warnings.add("selector $original 的条件转换生成了 as，无法安全打 tag")
-            return unchanged
+            return unsafe
         }
-        val baseVar = base.substringBefore('[')
-        if (baseVar == "@s") return unchanged
-        val finalBase = if (baseVar in setOf("@p", "@n", "@r")) "@e" else base
+        val filteredBase = filterJavaSelector?.invoke(base)?.trim().orEmpty().ifEmpty { base }
+        if (!filteredBase.startsWith("@")) return unsafe
+        val baseVar = filteredBase.substringBefore('[')
+        if (baseVar == "@s") return unsafe
+        val finalBase = if (baseVar in setOf("@p", "@n", "@r")) "@e" else filteredBase
         val taggedSelector = appendSelectorParam(finalBase, "tag=$tag") ?: return unchanged
-        val command = "execute as $base ${condTokens.joinToString(" ")} run tag @s add $tag"
+        val command = "execute as $filteredBase ${condTokens.joinToString(" ")} run tag @s add $tag"
         val cleanup = "tag ${appendSelectorParam(finalBase, "tag=$tag") ?: return unchanged} remove $tag"
         warnings.add("selector $original 的目标版本否定条件已拆 tag：$tag")
         return SelectorTagResult(
@@ -1066,7 +1088,8 @@ object ExecuteConverter {
         tagPrefix: String,
         suffix: String,
         nbtSyntax: VersionDiff.NbtSyntax,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        filterJavaSelector: ((String) -> String)? = null
     ): MessageTagResult {
         val root = try {
             JsonParser.parseString(json)
@@ -1077,6 +1100,8 @@ object ExecuteConverter {
         val commands = mutableListOf<String>()
         val cleanup = mutableListOf<String>()
         val tags = mutableListOf<String>()
+        var changed = false
+        var unsafe = false
         var index = 0
 
         fun visit(element: JsonElement) {
@@ -1085,12 +1110,18 @@ object ExecuteConverter {
                     val obj = element.asJsonObject
                     val selectorEl = obj.get("selector")
                     if (selectorEl != null && selectorEl.isJsonPrimitive && selectorEl.asJsonPrimitive.isString) {
+                        val raw = selectorEl.asString
                         val tag = "${tagPrefix}_${index}_$suffix"
                         val plan = planSelectorTag(
-                            selectorEl.asString, direction, tag, nbtSyntax, warnings
+                            raw, direction, tag, nbtSyntax, warnings,
+                            filterJavaSelector
                         )
-                        if (plan.tags.isNotEmpty()) {
+                        if (plan.selector != raw) {
                             obj.addProperty("selector", plan.selector)
+                            changed = true
+                        }
+                        if (plan.unsafe) unsafe = true
+                        if (plan.tags.isNotEmpty()) {
                             commands.addAll(plan.commands)
                             cleanup.addAll(plan.cleanup)
                             tags.addAll(plan.tags)
@@ -1103,8 +1134,10 @@ object ExecuteConverter {
             }
         }
         visit(root)
-        if (tags.isEmpty()) return MessageTagResult(json, emptyList(), emptyList(), emptyList())
-        return MessageTagResult(root.toString(), commands, cleanup, tags)
+        if (!changed && tags.isEmpty()) {
+            return MessageTagResult(json, emptyList(), emptyList(), emptyList(), unsafe)
+        }
+        return MessageTagResult(root.toString(), commands, cleanup, tags, unsafe)
     }
 
     private fun makeTagSuffix(tagSuffix: String?): String {
@@ -1154,6 +1187,17 @@ object ExecuteConverter {
     private fun targetRequiresOriginalContext(selector: String): Boolean {
         val varName = selector.trim().substringBefore('[')
         if (varName in setOf("@p", "@n", "@r", "@c", "@v", "@initiator")) return true
+        if (selectorHasSpatialParams(selector)) return true
+        if ('[' !in selector || !selector.endsWith("]")) return false
+        val body = selector.substringAfter('[').dropLast(1)
+        return ExecCondSupport.splitTopLevel(body, ',')
+            .map { it.substringBefore('=').trim() }
+            .any { it in setOf("limit", "sort", "c") }
+    }
+
+    private fun selectorNeedsOriginalContext(selector: String): Boolean {
+        val varName = selector.substringBefore('[').trim()
+        if (varName in setOf("@s", "@p", "@n", "@r")) return true
         if (selectorHasSpatialParams(selector)) return true
         if ('[' !in selector || !selector.endsWith("]")) return false
         val body = selector.substringAfter('[').dropLast(1)

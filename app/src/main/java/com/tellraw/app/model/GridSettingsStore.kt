@@ -40,13 +40,23 @@ class GridSettingsStore(private val file: File) {
         if (!file.exists()) GridUiSettings()
         else gson.fromJson(file.readText(), GridUiSettings::class.java) ?: GridUiSettings()
     } catch (e: Exception) {
+        try {
+            file.copyTo(File(file.path + ".corrupt"), overwrite = true)
+        } catch (_: Exception) {
+        }
         GridUiSettings()
     }
 
     fun save(settings: GridUiSettings) {
         try {
             file.parentFile?.mkdirs()
-            file.writeText(gson.toJson(settings))
+            val tmp = File(file.path + ".tmp")
+            tmp.writeText(gson.toJson(settings))
+            // API 24/25 上 java.nio.file.Files 不可用；renameTo 同样是原子的替换路径。
+            if (!tmp.renameTo(file)) {
+                file.writeText(tmp.readText())
+                tmp.delete()
+            }
         } catch (e: Exception) {
             // 持久化失败不影响编辑
         }

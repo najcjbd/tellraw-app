@@ -666,6 +666,31 @@ object TextComponentHelper {
      * 获取指定位置的文本组件类型
      * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
      */
+    /** 消息里每个顶层组件在纯文本中的位置；Translate 额外带 1 基序号。 */
+    data class ComponentToken(
+        val type: ComponentType,
+        val ordinal: Int,
+        val start: Int,
+        val end: Int
+    )
+
+    fun componentTokens(text: String): List<ComponentToken> {
+        val components = parseTextComponents(text)
+        val out = mutableListOf<ComponentToken>()
+        var pos = 0
+        var translateOrdinal = 0
+        for (component in components) {
+            val len = component.content.length +
+                component.subComponents.sumOf { it.content.length }
+            if (component.type == ComponentType.TRANSLATE) {
+                translateOrdinal++
+                out.add(ComponentToken(component.type, translateOrdinal, pos, pos + len))
+            }
+            pos += len
+        }
+        return out
+    }
+
     fun getComponentTypeAtPosition(text: String, position: Int): ComponentType? {
         if (position < 0) return null
         

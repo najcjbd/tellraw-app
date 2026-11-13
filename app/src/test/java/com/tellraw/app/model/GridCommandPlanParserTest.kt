@@ -449,4 +449,80 @@ class GridCommandPlanParserTest {
         val result = GridCommandPlanParser.evaluate(parsed!!, entities, Triple(0.0, -60.0, 0.0))
         assertEquals(listOf("p1"), result.matched.map { it.uid })
     }
+
+    @Test
+    fun sameEntityAsVehicleAndPassengerDoesNotCreateCycle() {
+        val a = EditableGridEntity(uid = "a")
+        val b = EditableGridEntity(uid = "b")
+        val updatedA = a.copy(relations = "vehicle=b;passengers=b")
+        val out = GridRelations.applyReciprocal(listOf(a, b), a, updatedA).associateBy { it.uid }
+        val aRel = GridRelations.decode(out.getValue("a").relations)
+        val bRel = GridRelations.decode(out.getValue("b").relations)
+        assertFalse(aRel["vehicle"].orEmpty().contains("b") && aRel["passengers"].orEmpty().contains("b"))
+        assertFalse(bRel["vehicle"].orEmpty().contains("a") && bRel["passengers"].orEmpty().contains("a"))
+    }
+
+
+    @Test
+    fun summonCreatesTransientEntityForFollowingConditions() {
+        val player = GridEntity("p", "minecraft:player", x = 10.0, y = -60.0, z = 3.0)
+        val result = GridCommandPlanParser.evaluateChain(
+            prefix = "execute as @a at @s summon minecraft:pig if entity @s[type=minecraft:pig]",
+            targetSelector = "@s",
+            entities = listOf(player)
+        )
+        requireNotNull(result)
+        assertEquals(1, result.matched.size)
+        val ghost = result.matched.single()
+        assertTrue(ghost.uid.startsWith("__summon_"))
+        assertEquals("minecraft:pig", ghost.id)
+        assertEquals(10.0, ghost.x, 0.0)
+        assertEquals(-60.0, ghost.y, 0.0)
+        assertEquals(3.0, ghost.z, 0.0)
+        assertEquals(0.0, ghost.rotationX ?: -1.0, 0.0)
+        assertEquals(0.0, ghost.rotationY ?: -1.0, 0.0)
+        assertTrue(result.notes.any { it.contains("summon") })
+    }
+
+    @Test
+    fun summonEntityIsVisibleToLaterEntitySelector() {
+        val player = GridEntity("p", "minecraft:player", x = 10.0, y = -60.0, z = 3.0)
+        val result = GridCommandPlanParser.evaluateChain(
+            prefix = "execute as @a at @s summon minecraft:pig if entity @e[type=minecraft:pig,distance=..1]",
+            targetSelector = "@a",
+            entities = listOf(player)
+        )
+        requireNotNull(result)
+        assertEquals(listOf("p"), result.matched.map { it.uid })
+    }
+
+
+    @Test
+    fun summonWithoutAsRunsOnceFromCommandSource() {
+        val p1 = GridEntity("p1", "minecraft:player", x = 1.0, y = -60.0, z = 1.0)
+        val p2 = GridEntity("p2", "minecraft:player", x = 2.0, y = -60.0, z = 2.0)
+        val result = GridCommandPlanParser.evaluateChain(
+            prefix = "execute summon minecraft:pig",
+            targetSelector = "@e[type=minecraft:pig]",
+            entities = listOf(p1, p2)
+        )
+        requireNotNull(result)
+        assertEquals(1, result.matched.size)
+        assertTrue(result.matched.single().uid.startsWith("__summon_"))
+    }
+
+
+    @Test
+    fun summonAtSameCoordinatesStillCreatesOnePerTarget() {
+        val p1 = GridEntity("p1", "minecraft:player", x = 1.0, y = -60.0, z = 1.0)
+        val p2 = GridEntity("p2", "minecraft:player", x = 1.0, y = -60.0, z = 1.0)
+        val result = GridCommandPlanParser.evaluateChain(
+            prefix = "execute at @a summon minecraft:pig",
+            targetSelector = "@e[type=minecraft:pig]",
+            entities = listOf(p1, p2)
+        )
+        requireNotNull(result)
+        assertEquals(2, result.matched.size)
+    }
+
 }

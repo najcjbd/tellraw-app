@@ -86,9 +86,11 @@ object GridRelations {
         fun reachesFrom(start: String, target: String): Boolean {
             var cur: String? = start
             val seen = mutableSetOf<String>()
-            while (cur != null && seen.add(cur)) {
-                if (cur == target) return true
-                cur = vehicleOf(cur)
+            while (cur != null) {
+                val node = cur ?: return false
+                if (!seen.add(node)) return false
+                if (node == target) return true
+                cur = vehicleOf(node)
             }
             return false
         }
@@ -99,7 +101,7 @@ object GridRelations {
                 it != e.uid && !reachesFrom(it, e.uid)
             }
             val passengers = map["passengers"].orEmpty().filter {
-                it != e.uid && !reachesFrom(e.uid, it)
+                it != e.uid && it !in vehicles && !reachesFrom(e.uid, it)
             }
             if (vehicles == map["vehicle"].orEmpty() && passengers == map["passengers"].orEmpty()) {
                 return e
@@ -196,6 +198,33 @@ object GridRelations {
                     }
                 }
             }
+        }
+
+        // 反向补全可能绕出环（例如同一实体同时被选为载具和乘客），最后按当前图再断环。
+        var cycleGuard = 0
+        while (cycleGuard++ < maxOf(12, byUid.size * 4)) {
+            var removed = false
+            for (e in byUid.values.toList()) {
+                var cur: String = e.uid
+                val seen = mutableSetOf<String>()
+                var cycleAt: String? = null
+                while (true) {
+                    if (!seen.add(cur)) {
+                        cycleAt = cur
+                        break
+                    }
+                    cur = decode(byUid[cur]?.relations)["vehicle"]?.firstOrNull() ?: break
+                }
+                if (cycleAt != null) {
+                    val node = byUid[cycleAt] ?: continue
+                    val vehicle = decode(node.relations)["vehicle"]?.firstOrNull() ?: continue
+                    byUid[node.uid] = removeFromRelation(node, "vehicle", vehicle)
+                    edit(vehicle) { removeFromRelation(it, "passengers", node.uid) }
+                    removed = true
+                    break
+                }
+            }
+            if (!removed) break
         }
 
         val out = entities.map { byUid[it.uid] ?: it }.toMutableList()

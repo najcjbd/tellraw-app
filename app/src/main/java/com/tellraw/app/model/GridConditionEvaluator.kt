@@ -44,17 +44,41 @@ object GridConditionEvaluator {
         val stopwatches: Map<String, Double> = emptyMap(),
         val dimensions: Map<String, DimensionWorld> = emptyMap()
     ) {
-        /** 按执行维度取对应世界数据；没有配置该维度时保留空间表但标明维度。 */
+        /** 按执行维度取对应世界数据；没有配置该维度时使用空世界，避免继承当前维度数据。 */
         fun forDimension(dim: String): GridWorld {
-            val data = dimensions[dim] ?: return copy(dimension = dim)
+            val normalized = normalizeDimension(dim)
+            val data = dimensions[dim] ?: dimensions.entries
+                .firstOrNull { normalizeDimension(it.key) == normalized }?.value
+                ?: if (normalized == normalizeDimension(dimension)) {
+                    DimensionWorld(biome, loaded, blocks, functions, stopwatches)
+                } else DimensionWorld()
             return copy(
-                dimension = dim,
+                dimension = normalized,
                 biome = data.biome,
                 loaded = data.loaded,
                 blocks = data.blocks,
                 functions = data.functions,
                 stopwatches = data.stopwatches
             )
+        }
+
+        companion object {
+            fun normalizeDimension(dim: String): String {
+                val raw = dim.trim().ifBlank { "minecraft:overworld" }
+                if (':' in raw) {
+                    return when (raw.lowercase()) {
+                        "minecraft:nether" -> "minecraft:the_nether"
+                        "minecraft:end" -> "minecraft:the_end"
+                        else -> raw
+                    }
+                }
+                return when (raw.lowercase()) {
+                    "overworld" -> "minecraft:overworld"
+                    "nether", "the_nether" -> "minecraft:the_nether"
+                    "end", "the_end" -> "minecraft:the_end"
+                    else -> "minecraft:$raw"
+                }
+            }
         }
     }
 
@@ -474,6 +498,11 @@ object GridConditionEvaluator {
             val target = tokens.getOrNull(i + 3) ?: return null
             val slots = tokens.getOrNull(i + 4) ?: return null
             val predicate = tokens.getOrNull(i + 5) ?: return null
+            if (predicate.trim().startsWith("!")) {
+                // Java 原版不接受 ID 前取反；按“未建模条件”处理，unless 也不能反向排除全部实体。
+                notes.add("items 谓词不支持在物品 ID 前取反（Java 用 *[!测试项]）；该条件未参与筛选")
+                return CondEval(true, 6, neutral = true)
+            }
             val ok = if (target == "@s" || target.startsWith("@s")) {
                 matchesItemPredicate(entity.items, slots, predicate, notes)
             } else {
@@ -486,6 +515,10 @@ object GridConditionEvaluator {
             val pos = readPos(tokens, i + 3, origin, notes, yaw, pitch, anchorEyes) ?: return null
             val slots = tokens.getOrNull(i + 6) ?: return null
             val predicate = tokens.getOrNull(i + 7) ?: return null
+            if (predicate.trim().startsWith("!")) {
+                notes.add("items 谓词不支持在物品 ID 前取反（Java 用 *[!测试项]）；该条件未参与筛选")
+                return CondEval(true, 8, neutral = true)
+            }
             val block = world.blocks[posKey(pos)]
             if (block == null) {
                 notes.add("方块表里没有 ${posKey(pos)} 的容器数据，items 条件未参与筛选")
@@ -534,10 +567,12 @@ object GridConditionEvaluator {
 
     /** Java items/slots 的 inventory.N 是 0-26 外部槽；网格内部键/NBT 是 9-35。 */
     private fun translateInventorySlotSource(source: String): String {
-        if (!source.startsWith("inventory.") && source != "inventory") return source
+        if (source == "inventory") return source
+        if (!source.startsWith("inventory.")) return source
         val rest = source.removePrefix("inventory.").ifEmpty { return source }
         if (rest == "*") return source
-        fun shift(text: String): String = text.toIntOrNull()?.let { (it + 9).toString() } ?: text
+        fun shift(text: String): String =
+            text.toIntOrNull()?.takeIf { it >= 0 }?.let { (it + 9).toString() } ?: text
         val body = if (rest.startsWith("!")) "!" + shift(rest.substring(1)) else rest
         val translated = if (".." in body) {
             val lo = body.substringBefore("..")
@@ -560,6 +595,18 @@ object GridConditionEvaluator {
         val k = key.removePrefix("slot.")
         if (src == "*") return true
         if (src.endsWith(".*")) return k.startsWith(src.dropLast(1)) || k == src.dropLast(2)
+        // 槽位区间，例如 hotbar.0..8 / inventory.0..8（后者已翻译成内部 9..17）。
+        if (".." in src) {
+            val type = src.substringBefore('.')
+            if (!k.startsWith("$type.")) return false
+            val idx = k.substringAfterLast('.').toIntOrNull() ?: return false
+            val range = src.substringAfter('.')
+            val lo = range.substringBefore("..").toIntOrNull()
+            val hi = range.substringAfter("..").toIntOrNull()
+            if (lo != null && idx < lo) return false
+            if (hi != null && idx > hi) return false
+            return true
+        }
         // 槽位名不带编号时，视为该类的任意槽
         if (src.count { it == '.' } == 0) return k == src || k.startsWith("$src.")
         return k == src
@@ -581,8 +628,13 @@ object GridConditionEvaluator {
             p.substring(bracketIndex + 1, p.length - 1)
         } else ""
 
-        val idNeg = idPart.startsWith("!")
-        val idRaw = if (idNeg) idPart.substring(1) else idPart
+        if (idPart.startsWith("!")) {
+            // Java 原版实测：item_predicate 的 ID 前不能写 !（! 只能加在 [] 内的测试项前），
+            // 盲拆成“存在任意非该 ID 物品”会得到原版根本不会执行的结果。
+            notes.add("items 谓词不支持在物品 ID 前取反（Java 用 *[!测试项]）；该条件未参与筛选")
+            return true
+        }
+        val idRaw = idPart
         val wantId = if (idRaw == "*" || idRaw.isEmpty()) null else normBlock(idRaw)
 
         // 测试项：`,` 是 AND（外层），`|` 是 OR（内层，优先级高）
@@ -626,13 +678,12 @@ object GridConditionEvaluator {
         }
 
         // 同一件物品必须同时满足所有 AND 组；组内任一 OR 项即可。
-        val hit = candidates.any { item ->
+        return candidates.any { item ->
             (wantId == null || normBlock(item.id) == wantId) &&
                 parsedGroups.all { orGroup ->
                     orGroup.isEmpty() || orGroup.any { term -> matchesTerm(item, term) }
                 }
         }
-        return if (idNeg) !hit else hit
     }
 
     private data class ItemTerm(
@@ -706,7 +757,8 @@ object GridConditionEvaluator {
             EntityRegistry.Category.PLAYER -> {
                 known += listOf("inventory", "hotbar", "armor", "weapon", "enderchest")
                 for (i in 0..8) known += "hotbar.$i"
-                for (i in 0..26) known += "inventory.$i"
+                // 网格主栏键使用 NBT 内部槽 9-35；external inventory.0-26 会在 slotMatches 里 +9。
+                for (i in 0..35) known += "inventory.$i"
                 known += listOf("armor.head", "armor.chest", "armor.legs", "armor.feet")
                 known += listOf("weapon.mainhand", "weapon.offhand")
             }

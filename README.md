@@ -324,15 +324,15 @@ jobs:
 > 这里记录"已经知道但暂未实现/无法完全等价"的能力边界。UI 交互问题不在此列。
 
 - **实体 ID**：Java/基岩实体 ID 有对照表；**物品/方块 ID 的跨版本差异尚未建表**。
-- **items 谓词**：支持 id/`*`/`!`、`count`/`count~{min,max}`、`damage`、`custom_data~{...}` 等；**不覆盖 `#物品标签`**，附魔/属性等复杂组件只做 SNBT 子集匹配。
+- **items 谓词**：支持 id/`*`、`count`/`count~{min,max}`、`damage`、`custom_data~{...}` 等；**不覆盖 `#物品标签`**，附魔/属性等复杂组件只做 SNBT 子集匹配。Java 原版实测 **不接受 `items ... !id`**（ID 前不能取反，`!` 只能用于 `[]` 内的测试项，如 `*[!count=1]`）；网格遇到这种写法会提示并标为“未参与筛选”，不会反向排除所有实体。
 - **slots 条件**：按文档语义判断"是否有匹配槽位源的槽位"；支持内置槽位名/通配符，**26.3 的自定义 slot_source（命名空间 ID / SNBT）未建模**。
 - **内容驱动 as**：scores=!、hasitem 空气/quantity=0 等可驱动 as；**多个内容选择器负条件不一致时只改写第一组**（单条 tellraw 无法无损拆分多组）。
-- **网格求值**：按原顺序逐步模拟 `as/on/at/positioned/rotated/facing/align/anchored/in`，并用 yaw/pitch 处理 `^ ^ ^` 局部坐标；`on` 关系需在实体编辑器里设置。`@r` / `sort=random` 使用运行时真随机（界面有“重新随机”）；`summon` 生成物仍未建模；`in` 会切换执行维度，世界条件（方块/群系/loaded/函数/stopwatch）按维度分别存储并使用；判定箱为近似值；`block/biome/dimension/function/stopwatch` 需要手填世界条件，未填时明确提示"未参与筛选"。
+- **网格求值**：按原顺序逐步模拟 `as/on/at/positioned/rotated/facing/align/anchored/in`，并用 yaw/pitch 处理 `^ ^ ^` 局部坐标；`on` 关系需在实体编辑器里设置。`@r` / `sort=random` 使用运行时真随机（界面有“重新随机”）；`summon` 只做**有限模拟**：按当前坐标/维度生成临时幽灵实体，使用空 tags/scores、0 视角和类型/判定箱；标记 NBT/装备/变体/生成副作用未建模，最终只在网格结果里显示，不写回存档；多命令 tag 方案仍回退单链。`in` 会切换执行维度，世界条件（方块/群系/loaded/函数/stopwatch）按维度分别存储并使用；判定箱为近似值；`block/biome/dimension/function/stopwatch` 需要手填世界条件，未填时明确提示"未参与筛选"。
 - **translate**：
   - Java 支持 fallback；基岩不支持 fallback（提醒）。
   - translate 自身的 color/bold 等样式不保留。
   - `with` 支持纯文本 / `with(JSON)`；JSON → 纯文本会丢失样式（纯文本模式的必然结果）。
-  - 选中 translate 后可用「构造 with 参数…」编辑嵌套参数：纯文本（颜色/格式）、translate（可无限嵌套）、selector、score、keybind、NBT、原始 JSON。可视化页现在是**树形大纲 + 检查器**：节点可展开/折叠、选中后在下方内联编辑，支持原位添加、复制、上移/下移、删除和添加子参数，不再弹窗叠弹窗；文本颜色带常用色快选，草稿可跨旋转保存。
+  - 选中 translate 后可用「构造 with 参数…」编辑嵌套参数：纯文本（颜色/格式）、translate（可无限嵌套）、selector、score、keybind、NBT、原始 JSON。设置里新增「简单 translate 嵌套」（默认开、持久化）：消息卡片会显示蓝色 `TranslateN` 令牌，N 是消息中第 N 个 translate，点令牌可直接重新打开构造器。可视化页现在是**树形大纲 + 检查器**：节点可展开/折叠、选中后在下方内联编辑，支持原位添加、复制、上移/下移、删除和添加子参数，不再弹窗叠弹窗；顶部有“翻译键 + 按顺序填空”的直白说明，根/嵌套节点都有「快速填空」（文字、玩家/实体、计分板、嵌套翻译），参数未填完整会给出路径提示；文本颜色带常用色快选，草稿可跨旋转保存。
   - 基岩 with 支持嵌套 rawtext/translate，但**嵌套组件样式不完全保留**。
   - 网格 translate 预览使用内置常见键模板，不读取客户端语言文件。
   - 顶层文本组件仍不支持 keybind / nbt / object（精灵图），只提醒；with 内部可通过构造器或原始 JSON 写入。
@@ -340,6 +340,7 @@ jobs:
 - **版本感知**：Java 26.3 的 items 槽位源写法未生成（我们生成的槽位名在 26.3 仍合法）；混合模式是启发式，不能保证所有混写等价。
 - **多命令 tag（默认关闭）**：用于把一条命令的结果用多条命令追出来。可折进**最终执行者选择器**的 `score matches`、根 `data`、纯 `entity @s` 参数会折成 `scores=`/`nbt=`/选择器参数；`items`、`blocks` 等仍逐条件 tag 到最终执行者。最终命令是 `execute as <带 tag 的执行者> run tellraw <原收信人>`，所以同一执行者必须满足全部 tag 条件；`on`/多个 `as` 都写在条件之前时也成立。`predicate/function/stopwatch` 属顺序/随机/副作用敏感条件，自动走整链 tag 保序；条件之间还有修饰、或转换生成 `as` 时也走整链。`@p/@n/@r`、距离坐标或 `limit/sort` 收信人回退单链；含 `in` 的链也回退单链（维度作用域取决于 as/in 顺序，独立 final/cleanup 无法通用保真）；`at/positioned as/rotated as/facing entity` 这类可能多目标分叉的修饰统一走整链。目标版本缺少某条件时仍会继续但明确标注“tag 方案不等价”。同一最终执行者被多个 base 分支命中时会合并重复 tellraw 次数（tag 优先策略，输出会标注）。`summon` 回退单链；selector 级否定/内容驱动 as 回退单命令。收信人选择器和消息 JSON 里的 selector 组件也各自建独立 tag 集（按需）：目标版本选择器表达不了的否定条件拆成 execute 条件并打 tag，再改写对应 selector；最终 tellraw 能独立就独立。网格可直接粘贴这套多行命令，按每条 tag 条件模拟后显示最终会收到 tellraw 的实体。`on` 关系已建模：实体编辑器可选择 attacker/controller/leasher/origin/owner/passengers/target/vehicle 指向场上实体；选择器用大头照 + 名字（自定义名优先，否则生物名）+ 点按头像查看该实体 NBT；`vehicle` 的骑手跟随载具、`passengers` 的乘客跟随载具，保存/拖动结束时会同步坐标；`vehicle ↔ passengers` 在网格模型里自动维护双向引用（不写游戏 NBT，单侧 NBT 字段不伪造反向值）。
 - **NBT 目录**：26.3 实体 NBT 已实测；玩家 NBT 已在 **26.2（DataVersion 4903）和 26.3（DataVersion 5023）真实服务端** `data get` 实测（上游 mineflayer 尚未收录 26.2/26.3 协议，采样客户端用兼容协议数据连入，服务端数据是原生的）。实测要点：主手在 `SelectedItem`，玩家 `equipment` 只有 head/chest/offhand、**没有 mainhand**，`Inventory` 含当前选中的快捷栏，`EnderItems` 独立；26.3 新增顶层键 `post_effects`。`fishing_bobber` 不能 summon，lightning_bolt/poplar 船等没有专属标量键。
+- **Tellraw 预览**：主界面提供独立的命令预览，可粘贴或导入单行/多行 txt，按行显示 execute 条件、收信人和文本内容；网格编辑器的「导入命令」也支持单行/多行 txt。
 - **兼容性**：转换结果中的近似项（sort、hasitem、旧版本物品 NBT 等）必须在目标游戏版本里自行核对。
 
 ## 📦 部署

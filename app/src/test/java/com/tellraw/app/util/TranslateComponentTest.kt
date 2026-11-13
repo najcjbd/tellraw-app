@@ -122,4 +122,23 @@ class TranslateComponentTest {
         assertEquals(ComponentType.TRANSLATE, comps[1].type)
         assertEquals("llo", comps[2].content)
     }
+
+    @Test
+    fun componentTokensIndexTranslateComponentsInOrder() {
+        val markers = TextComponentHelper.componentsToText(
+            listOf(
+                TextComponent(ComponentType.TEXT, "hi"),
+                TextComponent(ComponentType.TRANSLATE, "key.one"),
+                TextComponent(ComponentType.TEXT, "x"),
+                TextComponent(ComponentType.TRANSLATE, "key.two")
+            )
+        )
+        val tokens = TextComponentHelper.componentTokens(markers)
+        assertEquals(2, tokens.size)
+        assertEquals(1, tokens[0].ordinal)
+        assertEquals(2, tokens[1].ordinal)
+        assertEquals(2, tokens[0].start)
+        assertEquals(10, tokens[1].start)
+    }
+
 }

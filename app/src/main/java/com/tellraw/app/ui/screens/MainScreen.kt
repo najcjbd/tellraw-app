@@ -2,6 +2,8 @@ package com.tellraw.app.ui.screens
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.tellraw.app.MainActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -33,6 +35,7 @@ import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
+import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.TextComponentHelper
 import kotlinx.coroutines.launch
 
@@ -50,6 +53,10 @@ fun MainScreen(
     
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
+    val messageInputWithMarkers by viewModel.messageInputWithMarkers.collectAsState()
+    val simpleTranslateNesting by viewModel.simpleTranslateNesting.collectAsState()
+    var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
+    var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
     val javaCommand by viewModel.javaCommand.collectAsState()
     val bedrockCommand by viewModel.bedrockCommand.collectAsState()
     val warnings by viewModel.warnings.collectAsState()
@@ -135,6 +142,7 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onOpenTellrawPreview = { showTellrawPreview = true },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -181,6 +189,7 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onOpenTellrawPreview = { showTellrawPreview = true },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -285,6 +294,7 @@ fun MainScreen(
             bedrockColorToRgb = bedrockColorToRgb,
             asSensitive = asSensitive,
             allowMultiCmdTag = allowMultiCmdTag,
+            simpleTranslateNesting = simpleTranslateNesting,
             nbtSyntax = nbtSyntax,
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
@@ -316,6 +326,9 @@ fun MainScreen(
             },
             onAllowMultiCmdTagChanged = { enabled ->
                 viewModel.setAllowMultiCmdTag(enabled)
+            },
+            onSimpleTranslateNestingChanged = { enabled ->
+                viewModel.setSimpleTranslateNesting(enabled)
             },
             onNbtSyntaxChanged = { v ->
                 viewModel.setNbtSyntax(v)
@@ -504,6 +517,7 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onOpenTellrawPreview: () -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -522,6 +536,9 @@ private fun PortraitLayout(
     hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
+    val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
+    val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
@@ -600,6 +617,16 @@ private fun PortraitLayout(
                     style = MaterialTheme.typography.titleMedium
                 )
                 
+                if (simpleTranslate) {
+                    TranslateTokenBar(
+                        markers = messageMarkers,
+                        onOpen = { position -> viewModel.openWithBuilder(position) }
+                    )
+                }
+                TextButton(onClick = onOpenTellrawPreview) {
+                    Text(stringResource(R.string.tellraw_preview))
+                }
+
                 OutlinedTextField(
                     value = messageTextFieldValue.value,
                     onValueChange = { 
@@ -779,11 +806,167 @@ private fun PortraitLayout(
     }
 }
 
+private data class TellrawPreviewRow(
+    val condition: String,
+    val recipient: String,
+    val content: String
+)
+
+@Composable
+private fun TellrawPreviewDialog(
+    input: String,
+    onInputChange: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull()?.let { onInputChange(it) }
+        }
+    }
+    val rows = remember(input, context) {
+        input.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .mapNotNull { line ->
+                val isTellrawLine = line.startsWith("tellraw ") ||
+                    (line.startsWith("execute ") && " run tellraw " in line)
+                if (!isTellrawLine) {
+                    if (line.startsWith("execute ") || line.startsWith("tag ")) {
+                        TellrawPreviewRow(
+                            condition = if (line.startsWith("tag ")) "(cleanup)" else line.substringBefore(" run "),
+                            recipient = "-",
+                            content = line
+                        )
+                    } else null
+                } else {
+                    val parsed = runCatching {
+                        CommandInputParser.parse(
+                            line, context,
+                            com.tellraw.app.util.VersionDiff.NbtSyntax.MODERN
+                        )
+                    }.getOrNull()
+                    if (parsed == null) {
+                        TellrawPreviewRow(line, "?", "无法解析")
+                    } else {
+                        TellrawPreviewRow(
+                            condition = parsed.executePrefix ?: "(无 execute 前缀)",
+                            recipient = parsed.javaSelector ?: "@a",
+                            content = parsed.javaJson
+                        )
+                    }
+                }
+            }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.tellraw_preview)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    stringResource(R.string.tellraw_preview_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 4,
+                    maxLines = 8
+                )
+                TextButton(onClick = {
+                    importLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
+                }) { Text(stringResource(R.string.tellraw_preview_import)) }
+                if (rows.isEmpty()) {
+                    Text(stringResource(R.string.tellraw_preview_empty))
+                } else {
+                    rows.forEachIndexed { index, row ->
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(
+                                Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text("#${index + 1}", style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    "${stringResource(R.string.tellraw_preview_condition)}: ${row.condition}",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Text(
+                                    "${stringResource(R.string.tellraw_preview_recipient)}: ${row.recipient}",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Text(
+                                    "${stringResource(R.string.tellraw_preview_content)}: ${row.content}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        }
+    )
+}
+
+@Composable
+private fun TranslateTokenBar(markers: String, onOpen: (Int) -> Unit) {
+    val tokens = remember(markers) {
+        TextComponentHelper.componentTokens(markers)
+            .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
+    }
+    if (tokens.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            stringResource(R.string.translate_tokens_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            tokens.forEach { token ->
+                AssistChip(
+                    onClick = { onOpen(token.start) },
+                    label = {
+                        Text(stringResource(R.string.translate_token_label, token.ordinal))
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.translate_tokens_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onOpenTellrawPreview: () -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -802,6 +985,9 @@ private fun LandscapeLayout(
     hoveredComponentContent: String?,
     viewModel: TellrawViewModel
 ) {
+    val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
+    val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
@@ -932,6 +1118,15 @@ private fun LandscapeLayout(
                             style = MaterialTheme.typography.titleMedium
                         )
                         
+                        if (simpleTranslate) {
+                            TranslateTokenBar(
+                                markers = messageMarkers,
+                                onOpen = { position -> viewModel.openWithBuilder(position) }
+                            )
+                        }
+                                                TextButton(onClick = onOpenTellrawPreview) {
+                            Text(stringResource(R.string.tellraw_preview))
+                        }
                         OutlinedTextField(
                             value = messageTextFieldValue.value,
                             onValueChange = { 

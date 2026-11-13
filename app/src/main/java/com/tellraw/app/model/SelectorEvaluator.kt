@@ -625,7 +625,7 @@ object SelectorEvaluator {
     /** Bedrock slot.inventory / Java items inventory 的外部槽号 0-26 -> 内部 NBT 槽 9-35。 */
     private fun translateInventorySlotSpec(slot: String): String {
         fun shift(text: String): String {
-            val n = text.toIntOrNull() ?: return text
+            val n = text.toIntOrNull()?.takeIf { it >= 0 } ?: return text
             return (n + 9).toString()
         }
         if (slot.startsWith("!")) return "!" + shift(slot.substring(1))
@@ -840,26 +840,22 @@ object SelectorEvaluator {
         val qText = if (qNeg) rawQuantity!!.substring(1) else rawQuantity
         // quantity=0.. = 该项目不做过滤（doc: autocheck Q6/Q7）
         if (!qNeg && qText == "0..") return true
+        val matching = e.items.filter { (key, stack) ->
+            slotMatches(key) && stack.id == wantId &&
+                (data == null || (stack.damage ?: 0) == data)
+        }
         // quantity=0 / 0..0 的含义是"没有该物品"（与 execute 需求 A5/C18 一致）
         val meansNone = !qNeg && qText != null && qText in setOf("0", "0..0")
-        if (meansNone) {
-            return e.items.none { (key, stack) ->
-                slotMatches(key) && stack.id == wantId &&
-                    (data == null || (stack.damage ?: 0) == data)
-            }
-        }
+        if (meansNone) return matching.isEmpty()
         val (qLo, qHi) = parseRange(qText ?: "1..")
         val lo = qLo ?: 0.0
         val hi = qHi ?: Double.MAX_VALUE
-        return e.items.any { (key, stack) ->
-            if (!slotMatches(key) || stack.id != wantId) return@any false
-            val qtyOk = if (qNeg) {
-                // quantity=!N：存在且数量不等于 N
-                qText?.toIntOrNull()?.let { stack.count != it } ?: true
-            } else {
-                stack.count.toDouble() >= lo && stack.count.toDouble() <= hi
-            }
-            qtyOk && (data == null || (stack.damage ?: 0) == data)
+        // Bedrock quantity 是匹配槽位的总数，不是每个槽各自比较。
+        val total = matching.values.sumOf { it.count.toDouble() }
+        return if (qNeg) {
+            qText?.toIntOrNull()?.let { total != it.toDouble() } ?: matching.isNotEmpty()
+        } else {
+            total >= lo && total <= hi
         }
     }
 

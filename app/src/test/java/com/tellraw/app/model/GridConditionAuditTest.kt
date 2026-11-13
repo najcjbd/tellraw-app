@@ -90,4 +90,101 @@ class GridConditionAuditTest {
         assertEquals(base, r.origin)
         assertTrue(r.notes.isNotEmpty())
     }
+
+    @Test
+    fun missingDimensionDoesNotInheritCurrentWorldState() {
+        val world = GridConditionEvaluator.GridWorld(
+            dimension = "minecraft:overworld",
+            biome = "minecraft:plains",
+            loaded = true,
+            blocks = mapOf("0,-60,0" to GridConditionEvaluator.GridBlock("minecraft:stone")),
+            functions = setOf("test:fn"),
+            stopwatches = mapOf("sw" to 1.0),
+            dimensions = mapOf(
+                "minecraft:the_nether" to GridConditionEvaluator.DimensionWorld(
+                    biome = "minecraft:nether_wastes", loaded = false,
+                    blocks = mapOf("1,2,3" to GridConditionEvaluator.GridBlock("minecraft:netherrack"))
+                )
+            )
+        )
+        val nether = world.forDimension("nether")
+        assertEquals("minecraft:the_nether", nether.dimension)
+        assertEquals("minecraft:nether_wastes", nether.biome)
+        assertFalse(nether.loaded)
+        assertTrue(nether.blocks.containsKey("1,2,3"))
+
+        val end = world.forDimension("the_end")
+        assertEquals("minecraft:the_end", end.dimension)
+        assertEquals("", end.biome)
+        assertTrue(end.blocks.isEmpty())
+        assertTrue(end.functions.isEmpty())
+        assertTrue(end.stopwatches.isEmpty())
+    }
+
+
+    @Test
+    fun itemsAndSlotsUseExternalToInternalInventoryMapping() {
+        val p = EditableGridEntity(
+            uid = "p", id = "minecraft:player",
+            inventory = "27=minecraft:diamond,9=minecraft:dirt"
+        ).toGridEntity()
+        val items = eval(
+            "if items entity @s inventory.18 minecraft:diamond",
+            entity = p, all = listOf(p)
+        )
+        assertTrue(items.notes.joinToString(), items.ok)
+        val slots = eval(
+            "if slots entity @s inventory.18",
+            entity = p, all = listOf(p)
+        )
+        assertTrue(slots.notes.joinToString(), slots.ok)
+        val inv0 = eval(
+            "if items entity @s inventory.0 minecraft:dirt",
+            entity = p, all = listOf(p)
+        )
+        assertTrue(inv0.notes.joinToString(), inv0.ok)
+    }
+
+    @Test
+    fun itemsIdNegationIsRejectedAsUnsupportedJavaSyntax() {
+        val p = EditableGridEntity(uid = "p", id = "minecraft:player").toGridEntity()
+        val r = eval(
+            "if items entity @s hotbar.0 !minecraft:diamond",
+            entity = p, all = listOf(p)
+        )
+        assertTrue(r.notes.any { it.contains("物品 ID 前取反") })
+    }
+
+
+    @Test
+    fun bareInventorySlotAndInvalidIdNegationAreNeutral() {
+        val p = EditableGridEntity(
+            uid = "p", id = "minecraft:player", inventory = "9=minecraft:diamond"
+        ).toGridEntity()
+        val bare = eval(
+            "if items entity @s inventory minecraft:diamond",
+            entity = p, all = listOf(p)
+        )
+        assertTrue(bare.notes.joinToString(), bare.ok)
+
+        val unlessNeg = eval(
+            "unless items entity @s hotbar.0 !minecraft:diamond",
+            entity = p, all = listOf(p)
+        )
+        assertTrue("unless 遇到不支持的语法不能反向排除所有实体", unlessNeg.ok)
+        assertTrue(unlessNeg.notes.any { it.contains("物品 ID 前取反") })
+    }
+
+
+    @Test
+    fun slotRangesAndNegativeSlotsFollowJavaSemantics() {
+        val p = EditableGridEntity(
+            uid = "p", id = "minecraft:player", inventory = "9=minecraft:dirt"
+        ).toGridEntity()
+        val range = eval("if items entity @s inventory.0..8 minecraft:dirt", entity = p, all = listOf(p))
+        assertTrue(range.notes.joinToString(), range.ok)
+        val negative = eval("if slots entity @s inventory.-1", entity = p, all = listOf(p))
+        assertFalse("负数槽位不应该平移成有效槽位", negative.ok)
+    }
+
 }

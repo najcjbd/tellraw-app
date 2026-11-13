@@ -136,13 +136,15 @@ object GridCommandPlanParser {
             }
             return Result(matched, notes.distinct())
         }
+        val transients = mutableListOf<GridEntity>()
         val contexts = evaluateParts(
-            trimmed, entities, executor, edition, baseOrigin, target, world, notes
+            trimmed, entities, executor, edition, baseOrigin, target, world, notes, transients
         )
+        val pool = entities + transients
         val matched = contexts.flatMap { ctx ->
             SelectorEvaluator.evaluate(
                 selector = targetSelector,
-                entities = entities,
+                entities = pool,
                 executor = ctx.entity,
                 edition = edition,
                 origin = ctx.origin,
@@ -151,6 +153,10 @@ object GridCommandPlanParser {
         }.distinctBy { it.uid }
         return Result(matched, notes.distinct())
     }
+
+    private fun prefixHasSummon(prefix: String): Boolean =
+        ExecuteConverter.parseExecuteParts(prefix, mutableListOf())
+            ?.any { it.tokens.firstOrNull() == "summon" } == true
 
     fun evaluate(
         plan: TagPlan,
@@ -165,6 +171,10 @@ object GridCommandPlanParser {
         val edition = if (target?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java"
 
         for (condition in plan.conditions) {
+            if (prefixHasSummon(condition.prefix)) {
+                notes.add("summon 只在单链模拟中支持；tag 方案里未建模")
+                continue
+            }
             val contexts = evaluateParts(
                 prefix = condition.prefix,
                 entities = entities,
@@ -204,6 +214,10 @@ object GridCommandPlanParser {
             if (added.isNullOrEmpty()) e else e.copy(tags = e.tags + added)
         }
         val matched = if (plan.finalPrefix != null) {
+            if (prefixHasSummon(plan.finalPrefix)) {
+                notes.add("summon 只在单链模拟中支持；tag 最终行未建模")
+                return Result(emptyList(), notes.distinct())
+            }
             val contexts = evaluateParts(
                 prefix = plan.finalPrefix,
                 entities = augmented,
@@ -268,7 +282,8 @@ object GridCommandPlanParser {
         baseOrigin: Triple<Double, Double, Double>,
         target: VersionSpec?,
         world: GridConditionEvaluator.GridWorld,
-        notes: MutableList<String>
+        notes: MutableList<String>,
+        transients: MutableList<GridEntity>? = null
     ): List<ExecContext> {
         val parts = ExecuteConverter.parseExecuteParts(prefix, notes) ?: return emptyList()
         var contexts = if (executor != null) {
@@ -293,10 +308,24 @@ object GridCommandPlanParser {
             }
         }
 
+        // summon 从命令源执行时只有一个源；否则后面的 at/as 会按每个网格实体重复生成。
+        if (executor == null &&
+            parts.any { it.tokens.firstOrNull() == "summon" }
+        ) {
+            val source = contexts.firstOrNull() ?: ExecContext(
+                GridEntity(
+                    uid = "__command_source", id = "minecraft:player",
+                    x = baseOrigin.first, y = baseOrigin.second, z = baseOrigin.third
+                ),
+                baseOrigin, 0.0, 0.0, world.dimension
+            )
+            contexts = listOf(source.copy(origin = baseOrigin, yaw = 0.0, pitch = 0.0))
+        }
+
         fun selectEntities(selector: String, ctx: ExecContext): List<GridEntity> =
             SelectorEvaluator.evaluate(
                 selector = selector,
-                entities = entities,
+                entities = if (transients == null) entities else entities + transients,
                 executor = ctx.entity,
                 edition = edition,
                 origin = ctx.origin,
@@ -312,13 +341,16 @@ object GridCommandPlanParser {
             }
         }
 
+        var summonCounter = 0
         for (part in parts) {
             val conditionText = part.conditionText
             if (conditionText != null) {
                 contexts = contexts.mapNotNull { ctx ->
                     val worldForCtx = world.forDimension(ctx.dimension)
                     val r = GridConditionEvaluator.evaluate(
-                        conditionText, ctx.entity, entities, target, worldForCtx, ctx.origin,
+                        conditionText, ctx.entity,
+                        if (transients == null) entities else entities + transients,
+                        target, worldForCtx, ctx.origin,
                         ctx.yaw, ctx.pitch, ctx.anchorEyes
                     )
                     notes.addAll(r.notes)
@@ -353,7 +385,8 @@ object GridCommandPlanParser {
                             val uids = ctx.entity.relations[relation].orEmpty()
                             if (uids.isEmpty()) missing++
                             for (uid in uids) {
-                                val related = entities.firstOrNull { it.uid == uid }
+                                val related = (if (transients == null) entities else entities + transients)
+                                    .firstOrNull { it.uid == uid }
                                 if (related == null) {
                                     notes.add("on $relation 指向的实体 $uid 不在场上")
                                 } else {
@@ -385,7 +418,7 @@ object GridCommandPlanParser {
                                     )
                                 }
                             }
-                        }.distinctBy { it.contextKey() }
+                        }
                     }
                 }
                 "positioned" -> {
@@ -556,8 +589,45 @@ object GridCommandPlanParser {
                     }
                 }
                 "summon" -> {
-                    notes.add("summon 生成的新实体未建模，执行者解析停止")
-                    return emptyList()
+                    val rawId = tokens.getOrNull(1)
+                    if (rawId == null) {
+                        notes.add("summon 缺少实体 ID，执行者解析停止")
+                        contexts = emptyList()
+                    } else {
+                        val normalizedId = if (rawId.contains(':')) rawId else "minecraft:$rawId"
+                        val id = EntityIdAliases.toJava(normalizedId) ?: normalizedId
+                        val category = EntityRegistry.categoryOf(id)
+                        val width = when (category) {
+                            EntityRegistry.Category.PROJECTILE -> 0.25
+                            EntityRegistry.Category.VEHICLE -> 1.375
+                            else -> 0.6
+                        }
+                        val height = when (category) {
+                            EntityRegistry.Category.PROJECTILE -> 0.25
+                            EntityRegistry.Category.VEHICLE -> 0.5625
+                            else -> 1.8
+                        }
+                        notes.add(
+                            "summon $id 已按临时实体模拟：使用当前坐标/维度、0 视角、空 tags/scores；" +
+                                "默认 NBT/装备/变体未建模"
+                        )
+                        contexts = contexts.map { ctx ->
+                            val ghost = GridEntity(
+                                uid = "__summon_${ctx.entity.uid}_${summonCounter++}",
+                                id = id,
+                                x = ctx.origin.first,
+                                y = ctx.origin.second,
+                                z = ctx.origin.third,
+                                families = EntityFamilies.familiesOf(id),
+                                rotationX = 0.0,
+                                rotationY = 0.0,
+                                hitboxWidth = width,
+                                hitboxHeight = height
+                            )
+                            transients?.add(ghost)
+                            ctx.copy(entity = ghost, yaw = 0.0, pitch = 0.0)
+                        }
+                    }
                 }
                 else -> Unit
             }

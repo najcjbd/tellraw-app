@@ -85,4 +85,12 @@ class SnbtLiteTest {
     @Test fun invalidSnbtReturnsNull() {
         assertNull(SnbtLite.parseCompound("{a:"))
     }
+
+    @Test
+    fun emptyListQueryOnlyMatchesEmptyList() {
+        val query = SnbtLite.parseValue("[]")!!
+        assertTrue(SnbtLite.matches(query, SnbtLite.parseValue("[]")!!))
+        assertFalse(SnbtLite.matches(query, SnbtLite.parseValue("[1,2]")!!))
+    }
+
 }

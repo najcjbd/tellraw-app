@@ -339,4 +339,19 @@ class SelectorEvaluatorTest {
         assertTrue(r.matched.isEmpty())
         assertTrue(r.notes.any { it.contains("Health") })
     }
+
+    @Test fun hasitemQuantityAggregatesMatchingStacks() {
+        val p = steve.copy(items = mapOf(
+            "inventory.27" to GridItem("minecraft:stone", 32),
+            "inventory.28" to GridItem("minecraft:stone", 32)
+        ))
+        val target = VersionSpec(VersionSpec.Edition.BEDROCK, listOf(1, 20, 80))
+        fun sel(q: String) = SelectorEvaluator.evaluate(
+            "@a[hasitem={item=stone,location=slot.inventory,quantity=$q}]",
+            listOf(p), edition = "bedrock", target = target
+        ).matched.map { it.uid }
+        assertEquals(listOf("p1"), sel("64"))
+        assertTrue(sel("65").isEmpty())
+    }
+
 }

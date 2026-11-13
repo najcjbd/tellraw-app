@@ -16,6 +16,7 @@ import com.tellraw.app.data.repository.SettingsRepository
 import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
+import com.tellraw.app.util.CommandInputParser
 import com.tellraw.app.util.ExecuteConverter
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
@@ -111,6 +112,9 @@ class TellrawViewModel @Inject constructor(
     val asSensitive: StateFlow<Boolean> = _asSensitive.asStateFlow()
     private val _allowMultiCmdTag = MutableStateFlow(false)
     val allowMultiCmdTag: StateFlow<Boolean> = _allowMultiCmdTag.asStateFlow()
+
+    private val _simpleTranslateNesting = MutableStateFlow(true)
+    val simpleTranslateNesting: StateFlow<Boolean> = _simpleTranslateNesting.asStateFlow()
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -248,6 +252,7 @@ class TellrawViewModel @Inject constructor(
             _bedrockColorToRgb.value = loadedSettings.bedrockColorToRgb
             _asSensitive.value = loadedSettings.asSensitive
             _allowMultiCmdTag.value = loadedSettings.allowMultiCmdTag
+            _simpleTranslateNesting.value = loadedSettings.simpleTranslateNesting
             _targetVersion.value = loadedSettings.targetVersion
             
             // 加载历史记录文件名
@@ -866,6 +871,11 @@ class TellrawViewModel @Inject constructor(
         generateCommands()
     }
 
+    fun setSimpleTranslateNesting(enabled: Boolean) {
+        _simpleTranslateNesting.value = enabled
+        viewModelScope.launch { settingsRepository.setSimpleTranslateNesting(enabled) }
+    }
+
     fun setBedrockColorToRgb(enabled: Boolean) {
         _bedrockColorToRgb.value = enabled
         viewModelScope.launch {
@@ -915,13 +925,55 @@ class TellrawViewModel @Inject constructor(
         val jTellraw = "tellraw ${r.javaSelector ?: "@a"} ${r.javaJson}"
         val bTellraw = "tellraw ${r.bedrockSelector ?: "@a"} ${r.bedrockJson}"
         val prefix = r.executePrefix
-        val javaTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+        val prefixWarnings = mutableListOf<String>()
+        fun convertPrefix(direction: ExecuteConverter.Direction): String? {
+            if (prefix == null) return null
+            val reminders = mutableListOf<String>()
+            val converted = ExecuteConverter.convertExecutePrefix(prefix, direction, reminders, nbtSyntax)
+            prefixWarnings.addAll(reminders)
+            if (converted == null) {
+                prefixWarnings.add("execute 前缀无法安全转换到目标版本，已保留原文：$prefix")
+                return prefix
+            }
+            return converted
+        }
+        // 只有输入版本明确且与目标版本不同时才转换；同版本不能把 Java 前缀当基岩再转一次。
+        if (prefix != null && r.sourceEdition == CommandInputParser.SourceEdition.UNKNOWN) {
+            prefixWarnings.add("输入版本无法从 JSON 判断，execute 前缀按原文保留；请确认目标版本语法")
+        }
+        val javaPrefix = when (r.sourceEdition) {
+            CommandInputParser.SourceEdition.BEDROCK -> convertPrefix(ExecuteConverter.Direction.BEDROCK_TO_JAVA)
+            else -> prefix
+        }
+        val bedrockPrefix = when (r.sourceEdition) {
+            CommandInputParser.SourceEdition.JAVA -> convertPrefix(ExecuteConverter.Direction.JAVA_TO_BEDROCK)
+            else -> prefix
+        }
+        val rawJavaJson = if (r.sourceEdition == CommandInputParser.SourceEdition.BEDROCK) {
+            TextComponentHelper.convertToJavaJson(r.components, context = null)
+        } else r.javaJson
+        val rawJavaSelector = r.selector ?: r.javaSelector ?: "@a"
+        val recipientNeedsRaw = rawJavaSelector.contains("=!") || rawJavaSelector.contains("quantity=0")
+        val messageNeedsRaw = rawJavaJson.contains("=!") || rawJavaJson.contains("quantity=0")
+        val javaTagPlan = if (_allowMultiCmdTag.value && prefix != null &&
+            r.sourceEdition == CommandInputParser.SourceEdition.BEDROCK
+        ) {
             ExecuteConverter.buildMultiCommandTagPlan(
                 prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA,
-                r.javaSelector ?: "@a", r.javaJson, nbtSyntax
+                if (recipientNeedsRaw) rawJavaSelector else (r.javaSelector ?: "@a"),
+                if (messageNeedsRaw) rawJavaJson else r.javaJson,
+                nbtSyntax,
+                filterJavaSelector = { selectorText ->
+                    SelectorConverter.filterSelectorParameters(
+                        selectorText, SelectorType.JAVA, applicationContext,
+                        nbtSyntax, null
+                    ).first
+                }
             )
         } else null
-        val bedrockTagPlan = if (_allowMultiCmdTag.value && prefix != null) {
+        val bedrockTagPlan = if (_allowMultiCmdTag.value && prefix != null &&
+            r.sourceEdition == CommandInputParser.SourceEdition.JAVA
+        ) {
             ExecuteConverter.buildMultiCommandTagPlan(
                 prefix, ExecuteConverter.Direction.JAVA_TO_BEDROCK,
                 r.bedrockSelector ?: "@a", r.bedrockJson, nbtSyntax
@@ -929,16 +981,17 @@ class TellrawViewModel @Inject constructor(
         } else null
         _rawConvertJava.value = if (javaTagPlan != null) {
             javaTagPlan.commands.joinToString("\n")
-        } else if (prefix != null) {
-            ExecuteConverter.composeTellrawCommand(prefix, jTellraw)
+        } else if (javaPrefix != null) {
+            ExecuteConverter.composeTellrawCommand(javaPrefix, jTellraw)
         } else jTellraw
         _rawConvertBedrock.value = if (bedrockTagPlan != null) {
             bedrockTagPlan.commands.joinToString("\n")
-        } else if (prefix != null) {
-            ExecuteConverter.composeTellrawCommand(prefix, bTellraw)
+        } else if (bedrockPrefix != null) {
+            ExecuteConverter.composeTellrawCommand(bedrockPrefix, bTellraw)
         } else bTellraw
         _rawConvertWarnings.value = buildList {
             addAll(r.warnings)
+            addAll(prefixWarnings)
             javaTagPlan?.let {
                 addAll(it.warnings)
                 add("已使用多命令 tag 方案（Java）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")
@@ -1166,6 +1219,16 @@ class TellrawViewModel @Inject constructor(
                     nbtSyntax, _bedrockColorToRgb.value, target
                 )
                 allReminders.addAll(javaWarnings)
+                // 保留 selector 原文的另一份 JSON：tag 层需要先看到 `=!` 等目标版本写不出的条件，
+                // 否则上面的正常转换已把它们过滤掉，tag 永远没机会触发。
+                val javaTagWarnings = mutableListOf<String>()
+                val javaJsonForTag = if (_allowMultiCmdTag.value && contentAs == null) {
+                    TextFormatter.convertToJavaJson(
+                        messageToUse, mNHandling, _mnCFEnabled.value,
+                        null, javaTagWarnings, _separatorAsTextComponent.value,
+                        nbtSyntax, _bedrockColorToRgb.value, target
+                    )
+                } else javaJson
 
                 val finalJavaTarget = contentAs?.targetSelector ?: javaTarget
                 val finalJavaInnerTokens: List<String>? = when {
@@ -1174,20 +1237,36 @@ class TellrawViewModel @Inject constructor(
                     else -> null
                 }
                 val javaPlain = "tellraw $finalJavaTarget $javaJson"
+                val rawSelectorNeedsTag = javaJsonForTag.contains("=!") ||
+                    javaJsonForTag.contains("quantity=0")
+                val tagNeedsRaw = javaNegation != null || rawSelectorNeedsTag
+                val tagTarget = if (javaNegation != null) javaSelector else finalJavaTarget
+                val tagJson = if (tagNeedsRaw) javaJsonForTag else javaJson
+                val tagFilterWarnings = mutableListOf<String>()
                 val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
                     javaUserPrefix != null && _executePrefixInput.value.isNotBlank() &&
-                    finalJavaInnerTokens == null && contentAs == null
+                    contentAs == null && (finalJavaInnerTokens == null || javaNegation != null)
                 ) {
                     ExecuteConverter.buildMultiCommandTagPlan(
                         _executePrefixInput.value,
                         ExecuteConverter.Direction.BEDROCK_TO_JAVA,
-                        finalJavaTarget,
-                        javaJson,
-                        nbtSyntax
+                        tagTarget,
+                        tagJson,
+                        nbtSyntax,
+                        filterJavaSelector = { selectorText ->
+                            val (filtered, _, reminders) = SelectorConverter.filterSelectorParameters(
+                                selectorText, SelectorType.JAVA, applicationContext,
+                                nbtSyntax, target
+                            )
+                            tagFilterWarnings.addAll(reminders)
+                            filtered
+                        }
                     )
                 } else null
                 val javaCommand = if (javaTagPlan != null) {
                     allReminders.addAll(javaTagPlan.warnings)
+                    allReminders.addAll(javaTagWarnings)
+                    allReminders.addAll(tagFilterWarnings)
                     allReminders.add(
                         "已使用多命令 tag 方案（Java）：临时标签 ${javaTagPlan.tags.joinToString()}，末尾会自动 remove；" +
                             "请按顺序执行全部命令，中途停止会残留标签"

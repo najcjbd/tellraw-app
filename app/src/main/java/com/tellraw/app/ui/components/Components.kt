@@ -679,6 +679,7 @@ fun SettingsDialog(
     bedrockColorToRgb: Boolean,
     asSensitive: Boolean = true,
     allowMultiCmdTag: Boolean = false,
+    simpleTranslateNesting: Boolean = true,
     nbtSyntax: String,
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
@@ -691,6 +692,7 @@ fun SettingsDialog(
     onBedrockColorToRgbChanged: (Boolean) -> Unit,
     onAsSensitiveChanged: (Boolean) -> Unit = {},
     onAllowMultiCmdTagChanged: (Boolean) -> Unit = {},
+    onSimpleTranslateNestingChanged: (Boolean) -> Unit = {},
     onNbtSyntaxChanged: (String) -> Unit,
     onOpenRawConvert: () -> Unit = {}
 ) {
@@ -1016,6 +1018,28 @@ fun SettingsDialog(
                         }
                     }
 
+                    // 简单 translate 嵌套：消息框显示可点击 TranslateN
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = simpleTranslateNesting,
+                            onCheckedChange = onSimpleTranslateNestingChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.simple_translate_nesting),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.simple_translate_nesting_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口
@@ -1315,6 +1339,28 @@ fun SettingsDialog(
                             )
                             Text(
                                 text = stringResource(R.string.allow_multi_cmd_tag_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // 简单 translate 嵌套：消息框显示可点击 TranslateN
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = simpleTranslateNesting,
+                            onCheckedChange = onSimpleTranslateNestingChanged
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.simple_translate_nesting),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.simple_translate_nesting_description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

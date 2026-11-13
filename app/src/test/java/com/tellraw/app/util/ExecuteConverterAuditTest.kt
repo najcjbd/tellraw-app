@@ -479,4 +479,78 @@ class ExecuteConverterAuditTest {
         assertTrue(text, text.contains("if score @s n"))
         assertTrue(reminders.isNotEmpty())
     }
+
+    @Test
+    fun recipientSelectorsThatNeedOriginalContextFallBack() {
+        for (target in listOf(
+            "@p[scores={n=!5}]",
+            "@n[scores={n=!5}]",
+            "@r[scores={n=!5}]",
+            "@a[distance=..5,scores={n=!5}]",
+            "@a[limit=1,scores={n=!5}]",
+            "@a[sort=nearest,scores={n=!5}]"
+        )) {
+            val plan = ExecuteConverter.buildMultiCommandTagPlan(
+                "execute as @a if items entity @s hotbar.* minecraft:diamond " +
+                    "if predicate my:is_special",
+                Direction.BEDROCK_TO_JAVA,
+                tellrawTarget = target,
+                tellrawJson = "{\"text\":\"ok\"}",
+                requireUnmergeable = false,
+                tagSuffix = "ctx"
+            )
+            assertNull("$target 不应拆出会二次抽样的 tag", plan)
+        }
+    }
+
+
+    @Test
+    fun selectorTagPlanFiltersUnsupportedBaseParams() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a[family=zombie,scores={n=!5}]",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "filter",
+            filterJavaSelector = { "@a" }
+        )
+        requireNotNull(plan)
+        assertTrue(plan.commands.any { it.contains("run tag @s add tellraw_recv_filter") })
+        assertFalse(plan.commands.any { it.contains("family=zombie") })
+        assertTrue(plan.commands.any { it.contains("tellraw @a[tag=tellraw_recv_filter]") })
+    }
+
+
+    @Test
+    fun messageSelectorIsFilteredEvenWhenNoTagIsNeeded() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"text\":\"x\",\"extra\":[{\"selector\":\"@e[family=zombie]\"}]}",
+            requireUnmergeable = false,
+            tagSuffix = "msgfilter",
+            filterJavaSelector = { "@e" }
+        )
+        requireNotNull(plan)
+        assertFalse(plan.commands.any { it.contains("family=zombie") })
+        assertTrue(plan.commands.any { it.contains("\"selector\":\"@e\"") })
+    }
+
+
+    @Test
+    fun unsafeMessageSelectorAbortsTagPlanInsteadOfLeakingRawSelector() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@a",
+            tellrawJson = "{\"selector\":\"@p[scores={n=!5}]\"}",
+            requireUnmergeable = false,
+            tagSuffix = "unsafe",
+            filterJavaSelector = { it.replace("scores={n=!5}", "") }
+        )
+        assertNull(plan)
+    }
+
 }

@@ -151,6 +151,13 @@ object WithArgCodec {
 
     fun parseArgs(text: String): List<WithArgDraft> {
         val el = parseStrict(text)
+        if (el.isJsonNull) {
+            throw WithArgsFormatException(FormatError.NULL_ITEM, "null item")
+        }
+        val arr = argsArrayOf(el)
+        if (arr.any { it.isJsonNull }) {
+            throw WithArgsFormatException(FormatError.NULL_ITEM, "null item")
+        }
         rejectNullWithItems(el)
         return argsOf(el)
     }

@@ -75,6 +75,8 @@ object SnbtLite {
         }
         is Value.ListV -> {
             val a = actual as? Value.ListV ?: return false
+            // 空列表查询只匹配空列表；否则 query.items.all {} 会对任意列表恒真。
+            if (query.items.isEmpty()) return a.items.isEmpty()
             val used = BooleanArray(a.items.size)
             query.items.all { q ->
                 var found = false

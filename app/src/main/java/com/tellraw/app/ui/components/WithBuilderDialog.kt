@@ -2,6 +2,7 @@ package com.tellraw.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +71,7 @@ import com.tellraw.app.util.WithArgDraft
 @Composable
 fun WithBuilderDialog(
     state: WithBuilderState,
+    simpleMode: Boolean = false,
     onDismiss: () -> Unit,
     onKeyChange: (String) -> Unit,
     onFallbackChange: (String) -> Unit,
@@ -106,6 +108,17 @@ fun WithBuilderDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        stringResource(R.string.with_builder_intro),
+                        modifier = Modifier.padding(10.dp),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 OutlinedTextField(
                     value = state.key,
@@ -113,9 +126,12 @@ fun WithBuilderDialog(
                     label = { Text(stringResource(R.string.with_builder_key)) },
                     singleLine = true,
                     isError = state.key.isBlank(),
-                    supportingText = if (state.key.isBlank()) {
-                        { Text(stringResource(R.string.with_builder_key_required)) }
-                    } else null,
+                    supportingText = {
+                        Text(
+                            if (state.key.isBlank()) stringResource(R.string.with_builder_key_required)
+                            else stringResource(R.string.with_builder_key_hint)
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -123,6 +139,7 @@ fun WithBuilderDialog(
                     onValueChange = onFallbackChange,
                     label = { Text(stringResource(R.string.with_builder_fallback)) },
                     singleLine = true,
+                    supportingText = { Text(stringResource(R.string.with_builder_fallback_hint)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
@@ -139,17 +156,37 @@ fun WithBuilderDialog(
                     )
                     Tab(
                         selected = state.mode == WithBuilderMode.JSON,
-                        onClick = { onModeChange(WithBuilderMode.JSON) },
+                        enabled = visualRawError == null,
+                        onClick = {
+                            // 可视化里的 Raw 草稿还没通过 JSON 校验时不能切走，否则草稿会丢失且 Apply 会被错误放行。
+                            if (visualRawError == null) onModeChange(WithBuilderMode.JSON)
+                        },
                         text = { Text(stringResource(R.string.with_builder_tab_json)) }
+                    )
+                }
+                if (visualRawError != null) {
+                    Text(
+                        stringResource(R.string.with_builder_raw_blocked),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
 
                 if (state.mode == WithBuilderMode.VISUAL) {
-                    VisualTreeEditor(
-                        args = state.args,
-                        onArgsChange = onArgsChange,
-                        onRawError = { visualRawError = it }
-                    )
+                    if (simpleMode) {
+                        Text(
+                            stringResource(R.string.with_builder_args),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        ArgListSection(args = state.args, onArgsChange = onArgsChange)
+                    } else {
+                        VisualTreeEditor(
+                            args = state.args,
+                            onArgsChange = onArgsChange,
+                            onRawError = { visualRawError = it },
+                            rawEditingBlocked = visualRawError != null
+                        )
+                    }
                 } else {
                     JsonTab(state = state, onRawJsonChange = onRawJsonChange)
                 }
@@ -171,6 +208,19 @@ fun WithBuilderDialog(
                             WithArgCodec.parseArgs(state.rawJson)
                         }.getOrNull()
                     }
+                }
+                val incompletePath = remember(state.mode, state.args) {
+                    if (state.mode == WithBuilderMode.VISUAL) firstIncompletePath(state.args) else null
+                }
+                if (incompletePath != null) {
+                    Text(
+                        stringResource(
+                            R.string.with_builder_incomplete_args,
+                            incompletePath.joinToString(".") { (it + 1).toString() }
+                        ),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -203,7 +253,8 @@ fun WithBuilderDialog(
 private fun VisualTreeEditor(
     args: List<WithArgDraft>,
     onArgsChange: (List<WithArgDraft>) -> Unit,
-    onRawError: (String?) -> Unit
+    onRawError: (String?) -> Unit,
+    rawEditingBlocked: Boolean
 ) {
     var selectedRaw by rememberSaveable { mutableStateOf("") }
     var collapsedRaw by rememberSaveable { mutableStateOf("") }
@@ -212,10 +263,12 @@ private fun VisualTreeEditor(
     val selected = argAt(args, selectedPath)
 
     fun select(path: List<Int>) {
+        if (rawEditingBlocked) return
         selectedRaw = argPathString(path)
     }
 
     fun toggle(path: List<Int>) {
+        if (rawEditingBlocked) return
         val key = argPathString(path)
         val next = collapsed.toMutableSet()
         if (!next.add(key)) next.remove(key)
@@ -232,11 +285,22 @@ private fun VisualTreeEditor(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            AddArgMenu(label = stringResource(R.string.with_builder_add)) { draft ->
+            if (!rawEditingBlocked) {
+                AddArgMenu(label = stringResource(R.string.with_builder_add)) { draft ->
+                    val next = args + draft
+                    onArgsChange(next)
+                    collapsedRaw = ""
+                    selectedRaw = argPathString(listOf(next.lastIndex))
+                }
+            }
+        }
+
+        if (!rawEditingBlocked) {
+            QuickAddArgs(R.string.with_builder_quick_add_root) { draft ->
                 val next = args + draft
                 onArgsChange(next)
                 collapsedRaw = ""
-                select(listOf(next.lastIndex))
+                selectedRaw = argPathString(listOf(next.lastIndex))
             }
         }
 
@@ -285,6 +349,14 @@ private fun VisualTreeEditor(
                 onChanged = { updated -> onArgsChange(updateArgAt(args, selectedPath, updated)) },
                 onRawError = onRawError
             )
+            if (selected is WithArgDraft.Translate && !rawEditingBlocked) {
+                QuickAddArgs(R.string.with_builder_quick_add_child) { draft ->
+                    val childIndex = selected.args.size
+                    onArgsChange(addChildArg(args, selectedPath, draft))
+                    collapsedRaw = ""
+                    selectedRaw = argPathString(selectedPath + childIndex)
+                }
+            }
             val parentPath = selectedPath.dropLast(1)
             val index = selectedPath.lastOrNull() ?: 0
             val siblings = listAtPath(args, parentPath)
@@ -296,7 +368,7 @@ private fun VisualTreeEditor(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TextButton(
-                    enabled = index > 0,
+                    enabled = index > 0 && !rawEditingBlocked,
                     onClick = {
                         onArgsChange(moveArg(args, selectedPath, -1))
                         collapsedRaw = ""
@@ -304,32 +376,38 @@ private fun VisualTreeEditor(
                     }
                 ) { Text(stringResource(R.string.with_builder_move_up)) }
                 TextButton(
-                    enabled = index < siblingCount - 1,
+                    enabled = index < siblingCount - 1 && !rawEditingBlocked,
                     onClick = {
                         onArgsChange(moveArg(args, selectedPath, 1))
                         collapsedRaw = ""
                         select(parentPath + (index + 1))
                     }
                 ) { Text(stringResource(R.string.with_builder_move_down)) }
-                TextButton(onClick = {
-                    val next = insertArgAt(args, parentPath, index + 1, selected)
-                    onArgsChange(next)
-                    collapsedRaw = ""
-                    select(parentPath + (index + 1))
-                }) { Text(stringResource(R.string.with_builder_duplicate)) }
-                if (selected is WithArgDraft.Translate) {
+                TextButton(
+                    enabled = !rawEditingBlocked,
+                    onClick = {
+                        val next = insertArgAt(args, parentPath, index + 1, selected)
+                        onArgsChange(next)
+                        collapsedRaw = ""
+                        selectedRaw = argPathString(parentPath + (index + 1))
+                    }
+                ) { Text(stringResource(R.string.with_builder_duplicate)) }
+                if (selected is WithArgDraft.Translate && !rawEditingBlocked) {
                     AddArgMenu(label = stringResource(R.string.with_builder_add_child)) { draft ->
                         val childIndex = selected.args.size
                         onArgsChange(addChildArg(args, selectedPath, draft))
                         collapsedRaw = ""
-                        select(selectedPath + childIndex)
+                        selectedRaw = argPathString(selectedPath + childIndex)
                     }
                 }
-                TextButton(onClick = {
-                    onArgsChange(removeArg(args, selectedPath))
-                    collapsedRaw = ""
-                    selectedRaw = ""
-                }) { Text(stringResource(R.string.delete)) }
+                TextButton(
+                    enabled = !rawEditingBlocked,
+                    onClick = {
+                        onArgsChange(removeArg(args, selectedPath))
+                        collapsedRaw = ""
+                        selectedRaw = ""
+                    }
+                ) { Text(stringResource(R.string.delete)) }
             }
         }
     }
@@ -359,7 +437,7 @@ private fun ArgTree(
                         if (path == selectedPath) MaterialTheme.colorScheme.secondaryContainer
                         else Color.Transparent
                     )
-                    .clickable { onSelect(path) }
+                    .selectable(selected = path == selectedPath, onClick = { onSelect(path) })
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -371,7 +449,10 @@ private fun ArgTree(
                     ) {
                         Icon(
                             if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                            contentDescription = null
+                            contentDescription = stringResource(
+                                if (expanded) R.string.with_builder_collapse
+                                else R.string.with_builder_expand
+                            )
                         )
                     }
                 } else {
@@ -414,6 +495,40 @@ private fun ArgTree(
 }
 
 @Composable
+private fun QuickAddArgs(labelRes: Int, onAdd: (WithArgDraft) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            AssistChip(
+                onClick = { onAdd(WithArgDraft.Text("")) },
+                label = { Text(stringResource(R.string.with_builder_quick_text)) }
+            )
+            AssistChip(
+                onClick = { onAdd(WithArgDraft.Selector("@a")) },
+                label = { Text(stringResource(R.string.with_builder_quick_selector)) }
+            )
+            AssistChip(
+                onClick = { onAdd(WithArgDraft.Score("", "")) },
+                label = { Text(stringResource(R.string.with_builder_quick_score)) }
+            )
+            AssistChip(
+                onClick = { onAdd(WithArgDraft.Translate("")) },
+                label = { Text(stringResource(R.string.with_builder_quick_translate)) }
+            )
+        }
+    }
+}
+
+@Composable
 private fun AddArgMenu(label: String, onAdd: (WithArgDraft) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -425,7 +540,16 @@ private fun AddArgMenu(label: String, onAdd: (WithArgDraft) -> Unit) {
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             AddKind.values().forEach { kind ->
                 DropdownMenuItem(
-                    text = { Text(stringResource(kind.labelRes)) },
+                    text = {
+                        Column {
+                            Text(stringResource(kind.labelRes))
+                            Text(
+                                stringResource(kind.descriptionRes),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
                     onClick = {
                         open = false
                         onAdd(defaultDraft(kind))
@@ -1423,6 +1547,17 @@ private val AddKind.labelRes: Int
         AddKind.RAW -> R.string.with_builder_kind_raw
     }
 
+private val AddKind.descriptionRes: Int
+    get() = when (this) {
+        AddKind.TEXT -> R.string.with_builder_kind_text_desc
+        AddKind.TRANSLATE -> R.string.with_builder_kind_translate_desc
+        AddKind.SELECTOR -> R.string.with_builder_kind_selector_desc
+        AddKind.SCORE -> R.string.with_builder_kind_score_desc
+        AddKind.KEYBIND -> R.string.with_builder_kind_keybind_desc
+        AddKind.NBT -> R.string.with_builder_kind_nbt_desc
+        AddKind.RAW -> R.string.with_builder_kind_raw_desc
+    }
+
 private fun defaultDraft(kind: AddKind): WithArgDraft = when (kind) {
     AddKind.TEXT -> WithArgDraft.Text("")
     AddKind.TRANSLATE -> WithArgDraft.Translate("")
@@ -1439,6 +1574,28 @@ private fun containsSectionSign(draft: WithArgDraft): Boolean = when (draft) {
     else -> false
 }
 
+private fun firstIncompletePath(
+    args: List<WithArgDraft>,
+    base: List<Int> = emptyList()
+): List<Int>? {
+    args.forEachIndexed { index, arg ->
+        val path = base + index
+        when (arg) {
+            is WithArgDraft.Text, is WithArgDraft.Raw -> Unit
+            is WithArgDraft.Translate -> {
+                if (arg.key.isBlank()) return path
+                firstIncompletePath(arg.args, path)?.let { return it }
+            }
+            is WithArgDraft.Selector -> if (arg.selector.isBlank()) return path
+            is WithArgDraft.Score ->
+                if (arg.name.isBlank() || arg.objective.isBlank()) return path
+            is WithArgDraft.Keybind -> if (arg.keybind.isBlank()) return path
+            is WithArgDraft.Nbt -> if (arg.path.isBlank()) return path
+        }
+    }
+    return null
+}
+
 @Composable
 private fun kindLabel(draft: WithArgDraft): String = stringResource(    when (draft) {
         is WithArgDraft.Text -> R.string.with_builder_kind_text
@@ -1451,6 +1608,7 @@ private fun kindLabel(draft: WithArgDraft): String = stringResource(    when (dr
     }
 )
 
+@Composable
 private fun summaryOf(draft: WithArgDraft): String = when (draft) {
     is WithArgDraft.Text -> buildString {
         append('"').append(draft.text).append('"')
@@ -1465,10 +1623,14 @@ private fun summaryOf(draft: WithArgDraft): String = when (draft) {
         if (flags.isNotEmpty()) append(" · ").append(flags.joinToString("/"))
     }
     is WithArgDraft.Translate ->
-        draft.key + if (draft.args.isEmpty()) "" else " (${draft.args.size})"
-    is WithArgDraft.Selector -> draft.selector
-    is WithArgDraft.Score -> "${draft.name}:${draft.objective}"
+        "\"" + draft.key.ifBlank { stringResource(R.string.with_builder_summary_blank_key) } + "\"" +
+            if (draft.args.isEmpty()) "" else " | " +
+                stringResource(R.string.with_builder_summary_items, draft.args.size)
+    is WithArgDraft.Selector ->
+        draft.selector.ifBlank { stringResource(R.string.with_builder_summary_blank_selector) }
+    is WithArgDraft.Score -> "${draft.name} / ${draft.objective}"
     is WithArgDraft.Keybind -> draft.keybind
     is WithArgDraft.Nbt -> draft.path
-    is WithArgDraft.Raw -> draft.element.toString().take(80)
+    is WithArgDraft.Raw ->
+        stringResource(R.string.with_builder_summary_raw) + ": " + draft.element.toString().take(60)
 }

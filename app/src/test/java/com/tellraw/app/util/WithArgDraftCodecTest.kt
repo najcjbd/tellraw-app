@@ -245,4 +245,15 @@ class WithArgDraftCodecTest {
         assertTrue(issues.contains(WithArgCodec.BedrockIssue.FALLBACK))
         assertTrue(issues.contains(WithArgCodec.BedrockIssue.SELECTOR_SEPARATOR))
     }
+
+    @Test
+    fun topLevelNullArgIsRejected() {
+        assertThrows(WithArgCodec.WithArgsFormatException::class.java) {
+            WithArgCodec.parseArgs("[null]")
+        }
+        assertThrows(WithArgCodec.WithArgsFormatException::class.java) {
+            WithArgCodec.parseArgs("null")
+        }
+    }
+
 }
