@@ -726,7 +726,8 @@ object ExecuteConverter {
         val message = planMessageSelectors(
             tellrawJson, direction, "tellraw_msg", suffix, nbtSyntax, warnings,
             filterJavaSelector,
-            prefixChangesExecutionContext(prefix) && finalContext(prefix, "@e") == null
+            prefixChangesExecutionContext(prefix) &&
+                replayContext(prefix, listOf("__probe__")) == null
         )
         if (recipient.unsafe || message.unsafe) return null
         val executor = buildExecutorTagPlan(
@@ -784,6 +785,22 @@ object ExecuteConverter {
         return "execute ${tokens.joinToString(" ")}"
     }
 
+    /** 用原 execute 修饰序列重放上下文，并用 tag 过滤最终执行者；summon 不能重放。 */
+    private fun replayContext(segs: List<Seg>, tags: List<String>): String? {
+        if (segs.any { it is Seg.Mod && it.tokens.firstOrNull() == "summon" }) return null
+        val mods = segs.filterIsInstance<Seg.Mod>()
+        if (mods.isEmpty() || tags.isEmpty()) return null
+        val tokens = mods.flatMap { it.tokens }
+        val filter = tags.joinToString(",") { "tag=$it" }
+        return "execute ${tokens.joinToString(" ")} if entity @s[$filter]"
+    }
+
+    private fun replayContext(prefix: String, tags: List<String>): String? =
+        parseSegments(prefix, mutableListOf())?.let { replayContext(it, tags) }
+
+    private fun hasPositionModifier(segs: List<Seg>): Boolean =
+        segs.any { it is Seg.Mod && it.tokens.firstOrNull() in POSITION_MODIFIERS }
+
     private fun buildExecutorTagPlan(
         prefix: String,
         direction: Direction,
@@ -797,8 +814,9 @@ object ExecuteConverter {
         val rawSegs = parseSegments(prefix, parseReminders) ?: return null
         if (rawSegs.filterIsInstance<Seg.Cond>().size < 2) return null
         val target = tellrawTarget.trim()
-        val canReplayContext = finalContext(prefix, "@e") != null
-        if (target.startsWith("@s[") || !target.startsWith("@") ||
+        val replayProbe = replayContext(prefix, listOf("__probe__"))
+        val canReplayContext = replayProbe != null
+        if (!target.startsWith("@") ||
             (targetRequiresOriginalContext(target) && !canReplayContext)
         ) {
             return null
@@ -849,8 +867,7 @@ object ExecuteConverter {
 
         // summon 每次生成新实体；无法在网格/独立 final 里确定，回退单链。
         if (mods.any { it.tokens.firstOrNull() == "summon" }) return null
-        // in / 位置修饰能否重放由 finalContext 决定；不能重放时回退单链。
-        if (mods.any { it.tokens.firstOrNull() == "in" } && finalContext(prefix, "@e") == null) return null
+        // in / 位置修饰能否重放由 replayContext 决定；无法重放时仍可走 as@e + in 的简化 final。
 
         val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
         val asCount = asMods.size
@@ -957,7 +974,11 @@ object ExecuteConverter {
             finalExecutor, tags.joinToString(",") { "tag=$it" }
         ) ?: return null
         val dimension = lastInDimension(prefix)
-        val finalExecute = finalContext(prefix, executorWithTags) ?: "execute as $executorWithTags"
+        val finalExecute = if (hasPositionModifier(steps)) {
+            replayContext(steps, tags) ?: "execute as $executorWithTags"
+        } else {
+            "execute as $executorWithTags"
+        }
         commands.add("$finalExecute run tellraw $target $tellrawJson")
         tags.forEach { tag ->
             val cleanup = "tag ${withTags(executorBase, listOf(tag))} remove $tag"
@@ -1003,8 +1024,8 @@ object ExecuteConverter {
         reason: String
     ): MultiCommandPlan? {
         val target = tellrawTarget.trim()
-        val canReplayContext = finalContext(prefix, "@e") != null
-        if (!target.startsWith("@") || target.startsWith("@s[") ||
+        val canReplayContext = replayContext(prefix, listOf("__probe__")) != null
+        if (!target.startsWith("@") ||
             (targetRequiresOriginalContext(target) && !canReplayContext)
         ) {
             return null
@@ -1021,7 +1042,12 @@ object ExecuteConverter {
         val withTag = withTags("@e", listOf(tag))
         val dimension = lastInDimension(prefix)
         val cleanup = "tag $withTag remove $tag"
-        val finalExecute = finalContext(prefix, withTag) ?: "execute as $withTag"
+        val convertedSegs = parseSegments(converted, mutableListOf()).orEmpty()
+        val finalExecute = if (hasPositionModifier(convertedSegs)) {
+            replayContext(convertedSegs, listOf(tag)) ?: "execute as $withTag"
+        } else {
+            "execute as $withTag"
+        }
         val commands = listOf(
             "$converted run tag @s add $tag",
             "$finalExecute run tellraw $target $tellrawJson",

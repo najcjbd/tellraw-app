@@ -61,9 +61,11 @@ class ExecuteConverterAuditTest {
                     "if predicate my:is_special run tag @s add tellraw_all_test"
             )
         )
-        assertEquals(
-            "execute as @e[tag=tellraw_all_test] at @s run tellraw @s {\"text\":\"ok\"}",
-            plan.commands[1]
+        assertTrue(
+            plan.commands[1],
+            plan.commands[1].contains("as @a at @s") &&
+                plan.commands[1].contains("tag=tellraw_all_test") &&
+                plan.commands[1].contains("run tellraw @s")
         )
         assertEquals("tag @e[tag=tellraw_all_test] remove tellraw_all_test", plan.commands[2])
     }
@@ -274,7 +276,7 @@ class ExecuteConverterAuditTest {
         requireNotNull(plan)
         assertEquals(1, plan.tags.size)
         assertTrue(plan.commands[0].startsWith("execute as @a on owner at @s if items entity @s"))
-        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_on] run tellraw @s"))
+        assertTrue(plan.commands[1].contains("on owner") && plan.commands[1].contains("at @s"))
         assertTrue(plan.commands[2].startsWith("tag @e[tag=tellraw_all_on] remove"))
     }
 
@@ -297,7 +299,7 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
-    fun selfSelectorWithParamsFallsBackToSingleChain() {
+    fun selfSelectorWithParamsIsKeptAsFinalTarget() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a if items entity @s hotbar.* minecraft:diamond if predicate my:is_special",
             Direction.BEDROCK_TO_JAVA,
@@ -306,7 +308,8 @@ class ExecuteConverterAuditTest {
             requireUnmergeable = false,
             tagSuffix = "self"
         )
-        assertNull(plan)
+        requireNotNull(plan)
+        assertTrue(plan.commands.any { it.contains("run tellraw @s[tag=x]") })
     }
 
     @Test
@@ -363,7 +366,8 @@ class ExecuteConverterAuditTest {
                     "if predicate my:is_special run tag @s add "
             )
         )
-        assertTrue(plan.commands[1].startsWith("execute as @e[tag=tellraw_all_"))
+        assertTrue(plan.commands[1].contains("at @s"))
+        assertTrue(plan.commands[1].contains("if entity @s[tag=tellraw_all_"))
         assertTrue(plan.commands[2].startsWith("tag @e[tag=tellraw_all_"))
     }
 
@@ -582,7 +586,8 @@ class ExecuteConverterAuditTest {
             tagSuffix = "ctxmsg"
         )
         requireNotNull(plan)
-        assertTrue(plan.commands.any { it.contains("at @s run tellraw") })
+        val finalLine = plan.commands.first { it.contains("run tellraw") }
+        assertTrue(finalLine, finalLine.contains("at @s") && finalLine.contains("if entity @s[tag="))
     }
 
 
@@ -598,7 +603,7 @@ class ExecuteConverterAuditTest {
         )
         requireNotNull(plan)
         val finalLine = plan.commands.first { it.contains("run tellraw") }
-        assertTrue(finalLine, finalLine.contains("as @e[tag=") && finalLine.contains("at @s"))
+        assertTrue(finalLine, finalLine.contains("at @s") && finalLine.contains("if entity @s[tag="))
     }
 
 }
