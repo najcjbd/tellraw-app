@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -598,7 +599,7 @@ private fun PortraitLayout(
                     value = selectorInput,
                     onValueChange = { viewModel.updateSelector(it) },
                     label = { Text(stringResource(R.string.input_selector)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("selector_input"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     trailingIcon = {
                         if (selectorType != SelectorType.UNIVERSAL) {
@@ -675,7 +676,7 @@ private fun PortraitLayout(
                         }
                     },
                     label = { Text(stringResource(R.string.input_text)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("message_input"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
                 )
@@ -945,7 +946,10 @@ private fun TranslateTokenBar(markers: String, onOpen: (Int, Int) -> Unit) {
             .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
     }
     if (tokens.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier.testTag("translate_token_bar"),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         Text(
             stringResource(R.string.translate_tokens_label),
             style = MaterialTheme.typography.labelMedium,

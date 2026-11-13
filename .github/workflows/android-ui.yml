@@ -1,0 +1,53 @@
+name: Android UI Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  emulator:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v -keystore app/debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Enable KVM
+        run: |
+          sudo chmod 666 /dev/kvm || true
+
+      - name: Run Compose UI smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            ./gradlew connectedDebugAndroidTest
+            adb exec-out screencap -p > ui-smoke.png
+
+      - name: Upload UI results and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-${{ github.run_id }}
+          path: |
+            ui-smoke.png
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
