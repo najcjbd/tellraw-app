@@ -131,7 +131,6 @@ private fun subComponentsOf(
         TextComponentHelper.SubComponentType.WITH,
         TextComponentHelper.SubComponentType.WITH_JSON
     )
-    TextComponentHelper.ComponentType.SELECTOR -> listOf(TextComponentHelper.SubComponentType.SEPARATOR)
     else -> emptyList()
 }
 

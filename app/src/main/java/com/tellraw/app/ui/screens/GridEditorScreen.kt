@@ -276,6 +276,9 @@ fun GridEditorScreen(
         }
     }
 
+    var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
+    var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
+
     val importCommandLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -721,7 +724,7 @@ fun GridEditorScreen(
             Text(
                 "原点：(${"%.1f".format(evaluationOrigin.first)}, " +
                     "${"%.1f".format(evaluationOrigin.second)}, ${"%.1f".format(evaluationOrigin.third)})" +
-                    (if (selectorText.contains(Regex("(^|[,[])x="))) "；选择器自带 x/y/z 会覆盖原点" else ""),
+                    (if (selectorText.contains(Regex("(^|[,])x="))) "；选择器自带 x/y/z 会覆盖原点" else ""),
                 style = MaterialTheme.typography.labelSmall
             )
 
@@ -948,6 +951,11 @@ fun GridEditorScreen(
                     importCommandLauncher.launch(arrayOf("text/plain", "text/*", "application/octet-stream"))
                 }) { Text(stringResource(R.string.grid_import_command)) }
                 Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = {
+                    tellrawPreviewInput = selectorText
+                    showTellrawPreview = true
+                }) { Text("Tellraw 预览") }
+                Spacer(Modifier.width(8.dp))
                 Box {
                     OutlinedButton(onClick = { showDimensionMenu = true }) {
                         Text("维度：${worldDimension.ifBlank { "minecraft:overworld" }}")
@@ -1069,6 +1077,14 @@ fun GridEditorScreen(
                 }
             }
         }
+    }
+
+    if (showTellrawPreview) {
+        TellrawPreviewDialog(
+            input = tellrawPreviewInput,
+            onInputChange = { tellrawPreviewInput = it },
+            onDismiss = { showTellrawPreview = false }
+        )
     }
 
     if (showWorldSettings) {

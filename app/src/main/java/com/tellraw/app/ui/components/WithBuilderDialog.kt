@@ -108,18 +108,6 @@ fun WithBuilderDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        stringResource(R.string.with_builder_intro),
-                        modifier = Modifier.padding(10.dp),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-
                 OutlinedTextField(
                     value = state.key,
                     onValueChange = onKeyChange,
@@ -142,12 +130,6 @@ fun WithBuilderDialog(
                     supportingText = { Text(stringResource(R.string.with_builder_fallback_hint)) },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text(
-                    stringResource(R.string.with_builder_json_input_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 TabRow(selectedTabIndex = if (state.mode == WithBuilderMode.VISUAL) 0 else 1) {
                     Tab(
                         selected = state.mode == WithBuilderMode.VISUAL,
@@ -1122,48 +1104,24 @@ private fun TextItemDialog(
     onApply: (WithArgDraft) -> Unit
 ) {
     var text by remember(original) { mutableStateOf(original.text) }
-    var color by remember(original) { mutableStateOf(original.color.orEmpty()) }
-    var bold by remember(original) { mutableStateOf(original.bold) }
-    var italic by remember(original) { mutableStateOf(original.italic) }
-    var underlined by remember(original) { mutableStateOf(original.underlined) }
-    var strikethrough by remember(original) { mutableStateOf(original.strikethrough) }
-    var obfuscated by remember(original) { mutableStateOf(original.obfuscated) }
 
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
-        onApply = {
-            onApply(
-                original.copy(
-                    text = text,
-                    color = color.trim().ifEmpty { null },
-                    bold = bold,
-                    italic = italic,
-                    underlined = underlined,
-                    strikethrough = strikethrough,
-                    obfuscated = obfuscated
-                )
-            )
-        }
+        onApply = { onApply(original.copy(text = text)) }
     ) {
+        Text(
+            "文本输入与主界面一致：可直接输入 § 颜色/格式代码（如 §a绿色§l粗体）。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
             label = { Text(stringResource(R.string.with_builder_text)) },
+            minLines = 3,
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
-            value = color,
-            onValueChange = { color = it },
-            label = { Text(stringResource(R.string.with_builder_color)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        TriStateChip(R.string.with_builder_style_bold, bold) { bold = it }
-        TriStateChip(R.string.with_builder_style_italic, italic) { italic = it }
-        TriStateChip(R.string.with_builder_style_underlined, underlined) { underlined = it }
-        TriStateChip(R.string.with_builder_style_strikethrough, strikethrough) { strikethrough = it }
-        TriStateChip(R.string.with_builder_style_obfuscated, obfuscated) { obfuscated = it }
     }
 }
 

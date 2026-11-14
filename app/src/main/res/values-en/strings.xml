@@ -377,8 +377,8 @@
     <string name="action_delete">Delete</string>
 
     <!-- translate with-argument builder -->
-    <string name="with_builder_open">Build with args…</string>
-    <string name="with_builder_title">translate argument builder</string>
+    <string name="with_builder_open">Simpler translate</string>
+    <string name="with_builder_title">Simpler translate</string>
     <string name="with_builder_new_hint">No translate at the cursor; applying will create one here.</string>
     <string name="with_builder_tab_visual">Visual</string>
     <string name="with_builder_tab_json">JSON</string>
@@ -458,8 +458,8 @@
     <string name="with_builder_raw_blocked">Fix the raw JSON before switching or continuing.</string>
     <string name="with_builder_expand">Expand</string>
     <string name="with_builder_collapse">Collapse</string>
-    <string name="simple_translate_nesting">Simple translate nesting</string>
-    <string name="simple_translate_nesting_description">Show clickable TranslateN tokens in the message box; tap to edit with the simple with UI. On by default.</string>
+    <string name="simple_translate_nesting">Simpler translate</string>
+    <string name="simple_translate_nesting_description">Use the simplified translate argument/recipient editor when opening translate</string>
     <string name="translate_tokens_label">Translate components</string>
     <string name="translate_tokens_hint">Tap TranslateN to edit; the number is its position among translate components.</string>
     <string name="translate_token_label">Translate%1$d</string>

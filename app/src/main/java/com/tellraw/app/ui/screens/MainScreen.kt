@@ -665,7 +665,7 @@ private fun PortraitLayout(
                         Text(stringResource(R.string.tellraw_preview))
                     }
                     TextButton(onClick = onOpenSimpleTranslate) {
-                        Text("简单 translate 收信人表")
+                        Text("Simpler translate")
                     }
                 }
 
@@ -848,14 +848,14 @@ private fun PortraitLayout(
     }
 }
 
-private data class TellrawPreviewRow(
+internal data class TellrawPreviewRow(
     val condition: String,
     val recipient: String,
     val content: String
 )
 
 @Composable
-private fun TellrawPreviewDialog(
+internal fun TellrawPreviewDialog(
     input: String,
     onInputChange: (String) -> Unit,
     onDismiss: () -> Unit
@@ -1177,7 +1177,7 @@ private fun LandscapeLayout(
                                 Text(stringResource(R.string.tellraw_preview))
                             }
                             TextButton(onClick = onOpenSimpleTranslate) {
-                                Text("简单 translate 收信人表")
+                                Text("Simpler translate")
                             }
                         }
                         OutlinedTextField(

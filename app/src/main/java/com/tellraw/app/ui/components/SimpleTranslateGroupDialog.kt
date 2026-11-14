@@ -98,9 +98,9 @@ fun SimpleTranslateGroupDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("简单 translate 收信人表", style = MaterialTheme.typography.titleMedium)
+                Text("Simpler translate", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "参数只写 tag=... / scores=...；程序会在 Java 补 @a[...]，在基岩条件 rawtext 里补 @s[...]。",
+                    "填选择器参数；收信人选择器由程序补。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -124,7 +124,7 @@ fun SimpleTranslateGroupDialog(
                             OutlinedTextField(
                                 value = row.params,
                                 onValueChange = { rows[index] = row.copy(params = it) },
-                                label = { Text("参数：tag=admin / scores={vip=1..}") },
+                                label = { Text("填选择器参数") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -186,7 +186,7 @@ fun SimpleTranslateGroupDialog(
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                    Button(onClick = { generate() }) { Text("生成") }
+                    Button(onClick = { generate() }) { Text("完成") }
                 }
 
                 if (javaOutput.isNotBlank() || bedrockOutput.isNotBlank()) {

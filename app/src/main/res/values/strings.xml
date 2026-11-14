@@ -352,8 +352,8 @@
     <string name="action_delete">删除</string>
     
     <!-- translate 的 with 参数构造器 -->
-    <string name="with_builder_open">构造 with 参数…</string>
-    <string name="with_builder_title">translate 参数构造</string>
+    <string name="with_builder_open">Simpler translate</string>
+    <string name="with_builder_title">Simpler translate</string>
     <string name="with_builder_new_hint">光标处没有 translate，应用时会在这里新建一个。</string>
     <string name="with_builder_tab_visual">可视化</string>
     <string name="with_builder_tab_json">JSON</string>
@@ -433,8 +433,8 @@
     <string name="with_builder_raw_blocked">原始 JSON 还没修正，先修正才能切换或继续编辑。</string>
     <string name="with_builder_expand">展开</string>
     <string name="with_builder_collapse">折叠</string>
-    <string name="simple_translate_nesting">简单 translate 嵌套</string>
-    <string name="simple_translate_nesting_description">消息框显示可点击的 TranslateN 令牌，点进去用简单界面编辑 with；默认开启</string>
+    <string name="simple_translate_nesting">Simpler translate</string>
+    <string name="simple_translate_nesting_description">开启后，translate 入口使用简化的参数/收信人界面</string>
     <string name="translate_tokens_label">翻译组件</string>
     <string name="translate_tokens_hint">点 TranslateN 编辑；数字表示它是消息里的第几个 translate。</string>
     <string name="translate_token_label">Translate%1$d</string>
