@@ -53,7 +53,8 @@ fun SelectorTypeBadge(type: com.tellraw.app.model.SelectorType) {
 @Composable
 fun ColorCodeQuickInput(
     onCodeSelected: (String) -> Unit,
-    onCommaSelected: (() -> Unit)? = null
+    onCommaSelected: (() -> Unit)? = null,
+    onSeparatorSelected: (() -> Unit)? = null
 ) {
     val colorCodes = listOf(
         "§0" to stringResource(R.string.color_code_black),
@@ -101,6 +102,15 @@ fun ColorCodeQuickInput(
                 FilterChip(
                     onClick = onCommaSelected,
                     label = { Text(",（文本逗号）", maxLines = 1) },
+                    selected = false
+                )
+            }
+        }
+        if (onSeparatorSelected != null) {
+            item {
+                FilterChip(
+                    onClick = onSeparatorSelected,
+                    label = { Text(",'sep':（选择器分隔符）", maxLines = 1) },
                     selected = false
                 )
             }

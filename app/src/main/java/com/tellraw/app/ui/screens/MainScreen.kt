@@ -734,6 +734,15 @@ private fun PortraitLayout(
                 // 颜色代码快速输入
                 ColorCodeQuickInput(
                     onCommaSelected = onCommaSelected,
+                    onSeparatorSelected = if (!defaultUseText &&
+                        selectedTextComponent == TextComponentHelper.ComponentType.SELECTOR
+                    ) {
+                        {
+                            viewModel.insertTextWithComponent(
+                                messageTextFieldValue.value.selection.start, ",'sep':"
+                            )
+                        }
+                    } else null,
                     onCodeSelected = { code ->
                         val currentValue = messageTextFieldValue.value
                         val cursorPosition = currentValue.selection.start
@@ -1246,6 +1255,15 @@ private fun LandscapeLayout(
                         // 颜色代码快速输入
                         ColorCodeQuickInput(
                             onCommaSelected = onCommaSelected,
+                            onSeparatorSelected = if (!defaultUseText &&
+                                selectedTextComponent == TextComponentHelper.ComponentType.SELECTOR
+                            ) {
+                                {
+                                    viewModel.insertTextWithComponent(
+                                        messageTextFieldValue.value.selection.start, ",'sep':"
+                                    )
+                                }
+                            } else null,
                             onCodeSelected = { code ->
                                 val currentValue = messageTextFieldValue.value
                                 val cursorPosition = currentValue.selection.start
