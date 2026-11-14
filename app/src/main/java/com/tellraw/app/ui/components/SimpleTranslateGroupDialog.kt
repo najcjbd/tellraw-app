@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -82,10 +83,11 @@ fun SimpleTranslateGroupDialog(
     var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
     var restoreInput by remember { mutableStateOf("") }
     var restoreNotice by remember { mutableStateOf("") }
+    var bedrockFirstMatch by rememberSaveable { mutableStateOf(false) }
     fun apply() {
         val result = buildSimpleTranslateGroups(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
-            allowMultiCmdTag, chainAnchor
+            allowMultiCmdTag, chainAnchor, bedrockFirstMatch
         )
         onComplete(result.java, result.bedrock, result.warnings)
         onDismiss()
@@ -199,6 +201,18 @@ fun SimpleTranslateGroupDialog(
                     aliases.add(TranslateAlias("", listOf(WithArgDraft.Text(""))))
                 }) { Text("添加别名") }
 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = bedrockFirstMatch,
+                        onCheckedChange = { bedrockFirstMatch = it }
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "基岩也用多条 tellraw 做第一匹配（不用单条条件 rawtext）",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
                 HorizontalDivider()
                 Text("从 Java 生成结果还原", style = MaterialTheme.typography.titleSmall)
                 OutlinedTextField(
@@ -299,7 +313,8 @@ private fun buildSimpleTranslateGroups(
     target: VersionSpec?,
     nbtSyntax: VersionDiff.NbtSyntax,
     allowMultiCmdTag: Boolean,
-    chainAnchor: Boolean
+    chainAnchor: Boolean,
+    bedrockFirstMatch: Boolean
 ): SimpleTranslateOutput {
     val warnings = mutableListOf<String>()
     val aliasMap = aliases
@@ -319,6 +334,7 @@ private fun buildSimpleTranslateGroups(
 
     val java = mutableListOf<String>()
     val bedrockRows = mutableListOf<Any>()
+    val bedrockLines = mutableListOf<String>()
 
     rows.forEachIndexed { index, row ->
         val contents = applyAliasList(row.content)
@@ -370,6 +386,13 @@ private fun buildSimpleTranslateGroups(
         if (earlierParams.isNotEmpty()) {
             warnings.add("基岩单条 conditional rawtext 无法表达第一匹配排除；第 ${index + 1} 行与前面参数重叠时会显示多条")
         }
+        if (bedrockFirstMatch) {
+            val base = if (prefix.isBlank()) "execute" else prefix
+            val target = if (params.isBlank()) "@a" else "@a[$params]"
+            val exclusions = earlierParams.joinToString("") { " unless entity @s[$it]" }
+            bedrockLines.add("$base as $target$exclusions run tellraw @s $bJson")
+            return@forEachIndexed
+        }
         val args = com.google.gson.JsonArray()
         val condSel = if (params.isBlank()) "@s" else "@s[$params]"
         args.add(com.google.gson.JsonObject().apply { addProperty("selector", condSel) })
@@ -387,7 +410,9 @@ private fun buildSimpleTranslateGroups(
         bedrockRows.add(rowObj)
     }
 
-    val bedrock = if (bedrockRows.isEmpty()) "" else {
+    val bedrock = if (bedrockFirstMatch) {
+        bedrockLines.joinToString("\n")
+    } else if (bedrockRows.isEmpty()) "" else {
         val raw = com.google.gson.JsonObject().apply {
             add("rawtext", com.google.gson.JsonArray().apply { bedrockRows.forEach { add(it as com.google.gson.JsonElement) } })
         }
