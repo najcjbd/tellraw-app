@@ -372,7 +372,7 @@ class ExecuteConverterAuditTest {
     }
 
     @Test
-    fun summonChainFallsBackToSingleCommandPlan() {
+    fun summonChainUsesWholeChainTag() {
         val plan = ExecuteConverter.buildMultiCommandTagPlan(
             "execute as @a summon pig if items entity @s hotbar.* minecraft:diamond " +
                 "if predicate my:is_special",
@@ -382,7 +382,10 @@ class ExecuteConverterAuditTest {
             requireUnmergeable = false,
             tagSuffix = "summon"
         )
-        assertNull(plan)
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].contains("summon pig"))
+        assertTrue(plan.commands.any { it.contains("as @e[tag=tellraw_all_summon]") })
     }
 
     @Test
@@ -619,6 +622,24 @@ class ExecuteConverterAuditTest {
             "@a", json, tagSuffix = "condraw"
         )
         assertNull(plan)
+    }
+
+
+    @Test
+    fun summonUsesWholeChainTagOnce() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a summon minecraft:pig if items entity @s hotbar.* minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@s",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "summon"
+        )
+        requireNotNull(plan)
+        assertEquals(1, plan.tags.size)
+        assertTrue(plan.commands[0].contains("summon minecraft:pig"))
+        assertTrue(plan.commands.any { it.contains("as @e[tag=tellraw_all_summon]") })
     }
 
 }

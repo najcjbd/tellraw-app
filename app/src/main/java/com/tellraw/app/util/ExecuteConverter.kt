@@ -885,8 +885,13 @@ object ExecuteConverter {
         if (conds.size < 2) return null
         val mods = steps.filterIsInstance<Seg.Mod>()
 
-        // summon 每次生成新实体；无法在网格/独立 final 里确定，回退单链。
-        if (mods.any { it.tokens.firstOrNull() == "summon" }) return null
+        // summon 每次生成新实体；逐条件 tag 会重复 summon，改用整链 tag（只生成一次）。
+        if (mods.any { it.tokens.firstOrNull() == "summon" }) {
+            return buildWholeChainTagPlan(
+                prefix, direction, tellrawTarget, tellrawJson, warnings, nbtSyntax, suffix,
+                "链含 summon，逐条件拆分会在每条命令重复生成实体"
+            )
+        }
         // in / 位置修饰能否重放由 replayContext 决定；无法重放时仍可走 as@e + in 的简化 final。
 
         val asMods = mods.filter { it.tokens.firstOrNull() == "as" }
