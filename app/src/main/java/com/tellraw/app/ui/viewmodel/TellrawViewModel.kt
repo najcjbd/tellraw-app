@@ -123,6 +123,7 @@ class TellrawViewModel @Inject constructor(
     private val _simpleTranslateJava = MutableStateFlow("")
     private val _simpleTranslateBedrock = MutableStateFlow("")
     private val _simpleTranslateWarnings = MutableStateFlow<List<String>>(emptyList())
+    private var _simpleBlockJson: String = ""
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -401,6 +402,21 @@ class TellrawViewModel @Inject constructor(
             )
         )
 
+    private fun simpleToken(blockJson: String) = com.tellraw.app.util.TextComponentHelper.TextComponent(
+        com.tellraw.app.util.TextComponentHelper.ComponentType.TRANSLATE,
+        com.tellraw.app.util.TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+        mutableListOf(
+            com.tellraw.app.util.TextComponentHelper.SubComponent(
+                com.tellraw.app.util.TextComponentHelper.SubComponentType.WITH_JSON,
+                blockJson
+            )
+        )
+    )
+
+    private fun isSimpleToken(c: com.tellraw.app.util.TextComponentHelper.TextComponent) =
+        c.type == com.tellraw.app.util.TextComponentHelper.ComponentType.TRANSLATE &&
+            c.content == com.tellraw.app.util.TextComponentHelper.SIMPLE_TRANSLATE_KEY
+
     fun updateMessage(message: String) {
         _messageInput.value = message
         
@@ -443,6 +459,7 @@ class TellrawViewModel @Inject constructor(
         
         // 解析当前的带标记符文本，获取旧组件列表
         val oldComponents = TextComponentHelper.parseTextComponents(_messageInputWithMarkers.value)
+            .filterNot(::isSimpleToken)
         
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
@@ -452,7 +469,7 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 计算前台文本和旧纯文本的长度
-        val oldPlainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
+        val oldPlainText = TextComponentHelper.componentsToText(oldComponents)
         val oldLength = oldPlainText.length
         val newLength = frontendMessage.length
         
@@ -474,7 +491,13 @@ class TellrawViewModel @Inject constructor(
             ) ?: TextComponentHelper.remapComponentContents(oldComponents, frontendMessage)
         }
         
-        _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
+        var markers = TextComponentHelper.componentsToText(newComponents)
+        if (_simpleBlockJson.isNotBlank()) {
+            markers = TextComponentHelper.insertComponentAt(
+                markers, markers.length, simpleToken(_simpleBlockJson)
+            )
+        }
+        _messageInputWithMarkers.value = markers
         lastMessageInput = frontendMessage
     }
     
@@ -902,21 +925,12 @@ class TellrawViewModel @Inject constructor(
         _simpleTranslateJava.value = java
         _simpleTranslateBedrock.value = bedrock
         _simpleTranslateWarnings.value = warnings
-        val token = com.tellraw.app.util.TextComponentHelper.TextComponent(
-            com.tellraw.app.util.TextComponentHelper.ComponentType.TRANSLATE,
-            com.tellraw.app.util.TextComponentHelper.SIMPLE_TRANSLATE_KEY,
-            mutableListOf(
-                com.tellraw.app.util.TextComponentHelper.SubComponent(
-                    com.tellraw.app.util.TextComponentHelper.SubComponentType.WITH_JSON,
-                    blockJson
-                )
-            )
-        )
+        _simpleBlockJson = blockJson
         var markers = com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(
             _messageInputWithMarkers.value
         )
         markers = com.tellraw.app.util.TextComponentHelper.insertComponentAt(
-            markers, markers.length, token
+            markers, markers.length, simpleToken(blockJson)
         )
         _messageInputWithMarkers.value = markers
         _messageInput.value = com.tellraw.app.util.TextComponentHelper.stripComponentMarkers(
@@ -1673,6 +1687,7 @@ class TellrawViewModel @Inject constructor(
         _simpleTranslateJava.value = ""
         _simpleTranslateBedrock.value = ""
         _simpleTranslateWarnings.value = emptyList()
+        _simpleBlockJson = ""
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _selectedTextComponent.value = null
