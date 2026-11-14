@@ -68,6 +68,7 @@ data class TranslateAlias(
 @Composable
 fun SimpleTranslateGroupDialog(
     initialPrefix: String,
+    initialBlockJson: String? = null,
     target: VersionSpec?,
     nbtSyntax: VersionDiff.NbtSyntax,
     allowMultiCmdTag: Boolean,
@@ -76,16 +77,23 @@ fun SimpleTranslateGroupDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    var prefix by rememberSaveable { mutableStateOf(initialPrefix) }
-    val rows = remember { mutableStateListOf(TranslateParamRow("r0")) }
-    val aliases = remember { mutableStateListOf<TranslateAlias>() }
+    val initialBlock = remember(initialBlockJson) { decodeBlock(initialBlockJson) }
+    var prefix by rememberSaveable { mutableStateOf(initialBlock?.prefix ?: initialPrefix) }
+    val rows = remember {
+        mutableStateListOf<TranslateParamRow>().apply {
+            addAll(initialBlock?.rows.orEmpty().ifEmpty { listOf(TranslateParamRow("r0")) })
+        }
+    }
+    val aliases = remember {
+        mutableStateListOf<TranslateAlias>().apply { addAll(initialBlock?.aliases.orEmpty()) }
+    }
     var nextRow by remember { mutableStateOf(1) }
     var nextAlias by remember { mutableStateOf(0) }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
     var restoreInput by remember { mutableStateOf("") }
     var restoreNotice by remember { mutableStateOf("") }
-    var bedrockFirstMatch by rememberSaveable { mutableStateOf(false) }
+    var bedrockFirstMatch by rememberSaveable { mutableStateOf(initialBlock?.bedrockFirstMatch ?: false) }
     fun apply() {
         val result = buildSimpleTranslateGroups(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
@@ -305,6 +313,36 @@ private fun restoreRowsFromBedrock(text: String): List<TranslateParamRow> {
         if (drafts.isNotEmpty()) out.add(TranslateParamRow("b${id++}", params, drafts))
     }
     return out
+}
+
+private data class DecodedBlock(
+    val prefix: String,
+    val rows: List<TranslateParamRow>,
+    val aliases: List<TranslateAlias>,
+    val bedrockFirstMatch: Boolean
+)
+
+private fun decodeBlock(json: String?): DecodedBlock? {
+    if (json.isNullOrBlank()) return null
+    return runCatching {
+        val root = JsonParser.parseString(json).asJsonObject
+        val rows = root.getAsJsonArray("rows")?.mapIndexed { i, el ->
+            val o = el.asJsonObject
+            val args = WithArgCodec.parseArgs(o.getAsJsonArray("content").toString())
+            TranslateParamRow("r$i", o.get("params")?.asString.orEmpty(), args)
+        }.orEmpty()
+        val aliases = root.getAsJsonArray("aliases")?.map { el ->
+            val o = el.asJsonObject
+            val args = WithArgCodec.parseArgs(o.getAsJsonArray("to").toString())
+            TranslateAlias(o.get("from")?.asString.orEmpty(), args)
+        }.orEmpty()
+        DecodedBlock(
+            prefix = root.get("prefix")?.asString.orEmpty(),
+            rows = rows,
+            aliases = aliases,
+            bedrockFirstMatch = root.get("bedrockFirstMatch")?.asBoolean ?: false
+        )
+    }.getOrNull()
 }
 
 private fun encodeBlock(

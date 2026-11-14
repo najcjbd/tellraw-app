@@ -670,6 +670,25 @@ object TextComponentHelper {
      * 获取指定位置的文本组件类型
      * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
      */
+    /** 取某个 Simpler token 里保存的参数表 JSON。 */
+    fun simpleBlockJsonAt(text: String, position: Int): String? {
+        val components = parseTextComponents(text)
+        var pos = 0
+        for (component in components) {
+            val len = component.content.length +
+                component.subComponents.sumOf { it.content.length }
+            val inRange = position == pos || position in pos until (pos + len)
+            if (inRange && component.type == ComponentType.TRANSLATE &&
+                component.content == SIMPLE_TRANSLATE_KEY
+            ) {
+                return component.subComponents
+                    .firstOrNull { it.type == SubComponentType.WITH_JSON }?.content
+            }
+            pos += len
+        }
+        return null
+    }
+
     /** 从正常消息中移除 Simpler translate 保留组件（它由主生成单独展开）。 */
     fun removeSimpleTranslateBlocks(text: String): String {
         if (SIMPLE_TRANSLATE_KEY !in text) return text
