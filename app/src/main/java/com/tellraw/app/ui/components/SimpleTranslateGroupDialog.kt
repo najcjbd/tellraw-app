@@ -100,7 +100,7 @@ fun SimpleTranslateGroupDialog(
             ) {
                 Text("Simpler translate", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "填选择器参数；收信人选择器由程序补。",
+                    "填选择器参数；收信人选择器由程序补。按行第一匹配优先，Java 会排除前面已命中的收信人。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -249,8 +249,16 @@ private fun buildSimpleTranslateGroups(
         if (params.startsWith("@")) {
             warnings.add("第 ${index + 1} 行参数不要写 @a；只写 tag/scores 等参数，程序会补选择器")
         }
+        val earlierParams = rows.take(index)
+            .map { it.params.trim() }
+            .filter { it.isNotBlank() }
+        if (rows.take(index).any { it.params.isBlank() }) {
+            warnings.add("第 ${index + 1} 行前面存在无参数行；第一匹配优先时该行不会再有收信人")
+            return@forEachIndexed
+        }
         val javaTarget = if (params.isBlank()) "@a" else "@a[$params]"
-        val jPlan = if (prefix.isNotBlank() && allowMultiCmdTag) {
+        val exclusions = earlierParams.joinToString("") { " unless entity @s[$it]" }
+        val jPlan = if (exclusions.isBlank() && prefix.isNotBlank() && allowMultiCmdTag) {
             ExecuteConverter.buildMultiCommandTagPlan(
                 prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA,
                 javaTarget, contentJson, nbtSyntax,
@@ -262,12 +270,9 @@ private fun buildSimpleTranslateGroups(
             else jPlan.commands.joinToString("\n"))
             warnings.addAll(jPlan.warnings)
         } else {
-            val rem = mutableListOf<String>()
-            val converted = if (prefix.isBlank()) null else
-                ExecuteConverter.convertExecutePrefix(prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA, rem, nbtSyntax)
-            warnings.addAll(rem)
-            val plain = "tellraw $javaTarget $contentJson"
-            java.add(if (converted != null && converted.isNotBlank() && converted != "execute") "$converted run $plain" else plain)
+            // Java 用第一匹配优先：后面的行排除前面已经命中的实体。
+            val base = if (prefix.isBlank()) "execute" else prefix
+            java.add("$base as $javaTarget$exclusions run tellraw @s $contentJson")
         }
 
         val parsed = runCatching { CommandInputParser.parse("tellraw @a $contentJson", context, nbtSyntax) }.getOrNull()
@@ -282,6 +287,9 @@ private fun buildSimpleTranslateGroups(
         if (rawItems == null) {
             warnings.add("第 ${index + 1} 行基岩 rawtext 解析失败，已跳过")
             return@forEachIndexed
+        }
+        if (earlierParams.isNotEmpty()) {
+            warnings.add("基岩单条 conditional rawtext 无法表达第一匹配排除；第 ${index + 1} 行与前面参数重叠时会显示多条")
         }
         val args = com.google.gson.JsonArray()
         val condSel = if (params.isBlank()) "@s" else "@s[$params]"
@@ -310,6 +318,6 @@ private fun buildSimpleTranslateGroups(
         warnings.addAll(rem)
         "$converted run tellraw @s $raw"
     }
-    warnings.add("Java 每组一条 tellraw；基岩为一条 conditional rawtext。组间参数若重叠，Java 会重复发送。")
+    warnings.add("Java 按行第一匹配优先，后面的行会排除前面命中的实体；基岩条件 rawtext 无法表达该排除，重叠时可能显示多条。")
     return SimpleTranslateOutput(java.joinToString("\n"), bedrock, warnings.distinct())
 }
