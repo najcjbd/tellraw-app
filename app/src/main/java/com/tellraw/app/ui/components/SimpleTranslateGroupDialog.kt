@@ -210,6 +210,7 @@ fun SimpleTranslateGroupDialog(
                 )
                 TextButton(onClick = {
                     val restored = restoreRowsFromJava(restoreInput, context, nbtSyntax)
+                        .ifEmpty { restoreRowsFromBedrock(restoreInput) }
                     if (restored.isEmpty()) {
                         restoreNotice = "没有识别到可还原的 Java tellraw 行"
                     } else {
@@ -257,6 +258,35 @@ private fun restoreRowsFromJava(
             selector.substring(3, selector.length - 1)
         } else ""
         out.add(TranslateParamRow("r${id++}", params, args))
+    }
+    return out
+}
+
+private fun restoreRowsFromBedrock(text: String): List<TranslateParamRow> {
+    val start = text.indexOf('{')
+    val end = text.lastIndexOf('}')
+    if (start < 0 || end <= start) return emptyList()
+    val root = runCatching { JsonParser.parseString(text.substring(start, end + 1)) }.getOrNull()
+        ?: return emptyList()
+    val rawtext = root.asJsonObject.getAsJsonArray("rawtext") ?: return emptyList()
+    val out = mutableListOf<TranslateParamRow>()
+    var id = 0
+    rawtext.forEach { el ->
+        val row = el.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+        val with = row.getAsJsonObject("with") ?: return@forEach
+        val args = with.getAsJsonArray("rawtext") ?: return@forEach
+        if (args.size() < 2) return@forEach
+        val selector = args[0].takeIf { it.isJsonObject }
+            ?.asJsonObject?.get("selector")?.takeIf { it.isJsonPrimitive }?.asString
+            ?: return@forEach
+        val params = if (selector.startsWith("@s[") && selector.endsWith("]")) {
+            selector.substring(3, selector.length - 1)
+        } else ""
+        val content = com.google.gson.JsonArray()
+        for (i in 1 until args.size()) content.add(args[i])
+        val drafts = runCatching { WithArgCodec.parseArgs(content.toString()) }.getOrNull()
+            ?: return@forEach
+        if (drafts.isNotEmpty()) out.add(TranslateParamRow("b${id++}", params, drafts))
     }
     return out
 }
