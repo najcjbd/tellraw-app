@@ -121,6 +121,7 @@ class TellrawViewModel @Inject constructor(
 
     private val _simpleTranslateJava = MutableStateFlow("")
     private val _simpleTranslateBedrock = MutableStateFlow("")
+    private val _simpleTranslateWarnings = MutableStateFlow<List<String>>(emptyList())
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -894,7 +895,7 @@ class TellrawViewModel @Inject constructor(
     fun setSimpleTranslateOutput(java: String, bedrock: String, warnings: List<String>) {
         _simpleTranslateJava.value = java
         _simpleTranslateBedrock.value = bedrock
-        if (warnings.isNotEmpty()) _warnings.value = (_warnings.value + warnings).distinct()
+        _simpleTranslateWarnings.value = warnings
         generateCommands()
     }
 
@@ -1431,7 +1432,7 @@ class TellrawViewModel @Inject constructor(
                 _bedrockCommand.value = finalBedrock
                 
                 // 显示提醒（去重后）
-                _warnings.value = allReminders.distinct()
+                _warnings.value = (allReminders + _simpleTranslateWarnings.value).distinct()
             } catch (e: IllegalArgumentException) {
                 // 处理未知§组合的异常
                 _javaCommand.value = ""
@@ -1629,6 +1630,7 @@ class TellrawViewModel @Inject constructor(
         _bedrockCommand.value = ""
         _simpleTranslateJava.value = ""
         _simpleTranslateBedrock.value = ""
+        _simpleTranslateWarnings.value = emptyList()
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _selectedTextComponent.value = null
