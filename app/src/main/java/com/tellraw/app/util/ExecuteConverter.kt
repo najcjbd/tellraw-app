@@ -836,8 +836,9 @@ object ExecuteConverter {
         val target = tellrawTarget.trim()
         val replayProbe = replayContext(prefix, listOf("__probe__"))
         val canReplayContext = replayProbe != null
+        val positionChanges = prefixChangesExecutionContext(prefix)
         if (!target.startsWith("@") ||
-            (targetRequiresOriginalContext(target) && !canReplayContext)
+            (targetRequiresOriginalContext(target) && !canReplayContext && positionChanges)
         ) {
             return null
         }
@@ -1050,8 +1051,9 @@ object ExecuteConverter {
     ): MultiCommandPlan? {
         val target = tellrawTarget.trim()
         val canReplayContext = replayContext(prefix, listOf("__probe__")) != null
+        val positionChanges = prefixChangesExecutionContext(prefix)
         if (!target.startsWith("@") ||
-            (targetRequiresOriginalContext(target) && !canReplayContext)
+            (targetRequiresOriginalContext(target) && !canReplayContext && positionChanges)
         ) {
             return null
         }
