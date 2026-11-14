@@ -80,6 +80,8 @@ fun SimpleTranslateGroupDialog(
     var nextAlias by remember { mutableStateOf(0) }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
+    var restoreInput by remember { mutableStateOf("") }
+    var restoreNotice by remember { mutableStateOf("") }
     fun apply() {
         val result = buildSimpleTranslateGroups(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
@@ -197,6 +199,29 @@ fun SimpleTranslateGroupDialog(
                     aliases.add(TranslateAlias("", listOf(WithArgDraft.Text(""))))
                 }) { Text("添加别名") }
 
+                HorizontalDivider()
+                Text("从 Java 生成结果还原", style = MaterialTheme.typography.titleSmall)
+                OutlinedTextField(
+                    value = restoreInput,
+                    onValueChange = { restoreInput = it },
+                    label = { Text("粘贴 tellraw / execute+tellraw 行") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(onClick = {
+                    val restored = restoreRowsFromJava(restoreInput, context, nbtSyntax)
+                    if (restored.isEmpty()) {
+                        restoreNotice = "没有识别到可还原的 Java tellraw 行"
+                    } else {
+                        rows.clear()
+                        rows.addAll(restored)
+                        restoreNotice = "已还原 ${restored.size} 条 Java 收信人内容"
+                    }
+                }) { Text("还原到参数表") }
+                if (restoreNotice.isNotBlank()) {
+                    Text(restoreNotice, style = MaterialTheme.typography.labelSmall)
+                }
+
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     Button(onClick = { apply() }) { Text("完成") }
@@ -211,6 +236,30 @@ private fun contentSummary(args: List<WithArgDraft>): String =
     WithArgCodec.serialize(args).let { if (it.length <= 100) it else it.take(100) + "…" }
 
 private data class SimpleTranslateOutput(val java: String, val bedrock: String, val warnings: List<String>)
+
+private fun restoreRowsFromJava(
+    text: String,
+    context: android.content.Context,
+    nbtSyntax: VersionDiff.NbtSyntax
+): List<TranslateParamRow> {
+    val out = mutableListOf<TranslateParamRow>()
+    var id = 0
+    text.lines().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
+        val parsed = runCatching { CommandInputParser.parse(line, context, nbtSyntax) }.getOrNull()
+            ?: return@forEach
+        val args = runCatching { WithArgCodec.parseArgs(parsed.javaJson) }.getOrNull()
+            ?: return@forEach
+        if (args.isEmpty()) return@forEach
+        val execAs = Regex("\\bas\\s+(@a(?:\\[[^\\]]*\\])?)")
+            .find(parsed.executePrefix.orEmpty())?.groupValues?.getOrNull(1)
+        val selector = execAs ?: parsed.selector ?: "@a"
+        val params = if (selector.startsWith("@a[") && selector.endsWith("]")) {
+            selector.substring(3, selector.length - 1)
+        } else ""
+        out.add(TranslateParamRow("r${id++}", params, args))
+    }
+    return out
+}
 
 private fun buildSimpleTranslateGroups(
     context: android.content.Context,
