@@ -66,6 +66,7 @@ fun SimpleTranslateGroupDialog(
     nbtSyntax: VersionDiff.NbtSyntax,
     allowMultiCmdTag: Boolean,
     chainAnchor: Boolean,
+    onComplete: (String, String, List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -75,18 +76,13 @@ fun SimpleTranslateGroupDialog(
     var nextRow by remember { mutableStateOf(1) }
     var nextAlias by remember { mutableStateOf(0) }
     var expandedId by remember { mutableStateOf<String?>(null) }
-    var javaOutput by remember { mutableStateOf("") }
-    var bedrockOutput by remember { mutableStateOf("") }
-    var warnings by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    fun generate() {
+    fun apply() {
         val result = buildSimpleTranslateGroups(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
             allowMultiCmdTag, chainAnchor
         )
-        javaOutput = result.java
-        bedrockOutput = result.bedrock
-        warnings = result.warnings
+        onComplete(result.java, result.bedrock, result.warnings)
+        onDismiss()
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -186,18 +182,9 @@ fun SimpleTranslateGroupDialog(
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                    Button(onClick = { generate() }) { Text("完成") }
+                    Button(onClick = { apply() }) { Text("完成") }
                 }
 
-                if (javaOutput.isNotBlank() || bedrockOutput.isNotBlank()) {
-                    HorizontalDivider()
-                    Text("输出", style = MaterialTheme.typography.titleSmall)
-                    SelectionContainer { Text(javaOutput, style = MaterialTheme.typography.bodySmall) }
-                    SelectionContainer { Text(bedrockOutput, style = MaterialTheme.typography.bodySmall) }
-                }
-                warnings.forEach {
-                    Text("• $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-                }
             }
         }
     }

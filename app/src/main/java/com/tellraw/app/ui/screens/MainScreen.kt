@@ -414,6 +414,9 @@ fun MainScreen(
             nbtSyntax = VersionDiff.NbtSyntax.from(nbtSyntax),
             allowMultiCmdTag = allowMultiCmdTag,
             chainAnchor = chainAnchorEnabled,
+            onComplete = { java, bedrock, warnings ->
+                viewModel.setSimpleTranslateOutput(java, bedrock, warnings)
+            },
             onDismiss = { showSimpleTranslateGroups = false }
         )
     }
@@ -774,7 +777,8 @@ private fun PortraitLayout(
                             )
                         },
                         onOpenWithBuilder = {
-                            viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                            if (simpleTranslate) onOpenSimpleTranslate()
+                            else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                         }
                     )
                 }
@@ -1285,7 +1289,8 @@ private fun LandscapeLayout(
                                     )
                                 },
                                 onOpenWithBuilder = {
-                                    viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                                    if (simpleTranslate) onOpenSimpleTranslate()
+                                    else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                                 }
                             )
                         }

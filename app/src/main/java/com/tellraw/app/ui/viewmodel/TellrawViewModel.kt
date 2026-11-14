@@ -119,6 +119,9 @@ class TellrawViewModel @Inject constructor(
     private val _chainAnchorEnabled = MutableStateFlow(true)
     val chainAnchorEnabled: StateFlow<Boolean> = _chainAnchorEnabled.asStateFlow()
 
+    private val _simpleTranslateJava = MutableStateFlow("")
+    private val _simpleTranslateBedrock = MutableStateFlow("")
+
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
     val targetVersion: StateFlow<String> = _targetVersion.asStateFlow()
@@ -887,6 +890,14 @@ class TellrawViewModel @Inject constructor(
         if (_showRawConvertDialog.value) runRawConvert()
     }
 
+    /** Simpler translate 的完成结果并入主生成输出，而不是在独立界面单独保留。 */
+    fun setSimpleTranslateOutput(java: String, bedrock: String, warnings: List<String>) {
+        _simpleTranslateJava.value = java
+        _simpleTranslateBedrock.value = bedrock
+        if (warnings.isNotEmpty()) _warnings.value = (_warnings.value + warnings).distinct()
+        generateCommands()
+    }
+
     private fun renderTagPlanCommands(commands: List<String>): String =
         if (_chainAnchorEnabled.value) {
             ExecuteConverter.anchorCommandChain(commands).joinToString("\n")
@@ -1392,8 +1403,8 @@ class TellrawViewModel @Inject constructor(
                 mark("haspermission=" in metaText, com.tellraw.app.model.FeatureGate.Feature.HASPERMISSION_PARAM)
                 val plan = com.tellraw.app.model.TargetVersionPlanner.plan(target, used)
                 allReminders.addAll(plan.notes)
-                val finalJava: String
-                val finalBedrock: String
+                var finalJava: String
+                var finalBedrock: String
                 if (plan.kind == com.tellraw.app.model.TargetVersionPlanner.OutputKind.SAY) {
                     // say 不支持文本组件：带标记符的文本要先还原成纯文本再交给 say。
                     val hasMarkers = messageToUse.contains(com.tellraw.app.util.TextComponentHelper.MARKER_START)
@@ -1407,6 +1418,14 @@ class TellrawViewModel @Inject constructor(
                 } else {
                     finalJava = javaCommand
                     finalBedrock = bedrockCommand
+                }
+                if (_simpleTranslateJava.value.isNotBlank()) {
+                    finalJava = listOf(finalJava, _simpleTranslateJava.value)
+                        .filter { it.isNotBlank() }.joinToString("\n")
+                }
+                if (_simpleTranslateBedrock.value.isNotBlank()) {
+                    finalBedrock = listOf(finalBedrock, _simpleTranslateBedrock.value)
+                        .filter { it.isNotBlank() }.joinToString("\n")
                 }
                 _javaCommand.value = finalJava
                 _bedrockCommand.value = finalBedrock
@@ -1608,6 +1627,8 @@ class TellrawViewModel @Inject constructor(
         _messageInputWithMarkers.value = ""
         _javaCommand.value = ""
         _bedrockCommand.value = ""
+        _simpleTranslateJava.value = ""
+        _simpleTranslateBedrock.value = ""
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _selectedTextComponent.value = null
