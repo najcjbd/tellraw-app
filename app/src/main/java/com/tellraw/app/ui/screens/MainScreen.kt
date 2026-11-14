@@ -667,8 +667,10 @@ private fun PortraitLayout(
                     TextButton(onClick = onOpenTellrawPreview) {
                         Text(stringResource(R.string.tellraw_preview))
                     }
-                    TextButton(onClick = onOpenSimpleTranslate) {
-                        Text("Simpler translate")
+                    if (simpleTranslate) {
+                        TextButton(onClick = onOpenSimpleTranslate) {
+                            Text("Simpler translate")
+                        }
                     }
                 }
 
@@ -1189,8 +1191,10 @@ private fun LandscapeLayout(
                             TextButton(onClick = onOpenTellrawPreview) {
                                 Text(stringResource(R.string.tellraw_preview))
                             }
-                            TextButton(onClick = onOpenSimpleTranslate) {
-                                Text("Simpler translate")
+                            if (simpleTranslate) {
+                                TextButton(onClick = onOpenSimpleTranslate) {
+                                    Text("Simpler translate")
+                                }
                             }
                         }
                         OutlinedTextField(
