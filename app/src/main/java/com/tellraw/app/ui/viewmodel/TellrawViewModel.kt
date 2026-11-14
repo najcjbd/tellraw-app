@@ -1165,9 +1165,17 @@ class TellrawViewModel @Inject constructor(
             val actualMessage = if (_defaultUseText.value) message else messageWithMarkers
             
             if (selector.isEmpty() || actualMessage.isEmpty()) {
-                _javaCommand.value = ""
-                _bedrockCommand.value = ""
-                _warnings.value = emptyList()
+                val simpleJava = _simpleTranslateJava.value
+                val simpleBedrock = _simpleTranslateBedrock.value
+                if (simpleJava.isNotBlank() || simpleBedrock.isNotBlank()) {
+                    _javaCommand.value = simpleJava
+                    _bedrockCommand.value = simpleBedrock
+                    _warnings.value = _simpleTranslateWarnings.value.distinct()
+                } else {
+                    _javaCommand.value = ""
+                    _bedrockCommand.value = ""
+                    _warnings.value = emptyList()
+                }
                 _isLoading.value = false
                 return@launch
             }

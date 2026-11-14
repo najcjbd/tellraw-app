@@ -15,6 +15,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -199,7 +201,7 @@ private fun displayNameOf(
  *  - 顶部 x/z 跳转；默认 y=-60；
  *  - 下方列出当前 tellraw 会选中的实体，以及每个实体会显示什么。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun GridEditorScreen(
     viewModel: TellrawViewModel,
@@ -209,7 +211,9 @@ fun GridEditorScreen(
     val selectorFromMain by viewModel.selectorInput.collectAsState()
     val message by viewModel.messageInput.collectAsState()
     val targetVersion by viewModel.targetVersion.collectAsState()
-    val targetSpec = remember(targetVersion) { VersionSpec.parse(targetVersion) }
+    val targetSpec = remember(targetVersion) {
+        if (targetVersion.isBlank() || targetVersion == "-1") null else VersionSpec.parse(targetVersion)
+    }
 
     val entityStore = remember { GridEntityStore(File(context.filesDir, "grid_entities.json")) }
     val customStore = remember { CustomEntityStore(File(context.filesDir, "custom_entities.json")) }
@@ -944,7 +948,11 @@ fun GridEditorScreen(
                 label = { Text("附加条件（所有 if/unless 子条件）") },
                 modifier = Modifier.fillMaxWidth()
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(onClick = { showWorldSettings = true }) { Text("世界条件…") }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = {

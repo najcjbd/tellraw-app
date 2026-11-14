@@ -675,17 +675,6 @@ private fun PortraitLayout(
                         onOpenSimple = onOpenSimpleTranslate
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onOpenTellrawPreview) {
-                        Text(stringResource(R.string.tellraw_preview))
-                    }
-                    if (simpleTranslate) {
-                        TextButton(onClick = { onOpenSimpleTranslate(null) }) {
-                            Text("Simpler translate")
-                        }
-                    }
-                }
-
                 OutlinedTextField(
                     value = messageTextFieldValue.value,
                     onValueChange = { 
@@ -1210,17 +1199,7 @@ private fun LandscapeLayout(
                                 onOpenSimple = onOpenSimpleTranslate
                             )
                         }
-                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = onOpenTellrawPreview) {
-                                Text(stringResource(R.string.tellraw_preview))
-                            }
-                            if (simpleTranslate) {
-                                TextButton(onClick = { onOpenSimpleTranslate(null) }) {
-                                    Text("Simpler translate")
-                                }
-                            }
-                        }
-                        OutlinedTextField(
+                                                OutlinedTextField(
                             value = messageTextFieldValue.value,
                             onValueChange = { 
                                 val oldText = messageTextFieldValue.value.text
