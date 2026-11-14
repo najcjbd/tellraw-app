@@ -658,4 +658,20 @@ class ExecuteConverterAuditTest {
         assertTrue(plan.commands.any { it.contains("run tellraw @r") })
     }
 
+
+    @Test
+    fun summonWithPostSummonPositionAllowsContextTarget() {
+        val plan = ExecuteConverter.buildMultiCommandTagPlan(
+            "execute as @a summon minecraft:pig at @s if items entity @s hotbar.* minecraft:diamond " +
+                "if predicate my:is_special",
+            Direction.BEDROCK_TO_JAVA,
+            tellrawTarget = "@r",
+            tellrawJson = "{\"text\":\"ok\"}",
+            requireUnmergeable = false,
+            tagSuffix = "sumpos"
+        )
+        requireNotNull(plan)
+        assertTrue(plan.commands.any { it.contains("at @s run tellraw @r") })
+    }
+
 }

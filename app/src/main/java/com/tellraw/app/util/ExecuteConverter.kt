@@ -818,6 +818,18 @@ object ExecuteConverter {
     private fun replayContext(prefix: String, tags: List<String>): String? =
         parseSegments(prefix, mutableListOf())?.let { replayContext(it, tags) }
 
+    /** summon 之后的位置/维度修饰可以重放；summon 本身不能重放。 */
+    private fun postSummonContext(prefix: String, taggedExecutor: String): String? {
+        val segs = parseSegments(prefix, mutableListOf()) ?: return null
+        val lastSummon = segs.indexOfLast { it is Seg.Mod && it.tokens.firstOrNull() == "summon" }
+        if (lastSummon < 0) return null
+        val after = segs.drop(lastSummon + 1).filterIsInstance<Seg.Mod>()
+            .filter { it.tokens.firstOrNull() in POSITION_MODIFIERS }
+            .flatMap { it.tokens }
+        return if (after.isEmpty()) "execute as $taggedExecutor"
+        else "execute as $taggedExecutor ${after.joinToString(" ")}"
+    }
+
     private fun hasPositionModifier(segs: List<Seg>): Boolean =
         segs.any { it is Seg.Mod && it.tokens.firstOrNull() in POSITION_MODIFIERS }
 
@@ -834,7 +846,7 @@ object ExecuteConverter {
         val rawSegs = parseSegments(prefix, parseReminders) ?: return null
         if (rawSegs.filterIsInstance<Seg.Cond>().size < 2) return null
         val target = tellrawTarget.trim()
-        val replayProbe = replayContext(prefix, listOf("__probe__"))
+        val replayProbe = replayContext(prefix, listOf("__probe__")) ?: postSummonContext(prefix, "__probe__")
         val canReplayContext = replayProbe != null
         val positionChanges = prefixChangesExecutionContext(prefix)
         if (!target.startsWith("@") ||
@@ -1050,7 +1062,8 @@ object ExecuteConverter {
         reason: String
     ): MultiCommandPlan? {
         val target = tellrawTarget.trim()
-        val canReplayContext = replayContext(prefix, listOf("__probe__")) != null
+        val canReplayContext = (replayContext(prefix, listOf("__probe__"))
+            ?: postSummonContext(prefix, "__probe__")) != null
         val positionChanges = prefixChangesExecutionContext(prefix)
         if (!target.startsWith("@") ||
             (targetRequiresOriginalContext(target) && !canReplayContext && positionChanges)
@@ -1070,8 +1083,10 @@ object ExecuteConverter {
         val dimension = lastInDimension(prefix)
         val cleanup = "tag $withTag remove $tag"
         val convertedSegs = parseSegments(converted, mutableListOf()).orEmpty()
-        val finalExecute = if (hasPositionModifier(convertedSegs)) {
-            replayContext(convertedSegs, listOf(tag)) ?: "execute as $withTag"
+        val finalExecute = if (hasPositionModifier(convertedSegs) || converted.contains("summon")) {
+            replayContext(convertedSegs, listOf(tag))
+                ?: postSummonContext(converted, withTag)
+                ?: "execute as $withTag"
         } else {
             "execute as $withTag"
         }
