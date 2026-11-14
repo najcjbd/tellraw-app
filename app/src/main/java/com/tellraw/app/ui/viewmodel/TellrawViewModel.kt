@@ -17,6 +17,7 @@ import com.tellraw.app.data.repository.VersionCheckRepository
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.util.CommandInputParser
+import com.tellraw.app.util.ConditionalRawtextConverter
 import com.tellraw.app.util.ExecuteConverter
 import com.tellraw.app.util.SelectorConverter
 import com.tellraw.app.util.TextFormatter
@@ -1009,7 +1010,12 @@ class TellrawViewModel @Inject constructor(
                 r.bedrockSelector ?: "@a", r.bedrockJson, nbtSyntax
             )
         } else null
-        _rawConvertJava.value = if (javaTagPlan != null) {
+        val conditionalRows = if (r.sourceEdition == CommandInputParser.SourceEdition.BEDROCK) {
+            ConditionalRawtextConverter.parse(r.bedrockJson)
+        } else null
+        _rawConvertJava.value = if (conditionalRows != null) {
+            ConditionalRawtextConverter.toJava(conditionalRows, prefix.orEmpty()).joinToString("\n")
+        } else if (javaTagPlan != null) {
             renderTagPlanCommands(javaTagPlan.commands)
         } else if (javaPrefix != null) {
             ExecuteConverter.composeTellrawCommand(javaPrefix, jTellraw)
@@ -1022,6 +1028,9 @@ class TellrawViewModel @Inject constructor(
         _rawConvertWarnings.value = buildList {
             addAll(r.warnings)
             addAll(prefixWarnings)
+            if (conditionalRows != null) {
+                add("已将基岩 conditional rawtext 转为 Java 多条 tellraw（第一匹配）；请核对条件是否覆盖原结构")
+            }
             javaTagPlan?.let {
                 addAll(it.warnings)
                 add("已使用多命令 tag 方案（Java）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")

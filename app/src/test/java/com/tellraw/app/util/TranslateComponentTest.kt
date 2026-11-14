@@ -168,4 +168,20 @@ class TranslateComponentTest {
         assertTrue(bedrock, bedrock.contains("§g➮§c"))
     }
 
+
+    @Test
+    fun conditionalRawtextConvertsToFirstMatchJavaCommands() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"A"}]}},
+            {"translate":"%%2","with":{"rawtext":[{"selector":"@s[scores={menu=2}]"},{"text":"B"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        assertEquals(2, rows.size)
+        val commands = ConditionalRawtextConverter.toJava(rows)
+        assertEquals(2, commands.size)
+        assertTrue(commands[0].contains("as @a[scores={menu=1}]"))
+        assertTrue(commands[1].contains("unless entity @s[scores={menu=1}]"))
+        assertTrue(commands[1].contains("tellraw @s"))
+    }
+
 }
