@@ -414,8 +414,8 @@ fun MainScreen(
             nbtSyntax = VersionDiff.NbtSyntax.from(nbtSyntax),
             allowMultiCmdTag = allowMultiCmdTag,
             chainAnchor = chainAnchorEnabled,
-            onComplete = { java, bedrock, warnings ->
-                viewModel.setSimpleTranslateOutput(java, bedrock, warnings)
+            onComplete = { java, bedrock, warnings, blockJson ->
+                viewModel.setSimpleTranslateOutput(java, bedrock, warnings, blockJson)
             },
             onDismiss = { showSimpleTranslateGroups = false }
         )
@@ -660,7 +660,8 @@ private fun PortraitLayout(
                         markers = messageMarkers,
                         onOpen = { position, ordinal ->
                             viewModel.openWithBuilderForTranslate(position, ordinal)
-                        }
+                        },
+                        onOpenSimple = onOpenSimpleTranslate
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -980,7 +981,11 @@ internal fun TellrawPreviewDialog(
 }
 
 @Composable
-private fun TranslateTokenBar(markers: String, onOpen: (Int, Int) -> Unit) {
+private fun TranslateTokenBar(
+    markers: String,
+    onOpen: (Int, Int) -> Unit,
+    onOpenSimple: () -> Unit
+) {
     val tokens = remember(markers) {
         TextComponentHelper.componentTokens(markers)
             .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
@@ -1002,10 +1007,16 @@ private fun TranslateTokenBar(markers: String, onOpen: (Int, Int) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             tokens.forEach { token ->
+                val isSimpler = token.content == TextComponentHelper.SIMPLE_TRANSLATE_KEY
                 AssistChip(
-                    onClick = { onOpen(token.start, token.ordinal) },
+                    onClick = {
+                        if (isSimpler) onOpenSimple() else onOpen(token.start, token.ordinal)
+                    },
                     label = {
-                        Text(stringResource(R.string.translate_token_label, token.ordinal))
+                        Text(
+                            if (isSimpler) "Simpler${token.ordinal}"
+                            else stringResource(R.string.translate_token_label, token.ordinal)
+                        )
                     },
                     colors = AssistChipDefaults.assistChipColors(
                         labelColor = MaterialTheme.colorScheme.primary
@@ -1184,7 +1195,8 @@ private fun LandscapeLayout(
                                 markers = messageMarkers,
                                 onOpen = { position, ordinal ->
                                     viewModel.openWithBuilderForTranslate(position, ordinal)
-                                }
+                                },
+                                onOpenSimple = onOpenSimpleTranslate
                             )
                         }
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

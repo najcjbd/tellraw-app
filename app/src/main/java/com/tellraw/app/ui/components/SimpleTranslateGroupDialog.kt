@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.tellraw.app.R
 import com.tellraw.app.model.SelectorType
@@ -70,7 +72,7 @@ fun SimpleTranslateGroupDialog(
     nbtSyntax: VersionDiff.NbtSyntax,
     allowMultiCmdTag: Boolean,
     chainAnchor: Boolean,
-    onComplete: (String, String, List<String>) -> Unit,
+    onComplete: (String, String, List<String>, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -89,7 +91,7 @@ fun SimpleTranslateGroupDialog(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
             allowMultiCmdTag, chainAnchor, bedrockFirstMatch
         )
-        onComplete(result.java, result.bedrock, result.warnings)
+        onComplete(result.java, result.bedrock, result.warnings, encodeBlock(prefix, rows, aliases, bedrockFirstMatch))
         onDismiss()
     }
 
@@ -303,6 +305,34 @@ private fun restoreRowsFromBedrock(text: String): List<TranslateParamRow> {
         if (drafts.isNotEmpty()) out.add(TranslateParamRow("b${id++}", params, drafts))
     }
     return out
+}
+
+private fun encodeBlock(
+    prefix: String,
+    rows: List<TranslateParamRow>,
+    aliases: List<TranslateAlias>,
+    bedrockFirstMatch: Boolean
+): String {
+    val root = JsonObject()
+    root.addProperty("prefix", prefix)
+    root.addProperty("bedrockFirstMatch", bedrockFirstMatch)
+    root.add("rows", JsonArray().apply {
+        rows.forEach { row ->
+            add(JsonObject().apply {
+                addProperty("params", row.params)
+                add("content", JsonParser.parseString(WithArgCodec.serialize(row.content)))
+            })
+        }
+    })
+    root.add("aliases", JsonArray().apply {
+        aliases.forEach { alias ->
+            add(JsonObject().apply {
+                addProperty("from", alias.from)
+                add("to", JsonParser.parseString(WithArgCodec.serialize(alias.to)))
+            })
+        }
+    })
+    return root.toString()
 }
 
 private fun buildSimpleTranslateGroups(

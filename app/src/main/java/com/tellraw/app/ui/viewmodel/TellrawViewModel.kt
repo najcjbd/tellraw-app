@@ -893,10 +893,42 @@ class TellrawViewModel @Inject constructor(
     }
 
     /** Simpler translate 的完成结果并入主生成输出，而不是在独立界面单独保留。 */
-    fun setSimpleTranslateOutput(java: String, bedrock: String, warnings: List<String>) {
+    fun setSimpleTranslateOutput(
+        java: String,
+        bedrock: String,
+        warnings: List<String>,
+        blockJson: String
+    ) {
         _simpleTranslateJava.value = java
         _simpleTranslateBedrock.value = bedrock
         _simpleTranslateWarnings.value = warnings
+        val token = com.tellraw.app.util.TextComponentHelper.TextComponent(
+            com.tellraw.app.util.TextComponentHelper.ComponentType.TRANSLATE,
+            com.tellraw.app.util.TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(
+                com.tellraw.app.util.TextComponentHelper.SubComponent(
+                    com.tellraw.app.util.TextComponentHelper.SubComponentType.WITH_JSON,
+                    blockJson
+                )
+            )
+        )
+        var markers = com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(
+            _messageInputWithMarkers.value
+        )
+        markers = com.tellraw.app.util.TextComponentHelper.insertComponentAt(
+            markers, markers.length, token
+        )
+        _messageInputWithMarkers.value = markers
+        _messageInput.value = com.tellraw.app.util.TextComponentHelper.stripComponentMarkers(
+            com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(markers)
+        )
+        if (_defaultUseText.value) {
+            _defaultUseText.value = false
+            viewModelScope.launch {
+                settingsRepository.setDefaultUseText(false)
+                settingsRepository.saveConfig()
+            }
+        }
         generateCommands()
     }
 
@@ -1112,7 +1144,8 @@ class TellrawViewModel @Inject constructor(
             
             val selector = _selectorInput.value
             val message = _messageInput.value
-            val messageWithMarkers = _messageInputWithMarkers.value
+            val messageWithMarkers = com.tellraw.app.util.TextComponentHelper
+                .removeSimpleTranslateBlocks(_messageInputWithMarkers.value)
             
             // 检查消息是否为空（使用带标记符的文本检查，因为纯文本可能为空但带标记符不为空）
             val actualMessage = if (_defaultUseText.value) message else messageWithMarkers

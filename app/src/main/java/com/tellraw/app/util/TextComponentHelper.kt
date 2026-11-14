@@ -18,6 +18,9 @@ object TextComponentHelper {
     // 特殊标记字符
     const val MARKER_START = '\u0FC8'  // ྈ
     const val MARKER_END = '\u0F34'    // ༴
+
+    /** Simpler translate 在消息里的保留组件键；数据在 with_json 子组件中。 */
+    const val SIMPLE_TRANSLATE_KEY = "__simpler_translate__"
     
     // 文本组件类型（Java版和基岩版tellraw都支持的组件）
     enum class ComponentType(val key: String, @StringRes val displayNameResId: Int, val hasSubComponent: Boolean = false) {
@@ -667,12 +670,22 @@ object TextComponentHelper {
      * 获取指定位置的文本组件类型
      * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
      */
+    /** 从正常消息中移除 Simpler translate 保留组件（它由主生成单独展开）。 */
+    fun removeSimpleTranslateBlocks(text: String): String {
+        if (SIMPLE_TRANSLATE_KEY !in text) return text
+        val kept = parseTextComponents(text).filterNot {
+            it.type == ComponentType.TRANSLATE && it.content == SIMPLE_TRANSLATE_KEY
+        }
+        return componentsToText(kept)
+    }
+
     /** 消息里每个顶层组件在纯文本中的位置；Translate 额外带 1 基序号。 */
     data class ComponentToken(
         val type: ComponentType,
         val ordinal: Int,
         val start: Int,
-        val end: Int
+        val end: Int,
+        val content: String = ""
     )
 
     fun componentTokens(text: String): List<ComponentToken> {
@@ -685,7 +698,7 @@ object TextComponentHelper {
                 component.subComponents.sumOf { it.content.length }
             if (component.type == ComponentType.TRANSLATE) {
                 translateOrdinal++
-                out.add(ComponentToken(component.type, translateOrdinal, pos, pos + len))
+                out.add(ComponentToken(component.type, translateOrdinal, pos, pos + len, component.content))
             }
             pos += len
         }
