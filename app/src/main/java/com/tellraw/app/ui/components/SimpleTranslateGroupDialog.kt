@@ -50,7 +50,10 @@ data class TranslateParamRow(
     val content: List<WithArgDraft> = listOf(WithArgDraft.Text(""))
 )
 
-data class TranslateAlias(val from: String, val to: String)
+data class TranslateAlias(
+    val from: String,
+    val to: List<WithArgDraft> = listOf(WithArgDraft.Text(""))
+)
 
 /**
  * Simpler translate 的收信人参数表：
@@ -76,6 +79,7 @@ fun SimpleTranslateGroupDialog(
     var nextRow by remember { mutableStateOf(1) }
     var nextAlias by remember { mutableStateOf(0) }
     var expandedId by remember { mutableStateOf<String?>(null) }
+    var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
     fun apply() {
         val result = buildSimpleTranslateGroups(
             context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
@@ -157,28 +161,41 @@ fun SimpleTranslateGroupDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 aliases.forEachIndexed { index, alias ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = alias.from,
-                            onValueChange = { aliases[index] = alias.copy(from = it) },
-                            label = { Text("输入") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        OutlinedTextField(
-                            value = alias.to,
-                            onValueChange = { aliases[index] = alias.copy(to = it) },
-                            label = { Text("别名/替换") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        TextButton(onClick = { aliases.removeAt(index) }) { Text("删除") }
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = alias.from,
+                                onValueChange = { aliases[index] = alias.copy(from = it) },
+                                label = { Text("输入文字") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                contentSummary(alias.to),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = {
+                                expandedAliasIndex = if (expandedAliasIndex == index) null else index
+                            }) { Text("编辑别名内容") }
+                            TextButton(onClick = {
+                                aliases.removeAt(index)
+                                if (expandedAliasIndex == index) expandedAliasIndex = null
+                            }) { Text("删除") }
+                        }
+                        if (expandedAliasIndex == index) {
+                            MessageContentEditor(
+                                args = alias.to,
+                                onArgsChange = { aliases[index] = alias.copy(to = it) }
+                            )
+                        }
                     }
                 }
-                OutlinedButton(onClick = { aliases.add(TranslateAlias("", "")) }) {
-                    Text("添加别名")
-                }
+                OutlinedButton(onClick = {
+                    aliases.add(TranslateAlias("", listOf(WithArgDraft.Text(""))))
+                }) { Text("添加别名") }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
@@ -209,20 +226,23 @@ private fun buildSimpleTranslateGroups(
     val aliasMap = aliases
         .filter { it.from.isNotBlank() }
         .associate { it.from.trim() to it.to }
-    fun applyAlias(draft: WithArgDraft): WithArgDraft = when (draft) {
-        is WithArgDraft.Text -> {
-            val replacement = aliasMap[draft.text.trim()]
-            if (replacement != null && draft.text.trim() == draft.text) draft.copy(text = replacement) else draft
+    // 只解析一层：命中别名时直接放入别名内容，不再继续解析别名内容里的别名。
+    fun applyAliasList(args: List<WithArgDraft>): List<WithArgDraft> = args.flatMap { draft ->
+        when (draft) {
+            is WithArgDraft.Text -> {
+                val replacement = if (draft.text.trim() == draft.text) aliasMap[draft.text.trim()] else null
+                replacement ?: listOf(draft)
+            }
+            is WithArgDraft.Translate -> listOf(draft.copy(args = applyAliasList(draft.args)))
+            else -> listOf(draft)
         }
-        is WithArgDraft.Translate -> draft.copy(args = draft.args.map(::applyAlias))
-        else -> draft
     }
 
     val java = mutableListOf<String>()
     val bedrockRows = mutableListOf<Any>()
 
     rows.forEachIndexed { index, row ->
-        val contents = row.content.map(::applyAlias)
+        val contents = applyAliasList(row.content)
         val contentJson = WithArgCodec.serialize(contents)
         if (contentJson == "[]") return@forEachIndexed
         val params = row.params.trim()
