@@ -133,6 +133,30 @@ fun MainScreen(
         }
     }
     
+    fun insertComponentAtCursor(text: String) {
+        val pos = messageTextFieldValue.value.selection.start
+        val oldLen = viewModel.messageInput.value.length
+        viewModel.insertTextWithComponent(pos, text)
+        val newText = viewModel.messageInput.value
+        val delta = (newText.length - oldLen).coerceAtLeast(0)
+        messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+            text = newText,
+            selection = androidx.compose.ui.text.TextRange((pos + delta).coerceIn(0, newText.length))
+        )
+    }
+
+    fun insertPlainAtCursor(text: String) {
+        val pos = messageTextFieldValue.value.selection.start
+        val oldLen = viewModel.messageInput.value.length
+        viewModel.insertPlainTextAt(pos, text)
+        val newText = viewModel.messageInput.value
+        val delta = (newText.length - oldLen).coerceAtLeast(0)
+        messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+            text = newText,
+            selection = androidx.compose.ui.text.TextRange((pos + delta).coerceIn(0, newText.length))
+        )
+    }
+
     // 历史记录状态
     val commandHistory by viewModel.commandHistory.collectAsState(initial = emptyList())
     val searchResults by viewModel.searchResults.collectAsState(initial = emptyList())
@@ -157,25 +181,17 @@ fun MainScreen(
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
                         // 文本模式：插入 with 里的字面逗号
-                        viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, "\\,"
-                        )
+                        insertComponentAtCursor("\\,")
                     } else if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
                         // JSON 模式：逗号就是 JSON 元素分隔符
-                        viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, ","
-                        )
+                        insertComponentAtCursor(",")
                     } else {
                         showCommaChoiceDialog = true
                     }
                 } else if (defaultUseText) {
-                    viewModel.insertPlainTextAt(
-                        messageTextFieldValue.value.selection.start, ","
-                    )
+                    insertPlainAtCursor(",")
                 } else {
-                    viewModel.insertTextWithComponent(
-                        messageTextFieldValue.value.selection.start, ","
-                    )
+                    insertComponentAtCursor(",")
                 }
             },
             selectorInput = selectorInput,
@@ -207,25 +223,17 @@ fun MainScreen(
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
                         // 文本模式：插入 with 里的字面逗号
-                        viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, "\\,"
-                        )
+                        insertComponentAtCursor("\\,")
                     } else if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH_JSON) {
                         // JSON 模式：逗号就是 JSON 元素分隔符
-                        viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, ","
-                        )
+                        insertComponentAtCursor(",")
                     } else {
                         showCommaChoiceDialog = true
                     }
                 } else if (defaultUseText) {
-                    viewModel.insertPlainTextAt(
-                        messageTextFieldValue.value.selection.start, ","
-                    )
+                    insertPlainAtCursor(",")
                 } else {
-                    viewModel.insertTextWithComponent(
-                        messageTextFieldValue.value.selection.start, ","
-                    )
+                    insertComponentAtCursor(",")
                 }
             },
             selectorInput = selectorInput,
@@ -481,9 +489,7 @@ fun MainScreen(
                         viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
                     }
                     viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH)
-                    viewModel.insertTextWithComponent(
-                        messageTextFieldValue.value.selection.start, "\\,"
-                    )
+                    insertComponentAtCursor("\\,")
                     showCommaChoiceDialog = false
                 }) { Text("纯文本 with（\\,）") }
             },
@@ -494,15 +500,11 @@ fun MainScreen(
                             viewModel.selectTextComponent(TextComponentHelper.ComponentType.TRANSLATE)
                         }
                         viewModel.selectSubComponent(TextComponentHelper.SubComponentType.WITH_JSON)
-                        viewModel.insertTextWithComponent(
-                            messageTextFieldValue.value.selection.start, ","
-                        )
+                        insertComponentAtCursor(",")
                         showCommaChoiceDialog = false
                     }) { Text("JSON 组件 with（,）") }
                     TextButton(onClick = {
-                        viewModel.insertPlainTextAt(
-                            messageTextFieldValue.value.selection.start, ","
-                        )
+                        insertPlainAtCursor(",")
                         showCommaChoiceDialog = false
                     }) { Text("普通文本逗号（,）") }
                     TextButton(onClick = { showCommaChoiceDialog = false }) { Text("取消") }
@@ -608,6 +610,18 @@ private fun PortraitLayout(
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
+
+    fun insertComponentAtCursor(text: String) {
+        val pos = messageTextFieldValue.value.selection.start
+        val oldLen = viewModel.messageInput.value.length
+        viewModel.insertTextWithComponent(pos, text)
+        val newText = viewModel.messageInput.value
+        val delta = (newText.length - oldLen).coerceAtLeast(0)
+        messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+            text = newText,
+            selection = androidx.compose.ui.text.TextRange((pos + delta).coerceIn(0, newText.length))
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -801,12 +815,7 @@ private fun PortraitLayout(
                                 messageTextFieldValue.value.selection.start
                             )
                         },
-                        onInsertPlainQuote = {
-                            viewModel.insertTextWithComponent(
-                                messageTextFieldValue.value.selection.start,
-                                "'"
-                            )
-                        },
+                        onInsertPlainQuote = { insertComponentAtCursor("'") },
                         onOpenWithBuilder = {
                             viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                         }
@@ -1077,6 +1086,18 @@ private fun LandscapeLayout(
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
+
+    fun insertComponentAtCursor(text: String) {
+        val pos = messageTextFieldValue.value.selection.start
+        val oldLen = viewModel.messageInput.value.length
+        viewModel.insertTextWithComponent(pos, text)
+        val newText = viewModel.messageInput.value
+        val delta = (newText.length - oldLen).coerceAtLeast(0)
+        messageTextFieldValue.value = androidx.compose.ui.text.input.TextFieldValue(
+            text = newText,
+            selection = androidx.compose.ui.text.TextRange((pos + delta).coerceIn(0, newText.length))
+        )
+    }
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -1322,12 +1343,7 @@ private fun LandscapeLayout(
                                         messageTextFieldValue.value.selection.start
                                     )
                                 },
-                                onInsertPlainQuote = {
-                                    viewModel.insertTextWithComponent(
-                                        messageTextFieldValue.value.selection.start,
-                                        "'"
-                                    )
-                                },
+                                onInsertPlainQuote = { insertComponentAtCursor("'") },
                                 onOpenWithBuilder = {
                                     viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                                 }
