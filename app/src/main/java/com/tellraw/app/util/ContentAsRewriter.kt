@@ -1,5 +1,9 @@
 package com.tellraw.app.util
 
+import android.content.Context
+import com.tellraw.app.model.SelectorType
+import com.tellraw.app.model.VersionSpec
+
 /**
  * “目标选择器参数对 as 敏感 = 否”时的内容选择器改写：
  *
@@ -33,7 +37,9 @@ object ContentAsRewriter {
         targetSelector: String,
         message: String,
         existingPrefix: String,
-        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+        context: Context? = null,
+        target: VersionSpec? = null
     ): Result {
         val notes = mutableListOf<String>()
         val no = { Result(false, targetSelector, message, emptyList(), notes) }
@@ -79,11 +85,18 @@ object ContentAsRewriter {
         val targetUsesS = trimmedTarget == "@s" || trimmedTarget.startsWith("@s[")
         val newTarget = if (targetUsesS) "@p" + trimmedTarget.removePrefix("@s") else trimmedTarget
 
+        val asSelector = if (context == null) driver.asVar else {
+            val (filtered, _, reminders) = SelectorConverter.filterSelectorParameters(
+                driver.asVar, SelectorType.JAVA, context, nbtSyntax, target
+            )
+            notes.addAll(reminders)
+            filtered
+        }
         val tokens = mutableListOf<String>()
         if (targetUsesS) {
             tokens.addAll(listOf("at", "@s"))
         }
-        tokens.addAll(listOf("as", driver.asVar))
+        tokens.addAll(listOf("as", asSelector))
         tokens.addAll(driver.conditions)
 
         if (Regex("\\bas\\b").containsMatchIn(existingPrefix)) {
