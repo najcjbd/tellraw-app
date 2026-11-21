@@ -25,7 +25,13 @@ data class HistoryItem(
     val bedrockCommand: String,
     val timestamp: Long,
     /** 内部带标记的组件文本（Base64 后写入历史文件）；空 = 旧记录。 */
-    val markers: String = ""
+    val markers: String = "",
+    /** execute 前置命令（输入框内容）。 */
+    val executePrefix: String = "",
+    /** 生成时的目标版本，-1 = 最新。 */
+    val targetVersion: String = "-1",
+    /** 生成时的 NBT 语法策略（modern/legacy/follow）。 */
+    val nbtSyntax: String = "modern"
 )
 
 /**
@@ -277,6 +283,9 @@ class HistoryRepository @Inject constructor(
                 var javaCommand = ""
                 var bedrockCommand = ""
                 var markers = ""
+                var executePrefix = ""
+                var targetVersion = "-1"
+                var nbtSyntax = "modern"
                 
                 // 按行分割，但保留换行符
                 val lines = sectionContent.split("\n")
@@ -330,6 +339,19 @@ class HistoryRepository @Inject constructor(
                             currentField = "基岩版输出"
                             currentContent = mutableListOf(trimmedLine.substringAfter("基岩版输出:"))
                         }
+                        trimmedLine.startsWith("元数据:") -> {
+                            val encoded = trimmedLine.substringAfter("元数据:").trim()
+                            runCatching {
+                                val raw = String(
+                                    android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP),
+                                    Charsets.UTF_8
+                                )
+                                val o = com.google.gson.JsonParser.parseString(raw).asJsonObject
+                                executePrefix = o.get("prefix")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+                                targetVersion = o.get("target")?.takeIf { it.isJsonPrimitive }?.asString ?: "-1"
+                                nbtSyntax = o.get("syntax")?.takeIf { it.isJsonPrimitive }?.asString ?: "modern"
+                            }
+                        }
                         trimmedLine.startsWith("标记文本:") -> {
                             when (currentField) {
                                 "时间" -> timestamp = parseTimestamp(currentContent.joinToString(""))
@@ -368,7 +390,12 @@ class HistoryRepository @Inject constructor(
                 if (message.isNotEmpty() || javaCommand.isNotEmpty() || bedrockCommand.isNotEmpty()) {
                     // 选择器从Java命令中提取
                     val selector = extractSelectorFromCommand(javaCommand)
-                    history.add(HistoryItem(selector, message, javaCommand, bedrockCommand, timestamp, markers))
+                    history.add(
+                        HistoryItem(
+                            selector, message, javaCommand, bedrockCommand,
+                            timestamp, markers, executePrefix, targetVersion, nbtSyntax
+                        )
+                    )
                 }
             } catch (e: Exception) {
                 // 跳过解析失败的记录
@@ -457,7 +484,15 @@ class HistoryRepository @Inject constructor(
                 item.markers.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP
             )
         } else ""
-        return "${START_MARKER}时间:$timeText\n 输入文本:${item.message}\n JAVA版输出:${item.javaCommand}\n 基岩版输出:${item.bedrockCommand}$markersLine$END_MARKER\n\n"
+        val meta = com.google.gson.JsonObject().apply {
+            addProperty("prefix", item.executePrefix)
+            addProperty("target", item.targetVersion)
+            addProperty("syntax", item.nbtSyntax)
+        }
+        val metaLine = "\n 元数据:" + android.util.Base64.encodeToString(
+            meta.toString().toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP
+        )
+        return "${START_MARKER}时间:$timeText\n 输入文本:${item.message}\n JAVA版输出:${item.javaCommand}\n 基岩版输出:${item.bedrockCommand}$markersLine$metaLine$END_MARKER\n\n"
     }
     
     /**

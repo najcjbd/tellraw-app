@@ -1072,6 +1072,13 @@ class TellrawViewModel @Inject constructor(
             CommandInputParser.SourceEdition.JAVA -> convertPrefix(ExecuteConverter.Direction.JAVA_TO_BEDROCK)
             else -> prefix
         }
+        val targetForRaw = targetVersionSpec()
+        val gatedJavaPrefix = javaPrefix?.let {
+            gateExecuteForTargetVersion(it, ExecuteConverter.Direction.BEDROCK_TO_JAVA, targetForRaw, prefixWarnings)
+        }
+        val gatedBedrockPrefix = bedrockPrefix?.let {
+            gateExecuteForTargetVersion(it, ExecuteConverter.Direction.JAVA_TO_BEDROCK, targetForRaw, prefixWarnings)
+        }
         val rawJavaJson = if (r.sourceEdition == CommandInputParser.SourceEdition.BEDROCK) {
             TextComponentHelper.convertToJavaJson(r.components, context = null)
         } else r.javaJson
@@ -1118,13 +1125,13 @@ class TellrawViewModel @Inject constructor(
             ).joinToString("\n")
         } else if (javaTagPlan != null) {
             renderTagPlanCommands(javaTagPlan.commands)
-        } else if (javaPrefix != null) {
-            ExecuteConverter.composeTellrawCommand(javaPrefix, jTellraw)
+        } else if (gatedJavaPrefix != null) {
+            ExecuteConverter.composeTellrawCommand(gatedJavaPrefix, jTellraw)
         } else jTellraw
         _rawConvertBedrock.value = if (bedrockTagPlan != null) {
             renderTagPlanCommands(bedrockTagPlan.commands)
-        } else if (bedrockPrefix != null) {
-            ExecuteConverter.composeTellrawCommand(bedrockPrefix, bTellraw)
+        } else if (gatedBedrockPrefix != null) {
+            ExecuteConverter.composeTellrawCommand(gatedBedrockPrefix, bTellraw)
         } else bTellraw
         _rawConvertWarnings.value = buildList {
             addAll(r.warnings)
@@ -1905,7 +1912,10 @@ class TellrawViewModel @Inject constructor(
                         javaCommand = javaCommand,
                         bedrockCommand = bedrockCommand,
                         timestamp = System.currentTimeMillis(),
-                        markers = _messageInputWithMarkers.value
+                        markers = _messageInputWithMarkers.value,
+                        executePrefix = _executePrefixInput.value,
+                        targetVersion = _targetVersion.value,
+                        nbtSyntax = _nbtSyntax.value
                     )
                 )
             }
@@ -1975,6 +1985,10 @@ class TellrawViewModel @Inject constructor(
     fun loadFromHistory(history: HistoryItem) {
         resetTransientOverrides()
         _selectorInput.value = history.selector
+        _executePrefixInput.value = history.executePrefix
+        _executePrefixEnabled.value = history.executePrefix.isNotBlank()
+        _targetVersion.value = history.targetVersion.ifBlank { "-1" }
+        _nbtSyntax.value = history.nbtSyntax.ifBlank { "modern" }
         _messageInput.value = history.message
         val historyMarkers = history.markers.ifBlank { markersForPlainText(history.message) }
         val historySimpleBlock = TextComponentHelper.parseTextComponents(historyMarkers)
