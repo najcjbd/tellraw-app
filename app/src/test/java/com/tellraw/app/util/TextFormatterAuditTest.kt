@@ -87,8 +87,10 @@ class TextFormatterAuditTest {
             TextComponent(ComponentType.SELECTOR, "@a")
         )
         val json = TextComponentHelper.convertToJavaJson(components, context = null)
-        val arr = JsonParser.parseString(json).asJsonArray
-        val selectorPart = arr.first { it.asJsonObject.has("selector") }.asJsonObject
+        val root = JsonParser.parseString(json).asJsonObject
+        val selectorPart = root.getAsJsonArray("extra").first {
+            it.asJsonObject.has("selector")
+        }.asJsonObject
         assertFalse("selector 不应继承颜色", selectorPart.has("color"))
         assertFalse("selector 不应继承粗体", selectorPart.get("bold")?.asBoolean ?: false)
     }

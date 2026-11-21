@@ -1692,10 +1692,19 @@ object TextComponentHelper {
 
         if (merged.isEmpty()) return "{}"
         if (merged.size == 1) return merged[0].toString()
-        // 多个组件时输出 JSON 数组：每个组件自带完整样式，避免 extra 继承导致
-        // “后面组件要不要补 false / §r”这种跨版本歧义。
-        return JsonArray().apply {
-            merged.forEach { add(it) }
+        // 数组/extra 的第一个元素会成为后续元素的父节点并继承样式。
+        // 用一个无样式空根节点 + 扁平 extra，保证每个组件真正样式自包含。
+        val first = merged.first()
+        if (first.keySet().all { it == "text" || it in JAVA_STYLE_KEYS } &&
+            first.get("text")?.takeIf { it.isJsonPrimitive }?.asString.isNullOrEmpty() &&
+            JAVA_STYLE_KEYS.none { first.has(it) }
+        ) {
+            merged.removeAt(0)
+        }
+        if (merged.size == 1) return merged[0].toString()
+        return JsonObject().apply {
+            addProperty("text", "")
+            add("extra", JsonArray().apply { merged.forEach { add(it) } })
         }.toString()
     }
     

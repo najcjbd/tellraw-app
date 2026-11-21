@@ -166,13 +166,15 @@ class ComponentStyleTest {
             )
         )
         val java = TextComponentHelper.convertToJavaJson(components)
-        val arr = com.google.gson.JsonParser.parseString(java).asJsonArray
-        assertEquals(2, arr.size())
-        assertEquals("9191", arr[0].asJsonObject.get("text").asString)
-        assertTrue(arr[0].asJsonObject.get("strikethrough").asBoolean)
-        assertEquals("78", arr[1].asJsonObject.get("text").asString)
-        assertTrue(arr[1].asJsonObject.get("underlined").asBoolean)
-        assertTrue(arr.all { !it.asJsonObject.has("extra") })
+        val root = com.google.gson.JsonParser.parseString(java).asJsonObject
+        assertEquals("", root.get("text").asString)
+        val extras = root.getAsJsonArray("extra")
+        assertEquals(2, extras.size())
+        assertEquals("9191", extras[0].asJsonObject.get("text").asString)
+        assertTrue(extras[0].asJsonObject.get("strikethrough").asBoolean)
+        assertEquals("78", extras[1].asJsonObject.get("text").asString)
+        assertTrue(extras[1].asJsonObject.get("underlined").asBoolean)
+        assertTrue(extras.all { !it.asJsonObject.has("extra") })
     }
 
     @Test
@@ -186,8 +188,8 @@ class ComponentStyleTest {
             TextComponent(ComponentType.SELECTOR, "@a")
         )
         val java = TextComponentHelper.convertToJavaJson(components)
-        val arr = com.google.gson.JsonParser.parseString(java).asJsonArray
-        val selector = arr.first { it.asJsonObject.has("selector") }.asJsonObject
+        val root = com.google.gson.JsonParser.parseString(java).asJsonObject
+        val selector = root.getAsJsonArray("extra").first { it.asJsonObject.has("selector") }.asJsonObject
         assertFalse(selector.has("strikethrough"))
         assertFalse(selector.has("underlined"))
         assertFalse(selector.has("color"))
