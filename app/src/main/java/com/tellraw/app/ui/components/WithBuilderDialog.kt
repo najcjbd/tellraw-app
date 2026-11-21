@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.tellraw.app.R
 import com.tellraw.app.ui.viewmodel.WithBuilderMode
@@ -70,6 +72,25 @@ import com.tellraw.app.util.WithArgDraft
 /**
  * translate 的 with 参数可视化构造器：可视化列表 + JSON 兜底，支持 translate 无限嵌套。
  */
+private val WithArgListSaver = Saver<List<WithArgDraft>, String>(
+    save = { WithArgCodec.serialize(it) },
+    restore = { runCatching { WithArgCodec.parseArgs(it) }.getOrDefault(emptyList()) }
+)
+
+private val JsonObjectSaver = Saver<JsonObject, String>(
+    save = { it.toString() },
+    restore = { runCatching { JsonParser.parseString(it).asJsonObject }.getOrDefault(JsonObject()) }
+)
+
+private val TextDraftSaver = Saver<WithArgDraft.Text, String>(
+    save = { WithArgCodec.serialize(listOf(it)) },
+    restore = {
+        val draft = runCatching { WithArgCodec.parseArgs(it).firstOrNull() }.getOrNull()
+        draft as? WithArgDraft.Text ?: WithArgDraft.Text("")
+    }
+)
+
+
 @Composable
 fun WithBuilderDialog(
     state: WithBuilderState,
@@ -83,7 +104,7 @@ fun WithBuilderDialog(
     onRawJsonChange: (String) -> Unit,
     onApply: () -> Unit
 ) {
-    var visualRawError by remember { mutableStateOf<String?>(null) }
+    var visualRawError by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(state.mode) {
         if (state.mode == WithBuilderMode.JSON) visualRawError = null
     }
@@ -991,8 +1012,8 @@ private fun ArgListSection(
     onArgsChange: (List<WithArgDraft>) -> Unit,
     allowedKinds: Set<AddKind> = AddKind.values().toSet()
 ) {
-    var editIndex by remember { mutableStateOf<Int?>(null) }
-    var showAdd by remember { mutableStateOf(false) }
+    var editIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var showAdd by rememberSaveable { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (args.isEmpty()) {
@@ -1141,8 +1162,8 @@ private fun TextItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var current by remember(original) { mutableStateOf(original) }
-    val nodeKey = remember { "text-item-${java.util.UUID.randomUUID()}" }
+    var current by rememberSaveable(original, stateSaver = TextDraftSaver) { mutableStateOf(original) }
+    val nodeKey = rememberSaveable { "text-item-${java.util.UUID.randomUUID()}" }
 
     ItemDialog(
         title = kindLabel(original),
@@ -1168,10 +1189,10 @@ private fun TranslateItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var key by remember(original) { mutableStateOf(original.key) }
-    var fallback by remember(original) { mutableStateOf(original.fallback.orEmpty()) }
-    var args by remember(original) { mutableStateOf(original.args) }
-    var retained by remember(original) { mutableStateOf(original.retained) }
+    var key by rememberSaveable(original) { mutableStateOf(original.key) }
+    var fallback by rememberSaveable(original) { mutableStateOf(original.fallback.orEmpty()) }
+    var args by rememberSaveable(original, stateSaver = WithArgListSaver) { mutableStateOf(original.args) }
+    var retained by rememberSaveable(original, stateSaver = JsonObjectSaver) { mutableStateOf(original.retained) }
 
     ItemDialog(
         title = kindLabel(original),
@@ -1211,9 +1232,9 @@ private fun SelectorItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var selector by remember(original) { mutableStateOf(original.selector) }
-    var separator by remember(original) { mutableStateOf(original.separator.orEmpty()) }
-    var retained by remember(original) { mutableStateOf(original.retained) }
+    var selector by rememberSaveable(original) { mutableStateOf(original.selector) }
+    var separator by rememberSaveable(original) { mutableStateOf(original.separator.orEmpty()) }
+    var retained by rememberSaveable(original, stateSaver = JsonObjectSaver) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1250,9 +1271,9 @@ private fun ScoreItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var name by remember(original) { mutableStateOf(original.name) }
-    var objective by remember(original) { mutableStateOf(original.objective) }
-    var retained by remember(original) { mutableStateOf(original.retained) }
+    var name by rememberSaveable(original) { mutableStateOf(original.name) }
+    var objective by rememberSaveable(original) { mutableStateOf(original.objective) }
+    var retained by rememberSaveable(original, stateSaver = JsonObjectSaver) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1282,8 +1303,8 @@ private fun KeybindItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var keybind by remember(original) { mutableStateOf(original.keybind) }
-    var retained by remember(original) { mutableStateOf(original.retained) }
+    var keybind by rememberSaveable(original) { mutableStateOf(original.keybind) }
+    var retained by rememberSaveable(original, stateSaver = JsonObjectSaver) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1306,12 +1327,12 @@ private fun NbtItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var path by remember(original) { mutableStateOf(original.path) }
-    var source by remember(original) { mutableStateOf(original.source) }
-    var target by remember(original) { mutableStateOf(original.target.orEmpty()) }
-    var interpret by remember(original) { mutableStateOf(original.interpret) }
-    var separator by remember(original) { mutableStateOf(original.separator.orEmpty()) }
-    var retained by remember(original) { mutableStateOf(original.retained) }
+    var path by rememberSaveable(original) { mutableStateOf(original.path) }
+    var source by rememberSaveable(original) { mutableStateOf(original.source) }
+    var target by rememberSaveable(original) { mutableStateOf(original.target.orEmpty()) }
+    var interpret by rememberSaveable(original) { mutableStateOf(original.interpret) }
+    var separator by rememberSaveable(original) { mutableStateOf(original.separator.orEmpty()) }
+    var retained by rememberSaveable(original, stateSaver = JsonObjectSaver) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1388,7 +1409,7 @@ private fun RawItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var text by remember(original) { mutableStateOf(WithArgCodec.prettyJson(original.element)) }
+    var text by rememberSaveable(original) { mutableStateOf(WithArgCodec.prettyJson(original.element)) }
     val parsed = remember(text) {
         runCatching { WithArgCodec.parseRaw(text) }.getOrNull()
     }
