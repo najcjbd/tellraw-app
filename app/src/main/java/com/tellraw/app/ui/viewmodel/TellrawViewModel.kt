@@ -1026,8 +1026,8 @@ class TellrawViewModel @Inject constructor(
             _rawConvertWarnings.value = emptyList()
             return
         }
-        val nbtSyntax = syntaxOverride
-            ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        val nbtSyntax = com.tellraw.app.util.VersionDiff.syntaxForTarget(targetVersionSpec())
+            ?: (syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value))
         val r = try {
             com.tellraw.app.util.CommandInputParser.parse(
                 input, applicationContext, nbtSyntax, targetVersionSpec()
@@ -1201,7 +1201,9 @@ class TellrawViewModel @Inject constructor(
 
     /** 把解析结果填回生成器：选择器 / 消息（组件）/ execute 前缀；转换时生成的 if/unless 由生成器既有逻辑重算。 */
     fun applyRawConvertToGenerator() {
-        val nbtSyntax = syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        val nbtSyntax = com.tellraw.app.util.VersionDiff.syntaxForTarget(
+            versionOverride ?: targetVersionSpec()
+        ) ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
         val r = try {
             com.tellraw.app.util.CommandInputParser.parse(
                 _rawConvertInput.value, applicationContext, nbtSyntax,
@@ -1733,7 +1735,8 @@ class TellrawViewModel @Inject constructor(
 
         val converted = ExecuteConverter.convertExecutePrefix(
             prefix, direction, warnings,
-            effectiveNbtSyntax(_executePrefixInput.value)
+            com.tellraw.app.util.VersionDiff.syntaxForTarget(target)
+                ?: effectiveNbtSyntax(_executePrefixInput.value)
         )
         if (converted == null) {
             warnings.add(applicationContext.getString(R.string.execute_prefix_invalid_ignored, versionName))

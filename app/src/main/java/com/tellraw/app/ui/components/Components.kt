@@ -692,6 +692,8 @@ fun SettingsDialog(
     simpleTranslateNesting: Boolean = true,
     chainAnchorEnabled: Boolean = true,
     nbtSyntax: String,
+    targetVersion: String = "-1",
+    onTargetVersionChanged: (String) -> Unit = {},
     onDismiss: () -> Unit,
     onUseJavaFontStyleChanged: (Boolean) -> Unit,
     onMNMixedModeChanged: (Boolean) -> Unit,
@@ -1074,6 +1076,13 @@ fun SettingsDialog(
                         }
                     }
 
+                    OutlinedTextField(
+                        value = targetVersion,
+                        onValueChange = onTargetVersionChanged,
+                        label = { Text("目标版本（-1 最新 / java:1.20.4 / bedrock:1.21.0）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口
@@ -1426,6 +1435,13 @@ fun SettingsDialog(
                         }
                     }
 
+                    OutlinedTextField(
+                        value = targetVersion,
+                        onValueChange = onTargetVersionChanged,
+                        label = { Text("目标版本（-1 最新 / java:1.20.4 / bedrock:1.21.0）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     NbtSyntaxSelector(value = nbtSyntax, onChange = onNbtSyntaxChanged)
 
                     // D4：整条命令 / 裸 JSON 转换入口

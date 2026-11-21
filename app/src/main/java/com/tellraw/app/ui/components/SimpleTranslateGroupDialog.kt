@@ -25,8 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,20 +62,41 @@ fun SimpleTranslateGroupDialog(
 ) {
     val context = LocalContext.current
     val initialTable = remember(initialBlockJson) { SimpleTranslatePlanner.decode(initialBlockJson) }
-    val rows = remember {
+    val rowsSaver = remember {
+        Saver<SnapshotStateList<Row>, String>(
+            save = { rows -> SimpleTranslatePlanner.encode(Table(rows = rows.toList())) },
+            restore = { json ->
+                val restored = SimpleTranslatePlanner.decode(json)?.rows.orEmpty()
+                mutableStateListOf<Row>().apply {
+                    addAll(restored.ifEmpty { listOf(Row(id = "r0")) })
+                }
+            }
+        )
+    }
+    val aliasesSaver = remember {
+        Saver<SnapshotStateList<Alias>, String>(
+            save = { aliases -> SimpleTranslatePlanner.encode(Table(aliases = aliases.toList())) },
+            restore = { json ->
+                mutableStateListOf<Alias>().apply {
+                    addAll(SimpleTranslatePlanner.decode(json)?.aliases.orEmpty())
+                }
+            }
+        )
+    }
+    val rows = rememberSaveable(initialBlockJson, saver = rowsSaver) {
         mutableStateListOf<Row>().apply {
             addAll(initialTable?.rows.orEmpty().ifEmpty { listOf(Row(id = "r0")) })
         }
     }
-    val aliases = remember {
+    val aliases = rememberSaveable(initialBlockJson, saver = aliasesSaver) {
         mutableStateListOf<Alias>().apply { addAll(initialTable?.aliases.orEmpty()) }
     }
-    var nextRow by remember { mutableStateOf(nextRowNumber(rows.toList())) }
-    var expandedId by remember { mutableStateOf<String?>(null) }
-    var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
-    var restoreInput by remember { mutableStateOf("") }
-    var notice by remember { mutableStateOf("") }
-    var bedrockFirstMatch by rememberSaveable {
+    var nextRow by rememberSaveable { mutableStateOf(nextRowNumber(rows.toList())) }
+    var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedAliasIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var restoreInput by rememberSaveable { mutableStateOf("") }
+    var notice by rememberSaveable { mutableStateOf("") }
+    var bedrockFirstMatch by rememberSaveable(initialBlockJson) {
         mutableStateOf(initialTable?.bedrockFirstMatch == true)
     }
 

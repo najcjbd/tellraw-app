@@ -29,6 +29,8 @@ object FeatureGate {
         HASPERMISSION_PARAM,   // Bedrock 1.19.80
         HAS_PROPERTY_PARAM,    // Bedrock 1.20.70
         AT_N,                  // Java 1.21 / Bedrock 1.21.100
+        KEYBIND_TEXT,          // Java 1.12
+        NBT_TEXT,              // Java 1.14
     }
 
     private fun spec(edition: VersionSpec.Edition, vararg parts: Int) = VersionSpec(edition, parts.toList())
@@ -55,6 +57,8 @@ object FeatureGate {
         Feature.HASPERMISSION_PARAM to Min(null, spec(B, 1, 19, 80)),
         Feature.HAS_PROPERTY_PARAM to Min(null, spec(B, 1, 20, 70)),
         Feature.AT_N to Min(spec(J, 1, 21), spec(B, 1, 21, 100)),
+        Feature.KEYBIND_TEXT to Min(spec(J, 1, 12), null),
+        Feature.NBT_TEXT to Min(spec(J, 1, 14), null),
     )
 
     /** 目标版本是否支持该特性。version=null（最新）按支持处理。 */

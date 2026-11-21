@@ -11,11 +11,14 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
@@ -60,6 +63,7 @@ fun MainScreen(
     val chainAnchorEnabled by viewModel.chainAnchorEnabled.collectAsState()
     var showSimpleTranslateGroups by rememberSaveable { mutableStateOf(false) }
     var simpleInitialBlock by rememberSaveable { mutableStateOf<String?>(null) }
+    val targetVersion by viewModel.targetVersion.collectAsState()
     val javaCommand by viewModel.javaCommand.collectAsState()
     val bedrockCommand by viewModel.bedrockCommand.collectAsState()
     val warnings by viewModel.warnings.collectAsState()
@@ -244,6 +248,24 @@ fun MainScreen(
     }
 
     // 历史记录对话框
+    if (isLandscape && (showSettingsDialog.value || showHistoryDialog.value ||
+            showStorageSettingsDialog || showFilenameDialog != null || showFileExistsDialog != null)
+    ) {
+        // 横屏面板不是 Dialog；用可点击遮罩拦住背后输入。
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f))
+                .clickable {
+                    showSettingsDialog.value = false
+                    showHistoryDialog.value = false
+                    viewModel.hideStorageSettingsDialog()
+                    viewModel.hideFilenameDialog()
+                    viewModel.hideFileExistsDialog()
+                }
+        )
+    }
+
     if (showHistoryDialog.value) {
         HistoryDialog(
             historyList = commandHistory,
@@ -306,6 +328,8 @@ fun MainScreen(
             simpleTranslateNesting = simpleTranslateNesting,
             chainAnchorEnabled = chainAnchorEnabled,
             nbtSyntax = nbtSyntax,
+            targetVersion = targetVersion,
+            onTargetVersionChanged = { viewModel.setTargetVersion(it) },
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)

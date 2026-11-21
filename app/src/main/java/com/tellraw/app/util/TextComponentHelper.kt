@@ -1415,10 +1415,28 @@ object TextComponentHelper {
                     }
                 }
             }
-            ComponentType.KEYBIND -> result["keybind"] = mainComponent.content
-            ComponentType.NBT -> writeNbtSpec(
-                parseNbtContent(mainComponent.content), mainComponent.content, result, warnings
-            )
+            ComponentType.KEYBIND -> {
+                if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                    !com.tellraw.app.model.FeatureGate.isAvailable(
+                        com.tellraw.app.model.FeatureGate.Feature.KEYBIND_TEXT, target
+                    )
+                ) {
+                    warnings?.add("目标 Java 版本不支持 keybind 文本组件；输出可能无效")
+                }
+                result["keybind"] = mainComponent.content
+            }
+            ComponentType.NBT -> {
+                if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                    !com.tellraw.app.model.FeatureGate.isAvailable(
+                        com.tellraw.app.model.FeatureGate.Feature.NBT_TEXT, target
+                    )
+                ) {
+                    warnings?.add("目标 Java 版本不支持 nbt 文本组件；输出可能无效")
+                }
+                writeNbtSpec(
+                    parseNbtContent(mainComponent.content), mainComponent.content, result, warnings
+                )
+            }
         }
 
         if (!(mainComponent.type == ComponentType.TRANSLATE &&
@@ -1549,10 +1567,28 @@ object TextComponentHelper {
                             }
                         }
                     }
-                    ComponentType.KEYBIND -> subMap["keybind"] = sub.content
-                    ComponentType.NBT -> writeNbtSpec(
-                        parseNbtContent(sub.content), sub.content, subMap, warnings
-                    )
+                    ComponentType.KEYBIND -> {
+                        if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                            !com.tellraw.app.model.FeatureGate.isAvailable(
+                                com.tellraw.app.model.FeatureGate.Feature.KEYBIND_TEXT, target
+                            )
+                        ) {
+                            warnings?.add("目标 Java 版本不支持 keybind 文本组件；输出可能无效")
+                        }
+                        subMap["keybind"] = sub.content
+                    }
+                    ComponentType.NBT -> {
+                        if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                            !com.tellraw.app.model.FeatureGate.isAvailable(
+                                com.tellraw.app.model.FeatureGate.Feature.NBT_TEXT, target
+                            )
+                        ) {
+                            warnings?.add("目标 Java 版本不支持 nbt 文本组件；输出可能无效")
+                        }
+                        writeNbtSpec(
+                            parseNbtContent(sub.content), sub.content, subMap, warnings
+                        )
+                    }
                 }
                 if (!(sub.type == ComponentType.TRANSLATE &&
                         sub.content == SIMPLE_TRANSLATE_KEY)
