@@ -680,6 +680,43 @@ object TextComponentHelper {
         }
     }
 
+    /** 目标版本只能 say 时的最佳努力扁平化：尽量保留文字/translate 参数，不假装能解析 selector/score。 */
+    fun flattenToPlainText(components: List<TextComponent>): String {
+        fun draftText(draft: WithArgDraft): String = when (draft) {
+            is WithArgDraft.Text -> draft.text
+            is WithArgDraft.Translate -> {
+                val args = draft.args.map(::draftText)
+                TranslatePreview.render(draft.key, args)
+            }
+            is WithArgDraft.Selector -> draft.selector
+            is WithArgDraft.Score -> "${draft.name}:${draft.objective}"
+            is WithArgDraft.Keybind -> draft.keybind
+            is WithArgDraft.Nbt -> draft.path
+            is WithArgDraft.Raw -> draft.element.takeIf { it.isJsonPrimitive }?.asString ?: draft.element.toString()
+        }
+        fun componentText(c: TextComponent): String = when (c.type) {
+            ComponentType.TEXT -> c.content
+            ComponentType.TRANSLATE -> {
+                val sub = c.subComponents.firstOrNull {
+                    it.type == SubComponentType.WITH_JSON || it.type == SubComponentType.WITH
+                }
+                val args = if (sub == null || sub.content.isBlank()) emptyList() else {
+                    if (sub.type == SubComponentType.WITH_JSON) {
+                        runCatching { WithArgCodec.parseArgs(sub.content).map(::draftText) }.getOrDefault(emptyList())
+                    } else {
+                        parseTranslateWithContent(sub.content).map { it }
+                    }
+                }
+                TranslatePreview.render(c.content, args)
+            }
+            ComponentType.SELECTOR -> c.content
+            ComponentType.SCORE -> parseScoreContent(c.content).joinToString(",") { "${it.first}:${it.second}" }
+            ComponentType.KEYBIND -> c.content
+            ComponentType.NBT -> parseNbtContent(c.content)?.get("path")?.asString ?: c.content
+        }
+        return components.joinToString("") { componentText(it) }
+    }
+
     private fun plainTextComponentMap(
         content: String,
         mNHandling: String,

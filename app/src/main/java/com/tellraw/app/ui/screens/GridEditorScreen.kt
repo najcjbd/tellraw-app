@@ -577,7 +577,9 @@ fun GridEditorScreen(
         } else {
             evaluation.matched.map { ge ->
                 GridConditionEvaluator.evaluate(
-                    effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin
+                    effectiveConditions, ge, allGridEntities, targetSpec, worldState, evaluationOrigin,
+                    yaw = ge.rotationY ?: 0.0,
+                    pitch = ge.rotationX ?: 0.0
                 ) to ge
             }
         }
@@ -1161,6 +1163,7 @@ fun GridEditorScreen(
                 onDismiss = { showEditor = false; editing = null },
                 onDelete = {
                     entities.removeAll { it.uid == current.uid }
+                    if (executorUid == current.uid) executorUid = null
                     for (i in entities.indices) {
                         val e = entities[i]
                         val cleaned = GridRelations.removeUid(e.relations, current.uid)

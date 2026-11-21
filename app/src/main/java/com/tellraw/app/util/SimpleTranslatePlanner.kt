@@ -5,6 +5,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.util.TextComponentHelper.ComponentType
@@ -313,6 +314,13 @@ object SimpleTranslatePlanner {
         }
         val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
+        if (!FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_MODERN, target)) {
+            if (exclusions.isNotBlank()) {
+                warnings.add("目标版本不支持 execute，第一匹配排除无法表达；后面的行可能与前面重复显示")
+            }
+            val direct = filterJava(merged, context, nbtSyntax, target, warnings)
+            return "tellraw $direct $json"
+        }
         val combined = "$base ${inner.joinToString(" ")}$exclusions"
 
         // 原始 Bedrock 条件前缀（items/hasitem/...）无法直接写进 Java execute 时，
@@ -427,6 +435,12 @@ object SimpleTranslatePlanner {
         val exclusions = exclusionsForBedrock(earlier, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
         val raw = rawtextJson(items)
+        if (!FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_MODERN, target)) {
+            if (exclusions.isNotBlank()) {
+                warnings.add("目标版本不支持 execute，第一匹配排除无法表达；后面的行可能与前面重复显示")
+            }
+            return "tellraw $selector $raw"
+        }
         return "$base as $selector$exclusions run tellraw @s $raw"
     }
 
@@ -541,6 +555,9 @@ object SimpleTranslatePlanner {
         val selector = filterBedrock(baseSelector, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
         val raw = JsonObject().apply { add("rawtext", rows) }
+        if (!FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_MODERN, target)) {
+            return listOf("tellraw $selector $raw")
+        }
         return listOf("$base as $selector run tellraw @s $raw")
     }
 

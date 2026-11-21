@@ -504,6 +504,9 @@ object GridConditionEvaluator {
                 return CondEval(true, 6, neutral = true)
             }
             val ok = if (target == "@s" || target.startsWith("@s")) {
+                if (target != "@s") {
+                    notes.add("items 源 $target 的方括号条件未参与求值，网格按当前候选实体的物品近似")
+                }
                 matchesItemPredicate(entity.items, slots, predicate, notes)
             } else {
                 notes.add("items 条件的目标不是 @s（$target），网格按候选实体近似")
@@ -545,6 +548,9 @@ object GridConditionEvaluator {
             val target = tokens.getOrNull(i + 3) ?: return null
             val slots = tokens.getOrNull(i + 4) ?: return null
             val ok = if (target == "@s" || target.startsWith("@s")) {
+                if (target != "@s") {
+                    notes.add("slots 源 $target 的方括号条件未参与求值，网格按当前候选实体近似")
+                }
                 entityHasSlots(entity, slots)
             } else {
                 notes.add("slots 条件的目标不是 @s（$target），网格按候选实体近似")
@@ -656,6 +662,10 @@ object GridConditionEvaluator {
             p.substring(bracketIndex + 1, p.length - 1)
         } else ""
 
+        if (idPart.startsWith("#")) {
+            notes.add("物品标签谓词 $idPart 未建模，已按未参与筛选处理")
+            return true
+        }
         if (idPart.startsWith("!")) {
             // Java 原版实测：item_predicate 的 ID 前不能写 !（! 只能加在 [] 内的测试项前），
             // 盲拆成“存在任意非该 ID 物品”会得到原版根本不会执行的结果。

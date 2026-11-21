@@ -863,6 +863,7 @@ class TellrawViewModel @Inject constructor(
 
     /** 设置"新旧版本差异"策略（modern / legacy / follow）。 */
     fun setNbtSyntax(value: String) {
+        syntaxOverride = null
         _nbtSyntax.value = value
         viewModelScope.launch {
             settingsRepository.setNbtSyntax(value)
@@ -894,7 +895,16 @@ class TellrawViewModel @Inject constructor(
     }
 
     /** 目标版本（-1 = 最新）。 */
+    /** 一次性的版本/语法选择不能粘到后续输入上。 */
+    private fun resetTransientOverrides() {
+        syntaxOverride = null
+        versionOverride = null
+        versionChoiceAsked = false
+        pendingRemovedSuggestion = null
+    }
+
     fun setTargetVersion(value: String) {
+        resetTransientOverrides()
         _targetVersion.value = value.trim().ifEmpty { "-1" }
         viewModelScope.launch { settingsRepository.setTargetVersion(_targetVersion.value) }
         generateCommands()
@@ -1202,6 +1212,7 @@ class TellrawViewModel @Inject constructor(
             return
         } ?: return
         syntaxOverride = null
+        versionOverride = null
 
         if (r.selector != null) {
             _selectorInput.value = r.selector
@@ -1628,14 +1639,26 @@ class TellrawViewModel @Inject constructor(
                 var finalJava: String
                 var finalBedrock: String
                 if (plan.kind == com.tellraw.app.model.TargetVersionPlanner.OutputKind.SAY) {
-                    // say 不支持文本组件：带标记符的文本要先还原成纯文本再交给 say。
-                    val hasMarkers = messageToUse.contains(com.tellraw.app.util.TextComponentHelper.MARKER_START)
-                    val sayText = if (hasMarkers) {
-                        allReminders.add(applicationContext.getString(R.string.say_component_flattened))
-                        com.tellraw.app.util.TextComponentHelper.parseTextComponents(messageToUse)
-                            .filterNot(::isSimpleToken)
-                            .joinToString("") { it.content }
-                    } else messageToUse
+                    // say 不支持文本组件和 execute；尽量保留文字与 translate 参数，并明确说明不可表达的部分。
+                    val sayComponents = com.tellraw.app.util.TextComponentHelper
+                        .parseTextComponents(messageToUse)
+                        .filterNot(::isSimpleToken)
+                    val sayText = com.tellraw.app.util.TextComponentHelper.flattenToPlainText(sayComponents)
+                    if (sayComponents.any {
+                            it.type == com.tellraw.app.util.TextComponentHelper.ComponentType.SELECTOR ||
+                                it.type == com.tellraw.app.util.TextComponentHelper.ComponentType.SCORE ||
+                                it.type == com.tellraw.app.util.TextComponentHelper.ComponentType.KEYBIND ||
+                                it.type == com.tellraw.app.util.TextComponentHelper.ComponentType.NBT
+                        }
+                    ) {
+                        allReminders.add("say 不能解析 selector/score/keybind/nbt；这些组件已按原始标识文字输出")
+                    }
+                    if (selector.isNotBlank() && selector != "@a") {
+                        allReminders.add("say 不能限定收件人：原选择器 $selector 已丢弃，消息会广播给所有人")
+                    }
+                    if (_executePrefixInput.value.isNotBlank()) {
+                        allReminders.add("say 不支持 execute 前缀：原前缀已丢弃")
+                    }
                     finalJava = "say $sayText"
                     finalBedrock = "say $sayText"
                     if (simpleTable != null) {
@@ -1831,6 +1854,7 @@ class TellrawViewModel @Inject constructor(
     }
 
     fun clearAll() {
+        resetTransientOverrides()
         val selector = _selectorInput.value
         val message = _messageInput.value
         val javaCommand = _javaCommand.value
@@ -1914,6 +1938,7 @@ class TellrawViewModel @Inject constructor(
      * 从历史记录加载命令
      */
     fun loadFromHistory(history: HistoryItem) {
+        resetTransientOverrides()
         _selectorInput.value = history.selector
         _messageInput.value = history.message
         val historyMarkers = history.markers.ifBlank { markersForPlainText(history.message) }

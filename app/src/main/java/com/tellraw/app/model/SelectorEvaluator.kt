@@ -175,8 +175,14 @@ object SelectorEvaluator {
                     "dy" -> dy = value.toDoubleOrNull()
                     "dz" -> dz = value.toDoubleOrNull()
                     "distance" -> { val (a, b) = parseRange(value); minDist = a; maxDist = b }
-                    "r" -> maxDist = value.toDoubleOrNull()
-                    "rm" -> minDist = value.toDoubleOrNull()
+                    "r" -> {
+                        if (target?.edition == VersionSpec.Edition.JAVA || (target == null && edition == "java")) notes.add("r= 仅基岩版选择器支持；Java 目标下该参数不会生效，网格仍按距离近似")
+                        maxDist = value.toDoubleOrNull()
+                    }
+                    "rm" -> {
+                        if (target?.edition == VersionSpec.Edition.JAVA || (target == null && edition == "java")) notes.add("rm= 仅基岩版选择器支持；Java 目标下该参数不会生效，网格仍按距离近似")
+                        minDist = value.toDoubleOrNull()
+                    }
                     "limit" -> {
                         val n = value.toIntOrNull()
                         if (n == null || n < 0) {
@@ -188,6 +194,7 @@ object SelectorEvaluator {
                     }
                     "sort" -> sort = value
                     "c" -> {
+                        if (target?.edition == VersionSpec.Edition.JAVA || (target == null && edition == "java")) notes.add("c= 仅基岩版选择器支持；Java 目标下该参数不会生效，网格仍按最近/最远近似")
                         val n = value.toIntOrNull()
                         if (n != null) {
                             limit = kotlin.math.abs(n)
@@ -246,6 +253,7 @@ object SelectorEvaluator {
                         }
                     }
                     "x_rotation", "y_rotation" -> {
+                        if (target?.edition == VersionSpec.Edition.BEDROCK || (target == null && edition == "bedrock")) notes.add("$key= 是 Java 选择器参数；基岩目标下该参数不会生效，网格仍按视角近似")
                         val (lo, hi) = parseRange(value)
                         val actual = if (key == "x_rotation") e.rotationX else e.rotationY
                         if (actual == null) {
@@ -258,6 +266,7 @@ object SelectorEvaluator {
                         }
                     }
                     "rx", "ry", "rxm", "rym" -> {
+                        if (target?.edition == VersionSpec.Edition.JAVA || (target == null && edition == "java")) notes.add("$key= 仅基岩版选择器支持；Java 目标下该参数不会生效，网格仍按视角近似")
                         // 基岩：rx/ry 是上限、rxm/rym 是下限（单值），不是"必须相等"
                         val actual = if (key.startsWith("rx")) e.rotationX else e.rotationY
                         if (actual == null) {

@@ -598,7 +598,7 @@ object GridCommandPlanParser {
                     } else {
                         contexts = contexts.map { it.copy(dimension = dimension) }
                         notes.add(
-                            "in $dimension 已切换执行维度；方块/群系等世界数据仍按网格当前维度表，未按维度拆分"
+                            "in $dimension 已切换执行维度；方块/群系等世界条件按该维度的数据求值"
                         )
                     }
                 }
