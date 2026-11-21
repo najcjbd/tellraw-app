@@ -104,6 +104,20 @@ class WithArgDraftCodecTest {
     }
 
     @Test
+    fun nbtExplicitTargetRoundTrips() {
+        val draft = WithArgDraft.Nbt(
+            "Health", source = "block", target = "1 2 3",
+            interpret = true, separator = "|"
+        )
+        val back = WithArgCodec.parseArgs(WithArgCodec.serialize(listOf(draft))).single()
+        assertEquals(draft, back)
+        val json = draft.toJson().asJsonObject
+        assertEquals("1 2 3", json.get("block").asString)
+        assertFalse(json.has("source"))
+    }
+
+
+    @Test
     fun rawPrimitiveArrayAndUnknownObjectPassThrough() {
         val items = listOf(
             WithArgDraft.Raw(json("\"plain\"")),

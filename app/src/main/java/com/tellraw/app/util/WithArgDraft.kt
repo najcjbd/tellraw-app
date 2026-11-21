@@ -152,7 +152,8 @@ object WithArgCodec {
     /** fromJson 时删除这些键，避免序列化后出现重复/互斥字段。 */
     private val DISCRIMINATORS = listOf(
         "text", "translate", "with", "fallback", "selector", "separator",
-        "score", "keybind", "nbt", "source", "interpret"
+        "score", "keybind", "nbt", "source", "interpret",
+        "entity", "block", "storage"
     )
     private val STYLE_KEYS = listOf(
         "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",

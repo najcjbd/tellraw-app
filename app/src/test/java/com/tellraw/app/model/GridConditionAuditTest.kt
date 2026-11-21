@@ -20,6 +20,38 @@ class GridConditionAuditTest {
     ) = GridConditionEvaluator.evaluate(cond, entity, all, target, world, origin)
 
     @Test
+    fun ifEntityNonSelfSelectorChecksExistence() {
+        val zombie = GridEntity("z", "minecraft:zombie")
+        val r = GridConditionEvaluator.evaluate(
+            "if entity @e[type=zombie]", steve, listOf(steve, zombie)
+        )
+        assertTrue(r.ok)
+    }
+
+    @Test
+    fun bedrockRejectsJavaOnlyDataAndPredicate() {
+        val bedrock = VersionSpec.parse("1.21.100")
+        val data = eval("if data entity @s {Health:1}", target = bedrock)
+        assertTrue(data.ok)
+        assertTrue(data.notes.any { it.contains("Java 专有") })
+        val predicate = eval("if predicate my:x", target = bedrock)
+        assertTrue(predicate.ok)
+        assertTrue(predicate.notes.any { it.contains("Java 专有") })
+    }
+
+
+    @Test
+    fun hugeBlocksRegionIsNeutralWithNote() {
+        val world = GridConditionEvaluator.GridWorld(
+            blocks = mapOf("0,0,0" to GridConditionEvaluator.GridBlock("minecraft:stone"))
+        )
+        val r = eval("if blocks 0 0 0 999999 999999 999999 0 0 0 all", world = world)
+        assertTrue(r.ok)
+        assertTrue(r.notes.joinToString(), r.notes.any { it.contains("体积") })
+    }
+
+
+    @Test
     fun unlessUnknownConditionDoesNotFilter() {
         val r = eval("unless block 0 -60 0 stone")   // 没有方块数据
         assertTrue(r.ok)

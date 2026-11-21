@@ -179,6 +179,22 @@ class TranslateComponentTest {
     }
 
     @Test
+    fun stripMarkersIgnoresSimplerToken() {
+        val token = TextComponent(
+            ComponentType.TRANSLATE,
+            TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(SubComponent(SubComponentType.WITH_JSON, """{"rows":[]}"""))
+        )
+        val markers = TextComponentHelper.componentsToText(
+            listOf(TextComponent(ComponentType.TEXT, "Hi"), token)
+        )
+        val plain = TextComponentHelper.stripComponentMarkers(markers)
+        assertEquals("Hi", plain)
+        assertFalse(plain.contains("simpler"))
+        assertFalse(plain.contains("rows"))
+    }
+
+    @Test
     fun translatePreviewSupportsPercentFormatStrings() {
         assertEquals("A 和 B", TranslatePreview.render("%s 和 %s", listOf("A", "B")))
         assertEquals("B/A", TranslatePreview.render("%2\$s/%1\$s", listOf("A", "B")))
@@ -226,6 +242,77 @@ class TranslateComponentTest {
         assertTrue(command, command.contains("@a[tag=x]"))
         assertTrue(warnings.any { it.contains("@a") })
     }
+
+    @Test
+    fun conditionalRawtextFallsBackOnMissingAndNonNumericPlaceholders() {
+        val missing = ConditionalRawtextConverter.parse(
+            """{"rawtext":[{"translate":"%%3","with":{"rawtext":[{"selector":"@s[tag=a]"},{"text":"A"}]}}]}"""
+        )!!
+        val warnings = mutableListOf<String>()
+        val command = ConditionalRawtextConverter.toJava(missing, warnings = warnings).single()
+        assertTrue(command, command.contains("{\"text\":\"A\"}"))
+        assertTrue(warnings.any { it.contains("没有对应参数") })
+
+        val nonNumeric = ConditionalRawtextConverter.parse(
+            """{"rawtext":[{"translate":"%%s","with":{"rawtext":[{"selector":"@s[tag=a]"},{"text":"A"}]}}]}"""
+        )!!
+        val w2 = mutableListOf<String>()
+        val c2 = ConditionalRawtextConverter.toJava(nonNumeric, warnings = w2).single()
+        assertTrue(c2, c2.contains("{\"text\":\"A\"}"))
+        assertTrue(w2.any { it.contains("非数字") })
+    }
+
+    @Test
+    fun conditionalRawtextCombinesBaseSelectorAndSkipsNegatedExclusion() {
+        val rows = ConditionalRawtextConverter.parse(
+            """{"rawtext":[
+                {"translate":"%%2","with":{"rawtext":[{"selector":"@s[scores={k=!1}]"},{"text":"A"}]}},
+                {"translate":"%%2","with":{"rawtext":[{"selector":"@s[tag=b]"},{"text":"B"}]}}
+            ]}"""
+        )!!
+        val warnings = mutableListOf<String>()
+        val commands = ConditionalRawtextConverter.toJava(
+            rows, baseSelector = "@p[tag=x]", warnings = warnings
+        )
+        assertTrue(commands[0], commands[0].contains("as @p[tag=x]"))
+        assertTrue(commands[0], commands[0].contains("if score"))
+        assertFalse(commands[1], commands[1].contains("unless entity"))
+        assertTrue(warnings.any { it.contains("无法精确表达") })
+    }
+
+
+    @Test
+    fun conditionalUnconditionalRowStopsLaterRows() {
+        val rows = ConditionalRawtextConverter.parse(
+            """{"rawtext":[
+                {"translate":"%%2","with":{"rawtext":[{"selector":"@s"},{"text":"A"}]}},
+                {"translate":"%%2","with":{"rawtext":[{"selector":"@s[tag=x]"},{"text":"B"}]}}
+            ]}"""
+        )!!
+        val warnings = mutableListOf<String>()
+        val commands = ConditionalRawtextConverter.toJava(rows, warnings = warnings)
+        assertEquals(1, commands.size)
+        assertTrue(warnings.any { it.contains("永远不会命中") })
+    }
+
+    @Test
+    fun conditionalFallsBackWithoutExecute() {
+        val rows = ConditionalRawtextConverter.parse(
+            """{"rawtext":[{"translate":"%%2","with":{"rawtext":[{"selector":"@s[tag=a]"},{"text":"A"}]}}]}"""
+        )!!
+        val warnings = mutableListOf<String>()
+        val commands = ConditionalRawtextConverter.toJava(
+            rows,
+            target = com.tellraw.app.model.VersionSpec(
+                com.tellraw.app.model.VersionSpec.Edition.JAVA, listOf(1, 12, 2)
+            ),
+            warnings = warnings
+        )
+        assertTrue(commands.single().startsWith("tellraw "))
+        assertFalse(commands.single().contains("execute "))
+        assertFalse(warnings.any { it.contains("不支持 execute") }) // single row, no exclusion needed
+    }
+
 
     @Test
     fun conditionalRawtextKeepsLiteralTextAroundPlaceholder() {

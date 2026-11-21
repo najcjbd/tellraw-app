@@ -5,6 +5,7 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.tellraw.app.model.FeatureGate
 import com.tellraw.app.model.SelectorType
 import com.tellraw.app.model.VersionSpec
 
@@ -59,37 +60,48 @@ object ConditionalRawtextConverter {
         val earlier = mutableListOf<String>()
         val out = mutableListOf<String>()
         val base = prefix.trim().takeIf { it.isNotEmpty() } ?: "execute"
-        for (row in rows) {
+        val executeAvailable = FeatureGate.isAvailable(FeatureGate.Feature.EXECUTE_MODERN, target)
+        rows.forEachIndexed { index, row ->
             if (!row.selector.startsWith("@s")) {
                 warnings?.add(
                     "conditional rawtext 的条件选择器是 ${row.selector.substringBefore('[')}，不是 @s；已把方括号参数按收件人条件近似处理"
                 )
             }
             val raw = appendSelectorParams(baseSelector.ifBlank { "@a" }, row.params)
+            val jContent = javaContent(row, context, nbtSyntax, target, warnings) ?: row.contentJson
+            if (!executeAvailable) {
+                if (earlier.isNotEmpty() || row.params.isBlank() && index < rows.lastIndex) {
+                    warnings?.add("目标版本不支持 execute；conditional rawtext 的第一匹配/排除无法表达")
+                }
+                out.add("tellraw ${filterJava(raw, context, nbtSyntax, target, warnings)} $jContent")
+                if (row.params.isBlank() && index < rows.lastIndex) {
+                    warnings?.add("无条件条件行之后的 ${rows.size - index - 1} 行永远不会命中，已跳过")
+                    return@toJava out
+                }
+                return@forEachIndexed
+            }
             val negation = ExecuteConverter.bedrockSelectorNegation(
                 raw, warnings ?: mutableListOf(), preferExecute = true, nbtSyntax = nbtSyntax
             )
             val inner: List<String>
-            val tellrawTarget: String
             if (negation != null) {
                 val (asSelector, conditions) = negation
                 val filtered = filterJava(asSelector, context, nbtSyntax, target, warnings)
-                if (conditions.isEmpty()) {
-                    inner = listOf("as", filtered)
-                    tellrawTarget = "@s"
-                } else {
-                    inner = listOf("as", filtered) + conditions
-                    tellrawTarget = "@s"
-                }
+                inner = if (conditions.isEmpty()) listOf("as", filtered)
+                else listOf("as", filtered) + conditions
             } else {
-                val filtered = filterJava(raw, context, nbtSyntax, target, warnings)
-                inner = listOf("as", filtered)
-                tellrawTarget = "@s"
+                inner = listOf("as", filterJava(raw, context, nbtSyntax, target, warnings))
             }
             val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
-            val jContent = javaContent(row, context, nbtSyntax, target, warnings) ?: row.contentJson
-            out.add("$base ${inner.joinToString(" ")}$exclusions run tellraw $tellrawTarget $jContent")
-            if (row.params.isNotBlank()) earlier.add(row.params)
+            out.add("$base ${inner.joinToString(" ")}$exclusions run tellraw @s $jContent")
+            if (row.params.isBlank()) {
+                if (index < rows.lastIndex) {
+                    warnings?.add("无条件条件行之后的 ${rows.size - index - 1} 行永远不会命中，已跳过")
+                    return@toJava out
+                }
+            } else {
+                earlier.add(row.params)
+            }
         }
         return out
     }
@@ -106,12 +118,12 @@ object ConditionalRawtextConverter {
         warnings: MutableList<String>?
     ): String? {
         if (row.key.isBlank() || row.args.isEmpty()) return null
-        val token = Regex("%%(\\d+)")
-        if (!token.containsMatchIn(row.key)) return row.contentJson
         if (Regex("%%(?![0-9])").containsMatchIn(row.key)) {
             warnings?.add("conditional rawtext 的 translate 含非数字 %% 参数，已保留原参数内容，可能有字面文本丢失")
             return row.contentJson
         }
+        val token = Regex("%%(\\d+)")
+        if (!token.containsMatchIn(row.key)) return row.contentJson
 
         val expanded = JsonArray()
         fun addComponent(el: JsonElement) {

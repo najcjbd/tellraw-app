@@ -15,6 +15,19 @@ class SelectorEvaluatorTest {
     private fun ids(s: String, edition: String = "java", version: Long? = null) =
         SelectorEvaluator.evaluate(s, all, executor = steve, edition = edition, version = version)
 
+    @Test fun teamNegationAndMalformedBracket() {
+        val red = GridEntity("r", "minecraft:player", "R", team = "red")
+        val blue = GridEntity("b", "minecraft:player", "B", team = "blue")
+        val noTeam = GridEntity("n", "minecraft:player", "N")
+        val r = SelectorEvaluator.evaluate("@a[team=!red]", listOf(red, blue, noTeam), edition = "java")
+        assertEquals(setOf("b", "n"), r.matched.map { it.uid }.toSet())
+
+        val bad = SelectorEvaluator.evaluate("@a[tag=vip", listOf(red), edition = "java")
+        assertTrue(bad.matched.isEmpty())
+        assertTrue(bad.notes.isNotEmpty())
+    }
+
+
     @Test fun baseSelectors() {
         assertEquals(listOf("p1"), ids("@a").matched.map { it.uid })
         assertEquals(listOf("p1"), ids("@p").matched.map { it.uid })

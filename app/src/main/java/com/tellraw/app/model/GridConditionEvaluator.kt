@@ -128,13 +128,21 @@ object GridConditionEvaluator {
                             target = target
                         )
                         notes.addAll(r.notes)
-                        ok = r.matched.any { it.uid == entity.uid }
+                        val selfSelector = sel.trim().substringBefore('[') == "@s"
+                        ok = if (selfSelector) r.matched.any { it.uid == entity.uid }
+                        else r.matched.isNotEmpty()
                         // 选择器里有“未参与筛选”的参数时，unless 也不能反转
                         neutral = r.neutral
                         consumed = 3
                     }
                 }
                 "data" -> {
+                    if (target?.edition == VersionSpec.Edition.BEDROCK) {
+                        notes.add("data 条件是 Java 专有；基岩目标下未参与筛选")
+                        ok = true
+                        neutral = true
+                        consumed = 5
+                    } else {
                     val source = tokens.getOrNull(i + 2)
                     val tgt = tokens.getOrNull(i + 3)
                     val nbt = tokens.getOrNull(i + 4)
@@ -149,8 +157,15 @@ object GridConditionEvaluator {
                         ok = SelectorEvaluator.matchesNbt(entity, nbt, notes)
                         consumed = 5
                     }
+                    }
                 }
                 "predicate" -> {
+                    if (target?.edition == VersionSpec.Edition.BEDROCK) {
+                        notes.add("predicate 条件是 Java 专有；基岩目标下未参与筛选")
+                        ok = true
+                        neutral = true
+                        consumed = 3
+                    } else {
                     val id = tokens.getOrNull(i + 2)
                     if (id == null) {
                         notes.add("predicate 条件缺少 ID，已忽略")
@@ -159,6 +174,7 @@ object GridConditionEvaluator {
                     } else {
                         ok = entity.predicates.any { it == id }
                         consumed = 3
+                    }
                     }
                 }
                 "score" -> {
@@ -222,7 +238,7 @@ object GridConditionEvaluator {
                             ok = true
                             neutral = true
                         } else {
-                            ok = compareRegions(world, a, b, dest, mode)
+                            ok = compareRegions(world, a, b, dest, mode, notes)
                             consumed = 12
                         }
                     }
@@ -894,11 +910,17 @@ object GridConditionEvaluator {
         a: Triple<Int, Int, Int>,
         b: Triple<Int, Int, Int>,
         dest: Triple<Int, Int, Int>,
-        mode: String
+        mode: String,
+        notes: MutableList<String>
     ): Boolean {
         val x1 = minOf(a.first, b.first); val x2 = maxOf(a.first, b.first)
         val y1 = minOf(a.second, b.second); val y2 = maxOf(a.second, b.second)
         val z1 = minOf(a.third, b.third); val z2 = maxOf(a.third, b.third)
+        val volume = (x2 - x1 + 1L) * (y2 - y1 + 1L) * (z2 - z1 + 1L)
+        if (volume > 4096) {
+            notes.add("blocks 区域体积 $volume 过大（上限 4096），该条件未参与筛选")
+            return true
+        }
         val masked = mode.equals("masked", true)
         for (x in x1..x2) for (y in y1..y2) for (z in z1..z2) {
             val srcRaw = world.blocks["$x,$y,$z"]?.id

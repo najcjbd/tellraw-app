@@ -624,6 +624,34 @@ object TextComponentHelper {
         return componentsToText(components)
     }
 
+    /** 按 TranslateN 序号（只数普通 translate）精确写回，避免光标边界命中前一个 translate。 */
+    fun applyTranslateWithAtOrdinal(
+        markers: String,
+        ordinal: Int,
+        key: String,
+        fallback: String,
+        argsJson: String,
+        fallbackPresent: Boolean = fallback.isNotEmpty()
+    ): String? {
+        require(key.isNotBlank()) { "translate key is blank" }
+        val normalized = WithArgCodec.normalizeArgsJson(argsJson)
+        val hasArgs = normalized != "[]"
+        val components = parseTextComponents(markers).toMutableList()
+        val index = components.withIndex()
+            .filter {
+                it.value.type == ComponentType.TRANSLATE &&
+                    it.value.content != SIMPLE_TRANSLATE_KEY
+            }
+            .getOrNull(ordinal - 1)?.index ?: return null
+        components[index] = components[index].copy(
+            content = key,
+            subComponents = buildTranslateSubComponents(
+                fallback, fallbackPresent, normalized.takeIf { hasArgs }
+            )
+        )
+        return componentsToText(components)
+    }
+
     private fun buildTranslateComponent(
         key: String,
         fallback: String,
@@ -711,6 +739,18 @@ object TextComponentHelper {
                     }
                 }
                 out
+            }
+            el.isJsonPrimitive && el.asJsonPrimitive.isString && '§' in el.asString -> {
+                runCatching {
+                    com.google.gson.Gson().fromJson(
+                        TextFormatter.convertToJavaJson(
+                            el.asString, mNHandling, mnCFEnabled, context, warnings,
+                            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target,
+                            parseMarkers = false
+                        ),
+                        JsonElement::class.java
+                    )
+                }.getOrElse { el.deepCopy() }
             }
             else -> el.deepCopy()
         }
@@ -860,11 +900,13 @@ object TextComponentHelper {
      */
     private fun processSectionCodesToBedrock(content: String, mNHandling: String, mnCFEnabled: Boolean): String {
         var processedText = content
-        
-        // 基岩版中，§m/§n始终作为颜色代码处理
+        if (mnCFEnabled) {
+            // 与纯文本路径一致：_c/_f 模式下移除普通 §m/§n，只保留显式选择后的颜色码。
+            processedText = processedText.replace(Regex("§m(?!_)"), "")
+            processedText = processedText.replace(Regex("§n(?!_)"), "")
+        }
         processedText = processedText.replace("§m_f", "§m").replace("§m_c", "§m")
         processedText = processedText.replace("§n_f", "§n").replace("§n_c", "§n")
-        
         return processedText
     }
     
@@ -1727,10 +1769,11 @@ object TextComponentHelper {
 
         // 检查是否所有组件都是TEXT组件
         val allTextComponents = expandedComponents.all {
-            it.type == ComponentType.TEXT && it.subComponents.isEmpty() && it.style.isEmpty()
+            it.type == ComponentType.TEXT && it.subComponents.isEmpty() &&
+                it.style.isEmpty() && '§' !in it.content
         }
         if (allTextComponents) {
-            // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
+            // 所有组件都是无格式纯 TEXT 时才能安全合并；含 § 的 TEXT 要走格式状态机。
             val combinedText = expandedComponents.joinToString("") { it.content }
             return TextFormatter.convertToBedrockJson(
                 combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax,
@@ -2978,7 +3021,9 @@ object TextComponentHelper {
         }
         
         // 解析组件列表
-        val components = parseTextComponents(text)
+        val components = parseTextComponents(text).filterNot {
+            it.type == ComponentType.TRANSLATE && it.content == SIMPLE_TRANSLATE_KEY
+        }
         
         // 提取纯文本内容（包括副组件内容）
         return components.joinToString("") { component ->

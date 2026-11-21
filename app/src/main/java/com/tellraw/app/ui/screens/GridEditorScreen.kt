@@ -209,7 +209,7 @@ fun GridEditorScreen(
 ) {
     val context = LocalContext.current
     val selectorFromMain by viewModel.selectorInput.collectAsState()
-    val message by viewModel.messageInput.collectAsState()
+    val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val targetVersion by viewModel.targetVersion.collectAsState()
     val targetSpec = remember(targetVersion) {
         if (targetVersion.isBlank() || targetVersion == "-1") null else VersionSpec.parse(targetVersion)
@@ -1054,7 +1054,7 @@ fun GridEditorScreen(
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                     Text(
-                                        "显示：" + previewMessage(message, editable, name),
+                                        "显示：" + previewMessage(messageMarkers, editable, name),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -1277,7 +1277,10 @@ private fun previewMessage(
     displayName: String
 ): String {
     if (message.isBlank()) return "（消息为空）"
-    val components = TextComponentHelper.parseTextComponents(message)
+    val components = TextComponentHelper.parseTextComponents(message).filterNot {
+        it.type == TextComponentHelper.ComponentType.TRANSLATE &&
+            it.content == TextComponentHelper.SIMPLE_TRANSLATE_KEY
+    }
     if (components.none { it.type != TextComponentHelper.ComponentType.TEXT }) {
         return components.joinToString("") { it.content }.ifBlank { "（消息为空）" }
     }

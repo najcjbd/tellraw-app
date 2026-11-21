@@ -1129,9 +1129,11 @@ class TellrawViewModel @Inject constructor(
             if (conditionalRows != null) {
                 add("已将基岩 conditional rawtext 转为 Java 多条 tellraw（第一匹配）；请核对条件是否覆盖原结构")
             }
-            javaTagPlan?.let {
-                addAll(it.warnings)
-                add("已使用多命令 tag 方案（Java）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")
+            if (conditionalRows == null) {
+                javaTagPlan?.let {
+                    addAll(it.warnings)
+                    add("已使用多命令 tag 方案（Java）：临时标签 ${it.tags.joinToString()}，末尾会自动 remove；请按顺序执行全部命令，中途停止会残留标签")
+                }
             }
             bedrockTagPlan?.let {
                 addAll(it.warnings)
@@ -1203,7 +1205,7 @@ class TellrawViewModel @Inject constructor(
     fun applyRawConvertToGenerator() {
         val nbtSyntax = com.tellraw.app.util.VersionDiff.syntaxForTarget(
             versionOverride ?: targetVersionSpec()
-        ) ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
+        ) ?: syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
         val r = try {
             com.tellraw.app.util.CommandInputParser.parse(
                 _rawConvertInput.value, applicationContext, nbtSyntax,
@@ -1225,6 +1227,10 @@ class TellrawViewModel @Inject constructor(
         _messageInputWithMarkers.value = markers
         setSimpleBlockJson("")
         _simpleTranslateWarnings.value = emptyList()
+        if (simpleForcedTextMode) {
+            _defaultUseText.value = true
+            simpleForcedTextMode = false
+        }
         // 必须保留 TEXT 里的 § 样式码（不能用只保留可见字符的版本，否则纯文本模式会丢颜色/格式）
         _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
         // 填回的是组件命令时，默认 text 模式会丢掉组件结构 -> 自动切到组件模式
@@ -1251,7 +1257,11 @@ class TellrawViewModel @Inject constructor(
                 settingsRepository.setExecutePrefixInput(prefix)
             }
         } else {
-            viewModelScope.launch { settingsRepository.setExecutePrefixInput("") }
+            _executePrefixEnabled.value = false
+            viewModelScope.launch {
+                settingsRepository.setExecutePrefixEnabled(false)
+                settingsRepository.setExecutePrefixInput("")
+            }
         }
         // 让 §m/§n 计数与混合模式后台文本和回填内容同步，避免接着输入时误触发/漏触发询问
         detectAndCountMNCodes(_messageInput.value)
@@ -1403,8 +1413,8 @@ class TellrawViewModel @Inject constructor(
                 // 目标选择器（tellraw 的收信人）与"要折进 execute 的 token"。
                 // 注：拆出来后 condTokens 可能为空（例如 quantity=0.. 这种"形同虚设"的条件被去掉），
                 // 这时不需要 execute 前缀，只用清理过的选择器即可。
-                val javaTarget: String
-                val javaInnerTokens: List<String>?
+                var javaTarget: String
+                var javaInnerTokens: List<String>?
                 if (javaNegation != null) {
                     val (asSelectorRaw, condTokens) = javaNegation
                     // 选择器本体也要过一遍 Java 侧参数过滤（family/predicate 这类基岩参数要转或去掉）
@@ -1429,6 +1439,18 @@ class TellrawViewModel @Inject constructor(
                     javaTarget = javaFilteredSelector
                     javaInnerTokens = null
                 }
+                if (javaInnerTokens != null &&
+                    !com.tellraw.app.model.FeatureGate.isAvailable(
+                        com.tellraw.app.model.FeatureGate.Feature.EXECUTE_MODERN, target
+                    )
+                ) {
+                    allReminders.add("目标版本不支持 execute；选择器否定/as 改写无法表达，已退回普通选择器，部分条件可能丢失")
+                    javaInnerTokens = null
+                    javaTarget = SelectorConverter.filterSelectorParameters(
+                        javaSelector, SelectorType.JAVA, applicationContext, nbtSyntax, target
+                    ).first
+                }
+
                 // as 不敏感：只有 tellraw 目标自己不需要 as 时，才让内容选择器驱动 as。
                 // Simpler translate 需要自己控制每个收信人的 as，不能把目标选择器改写到消息里。
                 var contentAs: com.tellraw.app.util.ContentAsRewriter.Result? = null
@@ -1736,6 +1758,7 @@ class TellrawViewModel @Inject constructor(
         val converted = ExecuteConverter.convertExecutePrefix(
             prefix, direction, warnings,
             com.tellraw.app.util.VersionDiff.syntaxForTarget(target)
+                ?: syntaxOverride
                 ?: effectiveNbtSyntax(_executePrefixInput.value)
         )
         if (converted == null) {
@@ -2524,15 +2547,17 @@ class TellrawViewModel @Inject constructor(
     private fun openWithBuilderInternal(insertPosition: Int, forcedTranslateOrdinal: Int?) {
         val markers = _messageInputWithMarkers.value
         val components = TextComponentHelper.parseTextComponents(markers)
+        val normalTranslates = components.withIndex().filter {
+            it.value.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                !isSimpleToken(it.value)
+        }
         val index = (forcedTranslateOrdinal?.let { wanted ->
-            components.withIndex()
-                .filter {
-                    it.value.type == TextComponentHelper.ComponentType.TRANSLATE &&
-                        !isSimpleToken(it.value)
-                }
-                .getOrNull(wanted - 1)?.index
+            normalTranslates.getOrNull(wanted - 1)?.index
         } ?: TextComponentHelper.findTranslateIndexAt(components, insertPosition))
             ?.takeIf { !isSimpleToken(components[it]) }
+        val targetOrdinal = index?.let { idx ->
+            normalTranslates.indexOfFirst { it.index == idx }.takeIf { it >= 0 }?.plus(1)
+        }
         val component = index?.let { components[it] }
         val key = component?.content.orEmpty()
         val fallbackSub = component?.subComponents
@@ -2574,6 +2599,7 @@ class TellrawViewModel @Inject constructor(
         
         _withBuilderState.value = WithBuilderState(
             targetPosition = insertPosition.coerceAtLeast(0),
+            targetTranslateOrdinal = targetOrdinal,
             isNew = component == null,
             key = key,
             fallback = fallback,
@@ -2683,14 +2709,33 @@ class TellrawViewModel @Inject constructor(
         }
         
         val markers = try {
-            TextComponentHelper.applyTranslateWithAt(
-                _messageInputWithMarkers.value,
-                state.targetPosition,
-                state.key,
-                state.fallback,
-                argsJson,
-                state.fallbackPresent
-            )
+            val ordinal = state.targetTranslateOrdinal
+            if (ordinal != null && !state.isNew) {
+                TextComponentHelper.applyTranslateWithAtOrdinal(
+                    _messageInputWithMarkers.value,
+                    ordinal,
+                    state.key,
+                    state.fallback,
+                    argsJson,
+                    state.fallbackPresent
+                ) ?: TextComponentHelper.applyTranslateWithAt(
+                    _messageInputWithMarkers.value,
+                    state.targetPosition,
+                    state.key,
+                    state.fallback,
+                    argsJson,
+                    state.fallbackPresent
+                )
+            } else {
+                TextComponentHelper.applyTranslateWithAt(
+                    _messageInputWithMarkers.value,
+                    state.targetPosition,
+                    state.key,
+                    state.fallback,
+                    argsJson,
+                    state.fallbackPresent
+                )
+            }
         } catch (e: Exception) {
             _withBuilderState.value = state.copy(
                 rawError = builderJsonError(e)

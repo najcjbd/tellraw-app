@@ -10,6 +10,8 @@ enum class WithBuilderMode { VISUAL, JSON }
  */
 data class WithBuilderState(
     val targetPosition: Int,
+    /** 按 TranslateN 令牌打开时的 1 基序号（只数普通 translate）。 */
+    val targetTranslateOrdinal: Int? = null,
     val isNew: Boolean,
     val key: String,
     val fallback: String,

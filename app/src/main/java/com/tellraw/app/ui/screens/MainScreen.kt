@@ -249,7 +249,8 @@ fun MainScreen(
 
     // 历史记录对话框
     if (isLandscape && (showSettingsDialog.value || showHistoryDialog.value ||
-            showStorageSettingsDialog || showFilenameDialog != null || showFileExistsDialog != null)
+            showStorageSettingsDialog || showFilenameDialog != null || showFileExistsDialog != null ||
+            showMNDialog != null)
     ) {
         // 横屏面板不是 Dialog；用可点击遮罩拦住背后输入。
         Box(
@@ -262,6 +263,7 @@ fun MainScreen(
                     viewModel.hideStorageSettingsDialog()
                     viewModel.hideFilenameDialog()
                     viewModel.hideFileExistsDialog()
+                    if (showMNDialog != null) viewModel.dismissMNDialog()
                 }
         )
     }
@@ -428,6 +430,7 @@ fun MainScreen(
     BackHandler(enabled = showStorageSettingsDialog) { viewModel.hideStorageSettingsDialog() }
     BackHandler(enabled = showFilenameDialog != null) { viewModel.hideFilenameDialog() }
     BackHandler(enabled = showFileExistsDialog != null) { viewModel.hideFileExistsDialog() }
+    BackHandler(enabled = showMNDialog != null) { viewModel.dismissMNDialog() }
 
     if (showSimpleTranslateGroups) {
         SimpleTranslateGroupDialog(
