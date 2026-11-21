@@ -603,9 +603,6 @@ private fun PortraitLayout(
     viewModel: TellrawViewModel
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
-    val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
-    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
-
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
@@ -684,12 +681,13 @@ private fun PortraitLayout(
                     style = MaterialTheme.typography.titleMedium
                 )
                 
-                if (simpleTranslate || simpleBlockActive) {
+                if (!defaultUseText) {
                     TranslateTokenBar(
                         markers = messageMarkers,
                         onOpen = { position, ordinal ->
                             viewModel.openWithBuilderForTranslate(position, ordinal)
-                        }
+                        },
+                        onOpenSimple = onOpenSimpleTranslate
                     )
                 }
                 OutlinedTextField(
@@ -729,14 +727,6 @@ private fun PortraitLayout(
                     maxLines = 3
                 )
 
-                if (simpleTranslate || simpleBlockActive) {
-                    OutlinedButton(
-                        onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Simpler translate")
-                    }
-                }
                 
                 // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                 if (executePrefixEnabled) {
@@ -1008,14 +998,12 @@ internal fun TellrawPreviewDialog(
 @Composable
 private fun TranslateTokenBar(
     markers: String,
-    onOpen: (Int, Int) -> Unit
+    onOpen: (Int, Int) -> Unit,
+    onOpenSimple: (String?) -> Unit
 ) {
     val tokens = remember(markers) {
         TextComponentHelper.componentTokens(markers)
-            .filter {
-                it.type == TextComponentHelper.ComponentType.TRANSLATE &&
-                    it.content != TextComponentHelper.SIMPLE_TRANSLATE_KEY
-            }
+            .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
     }
     if (tokens.isEmpty()) return
     Column(
@@ -1035,7 +1023,13 @@ private fun TranslateTokenBar(
         ) {
             tokens.forEach { token ->
                 AssistChip(
-                    onClick = { onOpen(token.start, token.ordinal) },
+                    onClick = {
+                        if (token.content == TextComponentHelper.SIMPLE_TRANSLATE_KEY) {
+                            onOpenSimple(TextComponentHelper.simpleBlockJsonAt(markers, token.start))
+                        } else {
+                            onOpen(token.start, token.ordinal)
+                        }
+                    },
                     label = {
                         Text(stringResource(R.string.translate_token_label, token.ordinal))
                     },
@@ -1078,9 +1072,6 @@ private fun LandscapeLayout(
     viewModel: TellrawViewModel
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
-    val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
-    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
-
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     Column(
@@ -1211,12 +1202,13 @@ private fun LandscapeLayout(
                             style = MaterialTheme.typography.titleMedium
                         )
                         
-                        if (simpleTranslate || simpleBlockActive) {
+                        if (!defaultUseText) {
                             TranslateTokenBar(
                                 markers = messageMarkers,
                                 onOpen = { position, ordinal ->
                                     viewModel.openWithBuilderForTranslate(position, ordinal)
-                                }
+                                },
+                                onOpenSimple = onOpenSimpleTranslate
                             )
                         }
                                                 OutlinedTextField(
@@ -1256,14 +1248,6 @@ private fun LandscapeLayout(
                             maxLines = 5
                         )
 
-                        if (simpleTranslate || simpleBlockActive) {
-                            OutlinedButton(
-                                onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Simpler translate")
-                            }
-                        }
                         
                         // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                         if (executePrefixEnabled) {
