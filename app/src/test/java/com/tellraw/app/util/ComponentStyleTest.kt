@@ -194,6 +194,26 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun bedrockResetsFormattingBeforeUnstyledSibling() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "91", style = ComponentStyle(strikethrough = true)),
+            TextComponent(
+                ComponentType.TEXT, "78",
+                style = ComponentStyle(strikethrough = true, underlined = true)
+            ),
+            TextComponent(ComponentType.SELECTOR, "@a")
+        )
+        val bedrock = TextComponentHelper.convertToBedrockJson(components)
+        assertTrue(bedrock, bedrock.contains("§m91"))
+        assertTrue(bedrock, bedrock.contains("78"))
+        assertTrue("styled text 后应有 §r 复位：$bedrock", bedrock.contains("\"text\":\"§r\""))
+        val arr = com.google.gson.JsonParser.parseString(bedrock).asJsonObject.getAsJsonArray("rawtext")
+        val selectorIndex = arr.indexOfFirst { it.asJsonObject.has("selector") }
+        assertTrue(selectorIndex > 0)
+        assertEquals("§r", arr[selectorIndex - 1].asJsonObject.get("text").asString)
+    }
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()
