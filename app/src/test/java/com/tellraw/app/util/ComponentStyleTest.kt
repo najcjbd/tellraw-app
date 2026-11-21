@@ -60,6 +60,42 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun structuralKeysAreNotKeptAsStyle() {
+        val r = CommandInputParser.parse(
+            """{"text":"A","extra":[{"text":"B"}]}"""
+        )!!
+        val java = TextComponentHelper.convertToJavaJson(r.components)
+        assertEquals("""{"text":"AB"}""", java)
+        assertTrue(r.components.none { it.style.extra.has("extra") })
+
+        val tr = CommandInputParser.parse(
+            """{"translate":"k","with":["a"],"fallback":"f"}"""
+        )!!
+        val style = tr.components.single().style
+        assertEquals(0, style.extra.size())
+    }
+
+    @Test
+    fun scoreNameWithCommaAndColonSurvivesRoundTrip() {
+        val r = CommandInputParser.parse(
+            """{"score":{"name":"@e[tag=a,limit=1]","objective":"obj"}}"""
+        )!!
+        val java = com.google.gson.JsonParser.parseString(r.javaJson).asJsonObject
+        val score = java.getAsJsonObject("score")
+        assertEquals("@e[tag=a,limit=1]", score.get("name").asString)
+        assertEquals("obj", score.get("objective").asString)
+
+        val nbt = CommandInputParser.parse(
+            """{"score":{"name":"@e[nbt={id:\"minecraft:pig\"}]","objective":"obj"}}"""
+        )!!
+        val nbtJava = com.google.gson.JsonParser.parseString(nbt.javaJson).asJsonObject
+        assertEquals(
+            """@e[nbt={id:"minecraft:pig"}]""",
+            nbtJava.getAsJsonObject("score").get("name").asString
+        )
+    }
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()

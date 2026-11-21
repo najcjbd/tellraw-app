@@ -278,7 +278,8 @@ object CommandInputParser {
                 out.add(
                     TextComponent(
                         ComponentType.SCORE,
-                        "${str(sc, "name")}:${str(sc, "objective")}",
+                        TextComponentHelper.encodeScorePart(str(sc, "name")) + ":" +
+                            TextComponentHelper.encodeScorePart(str(sc, "objective")),
                         style = effectiveStyle
                     )
                 )

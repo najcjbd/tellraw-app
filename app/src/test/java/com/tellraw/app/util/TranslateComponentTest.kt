@@ -206,6 +206,16 @@ class TranslateComponentTest {
 
 
     @Test
+    fun conditionalRawtextKeepsOriginalTellrawTarget() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2","with":{"rawtext":[{"selector":"@s[tag=a]"},{"text":"A"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        val commands = ConditionalRawtextConverter.toJava(rows, baseSelector = "@p")
+        assertTrue(commands.single(), commands.single().contains("as @p[tag=a]"))
+    }
+
+    @Test
     fun conditionalRawtextConvertsToFirstMatchJavaCommands() {
         val raw = """{"rawtext":[
             {"translate":"%%2","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"A"}]}},

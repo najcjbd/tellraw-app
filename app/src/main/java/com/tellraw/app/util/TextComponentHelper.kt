@@ -147,6 +147,10 @@ object TextComponentHelper {
                 "color", "bold", "italic", "underlined", "strikethrough",
                 "obfuscated", "font", "insertion", "clickEvent", "hoverEvent"
             )
+            private val STRUCTURAL_KEYS = setOf(
+                "text", "translate", "with", "fallback", "selector", "separator",
+                "score", "keybind", "nbt", "source", "interpret", "object", "extra"
+            )
 
             fun fromJson(obj: JsonObject): ComponentStyle {
                 fun str(key: String): String? =
@@ -161,7 +165,7 @@ object TextComponentHelper {
                     obj.get(key)?.takeIf { it.isJsonObject }?.asJsonObject?.deepCopy()
                 val extra = JsonObject()
                 obj.entrySet().forEach { (k, v) ->
-                    if (k !in STYLE_KEYS) extra.add(k, v)
+                    if (k !in STYLE_KEYS && k !in STRUCTURAL_KEYS) extra.add(k, v)
                 }
                 return ComponentStyle(
                     color = str("color"),
@@ -1454,6 +1458,12 @@ object TextComponentHelper {
 
             when (component.type) {
                 ComponentType.TEXT -> {
+                    if (component.style.font != null || component.style.insertion != null ||
+                        component.style.clickEvent != null || component.style.hoverEvent != null ||
+                        component.style.extra.size() > 0
+                    ) {
+                        warnings?.add("基岩 rawtext 不支持 font/clickEvent/hoverEvent/insertion 等样式字段；Java 输出已保留")
+                    }
                     // 处理§代码
                     val prefix = component.style.legacyPrefix(warnings)
                     item["text"] = prefix + processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
@@ -1585,73 +1595,84 @@ object TextComponentHelper {
         val result = mutableListOf<Pair<String, String>>()
         var currentEntry = StringBuilder()
         var i = 0
-        
+
         while (i < content.length) {
-            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
-                // 转义的逗号，添加单个逗号
-                currentEntry.append(',')
-                i += 2
-            } else if (content[i] == ',') {
-                // 分隔符，处理当前条目
-                if (currentEntry.isNotEmpty()) {
-                    result.add(parseSingleScoreEntry(currentEntry.toString()))
+            when {
+                content[i] == '\\' && i + 1 < content.length -> {
+                    val next = content[i + 1]
+                    if (next == ',') {
+                        // 转义的逗号属于当前条目
+                        currentEntry.append(',')
+                    } else {
+                        // 保留 \: 和 \\，留给 parseSingleScoreEntry 区分分隔冒号
+                        currentEntry.append('\\').append(next)
+                    }
+                    i += 2
                 }
-                currentEntry.clear()
-                i++
-            } else {
-                currentEntry.append(content[i])
-                i++
+                content[i] == ',' -> {
+                    if (currentEntry.isNotEmpty()) {
+                        result.add(parseSingleScoreEntry(currentEntry.toString()))
+                    }
+                    currentEntry.clear()
+                    i++
+                }
+                else -> {
+                    currentEntry.append(content[i])
+                    i++
+                }
             }
         }
-        
-        // 处理最后一个条目
+
         if (currentEntry.isNotEmpty()) {
             result.add(parseSingleScoreEntry(currentEntry.toString()))
         }
-        
+
         return result
-        
+    }
+
+    /** 解析单个score条目：第一个未转义的 ':' 分隔 name/objective；两边支持 \: \, \\。 */
+    private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
+        var split = -1
+        var i = 0
+        while (i < entry.length) {
+            if (entry[i] == '\\' && i + 1 < entry.length) {
+                i += 2
+                continue
             }
-        
-            
-        
-            /**
-        
-             * 解析单个score条目
-        
-             * 格式：name:objective
-        
-             */
-        
-            private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
-        
-                val parts = entry.split(":", limit = 2)
-        
-                val name = when {
-        
-                    parts[0].isEmpty() && parts.size == 2 -> "*"  // 只有:objective
-        
-                    parts[0].isEmpty() -> "*"  // 只有:
-        
-                    else -> parts[0]
-        
-                }
-        
-                val objective = when {
-        
-                    parts.size == 2 && parts[1].isEmpty() -> "*"  // 只有name:
-        
-                    parts.size == 2 -> parts[1]  // 正常格式
-        
-                    else -> "*"  // 只有name或格式错误
-        
-                }
-        
-                return Pair(name, objective)
-        
+            if (entry[i] == ':') {
+                split = i
+                break
             }
-        
-        
+            i++
+        }
+
+        fun unescape(s: String): String {
+            val sb = StringBuilder(s.length)
+            var j = 0
+            while (j < s.length) {
+                if (s[j] == '\\' && j + 1 < s.length) {
+                    sb.append(s[j + 1])
+                    j += 2
+                } else {
+                    sb.append(s[j])
+                    j++
+                }
+            }
+            return sb.toString()
+        }
+
+        val rawName = if (split < 0) entry else entry.substring(0, split)
+        val rawObjective = if (split < 0) "" else entry.substring(split + 1)
+        val name = unescape(rawName).ifEmpty { "*" }
+        val objective = unescape(rawObjective).ifEmpty { "*" }
+        return Pair(name, objective)
+    }
+
+    /** score 的 name/objective 在文本模型里用 \: \, \\ 安全拼接。 */
+    fun encodeScorePart(value: String): String =
+        value.replace("\\", "\\\\")
+            .replace(":", "\\:")
+            .replace(",", "\\,")
         
     /**
      * 解析selector组件内容
@@ -2469,7 +2490,11 @@ object TextComponentHelper {
                     } else {
                         // 每个score条目都作为独立的score组件
                         for ((name, objective) in scoreEntries) {
-                            expanded.add(TextComponent(ComponentType.SCORE, "$name:$objective", style = component.style))
+                            expanded.add(TextComponent(
+                                ComponentType.SCORE,
+                                encodeScorePart(name) + ":" + encodeScorePart(objective),
+                                style = component.style
+                            ))
                         }
                     }
                 }

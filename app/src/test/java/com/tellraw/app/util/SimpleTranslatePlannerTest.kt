@@ -159,6 +159,24 @@ class SimpleTranslatePlannerTest {
     }
 
     @Test
+    fun bedrockConditionalDoesNotFakeScoreComplement() {
+        val result = plan(
+            Table(
+                rows = listOf(
+                    Row(params = "tag=a", content = listOf(WithArgDraft.Text("A"))),
+                    Row(params = "scores={k=1}", content = listOf(WithArgDraft.Text("B"))),
+                    Row(params = "tag=c", content = listOf(WithArgDraft.Text("C")))
+                )
+            ),
+            includeDefaultFallback = false
+        )
+        val cmd = result.bedrock.single()
+        // 第三个条件不能生成 scores={k=!1}：它会把"没有 k 分数"的人排掉。
+        assertFalse(cmd, cmd.contains("k=!1"))
+        assertTrue(result.warnings.any { it.contains("无法排除") })
+    }
+
+    @Test
     fun bedrockFirstMatchProducesMultipleCommands() {
         val result = plan(
             Table(

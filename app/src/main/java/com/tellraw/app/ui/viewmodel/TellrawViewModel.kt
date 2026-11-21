@@ -1067,8 +1067,17 @@ class TellrawViewModel @Inject constructor(
         val conditionalRows = if (r.sourceEdition == CommandInputParser.SourceEdition.BEDROCK) {
             ConditionalRawtextConverter.parse(r.bedrockJson)
         } else null
+        val conditionalWarnings = mutableListOf<String>()
         _rawConvertJava.value = if (conditionalRows != null) {
-            ConditionalRawtextConverter.toJava(conditionalRows, prefix.orEmpty()).joinToString("\n")
+            ConditionalRawtextConverter.toJava(
+                conditionalRows,
+                javaPrefix.orEmpty(),
+                r.javaSelector ?: "@a",
+                applicationContext,
+                nbtSyntax,
+                targetVersionSpec(),
+                conditionalWarnings
+            ).joinToString("\n")
         } else if (javaTagPlan != null) {
             renderTagPlanCommands(javaTagPlan.commands)
         } else if (javaPrefix != null) {
@@ -1082,6 +1091,7 @@ class TellrawViewModel @Inject constructor(
         _rawConvertWarnings.value = buildList {
             addAll(r.warnings)
             addAll(prefixWarnings)
+            addAll(conditionalWarnings)
             if (conditionalRows != null) {
                 add("已将基岩 conditional rawtext 转为 Java 多条 tellraw（第一匹配）；请核对条件是否覆盖原结构")
             }
@@ -1199,11 +1209,13 @@ class TellrawViewModel @Inject constructor(
             try {
                 // 混合模式的后台文本是扁平文本；消息里有组件时必须优先保留组件结构
                 val hasStructuredComponents = !_defaultUseText.value &&
-                    TextComponentHelper.parseTextComponents(messageWithMarkers).any {
-                        it.type != TextComponentHelper.ComponentType.TEXT ||
-                            it.subComponents.isNotEmpty() ||
-                            !it.style.isEmpty()
-                    }
+                    TextComponentHelper.parseTextComponents(messageWithMarkers)
+                        .filterNot(::isSimpleToken)
+                        .any {
+                            it.type != TextComponentHelper.ComponentType.TEXT ||
+                                it.subComponents.isNotEmpty() ||
+                                !it.style.isEmpty()
+                        }
                 val mixedPlainOnly = _mnMixedMode.value && !hasStructuredComponents
 
                 // 确定要使用的消息
@@ -1223,6 +1235,9 @@ class TellrawViewModel @Inject constructor(
                 
                 // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
                 val allReminders = mutableListOf<String>()
+                if (selector.isBlank() && simpleTable != null) {
+                    allReminders.add("主界面选择器为空：Simpler translate 将按基础选择器 @a 生成")
+                }
                 if (hasSimpleToken && simpleTable == null) {
                     allReminders.add("Simpler token 的数据丢失，已忽略该 token；请重新打开 Simpler translate 完成一次参数表")
                 }

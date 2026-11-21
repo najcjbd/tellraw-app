@@ -151,12 +151,8 @@ object SimpleTranslatePlanner {
         warnings: MutableList<String>
     ): Result {
         if (table.rows.isEmpty()) {
-            warnings.add("Simpler translate 没有任何收信人行；token 已按普通空内容处理")
-            return Result(
-                java = listOf(replaceJavaMarker(javaMessageJson, null) ?: javaMessageJson),
-                bedrock = listOf(replaceBedrockMarker(bedrockMessageJson, emptyList()) ?: bedrockMessageJson),
-                warnings = warnings.distinct()
-            )
+            warnings.add("Simpler translate 没有任何收信人行；token 已忽略")
+            return Result(emptyList(), emptyList(), warnings.distinct())
         }
         val javaHasMarker = hasMarker(javaMessageJson)
         val bedrockHasMarker = hasMarker(bedrockMessageJson)
@@ -302,10 +298,32 @@ object SimpleTranslatePlanner {
         } else {
             listOf("as", filterJava(merged, context, nbtSyntax, target, warnings))
         }
-        val exclusions = earlier.joinToString("") { " unless entity @s[$it]" }
+        val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
         return "$base ${inner.joinToString(" ")}$exclusions run tellraw @s $json"
     }
+
+    private fun exclusionsForJava(
+        earlier: List<String>,
+        context: Context?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        target: VersionSpec?,
+        warnings: MutableList<String>
+    ): String = earlier.mapNotNull { params ->
+        val filtered = filterJava("@s[$params]", context, nbtSyntax, target, warnings)
+        val inner = when {
+            filtered.startsWith("@s[") && filtered.endsWith("]") ->
+                filtered.substring(3, filtered.length - 1)
+            filtered == "@s" -> ""
+            else -> filtered
+        }
+        if (inner.isBlank()) {
+            warnings.add("Java 选择器无法表达收信人参数「$params」，该排除条件已省略（后面行可能重复显示）")
+            null
+        } else {
+            " unless entity @s[$inner]"
+        }
+    }.joinToString("")
 
     private fun buildBedrockFirstMatch(
         prepared: List<PreparedRow>,
@@ -526,7 +544,8 @@ object SimpleTranslatePlanner {
                     out.add(
                         TextComponent(
                             ComponentType.SCORE,
-                            "${draft.name}:${draft.objective}",
+                            TextComponentHelper.encodeScorePart(draft.name) + ":" +
+                                TextComponentHelper.encodeScorePart(draft.objective),
                             style = componentStyle(draft.retained)
                         )
                     )
@@ -722,18 +741,8 @@ object SimpleTranslatePlanner {
                 "tag", "team" -> {
                     out.add(if (value.startsWith("!")) "$key=${value.drop(1)}" else "$key=!$value")
                 }
-                "scores" -> {
-                    if (!value.startsWith("{") || !value.endsWith("}")) return null
-                    val entries = splitTopLevel(value.substring(1, value.length - 1), ',')
-                    val invertedEntries = entries.map { entry ->
-                        val i = indexOfTopLevel(entry, '=')
-                        if (i <= 0) return null
-                        val k = entry.substring(0, i).trim()
-                        val v = entry.substring(i + 1).trim()
-                        "$k=" + if (v.startsWith("!")) v.drop(1) else "!$v"
-                    }
-                    out.add("scores={${invertedEntries.joinToString(",")}}")
-                }
+                // scores 取反的语义是"存在且不等于"，不是补集：没有该分数的人也会漏掉。
+                // 单条条件 rawtext 无法表达"分数不存在", 因此不生成排除，交给重叠提醒。
                 else -> return null
             }
         }
