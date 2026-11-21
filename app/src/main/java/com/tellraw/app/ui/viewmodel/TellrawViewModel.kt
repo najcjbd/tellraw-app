@@ -120,8 +120,6 @@ class TellrawViewModel @Inject constructor(
     private val _chainAnchorEnabled = MutableStateFlow(true)
     val chainAnchorEnabled: StateFlow<Boolean> = _chainAnchorEnabled.asStateFlow()
 
-    private val _simpleTranslateJava = MutableStateFlow("")
-    private val _simpleTranslateBedrock = MutableStateFlow("")
     private val _simpleTranslateWarnings = MutableStateFlow<List<String>>(emptyList())
     private var _simpleBlockJson: String = ""
 
@@ -417,6 +415,22 @@ class TellrawViewModel @Inject constructor(
         c.type == com.tellraw.app.util.TextComponentHelper.ComponentType.TRANSLATE &&
             c.content == com.tellraw.app.util.TextComponentHelper.SIMPLE_TRANSLATE_KEY
 
+    /** 把 Simpler token 放回消息末尾（先移除旧 token，避免重复）。 */
+    private fun appendSimpleToken(markers: String): String {
+        if (_simpleBlockJson.isBlank()) {
+            return com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(markers)
+        }
+        val components = com.tellraw.app.util.TextComponentHelper
+            .parseTextComponents(markers)
+            .filterNot(::isSimpleToken)
+            .toMutableList()
+        components.add(simpleToken(_simpleBlockJson))
+        return com.tellraw.app.util.TextComponentHelper.componentsToText(components)
+    }
+
+    fun currentSimpleBlockJson(): String? =
+        _simpleBlockJson.takeIf { it.isNotBlank() }
+
     fun updateMessage(message: String) {
         _messageInput.value = message
         
@@ -426,7 +440,7 @@ class TellrawViewModel @Inject constructor(
             updateComponentMarkers(message)
         } else {
             // 默认使用text模式：也保存为 TEXT 组件标记，切到组件模式时不丢反斜杠等敏感符号
-            _messageInputWithMarkers.value = markersForPlainText(message)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(message))
             lastMessageInput = message
         }
         
@@ -450,9 +464,9 @@ class TellrawViewModel @Inject constructor(
      * 更新文本组件标记符（简化版，支持新的标记符格式）
      */
     private fun updateComponentMarkers(frontendMessage: String) {
-        // 如果前台文本为空，清空后台文本和映射
+        // 如果前台文本为空，清空后台文本和映射。Simpler token 不是用户可见文本，要保留。
         if (frontendMessage.isEmpty()) {
-            _messageInputWithMarkers.value = ""
+            _messageInputWithMarkers.value = appendSimpleToken("")
             lastMessageInput = ""
             return
         }
@@ -463,13 +477,15 @@ class TellrawViewModel @Inject constructor(
         
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
-            _messageInputWithMarkers.value = markersForPlainText(frontendMessage)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(frontendMessage))
             lastMessageInput = frontendMessage
             return
         }
         
-        // 计算前台文本和旧纯文本的长度
-        val oldPlainText = TextComponentHelper.componentsToText(oldComponents)
+        // 计算前台文本和旧纯文本的长度（不能拿带标记的字符串来比）
+        val oldPlainText = oldComponents.joinToString("") { c ->
+            c.content + c.subComponents.joinToString("") { it.content }
+        }
         val oldLength = oldPlainText.length
         val newLength = frontendMessage.length
         
@@ -480,7 +496,11 @@ class TellrawViewModel @Inject constructor(
         
         // 内容不同，重新构建带标记符的文本
         // 检查是否所有组件都是TEXT组件
-        val allTextComponents = oldComponents.all { it.type == TextComponentHelper.ComponentType.TEXT && it.subComponents.isEmpty() }
+        val allTextComponents = oldComponents.all {
+            it.type == TextComponentHelper.ComponentType.TEXT &&
+                it.subComponents.isEmpty() &&
+                it.style.isEmpty()
+        }
         val newComponents = if (allTextComponents) {
             // 所有组件都是TEXT组件，将整个输入内容作为一个TEXT组件处理
             mutableListOf(TextComponentHelper.TextComponent(TextComponentHelper.ComponentType.TEXT, frontendMessage))
@@ -492,11 +512,7 @@ class TellrawViewModel @Inject constructor(
         }
         
         var markers = TextComponentHelper.componentsToText(newComponents)
-        if (_simpleBlockJson.isNotBlank()) {
-            markers = TextComponentHelper.insertComponentAt(
-                markers, markers.length, simpleToken(_simpleBlockJson)
-            )
-        }
+        markers = appendSimpleToken(markers)
         _messageInputWithMarkers.value = markers
         lastMessageInput = frontendMessage
     }
@@ -915,27 +931,19 @@ class TellrawViewModel @Inject constructor(
         if (_showRawConvertDialog.value) runRawConvert()
     }
 
-    /** Simpler translate 的完成结果并入主生成输出，而不是在独立界面单独保留。 */
+    /** 保存 Simpler translate 参数表；生成时由 token 原位替换，不再单独追加输出。 */
     fun setSimpleTranslateOutput(
-        java: String,
-        bedrock: String,
-        warnings: List<String>,
-        blockJson: String
+        blockJson: String,
+        warnings: List<String>
     ) {
-        _simpleTranslateJava.value = java
-        _simpleTranslateBedrock.value = bedrock
-        _simpleTranslateWarnings.value = warnings
         _simpleBlockJson = blockJson
-        var markers = com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(
-            _messageInputWithMarkers.value
-        )
-        markers = com.tellraw.app.util.TextComponentHelper.insertComponentAt(
-            markers, markers.length, simpleToken(blockJson)
-        )
+        _simpleTranslateWarnings.value = warnings
+        val markers = appendSimpleToken(_messageInputWithMarkers.value)
         _messageInputWithMarkers.value = markers
-        _messageInput.value = com.tellraw.app.util.TextComponentHelper.stripComponentMarkers(
-            com.tellraw.app.util.TextComponentHelper.removeSimpleTranslateBlocks(markers)
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(
+            TextComponentHelper.removeSimpleTranslateBlocks(markers)
         )
+        lastMessageInput = _messageInput.value
         if (_defaultUseText.value) {
             _defaultUseText.value = false
             viewModelScope.launch {
@@ -1106,11 +1114,15 @@ class TellrawViewModel @Inject constructor(
 
         val markers = TextComponentHelper.componentsToText(r.components)
         _messageInputWithMarkers.value = markers
+        _simpleBlockJson = ""
+        _simpleTranslateWarnings.value = emptyList()
         // 必须保留 TEXT 里的 § 样式码（不能用只保留可见字符的版本，否则纯文本模式会丢颜色/格式）
         _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
         // 填回的是组件命令时，默认 text 模式会丢掉组件结构 -> 自动切到组件模式
         if (_defaultUseText.value && r.components.any {
-                it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+                it.type != TextComponentHelper.ComponentType.TEXT ||
+                    it.subComponents.isNotEmpty() ||
+                    !it.style.isEmpty()
             }
         ) {
             _defaultUseText.value = false
@@ -1158,24 +1170,28 @@ class TellrawViewModel @Inject constructor(
             
             val selector = _selectorInput.value
             val message = _messageInput.value
-            val messageWithMarkers = com.tellraw.app.util.TextComponentHelper
-                .removeSimpleTranslateBlocks(_messageInputWithMarkers.value)
-            
+            val rawMarkers = _messageInputWithMarkers.value
+            val hasSimpleToken = TextComponentHelper.parseTextComponents(rawMarkers).any(::isSimpleToken)
+            val simpleTable = com.tellraw.app.util.SimpleTranslatePlanner.decode(_simpleBlockJson)
+            val messageWithMarkers = if (simpleTable != null) {
+                appendSimpleToken(rawMarkers)
+            } else {
+                TextComponentHelper.removeSimpleTranslateBlocks(rawMarkers)
+            }
+            val outsideToken = TextComponentHelper.parseTextComponents(messageWithMarkers)
+                .filterNot(::isSimpleToken)
+            val hasSurrounding = outsideToken.any {
+                it.content.isNotEmpty() || it.subComponents.isNotEmpty()
+            }
+
             // 检查消息是否为空（使用带标记符的文本检查，因为纯文本可能为空但带标记符不为空）
-            val actualMessage = if (_defaultUseText.value) message else messageWithMarkers
-            
-            if (selector.isEmpty() || actualMessage.isEmpty()) {
-                val simpleJava = _simpleTranslateJava.value
-                val simpleBedrock = _simpleTranslateBedrock.value
-                if (simpleJava.isNotBlank() || simpleBedrock.isNotBlank()) {
-                    _javaCommand.value = simpleJava
-                    _bedrockCommand.value = simpleBedrock
-                    _warnings.value = _simpleTranslateWarnings.value.distinct()
-                } else {
-                    _javaCommand.value = ""
-                    _bedrockCommand.value = ""
-                    _warnings.value = emptyList()
-                }
+            val hasContent = hasSurrounding || (simpleTable != null && simpleTable.rows.isNotEmpty())
+            if ((selector.isEmpty() && simpleTable == null) || !hasContent) {
+                _javaCommand.value = ""
+                _bedrockCommand.value = ""
+                _warnings.value = if (hasSimpleToken && simpleTable == null) {
+                    listOf("Simpler token 的数据丢失，已忽略该 token；请重新打开 Simpler translate 完成一次参数表")
+                } else emptyList()
                 _isLoading.value = false
                 return@launch
             }
@@ -1184,12 +1200,15 @@ class TellrawViewModel @Inject constructor(
                 // 混合模式的后台文本是扁平文本；消息里有组件时必须优先保留组件结构
                 val hasStructuredComponents = !_defaultUseText.value &&
                     TextComponentHelper.parseTextComponents(messageWithMarkers).any {
-                        it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+                        it.type != TextComponentHelper.ComponentType.TEXT ||
+                            it.subComponents.isNotEmpty() ||
+                            !it.style.isEmpty()
                     }
                 val mixedPlainOnly = _mnMixedMode.value && !hasStructuredComponents
 
                 // 确定要使用的消息
                 val messageToUse = when {
+                    simpleTable != null -> messageWithMarkers
                     mixedPlainOnly -> backendMessageContent
                     _defaultUseText.value -> message
                     else -> messageWithMarkers
@@ -1204,8 +1223,14 @@ class TellrawViewModel @Inject constructor(
                 
                 // 收集所有要提醒用户的信息（选择器参数的转换提醒 + 文本格式警告）
                 val allReminders = mutableListOf<String>()
+                if (hasSimpleToken && simpleTable == null) {
+                    allReminders.add("Simpler token 的数据丢失，已忽略该 token；请重新打开 Simpler translate 完成一次参数表")
+                }
                 if (_mnMixedMode.value && hasStructuredComponents) {
-                    allReminders.add("混合模式只处理纯文本；当前消息含文本组件，已保留组件结构（§m/§n 的 _c/_f 会话选择不作用于该消息）")
+                    allReminders.add(
+                        "混合模式只处理一条扁平文本消息（纯文本也按 TEXT 组件存，但这里特指没有 translate/score/selector 等结构化组件、副组件或独立样式）；" +
+                            "当前消息含结构化组件，已保留组件结构，§m/§n 的 _c/_f 会话选择不作用于该消息"
+                    )
                 }
 
                 // 版本策略要在选择器/文本组件转换**之前**定出来：混合模式与组件内嵌 selector 都要按它过滤。
@@ -1225,7 +1250,7 @@ class TellrawViewModel @Inject constructor(
                         }
                     )
                     val platform = applicationContext.getString(
-                        if (target!!.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA)
+                        if (target.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA)
                             R.string.selector_type_java else R.string.selector_type_bedrock
                     )
                     allReminders.add(
@@ -1291,8 +1316,9 @@ class TellrawViewModel @Inject constructor(
                     javaInnerTokens = null
                 }
                 // as 不敏感：只有 tellraw 目标自己不需要 as 时，才让内容选择器驱动 as。
+                // Simpler translate 需要自己控制每个收信人的 as，不能把目标选择器改写到消息里。
                 var contentAs: com.tellraw.app.util.ContentAsRewriter.Result? = null
-                if (!_asSensitive.value && javaNegation == null) {
+                if (!_asSensitive.value && javaNegation == null && simpleTable == null) {
                     val r = com.tellraw.app.util.ContentAsRewriter.rewrite(
                         javaTarget, messageToUse, _executePrefixInput.value, nbtSyntax
                     )
@@ -1337,7 +1363,7 @@ class TellrawViewModel @Inject constructor(
                 val tagTarget = if (javaNegation != null) javaSelector else finalJavaTarget
                 val tagJson = if (tagNeedsRaw) javaJsonForTag else javaJson
                 val tagFilterWarnings = mutableListOf<String>()
-                val javaTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                val javaTagPlan = if (simpleTable == null && _allowMultiCmdTag.value && _executePrefixEnabled.value &&
                     javaUserPrefix != null && _executePrefixInput.value.isNotBlank() &&
                     contentAs == null && (finalJavaInnerTokens == null || javaNegation != null)
                 ) {
@@ -1391,7 +1417,7 @@ class TellrawViewModel @Inject constructor(
                     target
                 )
                 val bedrockPlain = "tellraw $bedrockFilteredSelector $bedrockJson"
-                val bedrockTagPlan = if (_allowMultiCmdTag.value && _executePrefixEnabled.value &&
+                val bedrockTagPlan = if (simpleTable == null && _allowMultiCmdTag.value && _executePrefixEnabled.value &&
                     bedrockUserPrefix != null && _executePrefixInput.value.isNotBlank()
                 ) {
                     ExecuteConverter.buildMultiCommandTagPlan(
@@ -1413,6 +1439,31 @@ class TellrawViewModel @Inject constructor(
                     ExecuteConverter.composeTellrawCommand(bedrockUserPrefix, bedrockPlain)
                 } else {
                     bedrockPlain
+                }
+
+                // Simpler translate：把完整消息里的 marker 按行替换，保留 token 前后的文本。
+                var simplePlan: com.tellraw.app.util.SimpleTranslatePlanner.Result? = null
+                if (simpleTable != null) {
+                    val simpleWarnings = mutableListOf<String>()
+                    simplePlan = com.tellraw.app.util.SimpleTranslatePlanner.plan(
+                        table = simpleTable,
+                        javaMessageJson = javaJson,
+                        bedrockMessageJson = bedrockJson,
+                        javaSelector = javaSelector,
+                        bedrockSelector = bedrockSelector,
+                        javaPrefix = javaUserPrefix,
+                        bedrockPrefix = bedrockUserPrefix,
+                        includeDefaultFallback = hasSurrounding,
+                        context = applicationContext,
+                        nbtSyntax = nbtSyntax,
+                        target = target,
+                        mNHandling = mNHandling,
+                        mnCFEnabled = _mnCFEnabled.value,
+                        separatorAsTextComponent = _separatorAsTextComponent.value,
+                        bedrockColorToRgb = _bedrockColorToRgb.value,
+                        warnings = simpleWarnings
+                    )
+                    allReminders.addAll(simpleWarnings)
                 }
                 
                 // 新旧写法混用 -> 问一嘴（版本差异规范 2.4）。
@@ -1476,21 +1527,29 @@ class TellrawViewModel @Inject constructor(
                     val sayText = if (hasMarkers) {
                         allReminders.add(applicationContext.getString(R.string.say_component_flattened))
                         com.tellraw.app.util.TextComponentHelper.parseTextComponents(messageToUse)
+                            .filterNot(::isSimpleToken)
                             .joinToString("") { it.content }
                     } else messageToUse
                     finalJava = "say $sayText"
                     finalBedrock = "say $sayText"
+                    if (simpleTable != null) {
+                        allReminders.add("目标版本只能用 say，Simpler translate 无法按收信人替换内容；本次已忽略参数表")
+                    }
                 } else {
-                    finalJava = javaCommand
-                    finalBedrock = bedrockCommand
-                }
-                if (_simpleTranslateJava.value.isNotBlank()) {
-                    finalJava = listOf(finalJava, _simpleTranslateJava.value)
-                        .filter { it.isNotBlank() }.joinToString("\n")
-                }
-                if (_simpleTranslateBedrock.value.isNotBlank()) {
-                    finalBedrock = listOf(finalBedrock, _simpleTranslateBedrock.value)
-                        .filter { it.isNotBlank() }.joinToString("\n")
+                    val sp = simplePlan
+                    if (simpleTable != null && sp != null &&
+                        (sp.java.isNotEmpty() || sp.bedrock.isNotEmpty())
+                    ) {
+                        finalJava = sp.java.joinToString("\n")
+                        finalBedrock = sp.bedrock.joinToString("\n")
+                    } else if (simpleTable != null) {
+                        allReminders.add("Simpler token 没有进入消息 JSON；已退化为去掉 token 的普通 tellraw")
+                        finalJava = com.tellraw.app.util.SimpleTranslatePlanner.stripJavaMarker(javaCommand)
+                        finalBedrock = com.tellraw.app.util.SimpleTranslatePlanner.stripBedrockMarker(bedrockCommand)
+                    } else {
+                        finalJava = javaCommand
+                        finalBedrock = bedrockCommand
+                    }
                 }
                 _javaCommand.value = finalJava
                 _bedrockCommand.value = finalBedrock
@@ -1692,8 +1751,6 @@ class TellrawViewModel @Inject constructor(
         _messageInputWithMarkers.value = ""
         _javaCommand.value = ""
         _bedrockCommand.value = ""
-        _simpleTranslateJava.value = ""
-        _simpleTranslateBedrock.value = ""
         _simpleTranslateWarnings.value = emptyList()
         _simpleBlockJson = ""
         _warnings.value = emptyList()
@@ -1750,11 +1807,20 @@ class TellrawViewModel @Inject constructor(
         _selectorInput.value = history.selector
         _messageInput.value = history.message
         val historyMarkers = history.markers.ifBlank { markersForPlainText(history.message) }
+        val historySimpleBlock = TextComponentHelper.parseTextComponents(historyMarkers)
+            .firstOrNull(::isSimpleToken)
+            ?.subComponents
+            ?.firstOrNull { it.type == TextComponentHelper.SubComponentType.WITH_JSON }
+            ?.content
+        _simpleBlockJson = historySimpleBlock.orEmpty()
+        _simpleTranslateWarnings.value = emptyList()
         _messageInputWithMarkers.value = historyMarkers
         // 历史里的组件命令：默认 text 模式下也要切到组件模式，否则重新生成会丢组件
         val historyComponents = TextComponentHelper.parseTextComponents(historyMarkers)
         if (_defaultUseText.value && historyComponents.any {
-                it.type != TextComponentHelper.ComponentType.TEXT || it.subComponents.isNotEmpty()
+                it.type != TextComponentHelper.ComponentType.TEXT ||
+                    it.subComponents.isNotEmpty() ||
+                    !it.style.isEmpty()
             }
         ) {
             _defaultUseText.value = false
@@ -2282,6 +2348,7 @@ class TellrawViewModel @Inject constructor(
                 val c = components[i]
                 val len = c.content.length + c.subComponents.sumOf { it.content.length }
                 if (c.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                    !isSimpleToken(c) &&
                     insertPosition in pos..(pos + len)
                 ) {
                     val migrated = TextComponentHelper.migrateWithMode(
@@ -2319,11 +2386,15 @@ class TellrawViewModel @Inject constructor(
     private fun openWithBuilderInternal(insertPosition: Int, forcedTranslateOrdinal: Int?) {
         val markers = _messageInputWithMarkers.value
         val components = TextComponentHelper.parseTextComponents(markers)
-        val index = forcedTranslateOrdinal?.let { wanted ->
+        val index = (forcedTranslateOrdinal?.let { wanted ->
             components.withIndex()
-                .filter { it.value.type == TextComponentHelper.ComponentType.TRANSLATE }
+                .filter {
+                    it.value.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                        !isSimpleToken(it.value)
+                }
                 .getOrNull(wanted - 1)?.index
-        } ?: TextComponentHelper.findTranslateIndexAt(components, insertPosition)
+        } ?: TextComponentHelper.findTranslateIndexAt(components, insertPosition))
+            ?.takeIf { !isSimpleToken(components[it]) }
         val component = index?.let { components[it] }
         val key = component?.content.orEmpty()
         val fallbackSub = component?.subComponents
@@ -2489,8 +2560,10 @@ class TellrawViewModel @Inject constructor(
             return
         }
         
-        _messageInputWithMarkers.value = markers
-        _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
+        _messageInputWithMarkers.value = appendSimpleToken(markers)
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(
+            TextComponentHelper.removeSimpleTranslateBlocks(_messageInputWithMarkers.value)
+        )
         lastMessageInput = _messageInput.value
         
         if (_defaultUseText.value) {
@@ -2538,7 +2611,7 @@ class TellrawViewModel @Inject constructor(
             deleteComponentMarkers(deletePosition, deletedLength, newText)
         } else {
             // 默认使用text模式，也保存为 TEXT 组件标记
-            _messageInputWithMarkers.value = markersForPlainText(newText)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(newText))
         }
         
         // 更新lastMessageInput
@@ -2563,9 +2636,9 @@ class TellrawViewModel @Inject constructor(
      * 使用位置映射来精确删除前台和后台的文本，并更新lastMessageInput
      */
     private fun deleteComponentMarkers(deletePosition: Int, deletedLength: Int, newText: String) {
-        // 如果新文本为空，清空后台文本和映射
+        // 如果新文本为空，清空后台文本和映射；Simpler token 仍然保留
         if (newText.isEmpty()) {
-            _messageInputWithMarkers.value = ""
+            _messageInputWithMarkers.value = appendSimpleToken("")
             lastMessageInput = ""
             return
         }
@@ -2575,7 +2648,7 @@ class TellrawViewModel @Inject constructor(
         
         // 如果没有旧组件，将前台文本作为纯文本处理
         if (oldComponents.isEmpty()) {
-            _messageInputWithMarkers.value = markersForPlainText(newText)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(newText))
             lastMessageInput = newText
             return
         }
@@ -2622,7 +2695,8 @@ class TellrawViewModel @Inject constructor(
                 newComponents[targetComponentIndex] = TextComponentHelper.TextComponent(
                     targetComponent.type,
                     newContent,
-                    targetComponent.subComponents
+                    targetComponent.subComponents,
+                    targetComponent.style
                 )
             } else {
                 // 在副组件内删除
@@ -2655,7 +2729,8 @@ class TellrawViewModel @Inject constructor(
                     newComponents[targetComponentIndex] = TextComponentHelper.TextComponent(
                         targetComponent.type,
                         targetComponent.content,
-                        updatedSubComponents
+                        updatedSubComponents,
+                        targetComponent.style
                     )
                 }
             }
@@ -2673,7 +2748,9 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 重新构建带标记符的文本
-        _messageInputWithMarkers.value = TextComponentHelper.componentsToText(newComponents)
+        _messageInputWithMarkers.value = appendSimpleToken(
+            TextComponentHelper.componentsToText(newComponents)
+        )
         lastMessageInput = newText
     }
     
@@ -2684,7 +2761,7 @@ class TellrawViewModel @Inject constructor(
             val plain = _messageInput.value
             val pos = insertPosition.coerceIn(0, plain.length)
             _messageInput.value = plain.substring(0, pos) + text + plain.substring(pos)
-            _messageInputWithMarkers.value = markersForPlainText(_messageInput.value)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(_messageInput.value))
             lastMessageInput = _messageInput.value
             refreshMixedBackendIfNeeded()
             generateCommands()
@@ -2744,6 +2821,7 @@ class TellrawViewModel @Inject constructor(
         }
         
         // 更新前台显示的纯文本（去除标记符）
+        _messageInputWithMarkers.value = appendSimpleToken(_messageInputWithMarkers.value)
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         _messageInput.value = plainText
         
@@ -2817,7 +2895,7 @@ class TellrawViewModel @Inject constructor(
                         } else {
                             updated.add(TextComponentHelper.SubComponent(targetSubComponent, textToInsert))
                         }
-                        result.add(TextComponentHelper.TextComponent(migrated.type, migrated.content, updated))
+                        result.add(TextComponentHelper.TextComponent(migrated.type, migrated.content, updated, migrated.style))
                     }
                 }
                 processed = true
@@ -2848,7 +2926,7 @@ class TellrawViewModel @Inject constructor(
     fun clearComponentMarkers() {
         val plainText = TextComponentHelper.stripComponentMarkers(_messageInputWithMarkers.value)
         if (plainText != _messageInputWithMarkers.value) {
-            _messageInputWithMarkers.value = markersForPlainText(plainText)
+            _messageInputWithMarkers.value = appendSimpleToken(markersForPlainText(plainText))
             _messageInput.value = plainText
             // 清空悬停组件类型和内容
             _hoveredComponentType.value = null

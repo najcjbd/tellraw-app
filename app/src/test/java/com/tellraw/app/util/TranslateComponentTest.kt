@@ -143,6 +143,42 @@ class TranslateComponentTest {
 
 
     @Test
+    fun removeSimpleTranslateBlocksHandlesEscapedUnderscores() {
+        val block = """{"rows":[{"params":"tag=a","content":[{"text":"A"}]}]}"""
+        val token = TextComponent(
+            ComponentType.TRANSLATE,
+            TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(SubComponent(SubComponentType.WITH_JSON, block))
+        )
+        val markers = TextComponentHelper.componentsToText(
+            listOf(
+                TextComponent(ComponentType.TEXT, "Hi "),
+                token,
+                TextComponent(ComponentType.TEXT, "!")
+            )
+        )
+        val stripped = TextComponentHelper.removeSimpleTranslateBlocks(markers)
+        assertFalse(stripped, stripped.contains("simpler"))
+        assertFalse(stripped, stripped.contains("rows"))
+        assertEquals("Hi !", TextComponentHelper.stripComponentMarkers(stripped))
+    }
+
+    @Test
+    fun simplerTokenIsInvisibleToCursorMapping() {
+        val token = TextComponent(
+            ComponentType.TRANSLATE,
+            TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(SubComponent(SubComponentType.WITH_JSON, """{"rows":[]}"""))
+        )
+        val markers = TextComponentHelper.componentsToText(
+            listOf(TextComponent(ComponentType.TEXT, "Hi"), token)
+        )
+        assertEquals(ComponentType.TEXT, TextComponentHelper.getComponentTypeAtPosition(markers, 1))
+        assertNull(TextComponentHelper.getComponentTypeAtPosition(markers, 2))
+        assertNull(TextComponentHelper.getComponentContentAtPosition(markers, 2))
+    }
+
+    @Test
     fun translatePreviewSupportsPercentFormatStrings() {
         assertEquals("A 和 B", TranslatePreview.render("%s 和 %s", listOf("A", "B")))
         assertEquals("B/A", TranslatePreview.render("%2\$s/%1\$s", listOf("A", "B")))

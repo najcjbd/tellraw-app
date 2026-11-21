@@ -62,6 +62,7 @@ import com.google.gson.JsonParser
 import com.tellraw.app.R
 import com.tellraw.app.ui.viewmodel.WithBuilderMode
 import com.tellraw.app.ui.viewmodel.WithBuilderState
+import com.tellraw.app.util.TextComponentHelper.ComponentStyle
 import com.tellraw.app.util.WithArgCodec
 import com.tellraw.app.util.WithArgDraft
 
@@ -72,6 +73,7 @@ import com.tellraw.app.util.WithArgDraft
 fun WithBuilderDialog(
     state: WithBuilderState,
     simpleMode: Boolean = false,
+    onOpenSimpleTranslate: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onKeyChange: (String) -> Unit,
     onFallbackChange: (String) -> Unit,
@@ -101,6 +103,19 @@ fun WithBuilderDialog(
                     stringResource(R.string.with_builder_title),
                     style = MaterialTheme.typography.titleMedium
                 )
+                if (simpleMode && onOpenSimpleTranslate != null) {
+                    OutlinedButton(
+                        onClick = onOpenSimpleTranslate,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Simpler translate：按收信人替换消息内容")
+                    }
+                    Text(
+                        "打开参数表后，当次输入里的 Simpler token 会按收信人/参数替换；基础选择器仍用主界面选择器。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (state.isNew) {
                     Text(
                         stringResource(R.string.with_builder_new_hint),
@@ -235,8 +250,19 @@ fun MessageContentEditor(
     args: List<WithArgDraft>,
     onArgsChange: (List<WithArgDraft>) -> Unit
 ) {
-    ArgListSection(args = args, onArgsChange = onArgsChange)
+    ArgListSection(
+        args = args,
+        onArgsChange = onArgsChange,
+        allowedKinds = SIMPLE_CONTENT_KINDS
+    )
 }
+
+private val SIMPLE_CONTENT_KINDS = setOf(
+    AddKind.TEXT,
+    AddKind.TRANSLATE,
+    AddKind.SELECTOR,
+    AddKind.SCORE
+)
 
 // ---------------- 树形大纲 + 检查器 ----------------
 
@@ -563,7 +589,7 @@ private fun InlineArgEditor(
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(kindLabel(arg), style = MaterialTheme.typography.titleSmall)
         when (arg) {
-            is WithArgDraft.Text -> InlineTextEditor(arg, nodeKey, onChanged)
+            is WithArgDraft.Text -> InlineTextEditor(arg, nodeKey) { onChanged(it) }
             is WithArgDraft.Translate -> InlineTranslateEditor(arg, nodeKey, onChanged)
             is WithArgDraft.Selector -> InlineSelectorEditor(arg, nodeKey, onChanged)
             is WithArgDraft.Score -> InlineScoreEditor(arg, nodeKey, onChanged)
@@ -578,7 +604,7 @@ private fun InlineArgEditor(
 private fun InlineTextEditor(
     original: WithArgDraft.Text,
     nodeKey: String,
-    onChanged: (WithArgDraft) -> Unit
+    onChanged: (WithArgDraft.Text) -> Unit
 ) {
     var text by rememberSaveable(nodeKey) { mutableStateOf(original.text) }
     var color by rememberSaveable(nodeKey) { mutableStateOf(original.color.orEmpty()) }
@@ -951,7 +977,8 @@ private fun addChildArg(
 @Composable
 private fun ArgListSection(
     args: List<WithArgDraft>,
-    onArgsChange: (List<WithArgDraft>) -> Unit
+    onArgsChange: (List<WithArgDraft>) -> Unit,
+    allowedKinds: Set<AddKind> = AddKind.values().toSet()
 ) {
     var editIndex by remember { mutableStateOf<Int?>(null) }
     var showAdd by remember { mutableStateOf(false) }
@@ -996,7 +1023,7 @@ private fun ArgListSection(
                 Text(stringResource(R.string.with_builder_add))
             }
             DropdownMenu(expanded = showAdd, onDismissRequest = { showAdd = false }) {
-                AddKind.values().forEach { kind ->
+                AddKind.values().filter { it in allowedKinds }.forEach { kind ->
                     DropdownMenuItem(
                         text = { Text(stringResource(kind.labelRes)) },
                         onClick = {
@@ -1103,24 +1130,23 @@ private fun TextItemDialog(
     onDismiss: () -> Unit,
     onApply: (WithArgDraft) -> Unit
 ) {
-    var text by remember(original) { mutableStateOf(original.text) }
+    var current by remember(original) { mutableStateOf(original) }
+    val nodeKey = remember { "text-item-${java.util.UUID.randomUUID()}" }
 
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
-        onApply = { onApply(original.copy(text = text)) }
+        onApply = { onApply(current) }
     ) {
         Text(
-            "文本输入与主界面一致：可直接输入 § 颜色/格式代码（如 §a绿色§l粗体）。",
+            "可直接输入 § 颜色/格式代码，也可以使用下面的颜色/格式字段；两者会一起生成。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            label = { Text(stringResource(R.string.with_builder_text)) },
-            minLines = 3,
-            modifier = Modifier.fillMaxWidth()
+        InlineTextEditor(
+            original = current,
+            nodeKey = nodeKey,
+            onChanged = { current = it }
         )
     }
 }
@@ -1134,6 +1160,7 @@ private fun TranslateItemDialog(
     var key by remember(original) { mutableStateOf(original.key) }
     var fallback by remember(original) { mutableStateOf(original.fallback.orEmpty()) }
     var args by remember(original) { mutableStateOf(original.args) }
+    var retained by remember(original) { mutableStateOf(original.retained) }
 
     ItemDialog(
         title = kindLabel(original),
@@ -1144,7 +1171,7 @@ private fun TranslateItemDialog(
             } else {
                 fallback.ifEmpty { null }
             }
-            onApply(original.copy(key = key, fallback = fallbackOut, args = args))
+            onApply(original.copy(key = key, fallback = fallbackOut, args = args, retained = retained))
         }
     ) {
         OutlinedTextField(
@@ -1163,6 +1190,7 @@ private fun TranslateItemDialog(
         )
         Text(stringResource(R.string.with_builder_args), style = MaterialTheme.typography.titleSmall)
         ArgListSection(args = args, onArgsChange = { args = it })
+        RetainedStyleEditor(retained) { retained = it }
     }
 }
 
@@ -1174,6 +1202,7 @@ private fun SelectorItemDialog(
 ) {
     var selector by remember(original) { mutableStateOf(original.selector) }
     var separator by remember(original) { mutableStateOf(original.separator.orEmpty()) }
+    var retained by remember(original) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1183,7 +1212,7 @@ private fun SelectorItemDialog(
             } else {
                 separator.ifEmpty { null }
             }
-            onApply(original.copy(selector = selector, separator = separatorOut))
+            onApply(original.copy(selector = selector, separator = separatorOut, retained = retained))
         }
     ) {
         OutlinedTextField(
@@ -1200,6 +1229,7 @@ private fun SelectorItemDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        RetainedStyleEditor(retained) { retained = it }
     }
 }
 
@@ -1211,10 +1241,11 @@ private fun ScoreItemDialog(
 ) {
     var name by remember(original) { mutableStateOf(original.name) }
     var objective by remember(original) { mutableStateOf(original.objective) }
+    var retained by remember(original) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
-        onApply = { onApply(original.copy(name = name, objective = objective)) }
+        onApply = { onApply(original.copy(name = name, objective = objective, retained = retained)) }
     ) {
         OutlinedTextField(
             value = name,
@@ -1230,6 +1261,7 @@ private fun ScoreItemDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        RetainedStyleEditor(retained) { retained = it }
     }
 }
 
@@ -1240,10 +1272,11 @@ private fun KeybindItemDialog(
     onApply: (WithArgDraft) -> Unit
 ) {
     var keybind by remember(original) { mutableStateOf(original.keybind) }
+    var retained by remember(original) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
-        onApply = { onApply(original.copy(keybind = keybind)) }
+        onApply = { onApply(original.copy(keybind = keybind, retained = retained)) }
     ) {
         OutlinedTextField(
             value = keybind,
@@ -1252,6 +1285,7 @@ private fun KeybindItemDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        RetainedStyleEditor(retained) { retained = it }
     }
 }
 
@@ -1265,6 +1299,7 @@ private fun NbtItemDialog(
     var source by remember(original) { mutableStateOf(original.source) }
     var interpret by remember(original) { mutableStateOf(original.interpret) }
     var separator by remember(original) { mutableStateOf(original.separator.orEmpty()) }
+    var retained by remember(original) { mutableStateOf(original.retained) }
     ItemDialog(
         title = kindLabel(original),
         onDismiss = onDismiss,
@@ -1279,7 +1314,8 @@ private fun NbtItemDialog(
                     path = path,
                     source = source,
                     interpret = interpret,
-                    separator = separatorOut
+                    separator = separatorOut,
+                    retained = retained
                 )
             )
         }
@@ -1322,6 +1358,7 @@ private fun NbtItemDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        RetainedStyleEditor(retained) { retained = it }
     }
 }
 
@@ -1435,6 +1472,63 @@ private fun BedrockNotes(args: List<WithArgDraft>) {
 }
 
 // ---------------- 通用小组件 ----------------
+
+/** 非 TEXT 组件的样式字段（Java 输出为 color/bold/...；基岩可表达的部分会转成 §）。 */
+@Composable
+private fun RetainedStyleEditor(
+    retained: com.google.gson.JsonObject,
+    onRetainedChange: (com.google.gson.JsonObject) -> Unit
+) {
+    val style = remember(retained) { ComponentStyle.fromJson(retained) }
+    var colorText by remember { mutableStateOf(style.color.orEmpty()) }
+    var fontText by remember { mutableStateOf(style.font.orEmpty()) }
+    fun emit(next: ComponentStyle) = onRetainedChange(next.toJsonObject())
+
+    Text("样式（Java 组件字段）", style = MaterialTheme.typography.labelMedium)
+    OutlinedTextField(
+        value = colorText,
+        onValueChange = {
+            colorText = it
+            emit(style.copy(color = it.trim().ifEmpty { null }))
+        },
+        label = { Text(stringResource(R.string.with_builder_color)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        listOf("red", "gold", "yellow", "green", "aqua", "blue", "light_purple", "white", "gray", "dark_gray", "black")
+            .forEach { preset ->
+                FilterChip(
+                    selected = colorText == preset,
+                    onClick = {
+                        colorText = preset
+                        emit(style.copy(color = preset))
+                    },
+                    label = { Text(preset) }
+                )
+            }
+    }
+    TriStateChip(R.string.with_builder_style_bold, style.bold) { emit(style.copy(bold = it)) }
+    TriStateChip(R.string.with_builder_style_italic, style.italic) { emit(style.copy(italic = it)) }
+    TriStateChip(R.string.with_builder_style_underlined, style.underlined) { emit(style.copy(underlined = it)) }
+    TriStateChip(R.string.with_builder_style_strikethrough, style.strikethrough) { emit(style.copy(strikethrough = it)) }
+    TriStateChip(R.string.with_builder_style_obfuscated, style.obfuscated) { emit(style.copy(obfuscated = it)) }
+    OutlinedTextField(
+        value = fontText,
+        onValueChange = {
+            fontText = it
+            emit(style.copy(font = it.trim().ifEmpty { null }))
+        },
+        label = { Text("font") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
 
 @Composable
 private fun ItemDialog(

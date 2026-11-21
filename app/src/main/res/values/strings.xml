@@ -400,7 +400,7 @@
     <string name="with_builder_json_error">JSON 无法解析</string>
     <string name="with_builder_json_input_hint">参数 JSON 会显示在消息框中；建议用本构造器修改，避免直接删改。</string>
     <string name="with_builder_preview">预览</string>
-    <string name="with_builder_bedrock_styles">基岩版会忽略颜色/格式/点击/悬停等样式</string>
+    <string name="with_builder_bedrock_styles">基岩 rawtext 只能用 § 给 text 表示颜色/格式；translate/score/selector 的样式字段会丢失，字体/点击/悬停也不支持</string>
     <string name="with_builder_bedrock_keybind">基岩版会忽略 keybind</string>
     <string name="with_builder_bedrock_nbt">基岩版会忽略 NBT 组件</string>
     <string name="with_builder_bedrock_fallback">基岩版会忽略嵌套 translate 的 fallback</string>

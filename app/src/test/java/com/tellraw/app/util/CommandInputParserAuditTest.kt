@@ -44,9 +44,11 @@ class CommandInputParserAuditTest {
     fun explicitFalseOverridesInheritedBold() {
         val r = parse("""{"text":"A","bold":true,"extra":[{"text":"B","bold":false}]}""")
         assertNotNull(r)
-        val contents = r!!.components.map { it.content }
-        assertEquals("§lA", contents[0])
-        assertEquals("§rB", contents[1])
+        val components = r!!.components
+        assertEquals("A", components[0].content)
+        assertEquals("B", components[1].content)
+        assertEquals(true, components[0].style.bold)
+        assertEquals(false, components[1].style.bold)
     }
 
     @Test
@@ -62,14 +64,18 @@ class CommandInputParserAuditTest {
     }
 
     @Test
-    fun unsupportedStyleFieldsAreWarned() {
+    fun unsupportedStyleFieldsArePreserved() {
         val r = parse(
             """{"text":"A","color":"#12AB34","clickEvent":{"action":"run_command","value":"/say hi"},"font":"minecraft:uniform"}"""
         )
         assertNotNull(r)
-        val warnings = r!!.warnings.joinToString("\n")
-        assertTrue(warnings, warnings.contains("clickEvent"))
-        assertTrue(warnings, warnings.contains("font"))
-        assertTrue(warnings, warnings.contains("#12AB34"))
+        val style = r!!.components.single().style
+        assertEquals("#12AB34", style.color)
+        assertEquals("minecraft:uniform", style.font)
+        assertNotNull(style.clickEvent)
+        val java = TextComponentHelper.convertToJavaJson(r.components)
+        assertTrue(java, java.contains("#12AB34"))
+        assertTrue(java, java.contains("clickEvent"))
+        assertTrue(java, java.contains("minecraft:uniform"))
     }
 }

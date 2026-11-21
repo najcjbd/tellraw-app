@@ -61,6 +61,7 @@ class CommandInputParserTest {
     @Test
     fun colorFieldMapsToSectionCode() {
         val r = CommandInputParser.parse("{\"text\":\"a\",\"color\":\"red\"}")!!
+        assertEquals("red", r.components.single().style.color)
         assertTrue("应还原出 red：${r.javaJson}", r.javaJson.contains("red"))
     }
 
@@ -87,8 +88,10 @@ class CommandInputParserTest {
     @Test
     fun extraInheritsParentStyle() {
         val r = CommandInputParser.parse("""{"text":"A","color":"red","extra":[{"text":"B"}]}""")!!
-        assertTrue(r.components[0].content.startsWith("§c"))
-        assertTrue("extra 子组件应继承父样式：${r.components[1].content}", r.components[1].content.startsWith("§c"))
+        assertEquals("A", r.components[0].content)
+        assertEquals("red", r.components[0].style.color)
+        assertEquals("B", r.components[1].content)
+        assertEquals("extra 子组件应继承父样式：${r.components[1].style}", "red", r.components[1].style.color)
     }
 
     @Test

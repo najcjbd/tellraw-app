@@ -401,7 +401,7 @@
     <string name="with_builder_json_error">JSON 無法解析</string>
     <string name="with_builder_json_input_hint">參數 JSON 會顯示在訊息框中；建議用本構造器修改，避免直接刪改。</string>
     <string name="with_builder_preview">預覽</string>
-    <string name="with_builder_bedrock_styles">基岩版會忽略顏色/格式/點擊/懸停等樣式</string>
+    <string name="with_builder_bedrock_styles">基岩 rawtext 只能用 § 給 text 表示顏色/格式；translate/score/selector 的樣式欄位會丟失，字體/點擊/懸停也不支援</string>
     <string name="with_builder_bedrock_keybind">基岩版會忽略 keybind</string>
     <string name="with_builder_bedrock_nbt">基岩版會忽略 NBT 組件</string>
     <string name="with_builder_bedrock_fallback">基岩版會忽略巢狀 translate 的 fallback</string>

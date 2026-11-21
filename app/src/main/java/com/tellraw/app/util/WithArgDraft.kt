@@ -354,11 +354,8 @@ object WithArgCodec {
         fun scan(draft: WithArgDraft) {
             when (draft) {
                 is WithArgDraft.Text -> {
-                    if (hasAnyStyle(draft.retained) || listOf(
-                            draft.color, draft.bold, draft.italic, draft.underlined,
-                            draft.strikethrough, draft.obfuscated
-                        ).any { it != null }
-                    ) out.add(BedrockIssue.STYLES)
+                    // text 的颜色/格式可以用 § 表示；font/click/hover/insertion 不行。
+                    if (hasAnyStyle(draft.retained)) out.add(BedrockIssue.STYLES)
                 }
                 is WithArgDraft.Translate -> {
                     if (!draft.fallback.isNullOrEmpty()) out.add(BedrockIssue.FALLBACK)

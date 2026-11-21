@@ -34,7 +34,6 @@ import com.tellraw.app.R
 import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
-import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
 import com.tellraw.app.util.CommandInputParser
@@ -56,15 +55,10 @@ fun MainScreen(
     
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
-    val messageInputWithMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslateNesting by viewModel.simpleTranslateNesting.collectAsState()
     val chainAnchorEnabled by viewModel.chainAnchorEnabled.collectAsState()
-    var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
-    var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
     var showSimpleTranslateGroups by rememberSaveable { mutableStateOf(false) }
     var simpleInitialBlock by rememberSaveable { mutableStateOf<String?>(null) }
-    val targetVersion by viewModel.targetVersion.collectAsState()
-    val groupedTarget = remember(targetVersion) { VersionSpec.parse(targetVersion) }
     val javaCommand by viewModel.javaCommand.collectAsState()
     val bedrockCommand by viewModel.bedrockCommand.collectAsState()
     val warnings by viewModel.warnings.collectAsState()
@@ -75,7 +69,6 @@ fun MainScreen(
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val defaultUseText by viewModel.defaultUseText.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
-    val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
     val asSensitive by viewModel.asSensitive.collectAsState()
@@ -151,11 +144,6 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onOpenTellrawPreview = { showTellrawPreview = true },
-            onOpenSimpleTranslate = { block ->
-                simpleInitialBlock = block
-                showSimpleTranslateGroups = true
-            },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -202,11 +190,6 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onOpenTellrawPreview = { showTellrawPreview = true },
-            onOpenSimpleTranslate = { block ->
-                simpleInitialBlock = block
-                showSimpleTranslateGroups = true
-            },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -406,24 +389,11 @@ fun MainScreen(
         )
     }
 
-    if (showTellrawPreview) {
-        TellrawPreviewDialog(
-            input = tellrawPreviewInput,
-            onInputChange = { tellrawPreviewInput = it },
-            onDismiss = { showTellrawPreview = false }
-        )
-    }
-
     if (showSimpleTranslateGroups) {
         SimpleTranslateGroupDialog(
-            initialPrefix = executePrefixInput,
             initialBlockJson = simpleInitialBlock,
-            target = groupedTarget,
-            nbtSyntax = VersionDiff.NbtSyntax.from(nbtSyntax),
-            allowMultiCmdTag = allowMultiCmdTag,
-            chainAnchor = chainAnchorEnabled,
-            onComplete = { java, bedrock, warnings, blockJson ->
-                viewModel.setSimpleTranslateOutput(java, bedrock, warnings, blockJson)
+            onComplete = { blockJson, warnings ->
+                viewModel.setSimpleTranslateOutput(blockJson, warnings)
             },
             onDismiss = {
                 showSimpleTranslateGroups = false
@@ -437,6 +407,11 @@ fun MainScreen(
         WithBuilderDialog(
             state = state,
             simpleMode = simpleTranslateNesting,
+            onOpenSimpleTranslate = {
+                viewModel.closeWithBuilder()
+                simpleInitialBlock = viewModel.currentSimpleBlockJson()
+                showSimpleTranslateGroups = true
+            },
             onDismiss = { viewModel.closeWithBuilder() },
             onKeyChange = { viewModel.updateWithBuilderKey(it) },
             onFallbackChange = { viewModel.updateWithBuilderFallback(it) },
@@ -565,8 +540,6 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onOpenTellrawPreview: () -> Unit,
-    onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -671,8 +644,7 @@ private fun PortraitLayout(
                         markers = messageMarkers,
                         onOpen = { position, ordinal ->
                             viewModel.openWithBuilderForTranslate(position, ordinal)
-                        },
-                        onOpenSimple = onOpenSimpleTranslate
+                        }
                     )
                 }
                 OutlinedTextField(
@@ -789,8 +761,7 @@ private fun PortraitLayout(
                             )
                         },
                         onOpenWithBuilder = {
-                            if (simpleTranslate) onOpenSimpleTranslate(null)
-                            else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                            viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                         }
                     )
                 }
@@ -983,12 +954,14 @@ internal fun TellrawPreviewDialog(
 @Composable
 private fun TranslateTokenBar(
     markers: String,
-    onOpen: (Int, Int) -> Unit,
-    onOpenSimple: (String?) -> Unit
+    onOpen: (Int, Int) -> Unit
 ) {
     val tokens = remember(markers) {
         TextComponentHelper.componentTokens(markers)
-            .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
+            .filter {
+                it.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                    it.content != TextComponentHelper.SIMPLE_TRANSLATE_KEY
+            }
     }
     if (tokens.isEmpty()) return
     Column(
@@ -1007,16 +980,10 @@ private fun TranslateTokenBar(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             tokens.forEach { token ->
-                val isSimpler = token.content == TextComponentHelper.SIMPLE_TRANSLATE_KEY
                 AssistChip(
-                    onClick = {
-                        if (isSimpler) onOpenSimple(TextComponentHelper.simpleBlockJsonAt(markers, token.start)) else onOpen(token.start, token.ordinal)
-                    },
+                    onClick = { onOpen(token.start, token.ordinal) },
                     label = {
-                        Text(
-                            if (isSimpler) "Simpler${token.ordinal}"
-                            else stringResource(R.string.translate_token_label, token.ordinal)
-                        )
+                        Text(stringResource(R.string.translate_token_label, token.ordinal))
                     },
                     colors = AssistChipDefaults.assistChipColors(
                         labelColor = MaterialTheme.colorScheme.primary
@@ -1037,8 +1004,6 @@ private fun TranslateTokenBar(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onOpenTellrawPreview: () -> Unit,
-    onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -1195,8 +1160,7 @@ private fun LandscapeLayout(
                                 markers = messageMarkers,
                                 onOpen = { position, ordinal ->
                                     viewModel.openWithBuilderForTranslate(position, ordinal)
-                                },
-                                onOpenSimple = onOpenSimpleTranslate
+                                }
                             )
                         }
                                                 OutlinedTextField(
@@ -1313,8 +1277,7 @@ private fun LandscapeLayout(
                                     )
                                 },
                                 onOpenWithBuilder = {
-                                    if (simpleTranslate) onOpenSimpleTranslate(null)
-                                    else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                                    viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                                 }
                             )
                         }

@@ -235,7 +235,12 @@ class WithArgDraftCodecTest {
             WithArgDraft.Text("a", color = "red"),
             WithArgDraft.Keybind("key.jump"),
             WithArgDraft.Nbt("Health"),
-            WithArgDraft.Translate("k", fallback = "f", args = listOf(WithArgDraft.Text("x"))),
+            WithArgDraft.Translate(
+                "k",
+                fallback = "f",
+                args = listOf(WithArgDraft.Text("x")),
+                retained = JsonParser.parseString("""{"color":"red"}""").asJsonObject
+            ),
             WithArgDraft.Selector("@a", separator = ",")
         )
         val issues = WithArgCodec.bedrockIssues(args)

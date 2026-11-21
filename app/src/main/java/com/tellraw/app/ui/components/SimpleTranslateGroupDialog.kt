@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -34,72 +33,61 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.google.gson.JsonArray
-import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.tellraw.app.R
-import com.tellraw.app.model.SelectorType
-import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.util.CommandInputParser
-import com.tellraw.app.util.ExecuteConverter
-import com.tellraw.app.util.SelectorConverter
-import com.tellraw.app.util.TextComponentHelper
+import com.tellraw.app.util.SimpleTranslatePlanner
+import com.tellraw.app.util.SimpleTranslatePlanner.Alias
+import com.tellraw.app.util.SimpleTranslatePlanner.Row
+import com.tellraw.app.util.SimpleTranslatePlanner.Table
 import com.tellraw.app.util.VersionDiff
 import com.tellraw.app.util.WithArgCodec
 import com.tellraw.app.util.WithArgDraft
 
-data class TranslateParamRow(
-    val id: String,
-    val params: String = "",
-    val content: List<WithArgDraft> = listOf(WithArgDraft.Text(""))
-)
-
-data class TranslateAlias(
-    val from: String,
-    val to: List<WithArgDraft> = listOf(WithArgDraft.Text(""))
-)
-
 /**
- * Simpler translate 的收信人参数表：
- *  - 参数只写 tag=... / scores=...，程序补 @a / @s；
- *  - 每行内容可任意嵌套文本组件；
- *  - 别名只做一层文本替换；
- *  - Java 生成多条 tellraw，基岩生成一条 conditional rawtext。
+ * Simpler translate：按收信人选择器参数替换消息里的 token。
+ *
+ * 表格只填参数（tag/scores 等）；基础选择器来自主界面。
+ * 生成由 [SimpleTranslatePlanner] 完成，本对话框只负责编辑和还原。
  */
 @Composable
 fun SimpleTranslateGroupDialog(
-    initialPrefix: String,
     initialBlockJson: String? = null,
-    target: VersionSpec?,
-    nbtSyntax: VersionDiff.NbtSyntax,
-    allowMultiCmdTag: Boolean,
-    chainAnchor: Boolean,
-    onComplete: (String, String, List<String>, String) -> Unit,
+    onComplete: (blockJson: String, warnings: List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val initialBlock = remember(initialBlockJson) { decodeBlock(initialBlockJson) }
-    var prefix by rememberSaveable { mutableStateOf(initialBlock?.prefix ?: initialPrefix) }
+    val initialTable = remember(initialBlockJson) { SimpleTranslatePlanner.decode(initialBlockJson) }
     val rows = remember {
-        mutableStateListOf<TranslateParamRow>().apply {
-            addAll(initialBlock?.rows.orEmpty().ifEmpty { listOf(TranslateParamRow("r0")) })
+        mutableStateListOf<Row>().apply {
+            addAll(initialTable?.rows.orEmpty().ifEmpty { listOf(Row(id = "r0")) })
         }
     }
     val aliases = remember {
-        mutableStateListOf<TranslateAlias>().apply { addAll(initialBlock?.aliases.orEmpty()) }
+        mutableStateListOf<Alias>().apply { addAll(initialTable?.aliases.orEmpty()) }
     }
-    var nextRow by remember { mutableStateOf(1) }
-    var nextAlias by remember { mutableStateOf(0) }
+    var nextRow by remember { mutableStateOf(nextRowNumber(rows.toList())) }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedAliasIndex by remember { mutableStateOf<Int?>(null) }
     var restoreInput by remember { mutableStateOf("") }
-    var restoreNotice by remember { mutableStateOf("") }
-    var bedrockFirstMatch by rememberSaveable { mutableStateOf(initialBlock?.bedrockFirstMatch ?: false) }
+    var notice by remember { mutableStateOf("") }
+    var bedrockFirstMatch by rememberSaveable {
+        mutableStateOf(initialTable?.bedrockFirstMatch == true)
+    }
+
     fun apply() {
-        val result = buildSimpleTranslateGroups(
-            context, prefix, rows.toList(), aliases.toList(), target, nbtSyntax,
-            allowMultiCmdTag, chainAnchor, bedrockFirstMatch
-        )
-        onComplete(result.java, result.bedrock, result.warnings, encodeBlock(prefix, rows, aliases, bedrockFirstMatch))
+        val problems = validate(rows.toList(), aliases.toList())
+        if (problems.isNotEmpty()) {
+            notice = problems.joinToString("\n")
+            return
+        }
+        val table = Table(rows.toList(), aliases.toList(), bedrockFirstMatch)
+        val notes = buildList {
+            if (rows.size > 1 && rows.take(rows.size - 1).any { it.params.isBlank() }) {
+                add("无参数行不是最后一行，后面的行会被生成器跳过")
+            }
+        }
+        onComplete(SimpleTranslatePlanner.encode(table), notes)
         onDismiss()
     }
 
@@ -114,31 +102,36 @@ fun SimpleTranslateGroupDialog(
             ) {
                 Text("Simpler translate", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "填选择器参数；收信人选择器由程序补。按行第一匹配优先，Java 会排除前面已命中的收信人。",
+                    "收信人选择器 = 主界面选择器 + 这里填的参数。每行只替换消息里 Simpler token 的位置，" +
+                        "token 前后的文字会保留。Java 按行第一匹配。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
-                    value = prefix,
-                    onValueChange = { prefix = it },
-                    label = { Text(stringResource(R.string.input_execute_prefix)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
-                )
 
-                Text("收信人参数 → 内容", style = MaterialTheme.typography.titleSmall)
+                Text("收信人参数 → 替换内容", style = MaterialTheme.typography.titleSmall)
                 rows.forEachIndexed { index, row ->
                     Surface(tonalElevation = 1.dp) {
                         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text("#${index + 1}", style = MaterialTheme.typography.labelMedium)
+                                if (row.params.isBlank()) {
+                                    Text(
+                                        "  回退行（匹配其余所有人）",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
                                 Spacer(Modifier.weight(1f))
-                                TextButton(onClick = { rows.removeAt(index) }) { Text("删除") }
+                                TextButton(onClick = {
+                                    rows.removeAt(index)
+                                    if (expandedId == row.id) expandedId = null
+                                }) { Text("删除") }
                             }
                             OutlinedTextField(
                                 value = row.params,
                                 onValueChange = { rows[index] = row.copy(params = it) },
-                                label = { Text("填选择器参数") },
+                                label = { Text("参数，例如 tag=vip 或 scores={level=5..}") },
+                                supportingText = { Text("不要写 @a；留空表示“其余所有人”") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -163,28 +156,31 @@ fun SimpleTranslateGroupDialog(
                 }
                 OutlinedButton(onClick = {
                     val id = "r${nextRow++}"
-                    rows.add(TranslateParamRow(id))
+                    rows.add(Row(id = id))
                     expandedId = id
                 }) { Text("添加收信人参数") }
 
                 HorizontalDivider()
-                Text("别名表（只解析一层）", style = MaterialTheme.typography.titleSmall)
+                Text("别名表（只替换整段文字，且只解析一层）", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "左边输入的文字，右边是替换后的文字。a=b 只把 a 变成 b，不会继续 b→c。",
+                    "内容里有一段文字完全等于左边时，整段换成右边；替换结果里的同名文字不会再次替换。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 aliases.forEachIndexed { index, alias ->
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = alias.from,
-                                onValueChange = { aliases[index] = alias.copy(from = it) },
-                                label = { Text("输入文字") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            Spacer(Modifier.width(4.dp))
+                    Surface(tonalElevation = 1.dp) {
+                    Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            value = alias.from,
+                            onValueChange = { aliases[index] = alias.copy(from = it) },
+                            label = { Text("被替换的整段文字") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
                                 contentSummary(alias.to),
                                 modifier = Modifier.weight(1f),
@@ -196,7 +192,13 @@ fun SimpleTranslateGroupDialog(
                             }) { Text("编辑别名内容") }
                             TextButton(onClick = {
                                 aliases.removeAt(index)
-                                if (expandedAliasIndex == index) expandedAliasIndex = null
+                                expandedAliasIndex = expandedAliasIndex?.let { e ->
+                                    when {
+                                        e == index -> null
+                                        e > index -> e - 1
+                                        else -> e
+                                    }
+                                }
                             }) { Text("删除") }
                         }
                         if (expandedAliasIndex == index) {
@@ -206,9 +208,10 @@ fun SimpleTranslateGroupDialog(
                             )
                         }
                     }
+                    }
                 }
                 OutlinedButton(onClick = {
-                    aliases.add(TranslateAlias("", listOf(WithArgDraft.Text(""))))
+                    aliases.add(Alias(from = "", to = listOf(WithArgDraft.Text(""))))
                 }) { Text("添加别名") }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -224,76 +227,135 @@ fun SimpleTranslateGroupDialog(
                 }
 
                 HorizontalDivider()
-                Text("从 Java 生成结果还原", style = MaterialTheme.typography.titleSmall)
+                Text("从生成结果还原", style = MaterialTheme.typography.titleSmall)
                 OutlinedTextField(
                     value = restoreInput,
                     onValueChange = { restoreInput = it },
-                    label = { Text("粘贴 tellraw / execute+tellraw 行") },
+                    label = { Text("粘贴 tellraw / execute+tellraw 行，或基岩 conditional rawtext") },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
                 TextButton(onClick = {
-                    val restored = restoreRowsFromJava(restoreInput, context, nbtSyntax)
-                        .ifEmpty { restoreRowsFromBedrock(restoreInput) }
+                    val looksBedrock = restoreInput.contains("\"rawtext\"")
+                    val javaRows = if (looksBedrock) emptyList()
+                    else restoreRowsFromJava(restoreInput, context, VersionDiff.NbtSyntax.MODERN)
+                    val bedrockRows = if (looksBedrock || javaRows.isEmpty()) {
+                        restoreRowsFromBedrock(restoreInput)
+                    } else emptyList()
+                    val restored = javaRows.ifEmpty { bedrockRows }
                     if (restored.isEmpty()) {
-                        restoreNotice = "没有识别到可还原的 Java tellraw 行"
+                        notice = "没有识别到可还原的收信人内容"
                     } else {
                         rows.clear()
-                        rows.addAll(restored)
-                        restoreNotice = "已还原 ${restored.size} 条 Java 收信人内容"
+                        restored.forEachIndexed { i, row -> rows.add(row.copy(id = "r$i")) }
+                        nextRow = restored.size
+                        expandedId = null
+                        notice = "已还原 ${restored.size} 条" + if (javaRows.isNotEmpty()) " Java 收信人内容" else "基岩条件内容"
                     }
                 }) { Text("还原到参数表") }
-                if (restoreNotice.isNotBlank()) {
-                    Text(restoreNotice, style = MaterialTheme.typography.labelSmall)
+                if (notice.isNotBlank()) {
+                    Text(
+                        notice,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (notice.startsWith("已还原")) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error
+                    )
                 }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     Button(onClick = { apply() }) { Text("完成") }
                 }
-
             }
         }
     }
 }
 
+private fun nextRowNumber(rows: List<Row>): Int {
+    val max = rows.mapNotNull { row ->
+        row.id.takeIf { it.startsWith("r") }?.drop(1)?.toIntOrNull()
+    }.maxOrNull() ?: -1
+    return max + 1
+}
+
+private fun validate(rows: List<Row>, aliases: List<Alias>): List<String> {
+    val problems = mutableListOf<String>()
+    if (rows.isEmpty()) problems.add("至少添加一条收信人参数")
+    val seenParams = mutableSetOf<String>()
+    rows.forEachIndexed { index, row ->
+        val p = row.params.trim()
+        if (p.startsWith("@")) {
+            problems.add("第 ${index + 1} 行不要写 @a/@p；只写方括号里的参数")
+        }
+        if (p.isNotEmpty() && !seenParams.add(p)) {
+            problems.add("第 ${index + 1} 行的参数与前面重复；第一匹配下它永远不会命中")
+        }
+        if (!WithArgCodec.isComplete(row.content)) {
+            problems.add("第 ${index + 1} 行有未填完的文本组件（例如空 translate key / score）")
+        }
+    }
+    val seenAliases = mutableSetOf<String>()
+    aliases.forEachIndexed { index, alias ->
+        if (alias.from.isNotBlank() && !seenAliases.add(alias.from)) {
+            problems.add("别名「${alias.from}」重复")
+        }
+        if (!WithArgCodec.isComplete(alias.to)) {
+            problems.add("第 ${index + 1} 条别名的替换内容有未填完的文本组件")
+        }
+    }
+    return problems
+}
+
 private fun contentSummary(args: List<WithArgDraft>): String =
     WithArgCodec.serialize(args).let { if (it.length <= 100) it else it.take(100) + "…" }
-
-private data class SimpleTranslateOutput(val java: String, val bedrock: String, val warnings: List<String>)
 
 private fun restoreRowsFromJava(
     text: String,
     context: android.content.Context,
     nbtSyntax: VersionDiff.NbtSyntax
-): List<TranslateParamRow> {
-    val out = mutableListOf<TranslateParamRow>()
+): List<Row> {
+    val out = mutableListOf<Row>()
     var id = 0
     text.lines().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
         val parsed = runCatching { CommandInputParser.parse(line, context, nbtSyntax) }.getOrNull()
             ?: return@forEach
-        val args = runCatching { WithArgCodec.parseArgs(parsed.javaJson) }.getOrNull()
+        val args = runCatching { parseJavaContent(parsed.javaJson) }.getOrNull()
             ?: return@forEach
         if (args.isEmpty()) return@forEach
-        val execAs = Regex("\\bas\\s+(@a(?:\\[[^\\]]*\\])?)")
+        val execAs = Regex("\\bas\\s+(@[aepnrs](?:\\[[^\\]]*\\])?)")
             .find(parsed.executePrefix.orEmpty())?.groupValues?.getOrNull(1)
         val selector = execAs ?: parsed.selector ?: "@a"
-        val params = if (selector.startsWith("@a[") && selector.endsWith("]")) {
-            selector.substring(3, selector.length - 1)
+        val params = if ('[' in selector && selector.endsWith("]")) {
+            selector.substringAfter('[').dropLast(1)
         } else ""
-        out.add(TranslateParamRow("r${id++}", params, args))
+        out.add(Row(id = "r${id++}", params = params, content = args))
     }
     return out
 }
 
-private fun restoreRowsFromBedrock(text: String): List<TranslateParamRow> {
+/** 把 Java 根组件 + extra 拆成平铺的 with 项；否则第一匹配还原会丢掉 extra 里的兄弟组件。 */
+private fun parseJavaContent(json: String): List<WithArgDraft> {
+    val root = JsonParser.parseString(json)
+    if (root.isJsonArray) return WithArgCodec.parseArgs(root.toString())
+    if (!root.isJsonObject) return WithArgCodec.parseArgs(json)
+    val obj = root.asJsonObject
+    val extra = obj.getAsJsonArray("extra") ?: return WithArgCodec.parseArgs(json)
+    val flat = JsonArray()
+    val own = obj.deepCopy()
+    own.remove("extra")
+    flat.add(own)
+    extra.forEach { flat.add(it) }
+    return WithArgCodec.parseArgs(flat.toString())
+}
+
+private fun restoreRowsFromBedrock(text: String): List<Row> {
     val start = text.indexOf('{')
     val end = text.lastIndexOf('}')
     if (start < 0 || end <= start) return emptyList()
     val root = runCatching { JsonParser.parseString(text.substring(start, end + 1)) }.getOrNull()
         ?: return emptyList()
     val rawtext = root.asJsonObject.getAsJsonArray("rawtext") ?: return emptyList()
-    val out = mutableListOf<TranslateParamRow>()
+    val out = mutableListOf<Row>()
     var id = 0
     rawtext.forEach { el ->
         val row = el.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
@@ -303,193 +365,19 @@ private fun restoreRowsFromBedrock(text: String): List<TranslateParamRow> {
         val selector = args[0].takeIf { it.isJsonObject }
             ?.asJsonObject?.get("selector")?.takeIf { it.isJsonPrimitive }?.asString
             ?: return@forEach
-        val params = if (selector.startsWith("@s[") && selector.endsWith("]")) {
-            selector.substring(3, selector.length - 1)
+        val params = if ('[' in selector && selector.endsWith("]")) {
+            selector.substringAfter('[').dropLast(1)
         } else ""
-        val content = com.google.gson.JsonArray()
-        for (i in 1 until args.size()) content.add(args[i])
+        val content = JsonArray()
+        for (i in 1 until args.size()) {
+            val itemEl = args[i]
+            val nested = itemEl.takeIf { it.isJsonObject }
+                ?.asJsonObject?.getAsJsonArray("rawtext")
+            if (nested != null) nested.forEach { content.add(it) } else content.add(itemEl)
+        }
         val drafts = runCatching { WithArgCodec.parseArgs(content.toString()) }.getOrNull()
             ?: return@forEach
-        if (drafts.isNotEmpty()) out.add(TranslateParamRow("b${id++}", params, drafts))
+        if (drafts.isNotEmpty()) out.add(Row(id = "b${id++}", params = params, content = drafts))
     }
     return out
-}
-
-private data class DecodedBlock(
-    val prefix: String,
-    val rows: List<TranslateParamRow>,
-    val aliases: List<TranslateAlias>,
-    val bedrockFirstMatch: Boolean
-)
-
-private fun decodeBlock(json: String?): DecodedBlock? {
-    if (json.isNullOrBlank()) return null
-    return runCatching {
-        val root = JsonParser.parseString(json).asJsonObject
-        val rows = root.getAsJsonArray("rows")?.mapIndexed { i, el ->
-            val o = el.asJsonObject
-            val args = WithArgCodec.parseArgs(o.getAsJsonArray("content").toString())
-            TranslateParamRow("r$i", o.get("params")?.asString.orEmpty(), args)
-        }.orEmpty()
-        val aliases = root.getAsJsonArray("aliases")?.map { el ->
-            val o = el.asJsonObject
-            val args = WithArgCodec.parseArgs(o.getAsJsonArray("to").toString())
-            TranslateAlias(o.get("from")?.asString.orEmpty(), args)
-        }.orEmpty()
-        DecodedBlock(
-            prefix = root.get("prefix")?.asString.orEmpty(),
-            rows = rows,
-            aliases = aliases,
-            bedrockFirstMatch = root.get("bedrockFirstMatch")?.asBoolean ?: false
-        )
-    }.getOrNull()
-}
-
-private fun encodeBlock(
-    prefix: String,
-    rows: List<TranslateParamRow>,
-    aliases: List<TranslateAlias>,
-    bedrockFirstMatch: Boolean
-): String {
-    val root = JsonObject()
-    root.addProperty("prefix", prefix)
-    root.addProperty("bedrockFirstMatch", bedrockFirstMatch)
-    root.add("rows", JsonArray().apply {
-        rows.forEach { row ->
-            add(JsonObject().apply {
-                addProperty("params", row.params)
-                add("content", JsonParser.parseString(WithArgCodec.serialize(row.content)))
-            })
-        }
-    })
-    root.add("aliases", JsonArray().apply {
-        aliases.forEach { alias ->
-            add(JsonObject().apply {
-                addProperty("from", alias.from)
-                add("to", JsonParser.parseString(WithArgCodec.serialize(alias.to)))
-            })
-        }
-    })
-    return root.toString()
-}
-
-private fun buildSimpleTranslateGroups(
-    context: android.content.Context,
-    prefix: String,
-    rows: List<TranslateParamRow>,
-    aliases: List<TranslateAlias>,
-    target: VersionSpec?,
-    nbtSyntax: VersionDiff.NbtSyntax,
-    allowMultiCmdTag: Boolean,
-    chainAnchor: Boolean,
-    bedrockFirstMatch: Boolean
-): SimpleTranslateOutput {
-    val warnings = mutableListOf<String>()
-    val aliasMap = aliases
-        .filter { it.from.isNotBlank() }
-        .associate { it.from.trim() to it.to }
-    // 只解析一层：命中别名时直接放入别名内容，不再继续解析别名内容里的别名。
-    fun applyAliasList(args: List<WithArgDraft>): List<WithArgDraft> = args.flatMap { draft ->
-        when (draft) {
-            is WithArgDraft.Text -> {
-                val replacement = if (draft.text.trim() == draft.text) aliasMap[draft.text.trim()] else null
-                replacement ?: listOf(draft)
-            }
-            is WithArgDraft.Translate -> listOf(draft.copy(args = applyAliasList(draft.args)))
-            else -> listOf(draft)
-        }
-    }
-
-    val java = mutableListOf<String>()
-    val bedrockRows = mutableListOf<Any>()
-    val bedrockLines = mutableListOf<String>()
-
-    rows.forEachIndexed { index, row ->
-        val contents = applyAliasList(row.content)
-        val contentJson = WithArgCodec.serialize(contents)
-        if (contentJson == "[]") return@forEachIndexed
-        val params = row.params.trim()
-        if (params.startsWith("@")) {
-            warnings.add("第 ${index + 1} 行参数不要写 @a；只写 tag/scores 等参数，程序会补选择器")
-        }
-        val earlierParams = rows.take(index)
-            .map { it.params.trim() }
-            .filter { it.isNotBlank() }
-        if (rows.take(index).any { it.params.isBlank() }) {
-            warnings.add("第 ${index + 1} 行前面存在无参数行；第一匹配优先时该行不会再有收信人")
-            return@forEachIndexed
-        }
-        val javaTarget = if (params.isBlank()) "@a" else "@a[$params]"
-        val exclusions = earlierParams.joinToString("") { " unless entity @s[$it]" }
-        val jPlan = if (exclusions.isBlank() && prefix.isNotBlank() && allowMultiCmdTag) {
-            ExecuteConverter.buildMultiCommandTagPlan(
-                prefix, ExecuteConverter.Direction.BEDROCK_TO_JAVA,
-                javaTarget, contentJson, nbtSyntax,
-                tagSuffix = "sg${index}"
-            )
-        } else null
-        if (jPlan != null) {
-            java.add(if (chainAnchor) ExecuteConverter.anchorCommandChain(jPlan.commands).joinToString("\n")
-            else jPlan.commands.joinToString("\n"))
-            warnings.addAll(jPlan.warnings)
-        } else {
-            // Java 用第一匹配优先：后面的行排除前面已经命中的实体。
-            val base = if (prefix.isBlank()) "execute" else prefix
-            java.add("$base as $javaTarget$exclusions run tellraw @s $contentJson")
-        }
-
-        val parsed = runCatching { CommandInputParser.parse("tellraw @a $contentJson", context, nbtSyntax) }.getOrNull()
-        if (parsed == null) {
-            warnings.add("第 ${index + 1} 行内容无法转成基岩 rawtext，已跳过")
-            return@forEachIndexed
-        }
-        val bJson = TextComponentHelper.convertToBedrockJson(parsed.components, context = context, warnings = warnings, nbtSyntax = nbtSyntax, target = target)
-        val rawItems = runCatching {
-            JsonParser.parseString(bJson).asJsonObject.getAsJsonArray("rawtext")
-        }.getOrNull()
-        if (rawItems == null) {
-            warnings.add("第 ${index + 1} 行基岩 rawtext 解析失败，已跳过")
-            return@forEachIndexed
-        }
-        if (earlierParams.isNotEmpty()) {
-            warnings.add("基岩单条 conditional rawtext 无法表达第一匹配排除；第 ${index + 1} 行与前面参数重叠时会显示多条")
-        }
-        if (bedrockFirstMatch) {
-            val base = if (prefix.isBlank()) "execute" else prefix
-            val target = if (params.isBlank()) "@a" else "@a[$params]"
-            val exclusions = earlierParams.joinToString("") { " unless entity @s[$it]" }
-            bedrockLines.add("$base as $target$exclusions run tellraw @s $bJson")
-            return@forEachIndexed
-        }
-        val args = com.google.gson.JsonArray()
-        val condSel = if (params.isBlank()) "@s" else "@s[$params]"
-        args.add(com.google.gson.JsonObject().apply { addProperty("selector", condSel) })
-        if (rawItems.size() == 1) {
-            args.add(rawItems[0])
-        } else {
-            args.add(com.google.gson.JsonObject().apply {
-                add("rawtext", rawItems)
-            })
-        }
-        val rowObj = com.google.gson.JsonObject().apply {
-            addProperty("translate", "%%2")
-            add("with", com.google.gson.JsonObject().apply { add("rawtext", args) })
-        }
-        bedrockRows.add(rowObj)
-    }
-
-    val bedrock = if (bedrockFirstMatch) {
-        bedrockLines.joinToString("\n")
-    } else if (bedrockRows.isEmpty()) "" else {
-        val raw = com.google.gson.JsonObject().apply {
-            add("rawtext", com.google.gson.JsonArray().apply { bedrockRows.forEach { add(it as com.google.gson.JsonElement) } })
-        }
-        val rem = mutableListOf<String>()
-        val converted = if (prefix.isBlank()) "execute as @a" else
-            ExecuteConverter.convertExecutePrefix(prefix, ExecuteConverter.Direction.JAVA_TO_BEDROCK, rem, nbtSyntax) ?: prefix
-        warnings.addAll(rem)
-        "$converted run tellraw @s $raw"
-    }
-    warnings.add("Java 按行第一匹配优先，后面的行会排除前面命中的实体；基岩条件 rawtext 无法表达该排除，重叠时可能显示多条。")
-    return SimpleTranslateOutput(java.joinToString("\n"), bedrock, warnings.distinct())
 }
