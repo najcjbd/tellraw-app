@@ -122,6 +122,8 @@ class TellrawViewModel @Inject constructor(
 
     private val _simpleTranslateWarnings = MutableStateFlow<List<String>>(emptyList())
     private var _simpleBlockJson: String = ""
+    /** Simpler 为了编辑 token 临时关掉 defaultUseText；移除时恢复。 */
+    private var simpleForcedTextMode = false
 
     /** 目标版本（配置文件输入；-1 = 最新）。 */
     private val _targetVersion = MutableStateFlow("-1")
@@ -945,11 +947,23 @@ class TellrawViewModel @Inject constructor(
         )
         lastMessageInput = _messageInput.value
         if (_defaultUseText.value) {
+            simpleForcedTextMode = true
             _defaultUseText.value = false
-            viewModelScope.launch {
-                settingsRepository.setDefaultUseText(false)
-                settingsRepository.saveConfig()
-            }
+        }
+        generateCommands()
+    }
+
+    /** 移除 Simpler token 和参数表；如果是为了 Simpler 临时关掉了文本模式，恢复它。 */
+    fun removeSimpleTranslate() {
+        _simpleBlockJson = ""
+        _simpleTranslateWarnings.value = emptyList()
+        val markers = TextComponentHelper.removeSimpleTranslateBlocks(_messageInputWithMarkers.value)
+        _messageInputWithMarkers.value = markers
+        _messageInput.value = TextComponentHelper.stripComponentMarkers(markers)
+        lastMessageInput = _messageInput.value
+        if (simpleForcedTextMode) {
+            _defaultUseText.value = true
+            simpleForcedTextMode = false
         }
         generateCommands()
     }
@@ -1481,7 +1495,12 @@ class TellrawViewModel @Inject constructor(
                         mnCFEnabled = _mnCFEnabled.value,
                         separatorAsTextComponent = _separatorAsTextComponent.value,
                         bedrockColorToRgb = _bedrockColorToRgb.value,
-                        warnings = simpleWarnings
+                        warnings = simpleWarnings,
+                        allowMultiCmdTag = _allowMultiCmdTag.value,
+                        chainAnchor = _chainAnchorEnabled.value,
+                        javaRawPrefix = _executePrefixInput.value.takeIf {
+                            _executePrefixEnabled.value && it.isNotBlank()
+                        }
                     )
                     allReminders.addAll(simpleWarnings)
                 }
@@ -1773,6 +1792,10 @@ class TellrawViewModel @Inject constructor(
         _bedrockCommand.value = ""
         _simpleTranslateWarnings.value = emptyList()
         _simpleBlockJson = ""
+        if (simpleForcedTextMode) {
+            _defaultUseText.value = true
+            simpleForcedTextMode = false
+        }
         _warnings.value = emptyList()
         _selectorType.value = SelectorType.UNIVERSAL
         _selectedTextComponent.value = null

@@ -340,6 +340,8 @@
     <string name="component_translate">翻译文本</string>
     <string name="component_score">记分板分数</string>
     <string name="component_selector">实体名称</string>
+    <string name="component_keybind">按键组件</string>
+    <string name="component_nbt">NBT 组件</string>
     <string name="component_with">参数</string>
     <string name="component_with_json">with（JSON 组件）</string>
     <string name="component_fallback">回落文本 fallback</string>

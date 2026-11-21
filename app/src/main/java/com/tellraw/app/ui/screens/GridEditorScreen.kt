@@ -1289,6 +1289,8 @@ private fun previewMessage(
                 val objective = c.content.substringAfter(':', "").substringBefore(':').trim()
                 entity.scoreMap()[objective]?.toString() ?: displayName
             }
+            TextComponentHelper.ComponentType.KEYBIND -> c.content
+            TextComponentHelper.ComponentType.NBT -> "[nbt]"
             TextComponentHelper.ComponentType.TRANSLATE -> {
                 val withSub = c.subComponents
                     .firstOrNull { it.type == TextComponentHelper.SubComponentType.WITH_JSON }

@@ -148,7 +148,10 @@ object SimpleTranslatePlanner {
         mnCFEnabled: Boolean,
         separatorAsTextComponent: Boolean,
         bedrockColorToRgb: Boolean,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        allowMultiCmdTag: Boolean = false,
+        chainAnchor: Boolean = false,
+        javaRawPrefix: String? = null
     ): Result {
         if (table.rows.isEmpty()) {
             warnings.add("Simpler translate 没有任何收信人行；token 已忽略")
@@ -214,7 +217,7 @@ object SimpleTranslatePlanner {
                 warnings.add("$label 无法把内容替换进消息 JSON，已跳过")
                 return@forEachIndexed
             }
-            prepared.add(PreparedRow(params, rowJava, rawtextItems(rowBedrock), params.isBlank()))
+            prepared.add(PreparedRow(index, params, rowJava, rawtextItems(rowBedrock), params.isBlank()))
         }
         if (prepared.isEmpty()) {
             return Result(emptyList(), emptyList(), warnings.distinct())
@@ -236,14 +239,16 @@ object SimpleTranslatePlanner {
                 java.add(
                     javaAsCommand(
                         baseJavaSelector, "", earlierJava, row.javaJson, javaPrefix,
-                        context, nbtSyntax, target, warnings
+                        context, nbtSyntax, target, warnings,
+                        allowMultiCmdTag, chainAnchor, javaRawPrefix, row.index
                     )
                 )
             } else {
                 java.add(
                     javaAsCommand(
                         baseJavaSelector, row.params, earlierJava, row.javaJson, javaPrefix,
-                        context, nbtSyntax, target, warnings
+                        context, nbtSyntax, target, warnings,
+                        allowMultiCmdTag, chainAnchor, javaRawPrefix, row.index
                     )
                 )
                 earlierJava.add(row.params)
@@ -253,7 +258,8 @@ object SimpleTranslatePlanner {
             java.add(
                 javaAsCommand(
                     baseJavaSelector, "", earlierJava, defaultJava, javaPrefix,
-                    context, nbtSyntax, target, warnings
+                    context, nbtSyntax, target, warnings,
+                    allowMultiCmdTag, chainAnchor, javaRawPrefix, -1
                 )
             )
         }
@@ -284,23 +290,55 @@ object SimpleTranslatePlanner {
         context: Context?,
         nbtSyntax: VersionDiff.NbtSyntax,
         target: VersionSpec?,
-        warnings: MutableList<String>
+        warnings: MutableList<String>,
+        allowMultiCmdTag: Boolean = false,
+        chainAnchor: Boolean = false,
+        rawPrefix: String? = null,
+        rowIndex: Int = -1
     ): String {
         val merged = appendSelectorParams(baseSelector, params)
         val negation = ExecuteConverter.bedrockSelectorNegation(
             merged, warnings, preferExecute = true, nbtSyntax = nbtSyntax
         )
-        val inner = if (negation != null) {
-            val (asSelector, conditions) = negation
-            val filtered = filterJava(asSelector, context, nbtSyntax, target, warnings)
-            if (conditions.isEmpty()) listOf("as", filtered)
-            else listOf("as", filtered) + conditions
+        val asSelector: String
+        val inner: List<String>
+        if (negation != null) {
+            val (rawAs, conditions) = negation
+            asSelector = filterJava(rawAs, context, nbtSyntax, target, warnings)
+            inner = if (conditions.isEmpty()) listOf("as", asSelector)
+            else listOf("as", asSelector) + conditions
         } else {
-            listOf("as", filterJava(merged, context, nbtSyntax, target, warnings))
+            asSelector = filterJava(merged, context, nbtSyntax, target, warnings)
+            inner = listOf("as", asSelector)
         }
         val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
-        return "$base ${inner.joinToString(" ")}$exclusions run tellraw @s $json"
+        val combined = "$base ${inner.joinToString(" ")}$exclusions"
+
+        // 原始 Bedrock 条件前缀（items/hasitem/...）无法直接写进 Java execute 时，
+        // 复用主生成的多命令 tag 规划；目标选择器/排除已经在 combined 里。
+        if (allowMultiCmdTag && negation == null && !rawPrefix.isNullOrBlank()) {
+            val tagPrefix = "$rawPrefix as $asSelector$exclusions"
+            val plan = ExecuteConverter.buildMultiCommandTagPlan(
+                tagPrefix,
+                ExecuteConverter.Direction.BEDROCK_TO_JAVA,
+                "@s",
+                json,
+                nbtSyntax,
+                tagSuffix = "simple${rowIndex}"
+            )
+            if (plan != null) {
+                warnings.addAll(plan.warnings)
+                val label = if (rowIndex >= 0) "Simpler 第 ${rowIndex + 1} 行" else "Simpler 回退行"
+                warnings.add(
+                    "$label 使用多命令 tag：临时标签 ${plan.tags.joinToString()}；请按顺序执行并保留清理命令"
+                )
+                val commands = if (chainAnchor) ExecuteConverter.anchorCommandChain(plan.commands)
+                else plan.commands
+                return commands.joinToString("\n")
+            }
+        }
+        return "$combined run tellraw @s $json"
     }
 
     private fun exclusionsForJava(
@@ -481,6 +519,7 @@ object SimpleTranslatePlanner {
     }
 
     data class PreparedRow(
+        val index: Int,
         val params: String,
         val javaJson: String,
         val bedrockItems: List<JsonElement>,
@@ -551,10 +590,24 @@ object SimpleTranslatePlanner {
                     )
                 }
                 is WithArgDraft.Keybind -> {
-                    warnings.add("$label 的 keybind 组件暂不支持放进 Simpler translate，已跳过")
+                    out.add(
+                        TextComponent(
+                            ComponentType.KEYBIND,
+                            draft.keybind,
+                            style = componentStyle(draft.retained)
+                        )
+                    )
                 }
                 is WithArgDraft.Nbt -> {
-                    warnings.add("$label 的 nbt 组件暂不支持放进 Simpler translate，已跳过")
+                    out.add(
+                        TextComponent(
+                            ComponentType.NBT,
+                            TextComponentHelper.encodeNbtContent(
+                                draft.path, draft.source, draft.interpret, draft.separator
+                            ),
+                            style = componentStyle(draft.retained)
+                        )
+                    )
                 }
                 is WithArgDraft.Raw -> {
                     val el = draft.element

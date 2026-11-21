@@ -54,6 +54,7 @@ import com.tellraw.app.util.WithArgDraft
 fun SimpleTranslateGroupDialog(
     initialBlockJson: String? = null,
     onComplete: (blockJson: String, warnings: List<String>) -> Unit,
+    onRemove: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -263,6 +264,12 @@ fun SimpleTranslateGroupDialog(
                 }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (onRemove != null) {
+                        TextButton(onClick = {
+                            onRemove()
+                            onDismiss()
+                        }) { Text("移除 Simpler") }
+                    }
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     Button(onClick = { apply() }) { Text("完成") }
                 }

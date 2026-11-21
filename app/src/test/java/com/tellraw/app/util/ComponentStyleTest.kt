@@ -96,6 +96,42 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun keybindAndNbtComponentsRoundTrip() {
+        val keybind = CommandInputParser.parse(
+            """{"keybind":"key.jump","color":"red"}"""
+        )!!
+        assertEquals(ComponentType.KEYBIND, keybind.components.single().type)
+        assertTrue(keybind.javaJson, keybind.javaJson.contains("\"keybind\":\"key.jump\""))
+        assertTrue(keybind.javaJson, keybind.javaJson.contains("\"color\":\"red\""))
+
+        val nbt = CommandInputParser.parse(
+            """{"nbt":"Health","interpret":true,"source":"entity","separator":", "}"""
+        )!!
+        val nbtComponent = nbt.components.single()
+        assertEquals(ComponentType.NBT, nbtComponent.type)
+        val markers = TextComponentHelper.componentsToText(nbt.components)
+        val parsed = TextComponentHelper.parseTextComponents(markers).single()
+        assertEquals("Health", TextComponentHelper.parseNbtContent(parsed.content)?.get("path")?.asString)
+        assertTrue(nbt.javaJson, nbt.javaJson.contains("\"nbt\":\"Health\""))
+        assertTrue(nbt.javaJson, nbt.javaJson.contains("\"interpret\":true"))
+
+        val warnings = mutableListOf<String>()
+        TextComponentHelper.convertToBedrockJson(nbt.components, warnings = warnings)
+        assertTrue(warnings.any { it.contains("nbt") })
+    }
+
+    @Test
+    fun selectorSeparatorCanCarryComponentStyle() {
+        val r = CommandInputParser.parse(
+            """{"selector":"@a","separator":{"text":" | ","color":"red"}}"""
+        )!!
+        val java = com.google.gson.JsonParser.parseString(r.javaJson).asJsonObject
+        val separator = java.getAsJsonObject("separator")
+        assertEquals(" | ", separator.get("text").asString)
+        assertEquals("red", separator.get("color").asString)
+    }
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()

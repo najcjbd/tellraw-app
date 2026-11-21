@@ -144,6 +144,10 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onOpenSimpleTranslate = { block ->
+                simpleInitialBlock = block ?: viewModel.currentSimpleBlockJson()
+                showSimpleTranslateGroups = true
+            },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -190,6 +194,10 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
+            onOpenSimpleTranslate = { block ->
+                simpleInitialBlock = block ?: viewModel.currentSimpleBlockJson()
+                showSimpleTranslateGroups = true
+            },
             onCommaSelected = {
                 if (!defaultUseText && selectedTextComponent == TextComponentHelper.ComponentType.TRANSLATE) {
                     if (selectedSubComponent == TextComponentHelper.SubComponentType.WITH) {
@@ -395,6 +403,9 @@ fun MainScreen(
             onComplete = { blockJson, warnings ->
                 viewModel.setSimpleTranslateOutput(blockJson, warnings)
             },
+            onRemove = if (simpleInitialBlock != null) {
+                { viewModel.removeSimpleTranslate() }
+            } else null,
             onDismiss = {
                 showSimpleTranslateGroups = false
                 simpleInitialBlock = null
@@ -540,6 +551,7 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -683,6 +695,15 @@ private fun PortraitLayout(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
                 )
+
+                if (simpleTranslate) {
+                    OutlinedButton(
+                        onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Simpler translate")
+                    }
+                }
                 
                 // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                 if (executePrefixEnabled) {
@@ -1004,6 +1025,7 @@ private fun TranslateTokenBar(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
+    onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
     messageTextFieldValue: MutableState<androidx.compose.ui.text.input.TextFieldValue>,
@@ -1199,6 +1221,15 @@ private fun LandscapeLayout(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             maxLines = 5
                         )
+
+                        if (simpleTranslate) {
+                            OutlinedButton(
+                                onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Simpler translate")
+                            }
+                        }
                         
                         // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                         if (executePrefixEnabled) {

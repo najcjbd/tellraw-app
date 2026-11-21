@@ -29,7 +29,9 @@ object TextComponentHelper {
         TEXT("text", R.string.component_text),
         TRANSLATE("translate", R.string.component_translate, true),
         SCORE("score", R.string.component_score),
-        SELECTOR("selector", R.string.component_selector, true)
+        SELECTOR("selector", R.string.component_selector, true),
+        KEYBIND("keybind", R.string.component_keybind),
+        NBT("nbt", R.string.component_nbt)
     }
     
     // 副组件类型
@@ -1268,6 +1270,15 @@ object TextComponentHelper {
                     }
                 }
             }
+            ComponentType.KEYBIND -> result["keybind"] = mainComponent.content
+            ComponentType.NBT -> {
+                val spec = parseNbtContent(mainComponent.content)
+                result["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString
+                    ?: mainComponent.content
+                spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString?.let { result["source"] = it }
+                spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { result["interpret"] = it }
+                spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { result["separator"] = it }
+            }
         }
 
         if (!(mainComponent.type == ComponentType.TRANSLATE &&
@@ -1390,6 +1401,15 @@ object TextComponentHelper {
                                 subMap["separator"] = separatorJsonValue(separatorEntries[0]!!, separatorAsTextComponent)
                             }
                         }
+                    }
+                    ComponentType.KEYBIND -> subMap["keybind"] = sub.content
+                    ComponentType.NBT -> {
+                        val spec = parseNbtContent(sub.content)
+                        subMap["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString
+                            ?: sub.content
+                        spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString?.let { subMap["source"] = it }
+                        spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { subMap["interpret"] = it }
+                        spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { subMap["separator"] = it }
                     }
                 }
                 if (!(sub.type == ComponentType.TRANSLATE &&
@@ -1584,6 +1604,12 @@ object TextComponentHelper {
                         // 基岩版不支持separator参数，忽略所有sep:定义
                     }
                 }
+                ComponentType.KEYBIND, ComponentType.NBT -> {
+                    warnings?.add(
+                        "基岩 rawtext 不支持 ${component.type.key} 文本组件；Java 输出已保留"
+                    )
+                    item["text"] = ""
+                }
             }
 
             item
@@ -1679,6 +1705,21 @@ object TextComponentHelper {
         value.replace("\\", "\\\\")
             .replace(":", "\\:")
             .replace(",", "\\,")
+
+    fun encodeNbtContent(
+        path: String,
+        source: String? = null,
+        interpret: Boolean? = null,
+        separator: String? = null
+    ): String = JsonObject().apply {
+        addProperty("path", path)
+        source?.let { addProperty("source", it) }
+        interpret?.let { addProperty("interpret", it) }
+        separator?.let { addProperty("separator", it) }
+    }.toString()
+
+    fun parseNbtContent(content: String): JsonObject? =
+        runCatching { JsonParser.parseString(content).asJsonObject }.getOrNull()
         
     /**
      * 解析selector组件内容
@@ -2585,8 +2626,13 @@ object TextComponentHelper {
      * separator 的输出形态：
      * 默认输出纯字符串；开关打开时输出文本组件 {"text": "..."}，方便玩家手动替换该组件（如加颜色）
      */
-    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any =
-        if (asTextComponent) mapOf("text" to content) else content
+    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any {
+        val trimmed = content.trim()
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            runCatching { JsonParser.parseString(trimmed) }.getOrNull()?.let { return it }
+        }
+        return if (asTextComponent) mapOf("text" to content) else content
+    }
 
     /**
      * 按JSON规范转义字符串内容（反斜杠、双引号、控制字符）

@@ -296,8 +296,11 @@ object CommandInputParser {
                     style = effectiveStyle
                 )
                 obj.get("separator")?.let { sep ->
-                    warnStyleLoss(sep, "separator", warnings)
-                    comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, plainTextOf(sep, warnings)))
+                    val content = when {
+                        sep.isJsonObject || sep.isJsonArray -> sep.toString()
+                        else -> plainTextOf(sep, warnings)
+                    }
+                    comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, content))
                 }
                 out.add(comp)
             }
@@ -308,8 +311,24 @@ object CommandInputParser {
                     style = effectiveStyle
                 )
             )
-            obj.has("keybind") -> warnings.add("keybind 文本组件暂不支持，已忽略：${str(obj, "keybind")}")
-            obj.has("nbt") -> warnings.add("nbt 文本组件暂不支持，已忽略")
+            obj.has("keybind") -> out.add(
+                TextComponent(ComponentType.KEYBIND, str(obj, "keybind"), style = effectiveStyle)
+            )
+            obj.has("nbt") -> {
+                val nbtSpec = TextComponentHelper.encodeNbtContent(
+                    path = str(obj, "nbt"),
+                    source = obj.get("source")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString
+                    }?.asString,
+                    interpret = obj.get("interpret")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isBoolean
+                    }?.asBoolean,
+                    separator = obj.get("separator")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString
+                    }?.asString
+                )
+                out.add(TextComponent(ComponentType.NBT, nbtSpec, style = effectiveStyle))
+            }
             obj.has("object") -> warnings.add("object/精灵图文本组件暂不支持，已忽略")
             else -> if (!obj.has("extra")) {
                 warnings.add("无法识别的组件（既不是 text/translate/score/selector/keybind/nbt/object）：$obj")

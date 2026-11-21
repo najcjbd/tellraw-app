@@ -65,8 +65,14 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("selector", selector)
-            // 空 separator 与缺省 separator 语义不同，保留原样
-            separator?.let { o.addProperty("separator", it) }
+            // 空 separator 与缺省 separator 语义不同，保留原样；对象/数组形式可直接带样式。
+            separator?.let {
+                val trimmed = it.trim()
+                val el = if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                    runCatching { JsonParser.parseString(trimmed) }.getOrNull()
+                } else null
+                if (el != null) o.add("separator", el) else o.addProperty("separator", it)
+            }
             return o
         }
     }
@@ -269,8 +275,13 @@ object WithArgCodec {
 
     private fun selectorOf(o: JsonObject): WithArgDraft.Selector? {
         val selector = stringOrNull(o, "selector") ?: return null
-        if (o.has("separator") && !isStringField(o, "separator")) return null
-        val separator = if (o.has("separator")) o.get("separator").asString else null
+        val sepEl = o.get("separator")
+        val separator = when {
+            sepEl == null -> null
+            sepEl.isJsonPrimitive && sepEl.asJsonPrimitive.isString -> sepEl.asString
+            sepEl.isJsonObject || sepEl.isJsonArray -> sepEl.toString()
+            else -> return null
+        }
         return WithArgDraft.Selector(selector, separator, retainedOf(o))
     }
 
