@@ -31,7 +31,10 @@ class HistoryRepositoryRecordsTest {
             javaCommand = """tellraw @a {"text":"x"}""",
             bedrockCommand = """tellraw @a {"rawtext":[{"text":"x"}]}""",
             timestamp = 1_700_000_000_000L,
-            markers = "a\u200Bb\u200Cc"
+            markers = "a\u200Bb\u200Cc",
+            executePrefix = "execute as @a at @s",
+            targetVersion = "java:1.20.4",
+            nbtSyntax = "legacy"
         )
         val second = HistoryItem(
             selector = "@p",
@@ -50,6 +53,9 @@ class HistoryRepositoryRecordsTest {
         assertEquals("前\u200B中\u200C后", parsed[1].message)
         assertEquals("a\u200Bb\u200Cc", parsed[1].markers)
         assertEquals("", parsed[0].markers)
+        assertEquals("execute as @a at @s", parsed[1].executePrefix)
+        assertEquals("java:1.20.4", parsed[1].targetVersion)
+        assertEquals("legacy", parsed[1].nbtSyntax)
         // 时间戳必须真正解析出来（否则会回落到“当前时间”，同秒记录的顺序不稳定）
         assertEquals(5000L, parsed[0].timestamp - parsed[1].timestamp)
     }
