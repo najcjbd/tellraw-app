@@ -65,8 +65,14 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("selector", selector)
-            // 空 separator 与缺省 separator 语义不同，保留原样
-            separator?.let { o.addProperty("separator", it) }
+            // 空 separator 与缺省 separator 语义不同，保留原样；对象/数组形式可直接带样式。
+            separator?.let {
+                val trimmed = it.trim()
+                val el = if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                    runCatching { JsonParser.parseString(trimmed) }.getOrNull()
+                } else null
+                if (el != null) o.add("separator", el) else o.addProperty("separator", it)
+            }
             return o
         }
     }
@@ -100,6 +106,7 @@ sealed interface WithArgDraft {
     data class Nbt(
         val path: String,
         val source: String? = null,
+        val target: String? = null,
         val interpret: Boolean? = null,
         val separator: String? = null,
         val retained: JsonObject = JsonObject()
@@ -107,7 +114,15 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("nbt", path)
-            addOptional(o, "source", source)
+            // Java 组件格式：entity/block/storage 指向具体目标，而不是自定义 source 字段。
+            when (source) {
+                "entity", "block", "storage" -> {
+                    if (target != null) o.addProperty(source, target)
+                    else o.addProperty("source", source)
+                }
+                null -> Unit
+                else -> o.addProperty("source", source)
+            }
             addOptionalBool(o, "interpret", interpret)
             // 空 separator 与缺省 separator 语义不同，保留原样
             separator?.let { o.addProperty("separator", it) }
@@ -269,8 +284,13 @@ object WithArgCodec {
 
     private fun selectorOf(o: JsonObject): WithArgDraft.Selector? {
         val selector = stringOrNull(o, "selector") ?: return null
-        if (o.has("separator") && !isStringField(o, "separator")) return null
-        val separator = if (o.has("separator")) o.get("separator").asString else null
+        val sepEl = o.get("separator")
+        val separator = when {
+            sepEl == null -> null
+            sepEl.isJsonPrimitive && sepEl.asJsonPrimitive.isString -> sepEl.asString
+            sepEl.isJsonObject || sepEl.isJsonArray -> sepEl.toString()
+            else -> return null
+        }
         return WithArgDraft.Selector(selector, separator, retainedOf(o))
     }
 
@@ -293,10 +313,14 @@ object WithArgCodec {
         if (o.has("source") && !isStringField(o, "source")) return null
         if (o.has("separator") && !isStringField(o, "separator")) return null
         if (o.has("interpret") && !isBoolField(o, "interpret")) return null
-        val source = if (o.has("source")) o.get("source").asString else null
+        val explicit = listOf("entity", "block", "storage").firstOrNull { key ->
+            o.has(key) && isStringField(o, key)
+        }
+        val source = explicit ?: if (o.has("source")) o.get("source").asString else null
+        val target = if (explicit != null) o.get(explicit).asString else null
         val interpret = boolValue(o, "interpret")
         val separator = if (o.has("separator")) o.get("separator").asString else null
-        return WithArgDraft.Nbt(path, source, interpret, separator, retainedOf(o))
+        return WithArgDraft.Nbt(path, source, target, interpret, separator, retainedOf(o))
     }
 
     private fun isStringField(o: JsonObject, key: String): Boolean {
@@ -354,11 +378,8 @@ object WithArgCodec {
         fun scan(draft: WithArgDraft) {
             when (draft) {
                 is WithArgDraft.Text -> {
-                    if (hasAnyStyle(draft.retained) || listOf(
-                            draft.color, draft.bold, draft.italic, draft.underlined,
-                            draft.strikethrough, draft.obfuscated
-                        ).any { it != null }
-                    ) out.add(BedrockIssue.STYLES)
+                    // text 的颜色/格式可以用 § 表示；font/click/hover/insertion 不行。
+                    if (hasAnyStyle(draft.retained)) out.add(BedrockIssue.STYLES)
                 }
                 is WithArgDraft.Translate -> {
                     if (!draft.fallback.isNullOrEmpty()) out.add(BedrockIssue.FALLBACK)

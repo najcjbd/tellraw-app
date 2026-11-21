@@ -44,7 +44,8 @@ object CommandInputParser {
     fun parse(
         input: String,
         context: Context? = null,
-        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+        target: com.tellraw.app.model.VersionSpec? = null
     ): Result? {
         val warnings = mutableListOf<String>()
         var s = input.trim()
@@ -84,8 +85,14 @@ object CommandInputParser {
         if (components.isEmpty() && warnings.isEmpty()) return null
 
         // 4) 生成两版 JSON（复用既有转换器）
-        val javaJson = TextComponentHelper.convertToJavaJson(components, context = context, warnings = warnings)
-        val bedrockJson = TextComponentHelper.convertToBedrockJson(components, context = context, warnings = warnings)
+        val javaJson = TextComponentHelper.convertToJavaJson(
+            components, context = context, warnings = warnings,
+            nbtSyntax = nbtSyntax, target = target
+        )
+        val bedrockJson = TextComponentHelper.convertToBedrockJson(
+            components, context = context, warnings = warnings,
+            nbtSyntax = nbtSyntax, target = target
+        )
 
         // 5) 目标选择器：双版本过滤（混合参数时用混合模式）
         var javaSel: String? = null
@@ -96,11 +103,16 @@ object CommandInputParser {
                 bedrockSel = selector
             } else {
                 val mixed = SelectorConverter.convertForMixedMode(selector, context, warnings, nbtSyntax)
-                val mixedWorked = mixed.first != selector || mixed.second != selector
-                javaSel = if (mixedWorked) mixed.first
-                    else SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context, nbtSyntax).first
-                bedrockSel = if (mixedWorked) mixed.second
-                    else SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, context, nbtSyntax).first
+                val (j, _, jReminders) = SelectorConverter.filterSelectorParameters(
+                    mixed.first, SelectorType.JAVA, context, nbtSyntax, target
+                )
+                val (b, _, bReminders) = SelectorConverter.filterSelectorParameters(
+                    mixed.second, SelectorType.BEDROCK, context, nbtSyntax, target
+                )
+                warnings.addAll(jReminders)
+                warnings.addAll(bReminders)
+                javaSel = j
+                bedrockSel = b
             }
         }
 
@@ -217,23 +229,18 @@ object CommandInputParser {
     private fun decodeComponent(
         obj: JsonObject,
         warnings: MutableList<String>,
-        inheritedStyle: String = ""
+        inheritedStyle: TextComponentHelper.ComponentStyle = TextComponentHelper.ComponentStyle()
     ): List<TextComponent> {
         val out = mutableListOf<TextComponent>()
-        val ownStyle = styleToSectionCodes(obj, warnings)
-        warnUnsupportedStyleFields(obj, warnings)
-        // 显式 false 要能关掉从父组件继承的格式码；否则子组件会被迫继承 true
-        val effectiveInherited = applyExplicitFalseStyleOverrides(obj, inheritedStyle)
-        val style = if (effectiveInherited != inheritedStyle) {
-            "§r$effectiveInherited$ownStyle"
-        } else {
-            inheritedStyle + ownStyle
-        }
-        val losesStyle = ownStyle.isNotEmpty()
+        val effectiveStyle = inheritedStyle.overlay(
+            TextComponentHelper.ComponentStyle.fromJson(obj)
+        )
         when {
             obj.has("translate") -> {
-                if (losesStyle) warnings.add("translate 组件上的样式字段暂未保留（会作用于 extra 子组件）")
-                val comp = TextComponent(ComponentType.TRANSLATE, str(obj, "translate"))
+                val comp = TextComponent(
+                    ComponentType.TRANSLATE, str(obj, "translate"),
+                    style = effectiveStyle
+                )
                 obj.get("fallback")?.let {
                     warnStyleLoss(it, "fallback", warnings)
                     comp.subComponents.add(
@@ -279,22 +286,60 @@ object CommandInputParser {
                 out.add(comp)
             }
             obj.has("score") && obj.get("score").isJsonObject -> {
-                if (losesStyle) warnings.add("score 组件上的样式字段暂未保留")
                 val sc = obj.getAsJsonObject("score")
-                out.add(TextComponent(ComponentType.SCORE, "${str(sc, "name")}:${str(sc, "objective")}"))
+                out.add(
+                    TextComponent(
+                        ComponentType.SCORE,
+                        TextComponentHelper.encodeScorePart(str(sc, "name")) + ":" +
+                            TextComponentHelper.encodeScorePart(str(sc, "objective")),
+                        style = effectiveStyle
+                    )
+                )
             }
             obj.has("selector") -> {
-                if (losesStyle) warnings.add("selector 组件上的样式字段暂未保留")
-                val comp = TextComponent(ComponentType.SELECTOR, str(obj, "selector"))
+                val comp = TextComponent(
+                    ComponentType.SELECTOR, str(obj, "selector"),
+                    style = effectiveStyle
+                )
                 obj.get("separator")?.let { sep ->
-                    warnStyleLoss(sep, "separator", warnings)
-                    comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, plainTextOf(sep, warnings)))
+                    val content = when {
+                        sep.isJsonObject || sep.isJsonArray -> sep.toString()
+                        else -> plainTextOf(sep, warnings)
+                    }
+                    comp.subComponents.add(SubComponent(SubComponentType.SEPARATOR, content))
                 }
                 out.add(comp)
             }
-            obj.has("text") -> out.add(TextComponent(ComponentType.TEXT, style + str(obj, "text")))
-            obj.has("keybind") -> warnings.add("keybind 文本组件暂不支持，已忽略：${str(obj, "keybind")}")
-            obj.has("nbt") -> warnings.add("nbt 文本组件暂不支持，已忽略")
+            obj.has("text") -> out.add(
+                TextComponent(
+                    ComponentType.TEXT,
+                    str(obj, "text"),
+                    style = effectiveStyle
+                )
+            )
+            obj.has("keybind") -> out.add(
+                TextComponent(ComponentType.KEYBIND, str(obj, "keybind"), style = effectiveStyle)
+            )
+            obj.has("nbt") -> {
+                val explicit = listOf("entity", "block", "storage").firstOrNull { key ->
+                    obj.has(key) && obj.get(key).isJsonPrimitive &&
+                        obj.get(key).asJsonPrimitive.isString
+                }
+                val nbtSpec = TextComponentHelper.encodeNbtContent(
+                    path = str(obj, "nbt"),
+                    source = explicit ?: obj.get("source")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString
+                    }?.asString,
+                    target = explicit?.let { obj.get(it)?.asString },
+                    interpret = obj.get("interpret")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isBoolean
+                    }?.asBoolean,
+                    separator = obj.get("separator")?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString
+                    }?.asString
+                )
+                out.add(TextComponent(ComponentType.NBT, nbtSpec, style = effectiveStyle))
+            }
             obj.has("object") -> warnings.add("object/精灵图文本组件暂不支持，已忽略")
             else -> if (!obj.has("extra")) {
                 warnings.add("无法识别的组件（既不是 text/translate/score/selector/keybind/nbt/object）：$obj")
@@ -303,7 +348,7 @@ object CommandInputParser {
         // extra 子组件继承父组件样式（父样式 + 子组件自己的样式）
         obj.get("extra")?.takeIf { it.isJsonArray }?.let { ex ->
             for (e in ex.asJsonArray) if (e.isJsonObject) {
-                out.addAll(decodeComponent(e.asJsonObject, warnings, style))
+                out.addAll(decodeComponent(e.asJsonObject, warnings, effectiveStyle))
             }
         }
         return out
@@ -326,77 +371,8 @@ object CommandInputParser {
         else -> { warnings.add("translate 的 with 里有一项不是纯文本，已尽力取其文字：$e"); e.toString() }
     }
 
-    /** 把常见的样式字段转成 § 前缀（color/format），未知的忽略并提醒。 */
-    private fun styleToSectionCodes(obj: JsonObject, warnings: MutableList<String> = mutableListOf()): String {
-        val sb = StringBuilder()
-        obj.get("color")?.takeIf { it.isJsonPrimitive }?.let { c ->
-            val v = c.asString
-            val code = NAMED_COLOR_TO_SECTION[v.lowercase()]
-                ?: RGB_TO_SECTION[v.uppercase()]     // #RRGGBB
-                ?: BEDROCK_ONLY_RGB_TO_SECTION[v.uppercase()]
-            if (code != null) sb.append('§').append(code)
-            else warnings.add("颜色 $v 无法用 § 代码表示，已忽略")
-        }
-        if (bool(obj, "bold")) sb.append("§l")
-        if (bool(obj, "italic")) sb.append("§o")
-        if (bool(obj, "underlined")) sb.append("§n")
-        if (bool(obj, "strikethrough")) sb.append("§m")
-        if (bool(obj, "obfuscated")) sb.append("§k")
-        return sb.toString()
-    }
-
-    private val STYLE_FLAG_CODES = listOf(
-        "bold" to "§l", "italic" to "§o", "underlined" to "§n",
-        "strikethrough" to "§m", "obfuscated" to "§k"
-    )
-
-    /** 显式 false 的格式位从继承样式里移除（随后再补 §r 重置）。 */
-    private fun applyExplicitFalseStyleOverrides(obj: JsonObject, inheritedStyle: String): String {
-        var result = inheritedStyle
-        for ((field, code) in STYLE_FLAG_CODES) {
-            val e = obj.get(field) ?: continue
-            if (e.isJsonPrimitive && e.asJsonPrimitive.isBoolean && !e.asBoolean) {
-                result = result.replace(code, "")
-            }
-        }
-        return result
-    }
-
-    /** § 文本模型无法表达的样式字段，至少要明确告诉用户。 */
-    private fun warnUnsupportedStyleFields(obj: JsonObject, warnings: MutableList<String>) {
-        val keys = listOf("clickEvent", "hoverEvent", "font", "insertion").filter { obj.has(it) }
-        if (keys.isNotEmpty()) {
-            warnings.add("样式字段 ${keys.joinToString("、")} 暂未保留（§ 文本模型无法表达）")
-        }
-    }
-
     private fun str(o: JsonObject, key: String): String {
         val e = o.get(key) ?: return ""
         return if (e.isJsonPrimitive) e.asString else e.toString()
-    }
-
-    private fun bool(o: JsonObject, key: String): Boolean =
-        o.get(key)?.takeIf { it.isJsonPrimitive }?.asBoolean == true
-
-    // Java 具名色 -> §
-    private val NAMED_COLOR_TO_SECTION = mapOf(
-        "black" to '0', "dark_blue" to '1', "dark_green" to '2', "dark_aqua" to '3',
-        "dark_red" to '4', "dark_purple" to '5', "gold" to '6', "gray" to '7',
-        "dark_gray" to '8', "blue" to '9', "green" to 'a', "aqua" to 'b',
-        "red" to 'c', "light_purple" to 'd', "yellow" to 'e', "white" to 'f'
-    )
-
-    // 16 具名色对应的 RGB -> §
-    private val RGB_TO_SECTION: Map<String, Char> = mapOf(
-        "#000000" to '0', "#0000AA" to '1', "#00AA00" to '2', "#00AAAA" to '3',
-        "#AA0000" to '4', "#AA00AA" to '5', "#FFAA00" to '6', "#AAAAAA" to '7',
-        "#555555" to '8', "#5555FF" to '9', "#55FF55" to 'a', "#55FFFF" to 'b',
-        "#FF5555" to 'c', "#FF55FF" to 'd', "#FFFF55" to 'e', "#FFFFFF" to 'f'
-    )
-
-    // 基岩独有色（含 §m/§n 对应）-> §
-    private val BEDROCK_ONLY_RGB_TO_SECTION: Map<String, Char> = buildMap {
-        VersionDiff.BEDROCK_ONLY_COLOR_RGB.forEach { (c, hex) -> put(hex.uppercase(), c) }
-        VersionDiff.BEDROCK_MN_COLOR_RGB.forEach { (c, hex) -> put(hex.uppercase(), c) }
     }
 }

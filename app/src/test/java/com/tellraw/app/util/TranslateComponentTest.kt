@@ -143,6 +143,42 @@ class TranslateComponentTest {
 
 
     @Test
+    fun removeSimpleTranslateBlocksHandlesEscapedUnderscores() {
+        val block = """{"rows":[{"params":"tag=a","content":[{"text":"A"}]}]}"""
+        val token = TextComponent(
+            ComponentType.TRANSLATE,
+            TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(SubComponent(SubComponentType.WITH_JSON, block))
+        )
+        val markers = TextComponentHelper.componentsToText(
+            listOf(
+                TextComponent(ComponentType.TEXT, "Hi "),
+                token,
+                TextComponent(ComponentType.TEXT, "!")
+            )
+        )
+        val stripped = TextComponentHelper.removeSimpleTranslateBlocks(markers)
+        assertFalse(stripped, stripped.contains("simpler"))
+        assertFalse(stripped, stripped.contains("rows"))
+        assertEquals("Hi !", TextComponentHelper.stripComponentMarkers(stripped))
+    }
+
+    @Test
+    fun simplerTokenIsInvisibleToCursorMapping() {
+        val token = TextComponent(
+            ComponentType.TRANSLATE,
+            TextComponentHelper.SIMPLE_TRANSLATE_KEY,
+            mutableListOf(SubComponent(SubComponentType.WITH_JSON, """{"rows":[]}"""))
+        )
+        val markers = TextComponentHelper.componentsToText(
+            listOf(TextComponent(ComponentType.TEXT, "Hi"), token)
+        )
+        assertEquals(ComponentType.TEXT, TextComponentHelper.getComponentTypeAtPosition(markers, 1))
+        assertNull(TextComponentHelper.getComponentTypeAtPosition(markers, 2))
+        assertNull(TextComponentHelper.getComponentContentAtPosition(markers, 2))
+    }
+
+    @Test
     fun translatePreviewSupportsPercentFormatStrings() {
         assertEquals("A 和 B", TranslatePreview.render("%s 和 %s", listOf("A", "B")))
         assertEquals("B/A", TranslatePreview.render("%2\$s/%1\$s", listOf("A", "B")))
@@ -168,6 +204,39 @@ class TranslateComponentTest {
         assertTrue(bedrock, bedrock.contains("§g➮§c"))
     }
 
+
+    @Test
+    fun conditionalRawtextKeepsOriginalTellrawTarget() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2","with":{"rawtext":[{"selector":"@s[tag=a]"},{"text":"A"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        val commands = ConditionalRawtextConverter.toJava(rows, baseSelector = "@p")
+        assertTrue(commands.single(), commands.single().contains("as @p[tag=a]"))
+    }
+
+    @Test
+    fun conditionalRawtextKeepsNonPlayerSelectorParams() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2","with":{"rawtext":[{"selector":"@a[tag=x]"},{"text":"A"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        val warnings = mutableListOf<String>()
+        val command = ConditionalRawtextConverter.toJava(rows, warnings = warnings).single()
+        assertTrue(command, command.contains("@a[tag=x]"))
+        assertTrue(warnings.any { it.contains("@a") })
+    }
+
+    @Test
+    fun conditionalRawtextKeepsLiteralTextAroundPlaceholder() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2『传送主城』","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"A"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        val command = ConditionalRawtextConverter.toJava(rows).single()
+        assertTrue(command, command.contains("A"))
+        assertTrue(command, command.contains("『传送主城』"))
+    }
 
     @Test
     fun conditionalRawtextConvertsToFirstMatchJavaCommands() {

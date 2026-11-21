@@ -7,6 +7,7 @@ package com.tellraw.app.util
 import android.content.Context
 import androidx.annotation.StringRes
 import com.tellraw.app.R
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -21,13 +22,17 @@ object TextComponentHelper {
 
     /** Simpler translate 在消息里的保留组件键；数据在 with_json 子组件中。 */
     const val SIMPLE_TRANSLATE_KEY = "__simpler_translate__"
+
+    private const val STYLE_MARKER_KEY = "style"
     
     // 文本组件类型（Java版和基岩版tellraw都支持的组件）
     enum class ComponentType(val key: String, @StringRes val displayNameResId: Int, val hasSubComponent: Boolean = false) {
         TEXT("text", R.string.component_text),
         TRANSLATE("translate", R.string.component_translate, true),
         SCORE("score", R.string.component_score),
-        SELECTOR("selector", R.string.component_selector, true)
+        SELECTOR("selector", R.string.component_selector, true),
+        KEYBIND("keybind", R.string.component_keybind),
+        NBT("nbt", R.string.component_nbt)
     }
     
     // 副组件类型
@@ -44,8 +49,143 @@ object TextComponentHelper {
     data class TextComponent(
         val type: ComponentType,
         val content: String,
-        val subComponents: MutableList<SubComponent> = mutableListOf()
+        val subComponents: MutableList<SubComponent> = mutableListOf(),
+        val style: ComponentStyle = ComponentStyle()
     )
+
+    /**
+     * 任意组件都能携带的样式。Java 输出 color/bold/... 字段；
+     * 基岩 rawtext 只能在 text 里用 §，所以非 TEXT 组件的样式会按平台提示。
+     */
+    data class ComponentStyle(
+        val color: String? = null,
+        val bold: Boolean? = null,
+        val italic: Boolean? = null,
+        val underlined: Boolean? = null,
+        val strikethrough: Boolean? = null,
+        val obfuscated: Boolean? = null,
+        val font: String? = null,
+        val insertion: String? = null,
+        val clickEvent: JsonObject? = null,
+        val hoverEvent: JsonObject? = null,
+        val extra: JsonObject = JsonObject()
+    ) {
+        fun isEmpty(): Boolean =
+            color == null && bold == null && italic == null && underlined == null &&
+                strikethrough == null && obfuscated == null && font == null &&
+                insertion == null && clickEvent == null && hoverEvent == null &&
+                extra.size() == 0
+
+        fun overlay(child: ComponentStyle): ComponentStyle = ComponentStyle(
+            color = child.color ?: color,
+            bold = child.bold ?: bold,
+            italic = child.italic ?: italic,
+            underlined = child.underlined ?: underlined,
+            strikethrough = child.strikethrough ?: strikethrough,
+            obfuscated = child.obfuscated ?: obfuscated,
+            font = child.font ?: font,
+            insertion = child.insertion ?: insertion,
+            clickEvent = child.clickEvent ?: clickEvent,
+            hoverEvent = child.hoverEvent ?: hoverEvent,
+            extra = JsonObject().apply {
+                extra.entrySet().forEach { (k, v) -> add(k, v) }
+                child.extra.entrySet().forEach { (k, v) -> add(k, v) }
+            }
+        )
+
+        fun legacyPrefix(warnings: MutableList<String>? = null): String {
+            val sb = StringBuilder()
+            if (color != null) {
+                val code = JAVA_COLOR_NAME_TO_CODE[color.lowercase()]
+                if (code != null) sb.append('§').append(code)
+                else warnings?.add("基岩 § 样式不支持颜色 $color，已忽略")
+            }
+            if (bold == true) sb.append("§l")
+            if (italic == true) sb.append("§o")
+            if (underlined == true) sb.append("§n")
+            if (strikethrough == true) sb.append("§m")
+            if (obfuscated == true) sb.append("§k")
+            return sb.toString()
+        }
+
+        /** 写入 Java 组件 JSON；[onlyMissing] 用于 TEXT：正文里的 § 优先。 */
+        fun applyJavaFields(target: MutableMap<String, Any>, onlyMissing: Boolean = true) {
+            fun put(key: String, value: Any?) {
+                if (value == null) return
+                if (onlyMissing && target.containsKey(key)) return
+                target[key] = value
+            }
+            put("color", color)
+            put("bold", bold)
+            put("italic", italic)
+            put("underlined", underlined)
+            put("strikethrough", strikethrough)
+            put("obfuscated", obfuscated)
+            put("font", font)
+            put("insertion", insertion)
+            put("clickEvent", clickEvent)
+            put("hoverEvent", hoverEvent)
+            extra.entrySet().forEach { (k, v) ->
+                if (!(onlyMissing && target.containsKey(k))) target[k] = v
+            }
+        }
+
+        fun toJsonObject(): JsonObject {
+            val o = extra.deepCopy()
+            color?.let { o.addProperty("color", it) }
+            bold?.let { o.addProperty("bold", it) }
+            italic?.let { o.addProperty("italic", it) }
+            underlined?.let { o.addProperty("underlined", it) }
+            strikethrough?.let { o.addProperty("strikethrough", it) }
+            obfuscated?.let { o.addProperty("obfuscated", it) }
+            font?.let { o.addProperty("font", it) }
+            insertion?.let { o.addProperty("insertion", it) }
+            clickEvent?.let { o.add("clickEvent", it) }
+            hoverEvent?.let { o.add("hoverEvent", it) }
+            return o
+        }
+
+        companion object {
+            private val STYLE_KEYS = setOf(
+                "color", "bold", "italic", "underlined", "strikethrough",
+                "obfuscated", "font", "insertion", "clickEvent", "hoverEvent"
+            )
+            private val STRUCTURAL_KEYS = setOf(
+                "text", "translate", "with", "fallback", "selector", "separator",
+                "score", "keybind", "nbt", "source", "interpret", "object", "extra"
+            )
+
+            fun fromJson(obj: JsonObject): ComponentStyle {
+                fun str(key: String): String? =
+                    obj.get(key)?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isString
+                    }?.asString
+                fun bool(key: String): Boolean? =
+                    obj.get(key)?.takeIf {
+                        it.isJsonPrimitive && it.asJsonPrimitive.isBoolean
+                    }?.asBoolean
+                fun event(key: String): JsonObject? =
+                    obj.get(key)?.takeIf { it.isJsonObject }?.asJsonObject?.deepCopy()
+                val extra = JsonObject()
+                obj.entrySet().forEach { (k, v) ->
+                    if (k !in STYLE_KEYS && k !in STRUCTURAL_KEYS) extra.add(k, v)
+                }
+                return ComponentStyle(
+                    color = str("color"),
+                    bold = bool("bold"),
+                    italic = bool("italic"),
+                    underlined = bool("underlined"),
+                    strikethrough = bool("strikethrough"),
+                    obfuscated = bool("obfuscated"),
+                    font = str("font"),
+                    insertion = str("insertion"),
+                    clickEvent = event("clickEvent"),
+                    hoverEvent = event("hoverEvent"),
+                    extra = extra
+                )
+            }
+        }
+    }
     
     /**
      * 副组件数据类
@@ -167,6 +307,7 @@ object TextComponentHelper {
     private fun parseSingleComponentWithContent(type: ComponentType, content: String): TextComponent? {
         // 查找副组件
         val subComponents = mutableListOf<SubComponent>()
+        var style = ComponentStyle()
         var mainContentEnd = content.length  // 主内容的结束位置（遇到第一个有效副组件时前移）
         var searchStart = 0
         
@@ -181,6 +322,20 @@ object TextComponentHelper {
             if (typeEnd == -1) break
             
             val subTypeKey = content.substring(typeStart, typeEnd)
+            val contentStart = typeEnd + 2
+            val contentEnd = indexOfUnescaped(content, "__", contentStart)
+            if (contentEnd == -1) break
+            if (subTypeKey == STYLE_MARKER_KEY) {
+                if (subComponents.isEmpty() && style.isEmpty()) {
+                    mainContentEnd = subComponentStart
+                }
+                val json = unescapeContent(content.substring(contentStart, contentEnd))
+                runCatching { JsonParser.parseString(json).asJsonObject }.getOrNull()?.let {
+                    style = ComponentStyle.fromJson(it)
+                }
+                searchStart = contentEnd + 2
+                continue
+            }
             // 副组件类型必须与父组件匹配：WITH只属于translate，SEPARATOR只属于selector
             val subType = SubComponentType.values().find { it.key == subTypeKey && it.parentComponent == type }
             if (subType == null) {
@@ -189,16 +344,8 @@ object TextComponentHelper {
                 continue
             }
             
-            // 查找副组件内容（从typeEnd + 2开始，到下一个__）
-            val contentStart = typeEnd + 2
-            val contentEnd = indexOfUnescaped(content, "__", contentStart)
-            if (contentEnd == -1) {
-                // 没有找到结束标记，这不是有效的副组件
-                break
-            }
-            
-            if (subComponents.isEmpty()) {
-                // 主内容到第一个有效副组件为止
+            if (subComponents.isEmpty() && style.isEmpty()) {
+                // 主内容到第一个有效副组件/样式为止
                 mainContentEnd = subComponentStart
             }
             val subContent = unescapeContent(content.substring(contentStart, contentEnd))
@@ -210,7 +357,7 @@ object TextComponentHelper {
         // 主内容：到第一个有效副组件为止（没有副组件时就是整个内容）
         val mainContent = unescapeContent(content.substring(0, mainContentEnd))
         
-        return TextComponent(type, mainContent, subComponents)
+        return TextComponent(type, mainContent, subComponents, style)
     }
     
     /**
@@ -224,7 +371,10 @@ object TextComponentHelper {
             val subComponentText = component.subComponents.joinToString("") { sub ->
                 "__${sub.type.key}__${escapeContent(sub.content)}__"
             }
-            "${escapeContent(component.content)}$subComponentText$MARKER_START${component.type.key}$MARKER_END"
+            val styleText = if (component.style.isEmpty()) "" else {
+                "__${STYLE_MARKER_KEY}__${escapeContent(component.style.toJsonObject().toString())}__"
+            }
+            "${escapeContent(component.content)}$subComponentText$styleText$MARKER_START${component.type.key}$MARKER_END"
         }
     }
     
@@ -256,7 +406,7 @@ object TextComponentHelper {
                     SubComponent(oldSub.type, subContent)
                 }.toMutableList()
 
-                result.add(TextComponent(oldComponent.type, newContent, newSubComponents))
+                result.add(TextComponent(oldComponent.type, newContent, newSubComponents, oldComponent.style))
                 currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
             } else {
                 val remainingLength = newLength - currentPos
@@ -278,7 +428,7 @@ object TextComponentHelper {
                         }
                     }
 
-                    result.add(TextComponent(oldComponent.type, newContent, newSubComponents))
+                    result.add(TextComponent(oldComponent.type, newContent, newSubComponents, oldComponent.style))
                     currentPos += newContent.length + newSubComponents.sumOf { it.content.length }
                 }
             }
@@ -288,7 +438,7 @@ object TextComponentHelper {
             result.add(TextComponent(ComponentType.TEXT, frontendMessage.substring(currentPos)))
         }
         // 内容被删空的组件不应继续留在标记里（与 deleteComponentMarkers 的清理口径一致）
-        return result.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() }
+        return result.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() && it.style.isEmpty() }
     }
 
     /** 前台文本的一处编辑（公共前后缀之外的替换区间）。 */
@@ -367,7 +517,7 @@ object TextComponentHelper {
             updated[seg.compIndex] = c.copy(subComponents = subs)
         }
         // 删除后变空的组件直接移除，避免留下空 translate/score/selector
-        return updated.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() }
+        return updated.filterNot { it.content.isEmpty() && it.subComponents.isEmpty() && it.style.isEmpty() }
     }
 
     /**
@@ -384,6 +534,7 @@ object TextComponentHelper {
             if (insertPosition in pos..(pos + len)) {
                 val offset = insertPosition - pos
                 if (c.type == ComponentType.TEXT && component.type == ComponentType.TEXT &&
+                    c.style == component.style &&
                     offset in 0..c.content.length
                 ) {
                     // TEXT 插 TEXT：合并，避免每敲一个字就多一个组件
@@ -394,9 +545,9 @@ object TextComponentHelper {
                     val before = c.content.substring(0, offset)
                     val after = c.content.substring(offset)
                     val repl = mutableListOf<TextComponent>()
-                    if (before.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, before))
+                    if (before.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, before, style = c.style))
                     repl.add(component)
-                    if (after.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, after))
+                    if (after.isNotEmpty()) repl.add(TextComponent(ComponentType.TEXT, after, style = c.style))
                     components.removeAt(i)
                     components.addAll(i, repl)
                 } else if (offset == 0) {
@@ -496,6 +647,143 @@ object TextComponentHelper {
     }
     
     /** TEXT 组件的 § 样式解析：复用纯文本转换器，得到可合并的 JSON 对象。 */
+    /** 基岩 with JSON 里的 text 仍用 §；转 Java 时把 § 展开成字段，其他组件递归。 */
+    private fun normalizeWithJsonForJava(
+        el: JsonElement,
+        mNHandling: String,
+        mnCFEnabled: Boolean,
+        context: Context?,
+        warnings: MutableList<String>?,
+        separatorAsTextComponent: Boolean,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        bedrockColorToRgb: Boolean,
+        target: com.tellraw.app.model.VersionSpec?
+    ): JsonElement {
+        return when {
+            el.isJsonArray -> JsonArray().apply {
+                el.asJsonArray.forEach {
+                    add(normalizeWithJsonForJava(
+                        it, mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+            }
+            el.isJsonObject -> {
+                val o = el.asJsonObject
+                val out = o.deepCopy()
+                if (o.has("with")) {
+                    out.add("with", normalizeWithJsonForJava(
+                        o.get("with"), mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+                o.get("extra")?.let {
+                    out.add("extra", normalizeWithJsonForJava(
+                        it, mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+                val textEl = o.get("text")
+                if (textEl != null && textEl.isJsonPrimitive && '§' in textEl.asString) {
+                    val converted = runCatching {
+                        com.google.gson.Gson().fromJson(
+                            TextFormatter.convertToJavaJson(
+                                textEl.asString, mNHandling, mnCFEnabled, context, warnings,
+                                separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target,
+                                parseMarkers = false
+                            ),
+                            JsonObject::class.java
+                        )
+                    }.getOrNull()
+                    if (converted != null) {
+                        converted.entrySet().forEach { (k, v) ->
+                            when (k) {
+                                "extra" -> {
+                                    val merged = JsonArray()
+                                    v.takeIf { it.isJsonArray }?.asJsonArray?.forEach { merged.add(it) }
+                                    o.get("extra")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { merged.add(it) }
+                                    if (merged.size() > 0) out.add("extra", merged)
+                                }
+                                "text" -> out.add("text", v)
+                                else -> if (!o.has(k)) out.add(k, v)
+                            }
+                        }
+                    }
+                }
+                out
+            }
+            else -> el.deepCopy()
+        }
+    }
+    private fun filterJsonSelectors(
+        el: JsonElement,
+        type: SelectorType,
+        context: Context?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        target: com.tellraw.app.model.VersionSpec?,
+        warnings: MutableList<String>?
+    ): JsonElement {
+        if (context == null) return el.deepCopy()
+        return when {
+            el.isJsonArray -> JsonArray().apply {
+                el.asJsonArray.forEach {
+                    add(filterJsonSelectors(it, type, context, nbtSyntax, target, warnings))
+                }
+            }
+            el.isJsonObject -> JsonObject().apply {
+                el.asJsonObject.entrySet().forEach { (k, v) ->
+                    if (k == "selector" && v.isJsonPrimitive && v.asJsonPrimitive.isString) {
+                        val (filtered, _, reminders) = SelectorConverter.filterSelectorParameters(
+                            v.asString, type, context, nbtSyntax, target
+                        )
+                        warnings?.addAll(reminders)
+                        addProperty(k, filtered)
+                    } else {
+                        add(k, filterJsonSelectors(v, type, context, nbtSyntax, target, warnings))
+                    }
+                }
+            }
+            else -> el.deepCopy()
+        }
+    }
+
+    /** 目标版本只能 say 时的最佳努力扁平化：尽量保留文字/translate 参数，不假装能解析 selector/score。 */
+    fun flattenToPlainText(components: List<TextComponent>): String {
+        fun draftText(draft: WithArgDraft): String = when (draft) {
+            is WithArgDraft.Text -> draft.text
+            is WithArgDraft.Translate -> {
+                val args = draft.args.map(::draftText)
+                TranslatePreview.render(draft.key, args)
+            }
+            is WithArgDraft.Selector -> draft.selector
+            is WithArgDraft.Score -> "${draft.name}:${draft.objective}"
+            is WithArgDraft.Keybind -> draft.keybind
+            is WithArgDraft.Nbt -> draft.path
+            is WithArgDraft.Raw -> draft.element.takeIf { it.isJsonPrimitive }?.asString ?: draft.element.toString()
+        }
+        fun componentText(c: TextComponent): String = when (c.type) {
+            ComponentType.TEXT -> c.content
+            ComponentType.TRANSLATE -> {
+                val sub = c.subComponents.firstOrNull {
+                    it.type == SubComponentType.WITH_JSON || it.type == SubComponentType.WITH
+                }
+                val args = if (sub == null || sub.content.isBlank()) emptyList() else {
+                    if (sub.type == SubComponentType.WITH_JSON) {
+                        runCatching { WithArgCodec.parseArgs(sub.content).map(::draftText) }.getOrDefault(emptyList())
+                    } else {
+                        parseTranslateWithContent(sub.content).map { it }
+                    }
+                }
+                TranslatePreview.render(c.content, args)
+            }
+            ComponentType.SELECTOR -> c.content
+            ComponentType.SCORE -> parseScoreContent(c.content).joinToString(",") { "${it.first}:${it.second}" }
+            ComponentType.KEYBIND -> c.content
+            ComponentType.NBT -> parseNbtContent(c.content)?.get("path")?.asString ?: c.content
+        }
+        return components.joinToString("") { componentText(it) }
+    }
+
     private fun plainTextComponentMap(
         content: String,
         mNHandling: String,
@@ -665,37 +953,19 @@ object TextComponentHelper {
         "e" to "yellow",
         "f" to "white"
     )
-    
-    /**
-     * 获取指定位置的文本组件类型
-     * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
-     */
-    /** 取某个 Simpler token 里保存的参数表 JSON。 */
-    fun simpleBlockJsonAt(text: String, position: Int): String? {
-        val components = parseTextComponents(text)
-        var pos = 0
-        for (component in components) {
-            val len = component.content.length +
-                component.subComponents.sumOf { it.content.length }
-            val inRange = position == pos || position in pos until (pos + len)
-            if (inRange && component.type == ComponentType.TRANSLATE &&
-                component.content == SIMPLE_TRANSLATE_KEY
-            ) {
-                return component.subComponents
-                    .firstOrNull { it.type == SubComponentType.WITH_JSON }?.content
-            }
-            pos += len
-        }
-        return null
-    }
+
+    private val JAVA_COLOR_NAME_TO_CODE: Map<String, Char> =
+        JAVA_COLORS.entries.associate { (code, name) -> name to code[0] }
 
     /** 从正常消息中移除 Simpler translate 保留组件（它由主生成单独展开）。 */
     fun removeSimpleTranslateBlocks(text: String): String {
-        if (SIMPLE_TRANSLATE_KEY !in text) return text
-        val kept = parseTextComponents(text).filterNot {
+        // 不能直接查 SIMPLE_TRANSLATE_KEY：componentsToText 会把 "_" 转义成 "\_"
+        if (MARKER_START !in text) return text
+        val components = parseTextComponents(text)
+        val kept = components.filterNot {
             it.type == ComponentType.TRANSLATE && it.content == SIMPLE_TRANSLATE_KEY
         }
-        return componentsToText(kept)
+        return if (kept.size == components.size) text else componentsToText(kept)
     }
 
     /** 消息里每个顶层组件在纯文本中的位置；Translate 额外带 1 基序号。 */
@@ -724,6 +994,10 @@ object TextComponentHelper {
         return out
     }
 
+    /**
+     * 获取指定位置的文本组件类型
+     * position 是去掉标记后的纯文本下标，与输入框里的光标位置一致
+     */
     fun getComponentTypeAtPosition(text: String, position: Int): ComponentType? {
         if (position < 0) return null
         
@@ -731,6 +1005,10 @@ object TextComponentHelper {
         var currentPos = 0
         
         for (component in components) {
+            // Simpler token 不可见，不参与光标位置映射。
+            if (component.type == ComponentType.TRANSLATE &&
+                component.content == SIMPLE_TRANSLATE_KEY
+            ) continue
             // 计算组件内容长度（不包括标记）
             val contentLength = component.content.length + 
                                 component.subComponents.sumOf { it.content.length }
@@ -757,6 +1035,9 @@ object TextComponentHelper {
         var currentPos = 0
         
         for (component in components) {
+            if (component.type == ComponentType.TRANSLATE &&
+                component.content == SIMPLE_TRANSLATE_KEY
+            ) continue
             // 计算组件内容长度（不包括标记）
             val contentLength = component.content.length + 
                                 component.subComponents.sumOf { it.content.length }
@@ -829,7 +1110,9 @@ object TextComponentHelper {
             if (lastComponent != null && lastComponent.type == currentComponent && lastComponent.subComponents.isEmpty()) {
                 // 与最后一个组件合并
                 val mergedContent = lastComponent.content + textToInsert
-                val mergedComponent = TextComponent(currentComponent, mergedContent, lastComponent.subComponents)
+                val mergedComponent = TextComponent(
+                    currentComponent, mergedContent, lastComponent.subComponents, lastComponent.style
+                )
                 val result = StringBuilder()
                 for (i in 0 until components.size - 1) {
                     result.append(componentToText(components[i]))
@@ -913,7 +1196,9 @@ object TextComponentHelper {
             val newContent = targetComponent.content.substring(0, offsetInTargetComponent) + 
                            textToInsert + 
                            targetComponent.content.substring(offsetInTargetComponent)
-            result.append(componentToText(TextComponent(targetComponent.type, newContent, targetComponent.subComponents)))
+            result.append(componentToText(
+                TextComponent(targetComponent.type, newContent, targetComponent.subComponents, targetComponent.style)
+            ))
         } else {
             // 在副组件内或之后，需要计算在哪个副组件中
             var remainingOffset = offsetInTargetComponent - targetComponent.content.length
@@ -939,9 +1224,13 @@ object TextComponentHelper {
             if (!insertedInSub) {
                 // 在所有副组件之后，添加到主组件内容末尾
                 val newContent = targetComponent.content + textToInsert
-                result.append(componentToText(TextComponent(targetComponent.type, newContent, targetComponent.subComponents)))
+                result.append(componentToText(
+                    TextComponent(targetComponent.type, newContent, targetComponent.subComponents, targetComponent.style)
+                ))
             } else {
-                result.append(componentToText(TextComponent(targetComponent.type, targetComponent.content, updatedSubComponents)))
+                result.append(componentToText(
+                    TextComponent(targetComponent.type, targetComponent.content, updatedSubComponents, targetComponent.style)
+                ))
             }
         }
         
@@ -977,14 +1266,18 @@ object TextComponentHelper {
         val expandedComponents = expandComponents(components)
 
         // 检查是否所有组件都是TEXT组件
-        val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
+        val allTextComponents = expandedComponents.all {
+            it.type == ComponentType.TEXT && it.subComponents.isEmpty() && it.style.isEmpty()
+        }
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
             return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb, target = target, parseMarkers = false)
         }
 
-        if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT && expandedComponents[0].subComponents.isEmpty()) {
+        if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT &&
+            expandedComponents[0].subComponents.isEmpty() && expandedComponents[0].style.isEmpty()
+        ) {
             // 单个纯文本组件（这个分支现在不会被触发，因为上面已经处理了所有TEXT组件的情况）
             val plainText = expandedComponents[0].content
             val formatMap = processSectionCodesToJson(plainText, mNHandling, mnCFEnabled, bedrockColorToRgb)
@@ -1009,6 +1302,10 @@ object TextComponentHelper {
                 textMap.forEach { (k, v) -> if (v != null) result[k] = v }
             }
             ComponentType.TRANSLATE -> {
+                if (mainComponent.content == SIMPLE_TRANSLATE_KEY) {
+                    // 保留成标记对象，交给 Simpler translate 生成器按收信人替换。
+                    result["translate"] = SIMPLE_TRANSLATE_KEY
+                } else {
                 result["translate"] = mainComponent.content
                 mainComponent.subComponents.find { it.type == SubComponentType.FALLBACK }?.let {
                     result["fallback"] = it.content
@@ -1026,7 +1323,14 @@ object TextComponentHelper {
                         }
                         val withComponents = items.mapNotNull { item ->
                             if (item.json != null) {
-                                item.json
+                                normalizeWithJsonForJava(
+                                    filterJsonSelectors(
+                                        item.json, SelectorType.JAVA, context,
+                                        nbtSyntax, target, warnings
+                                    ),
+                                    mNHandling, mnCFEnabled, context, warnings,
+                                    separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                                )
                             } else {
                                 val param = item.raw
                                 val map = plainTextComponentMap(
@@ -1044,6 +1348,7 @@ object TextComponentHelper {
                             result["with"] = withComponents
                         }
                     }
+                }
                 }
             }
             ComponentType.SCORE -> {
@@ -1110,6 +1415,34 @@ object TextComponentHelper {
                     }
                 }
             }
+            ComponentType.KEYBIND -> {
+                if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                    !com.tellraw.app.model.FeatureGate.isAvailable(
+                        com.tellraw.app.model.FeatureGate.Feature.KEYBIND_TEXT, target
+                    )
+                ) {
+                    warnings?.add("目标 Java 版本不支持 keybind 文本组件；输出可能无效")
+                }
+                result["keybind"] = mainComponent.content
+            }
+            ComponentType.NBT -> {
+                if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                    !com.tellraw.app.model.FeatureGate.isAvailable(
+                        com.tellraw.app.model.FeatureGate.Feature.NBT_TEXT, target
+                    )
+                ) {
+                    warnings?.add("目标 Java 版本不支持 nbt 文本组件；输出可能无效")
+                }
+                writeNbtSpec(
+                    parseNbtContent(mainComponent.content), mainComponent.content, result, warnings
+                )
+            }
+        }
+
+        if (!(mainComponent.type == ComponentType.TRANSLATE &&
+                mainComponent.content == SIMPLE_TRANSLATE_KEY)
+        ) {
+            mainComponent.style.applyJavaFields(result)
         }
 
         // 添加extra（如果有子组件）
@@ -1124,6 +1457,9 @@ object TextComponentHelper {
                         ).forEach { (k, v) -> if (v != null) subMap[k] = v }
                     }
                     ComponentType.TRANSLATE -> {
+                        if (sub.content == SIMPLE_TRANSLATE_KEY) {
+                            subMap["translate"] = SIMPLE_TRANSLATE_KEY
+                        } else {
                         subMap["translate"] = sub.content
                         sub.subComponents.find { it.type == SubComponentType.FALLBACK }?.let {
                             subMap["fallback"] = it.content
@@ -1141,7 +1477,14 @@ object TextComponentHelper {
                                 }
                                 val withComponents = items.mapNotNull { item ->
                                     if (item.json != null) {
-                                        item.json
+                                        normalizeWithJsonForJava(
+                                            filterJsonSelectors(
+                                                item.json, SelectorType.JAVA, context,
+                                                nbtSyntax, target, warnings
+                                            ),
+                                            mNHandling, mnCFEnabled, context, warnings,
+                                            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                                        )
                                     } else {
                                         val param = item.raw
                                         val map = plainTextComponentMap(
@@ -1159,6 +1502,7 @@ object TextComponentHelper {
                                     subMap["with"] = withComponents
                                 }
                             }
+                        }
                         }
                     }
                     ComponentType.SCORE -> {
@@ -1223,21 +1567,54 @@ object TextComponentHelper {
                             }
                         }
                     }
+                    ComponentType.KEYBIND -> {
+                        if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                            !com.tellraw.app.model.FeatureGate.isAvailable(
+                                com.tellraw.app.model.FeatureGate.Feature.KEYBIND_TEXT, target
+                            )
+                        ) {
+                            warnings?.add("目标 Java 版本不支持 keybind 文本组件；输出可能无效")
+                        }
+                        subMap["keybind"] = sub.content
+                    }
+                    ComponentType.NBT -> {
+                        if (target?.edition == com.tellraw.app.model.VersionSpec.Edition.JAVA &&
+                            !com.tellraw.app.model.FeatureGate.isAvailable(
+                                com.tellraw.app.model.FeatureGate.Feature.NBT_TEXT, target
+                            )
+                        ) {
+                            warnings?.add("目标 Java 版本不支持 nbt 文本组件；输出可能无效")
+                        }
+                        writeNbtSpec(
+                            parseNbtContent(sub.content), sub.content, subMap, warnings
+                        )
+                    }
+                }
+                if (!(sub.type == ComponentType.TRANSLATE &&
+                        sub.content == SIMPLE_TRANSLATE_KEY)
+                ) {
+                    sub.style.applyJavaFields(subMap)
                 }
                 subMap
             }
             // 外层根组件的样式会被所有 extra 继承；非 TEXT 兄弟组件没有样式时应显式复位
             val styleKeys = setOf(
-                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated"
+                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
+                "font", "insertion"
             )
             val rootStyle = result.filterKeys { it in styleKeys }
             if (rootStyle.isNotEmpty()) {
+                if (result.containsKey("clickEvent") || result.containsKey("hoverEvent")) {
+                    warnings?.add("extra 子组件会继承父组件的 clickEvent/hoverEvent；Java JSON 没有显式取消写法，请检查子组件")
+                }
                 extra.forEach { subMap ->
                     for ((key, value) in rootStyle) {
                         if (subMap.containsKey(key)) continue
                         when {
                             // tellraw 默认前景色是白色（JSON 没有官方的 color:"reset"）
                             key == "color" -> subMap["color"] = "white"
+                            key == "font" -> subMap["font"] = "minecraft:default"
+                            key == "insertion" -> subMap["insertion"] = ""
                             value == true -> subMap[key] = false
                         }
                     }
@@ -1271,11 +1648,16 @@ object TextComponentHelper {
         val expandedComponents = expandComponents(components)
 
         // 检查是否所有组件都是TEXT组件
-        val allTextComponents = expandedComponents.all { it.type == ComponentType.TEXT && it.subComponents.isEmpty() }
+        val allTextComponents = expandedComponents.all {
+            it.type == ComponentType.TEXT && it.subComponents.isEmpty() && it.style.isEmpty()
+        }
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax, target = target)
+            return TextFormatter.convertToBedrockJson(
+                combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax,
+                target = target, parseMarkers = false
+            )
         }
 
         val rawtext = expandedComponents.map { component ->
@@ -1283,11 +1665,24 @@ object TextComponentHelper {
 
             when (component.type) {
                 ComponentType.TEXT -> {
+                    if (component.style.font != null || component.style.insertion != null ||
+                        component.style.clickEvent != null || component.style.hoverEvent != null ||
+                        component.style.extra.size() > 0
+                    ) {
+                        warnings?.add("基岩 rawtext 不支持 font/clickEvent/hoverEvent/insertion 等样式字段；Java 输出已保留")
+                    }
                     // 处理§代码
-                    item["text"] = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
+                    val prefix = component.style.legacyPrefix(warnings)
+                    item["text"] = prefix + processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
                 }
                 ComponentType.TRANSLATE -> {
+                    if (component.content != SIMPLE_TRANSLATE_KEY && !component.style.isEmpty()) {
+                        warnings?.add("基岩 rawtext 不支持给 translate 组件加样式字段；Java 输出已保留")
+                    }
                     item["translate"] = component.content
+                    if (component.content == SIMPLE_TRANSLATE_KEY) {
+                        // marker 原样保留，由 Simpler translate 生成器替换。
+                    } else {
                     if (component.subComponents.any { it.type == SubComponentType.FALLBACK }) {
                         warnings?.add("基岩版不支持 translate 的 fallback，已忽略")
                     }
@@ -1304,7 +1699,14 @@ object TextComponentHelper {
                             val withRawtext = mutableListOf<Any>()
                             for (item in items) {
                                 if (item.json != null) {
-                                    jsonWithToBedrock(item.json, warnings, withRawtext)
+                                    jsonWithToBedrock(
+                                        filterJsonSelectors(
+                                            item.json, SelectorType.BEDROCK, context,
+                                            nbtSyntax, target, warnings
+                                        ),
+                                        warnings,
+                                        withRawtext
+                                    )
                                 } else {
                                     withRawtext.add(
                                         mapOf<String, Any>(
@@ -1318,8 +1720,12 @@ object TextComponentHelper {
                             }
                         }
                     }
+                    }
                 }
                 ComponentType.SCORE -> {
+                    if (!component.style.isEmpty()) {
+                        warnings?.add("基岩 rawtext 不支持给 score 组件加样式字段；Java 输出已保留")
+                    }
                     // SCORE组件已展开，每个组件只包含一个条目
                     val scoreEntries = parseScoreContent(component.content)
 
@@ -1338,6 +1744,9 @@ object TextComponentHelper {
                     }
                 }
                 ComponentType.SELECTOR -> {
+                    if (!component.style.isEmpty()) {
+                        warnings?.add("基岩 rawtext 不支持给 selector 组件加样式字段；Java 输出已保留")
+                    }
                     // SELECTOR组件已展开，每个组件只包含一个条目
                     val selectorString = component.content
                     val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
@@ -1383,6 +1792,12 @@ object TextComponentHelper {
                         // 基岩版不支持separator参数，忽略所有sep:定义
                     }
                 }
+                ComponentType.KEYBIND, ComponentType.NBT -> {
+                    warnings?.add(
+                        "基岩 rawtext 不支持 ${component.type.key} 文本组件；Java 输出已保留"
+                    )
+                    item["text"] = ""
+                }
             }
 
             item
@@ -1400,73 +1815,121 @@ object TextComponentHelper {
         val result = mutableListOf<Pair<String, String>>()
         var currentEntry = StringBuilder()
         var i = 0
-        
+
         while (i < content.length) {
-            if (content[i] == '\\' && i + 1 < content.length && content[i + 1] == ',') {
-                // 转义的逗号，添加单个逗号
-                currentEntry.append(',')
-                i += 2
-            } else if (content[i] == ',') {
-                // 分隔符，处理当前条目
-                if (currentEntry.isNotEmpty()) {
-                    result.add(parseSingleScoreEntry(currentEntry.toString()))
+            when {
+                content[i] == '\\' && i + 1 < content.length -> {
+                    val next = content[i + 1]
+                    if (next == ',') {
+                        // 转义的逗号属于当前条目
+                        currentEntry.append(',')
+                    } else {
+                        // 保留 \: 和 \\，留给 parseSingleScoreEntry 区分分隔冒号
+                        currentEntry.append('\\').append(next)
+                    }
+                    i += 2
                 }
-                currentEntry.clear()
-                i++
-            } else {
-                currentEntry.append(content[i])
-                i++
+                content[i] == ',' -> {
+                    if (currentEntry.isNotEmpty()) {
+                        result.add(parseSingleScoreEntry(currentEntry.toString()))
+                    }
+                    currentEntry.clear()
+                    i++
+                }
+                else -> {
+                    currentEntry.append(content[i])
+                    i++
+                }
             }
         }
-        
-        // 处理最后一个条目
+
         if (currentEntry.isNotEmpty()) {
             result.add(parseSingleScoreEntry(currentEntry.toString()))
         }
-        
+
         return result
-        
+    }
+
+    /** 解析单个score条目：第一个未转义的 ':' 分隔 name/objective；两边支持 \: \, \\。 */
+    private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
+        var split = -1
+        var i = 0
+        while (i < entry.length) {
+            if (entry[i] == '\\' && i + 1 < entry.length) {
+                i += 2
+                continue
             }
-        
-            
-        
-            /**
-        
-             * 解析单个score条目
-        
-             * 格式：name:objective
-        
-             */
-        
-            private fun parseSingleScoreEntry(entry: String): Pair<String, String> {
-        
-                val parts = entry.split(":", limit = 2)
-        
-                val name = when {
-        
-                    parts[0].isEmpty() && parts.size == 2 -> "*"  // 只有:objective
-        
-                    parts[0].isEmpty() -> "*"  // 只有:
-        
-                    else -> parts[0]
-        
-                }
-        
-                val objective = when {
-        
-                    parts.size == 2 && parts[1].isEmpty() -> "*"  // 只有name:
-        
-                    parts.size == 2 -> parts[1]  // 正常格式
-        
-                    else -> "*"  // 只有name或格式错误
-        
-                }
-        
-                return Pair(name, objective)
-        
+            if (entry[i] == ':') {
+                split = i
+                break
             }
-        
-        
+            i++
+        }
+
+        fun unescape(s: String): String {
+            val sb = StringBuilder(s.length)
+            var j = 0
+            while (j < s.length) {
+                if (s[j] == '\\' && j + 1 < s.length) {
+                    sb.append(s[j + 1])
+                    j += 2
+                } else {
+                    sb.append(s[j])
+                    j++
+                }
+            }
+            return sb.toString()
+        }
+
+        val rawName = if (split < 0) entry else entry.substring(0, split)
+        val rawObjective = if (split < 0) "" else entry.substring(split + 1)
+        val name = unescape(rawName).ifEmpty { "*" }
+        val objective = unescape(rawObjective).ifEmpty { "*" }
+        return Pair(name, objective)
+    }
+
+    /** score 的 name/objective 在文本模型里用 \: \, \\ 安全拼接。 */
+    fun encodeScorePart(value: String): String =
+        value.replace("\\", "\\\\")
+            .replace(":", "\\:")
+            .replace(",", "\\,")
+
+    fun encodeNbtContent(
+        path: String,
+        source: String? = null,
+        target: String? = null,
+        interpret: Boolean? = null,
+        separator: String? = null
+    ): String = JsonObject().apply {
+        addProperty("path", path)
+        source?.let { addProperty("source", it) }
+        target?.let { addProperty("target", it) }
+        interpret?.let { addProperty("interpret", it) }
+        separator?.let { addProperty("separator", it) }
+    }.toString()
+
+    fun parseNbtContent(content: String): JsonObject? =
+        runCatching { JsonParser.parseString(content).asJsonObject }.getOrNull()
+
+    private fun writeNbtSpec(
+        spec: JsonObject?,
+        rawContent: String,
+        target: MutableMap<String, Any>,
+        warnings: MutableList<String>?
+    ) {
+        target["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString ?: rawContent
+        val source = spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString
+        val sourceTarget = spec?.get("target")?.takeIf { it.isJsonPrimitive }?.asString
+        if (source != null) {
+            if (source in setOf("entity", "block", "storage") && sourceTarget != null) {
+                target[source] = sourceTarget
+            } else {
+                warnings?.add("NBT 组件缺少 $source 目标，已省略来源字段；请在 NBT 编辑器里填写目标")
+            }
+        }
+        spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { target["interpret"] = it }
+        spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { target["separator"] = it }
+    }
         
     /**
      * 解析selector组件内容
@@ -2211,6 +2674,14 @@ object TextComponentHelper {
                             )
                         )
                     }
+                    o.has("keybind") || o.has("nbt") || o.has("object") -> {
+                        warnings?.add("基岩 rawtext with 不支持 keybind/nbt/object 组件；该项已保留为空文本以维持参数序号")
+                        out.add(mapOf("text" to ""))
+                    }
+                    else -> if (!o.has("extra")) {
+                        warnings?.add("基岩 rawtext with 无法识别该组件；已保留为空文本以维持参数序号：$o")
+                        out.add(mapOf("text" to ""))
+                    }
                 }
                 o.get("extra")?.let { extra -> jsonWithToBedrock(extra, warnings, out) }
             }
@@ -2272,17 +2743,23 @@ object TextComponentHelper {
                 ComponentType.TEXT -> {
                     // TEXT组件直接使用原有的text文本处理逻辑
                     // 将TEXT组件的内容提取出来，作为纯文本处理
-                    expanded.add(TextComponent(ComponentType.TEXT, component.content))
+                    expanded.add(
+                        TextComponent(ComponentType.TEXT, component.content, style = component.style)
+                    )
                 }
                 ComponentType.SCORE -> {
                     val scoreEntries = parseScoreContent(component.content)
                     if (scoreEntries.isEmpty()) {
                         // 空内容，保持为score组件（与SELECTOR一致）
-                        expanded.add(TextComponent(ComponentType.SCORE, ":"))
+                        expanded.add(TextComponent(ComponentType.SCORE, ":", style = component.style))
                     } else {
                         // 每个score条目都作为独立的score组件
                         for ((name, objective) in scoreEntries) {
-                            expanded.add(TextComponent(ComponentType.SCORE, "$name:$objective"))
+                            expanded.add(TextComponent(
+                                ComponentType.SCORE,
+                                encodeScorePart(name) + ":" + encodeScorePart(objective),
+                                style = component.style
+                            ))
                         }
                     }
                 }
@@ -2290,7 +2767,9 @@ object TextComponentHelper {
                     val (selectorEntries, separatorEntries) = parseSelectorContent(component.content)
                     if (selectorEntries.isEmpty()) {
                         // 空内容，保留为selector组件（内容为空字符串），副组件一并保留
-                        expanded.add(TextComponent(ComponentType.SELECTOR, "", component.subComponents))
+                        expanded.add(
+                            TextComponent(ComponentType.SELECTOR, "", component.subComponents, component.style)
+                        )
                     } else {
                         // 每个selector条目都作为独立的selector组件
                         for ((index, selector) in selectorEntries.withIndex()) {
@@ -2311,7 +2790,7 @@ object TextComponentHelper {
                             if (sep != null && subComponents.none { it.type == SubComponentType.SEPARATOR }) {
                                 subComponents.add(SubComponent(SubComponentType.SEPARATOR, sep))
                             }
-                            val newComponent = TextComponent(ComponentType.SELECTOR, selector, subComponents)
+                            val newComponent = TextComponent(ComponentType.SELECTOR, selector, subComponents, component.style)
                             expanded.add(newComponent)
                         }
                     }
@@ -2365,8 +2844,13 @@ object TextComponentHelper {
      * separator 的输出形态：
      * 默认输出纯字符串；开关打开时输出文本组件 {"text": "..."}，方便玩家手动替换该组件（如加颜色）
      */
-    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any =
-        if (asTextComponent) mapOf("text" to content) else content
+    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any {
+        val trimmed = content.trim()
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            runCatching { JsonParser.parseString(trimmed) }.getOrNull()?.let { return it }
+        }
+        return if (asTextComponent) mapOf("text" to content) else content
+    }
 
     /**
      * 按JSON规范转义字符串内容（反斜杠、双引号、控制字符）

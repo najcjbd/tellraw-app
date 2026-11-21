@@ -4061,7 +4061,7 @@ object SelectorConverter {
         // 因此把真实选择器分析出的种类显式传进去（反例：@e[type=zombie,…,hasitem=…]）。
         val realEntityKind = SelectorEntityKind.analyze(selector)
         val tempBedrockParamsPart = bedrockParams.joinToString(",")
-        val (javaConvertedBedrock, _, _) = filterSelectorParameters(
+        val (javaConvertedBedrock, _, javaReminders) = filterSelectorParameters(
             "a[$tempBedrockParamsPart]",
             SelectorType.JAVA,
             context,
@@ -4069,6 +4069,7 @@ object SelectorConverter {
             null,
             realEntityKind
         )
+        reminders.addAll(javaReminders)
         // 提取转换后的参数
         if ('[' in javaConvertedBedrock && ']' in javaConvertedBedrock) {
             val convertedParams = javaConvertedBedrock.substringAfter('[').substringBeforeLast(']')
@@ -4106,7 +4107,7 @@ object SelectorConverter {
         
         // 转换Java版参数到基岩版
         val tempJavaParamsPart = javaParams.joinToString(",")
-        val (bedrockConvertedJava, _, _) = filterSelectorParameters(
+        val (bedrockConvertedJava, _, bedrockReminders) = filterSelectorParameters(
             "a[$tempJavaParamsPart]",
             SelectorType.BEDROCK,
             context,
@@ -4114,6 +4115,7 @@ object SelectorConverter {
             null,
             realEntityKind
         )
+        reminders.addAll(bedrockReminders)
         // 提取转换后的参数
         if ('[' in bedrockConvertedJava && ']' in bedrockConvertedJava) {
             val convertedParams = bedrockConvertedJava.substringAfter('[').substringBeforeLast(']')

@@ -121,7 +121,7 @@ class GridConditionEvaluatorTest {
         assertTrue(ok("if slots entity @s armor.*"))
         assertTrue(ok("if slots entity @s hotbar.0"))
         assertFalse(ok("if slots entity @s hotbar.9"))
-        assertFalse(ok("if slots entity @s container.*"))
+        assertTrue(ok("if slots entity @s container.*"))
         assertTrue(ok("if slots entity @s inventory.*"))
     }
 

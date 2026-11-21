@@ -2,6 +2,7 @@ package com.tellraw.app.ui.screens
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.tellraw.app.MainActivity
@@ -10,11 +11,14 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
@@ -34,7 +38,6 @@ import com.tellraw.app.R
 import com.tellraw.app.data.repository.HistoryItem
 import com.tellraw.app.data.remote.GithubRelease
 import com.tellraw.app.model.SelectorType
-import com.tellraw.app.model.VersionSpec
 import com.tellraw.app.ui.components.*
 import com.tellraw.app.ui.viewmodel.TellrawViewModel
 import com.tellraw.app.util.CommandInputParser
@@ -56,15 +59,11 @@ fun MainScreen(
     
     val selectorInput by viewModel.selectorInput.collectAsState()
     val messageInput by viewModel.messageInput.collectAsState()
-    val messageInputWithMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslateNesting by viewModel.simpleTranslateNesting.collectAsState()
     val chainAnchorEnabled by viewModel.chainAnchorEnabled.collectAsState()
-    var showTellrawPreview by rememberSaveable { mutableStateOf(false) }
-    var tellrawPreviewInput by rememberSaveable { mutableStateOf("") }
     var showSimpleTranslateGroups by rememberSaveable { mutableStateOf(false) }
     var simpleInitialBlock by rememberSaveable { mutableStateOf<String?>(null) }
     val targetVersion by viewModel.targetVersion.collectAsState()
-    val groupedTarget = remember(targetVersion) { VersionSpec.parse(targetVersion) }
     val javaCommand by viewModel.javaCommand.collectAsState()
     val bedrockCommand by viewModel.bedrockCommand.collectAsState()
     val warnings by viewModel.warnings.collectAsState()
@@ -75,7 +74,6 @@ fun MainScreen(
     val javaBedrockMixedMode by viewModel.javaBedrockMixedMode.collectAsState()
     val defaultUseText by viewModel.defaultUseText.collectAsState()
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
-    val executePrefixInput by viewModel.executePrefixInput.collectAsState()
     val separatorAsTextComponent by viewModel.separatorAsTextComponent.collectAsState()
     val bedrockColorToRgb by viewModel.bedrockColorToRgb.collectAsState()
     val asSensitive by viewModel.asSensitive.collectAsState()
@@ -151,9 +149,8 @@ fun MainScreen(
         LandscapeLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onOpenTellrawPreview = { showTellrawPreview = true },
             onOpenSimpleTranslate = { block ->
-                simpleInitialBlock = block
+                simpleInitialBlock = block ?: viewModel.currentSimpleBlockJson()
                 showSimpleTranslateGroups = true
             },
             onCommaSelected = {
@@ -202,9 +199,8 @@ fun MainScreen(
         PortraitLayout(
             onNavigateToHelp = onNavigateToHelp,
             onNavigateToGrid = onNavigateToGrid,
-            onOpenTellrawPreview = { showTellrawPreview = true },
             onOpenSimpleTranslate = { block ->
-                simpleInitialBlock = block
+                simpleInitialBlock = block ?: viewModel.currentSimpleBlockJson()
                 showSimpleTranslateGroups = true
             },
             onCommaSelected = {
@@ -252,6 +248,24 @@ fun MainScreen(
     }
 
     // 历史记录对话框
+    if (isLandscape && (showSettingsDialog.value || showHistoryDialog.value ||
+            showStorageSettingsDialog || showFilenameDialog != null || showFileExistsDialog != null)
+    ) {
+        // 横屏面板不是 Dialog；用可点击遮罩拦住背后输入。
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f))
+                .clickable {
+                    showSettingsDialog.value = false
+                    showHistoryDialog.value = false
+                    viewModel.hideStorageSettingsDialog()
+                    viewModel.hideFilenameDialog()
+                    viewModel.hideFileExistsDialog()
+                }
+        )
+    }
+
     if (showHistoryDialog.value) {
         HistoryDialog(
             historyList = commandHistory,
@@ -314,6 +328,8 @@ fun MainScreen(
             simpleTranslateNesting = simpleTranslateNesting,
             chainAnchorEnabled = chainAnchorEnabled,
             nbtSyntax = nbtSyntax,
+            targetVersion = targetVersion,
+            onTargetVersionChanged = { viewModel.setTargetVersion(it) },
             onDismiss = { showSettingsDialog.value = false },
             onUseJavaFontStyleChanged = { useJava ->
                 viewModel.setUseJavaFontStyle(useJava)
@@ -406,25 +422,22 @@ fun MainScreen(
         )
     }
 
-    if (showTellrawPreview) {
-        TellrawPreviewDialog(
-            input = tellrawPreviewInput,
-            onInputChange = { tellrawPreviewInput = it },
-            onDismiss = { showTellrawPreview = false }
-        )
-    }
+    // 横屏的面板不是 Dialog，必须显式接管返回键；否则返回会直接退出 Activity。
+    BackHandler(enabled = showSettingsDialog.value) { showSettingsDialog.value = false }
+    BackHandler(enabled = showHistoryDialog.value) { showHistoryDialog.value = false }
+    BackHandler(enabled = showStorageSettingsDialog) { viewModel.hideStorageSettingsDialog() }
+    BackHandler(enabled = showFilenameDialog != null) { viewModel.hideFilenameDialog() }
+    BackHandler(enabled = showFileExistsDialog != null) { viewModel.hideFileExistsDialog() }
 
     if (showSimpleTranslateGroups) {
         SimpleTranslateGroupDialog(
-            initialPrefix = executePrefixInput,
             initialBlockJson = simpleInitialBlock,
-            target = groupedTarget,
-            nbtSyntax = VersionDiff.NbtSyntax.from(nbtSyntax),
-            allowMultiCmdTag = allowMultiCmdTag,
-            chainAnchor = chainAnchorEnabled,
-            onComplete = { java, bedrock, warnings, blockJson ->
-                viewModel.setSimpleTranslateOutput(java, bedrock, warnings, blockJson)
+            onComplete = { blockJson, warnings ->
+                viewModel.setSimpleTranslateOutput(blockJson, warnings)
             },
+            onRemove = if (simpleInitialBlock != null) {
+                { viewModel.removeSimpleTranslate() }
+            } else null,
             onDismiss = {
                 showSimpleTranslateGroups = false
                 simpleInitialBlock = null
@@ -437,6 +450,11 @@ fun MainScreen(
         WithBuilderDialog(
             state = state,
             simpleMode = simpleTranslateNesting,
+            onOpenSimpleTranslate = {
+                viewModel.closeWithBuilder()
+                simpleInitialBlock = viewModel.currentSimpleBlockJson()
+                showSimpleTranslateGroups = true
+            },
             onDismiss = { viewModel.closeWithBuilder() },
             onKeyChange = { viewModel.updateWithBuilderKey(it) },
             onFallbackChange = { viewModel.updateWithBuilderFallback(it) },
@@ -565,7 +583,6 @@ fun MainScreen(
 private fun PortraitLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onOpenTellrawPreview: () -> Unit,
     onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
@@ -587,6 +604,7 @@ private fun PortraitLayout(
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
 
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
@@ -666,13 +684,12 @@ private fun PortraitLayout(
                     style = MaterialTheme.typography.titleMedium
                 )
                 
-                if (simpleTranslate) {
+                if (simpleTranslate || simpleBlockActive) {
                     TranslateTokenBar(
                         markers = messageMarkers,
                         onOpen = { position, ordinal ->
                             viewModel.openWithBuilderForTranslate(position, ordinal)
-                        },
-                        onOpenSimple = onOpenSimpleTranslate
+                        }
                     )
                 }
                 OutlinedTextField(
@@ -711,6 +728,15 @@ private fun PortraitLayout(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     maxLines = 3
                 )
+
+                if (simpleTranslate || simpleBlockActive) {
+                    OutlinedButton(
+                        onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Simpler translate")
+                    }
+                }
                 
                 // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                 if (executePrefixEnabled) {
@@ -789,8 +815,7 @@ private fun PortraitLayout(
                             )
                         },
                         onOpenWithBuilder = {
-                            if (simpleTranslate) onOpenSimpleTranslate(null)
-                            else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                            viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                         }
                     )
                 }
@@ -983,12 +1008,14 @@ internal fun TellrawPreviewDialog(
 @Composable
 private fun TranslateTokenBar(
     markers: String,
-    onOpen: (Int, Int) -> Unit,
-    onOpenSimple: (String?) -> Unit
+    onOpen: (Int, Int) -> Unit
 ) {
     val tokens = remember(markers) {
         TextComponentHelper.componentTokens(markers)
-            .filter { it.type == TextComponentHelper.ComponentType.TRANSLATE }
+            .filter {
+                it.type == TextComponentHelper.ComponentType.TRANSLATE &&
+                    it.content != TextComponentHelper.SIMPLE_TRANSLATE_KEY
+            }
     }
     if (tokens.isEmpty()) return
     Column(
@@ -1007,16 +1034,10 @@ private fun TranslateTokenBar(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             tokens.forEach { token ->
-                val isSimpler = token.content == TextComponentHelper.SIMPLE_TRANSLATE_KEY
                 AssistChip(
-                    onClick = {
-                        if (isSimpler) onOpenSimple(TextComponentHelper.simpleBlockJsonAt(markers, token.start)) else onOpen(token.start, token.ordinal)
-                    },
+                    onClick = { onOpen(token.start, token.ordinal) },
                     label = {
-                        Text(
-                            if (isSimpler) "Simpler${token.ordinal}"
-                            else stringResource(R.string.translate_token_label, token.ordinal)
-                        )
+                        Text(stringResource(R.string.translate_token_label, token.ordinal))
                     },
                     colors = AssistChipDefaults.assistChipColors(
                         labelColor = MaterialTheme.colorScheme.primary
@@ -1037,7 +1058,6 @@ private fun TranslateTokenBar(
 private fun LandscapeLayout(
     onNavigateToHelp: () -> Unit,
     onNavigateToGrid: () -> Unit,
-    onOpenTellrawPreview: () -> Unit,
     onOpenSimpleTranslate: (String?) -> Unit,
     onCommaSelected: () -> Unit,
     selectorInput: String,
@@ -1059,6 +1079,7 @@ private fun LandscapeLayout(
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
 
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
@@ -1084,42 +1105,42 @@ private fun LandscapeLayout(
                 )
                 IconButton(
                     onClick = onNavigateToGrid,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.Apps,
                         contentDescription = "网格实体编辑器",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = { showHistoryDialog.value = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.History, 
                         contentDescription = stringResource(R.string.history),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = { showSettingsDialog.value = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.Settings,
                         contentDescription = stringResource(R.string.settings_title),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = onNavigateToHelp,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Help,
                         contentDescription = stringResource(R.string.help),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -1190,13 +1211,12 @@ private fun LandscapeLayout(
                             style = MaterialTheme.typography.titleMedium
                         )
                         
-                        if (simpleTranslate) {
+                        if (simpleTranslate || simpleBlockActive) {
                             TranslateTokenBar(
                                 markers = messageMarkers,
                                 onOpen = { position, ordinal ->
                                     viewModel.openWithBuilderForTranslate(position, ordinal)
-                                },
-                                onOpenSimple = onOpenSimpleTranslate
+                                }
                             )
                         }
                                                 OutlinedTextField(
@@ -1235,6 +1255,15 @@ private fun LandscapeLayout(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                             maxLines = 5
                         )
+
+                        if (simpleTranslate || simpleBlockActive) {
+                            OutlinedButton(
+                                onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Simpler translate")
+                            }
+                        }
                         
                         // execute 前置命令框（需求七.1：单独一个框，避免"玩家文本本身就是 execute"的歧义）
                         if (executePrefixEnabled) {
@@ -1313,8 +1342,7 @@ private fun LandscapeLayout(
                                     )
                                 },
                                 onOpenWithBuilder = {
-                                    if (simpleTranslate) onOpenSimpleTranslate(null)
-                                    else viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
+                                    viewModel.openWithBuilder(messageTextFieldValue.value.selection.start)
                                 }
                             )
                         }

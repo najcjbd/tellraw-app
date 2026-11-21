@@ -365,6 +365,8 @@
     <string name="component_translate">Translation</string>
     <string name="component_score">Score</string>
     <string name="component_selector">Selector</string>
+    <string name="component_keybind">Keybind</string>
+    <string name="component_nbt">NBT</string>
     <string name="component_with">With</string>
     <string name="component_with_json">with (JSON components)</string>
     <string name="component_fallback">Fallback</string>
@@ -425,7 +427,7 @@
     <string name="with_builder_json_error">Cannot parse JSON</string>
     <string name="with_builder_json_input_hint">The argument JSON is shown in the message field; edit it here to avoid breaking it.</string>
     <string name="with_builder_preview">Preview</string>
-    <string name="with_builder_bedrock_styles">Bedrock ignores color/format/click/hover styles</string>
+    <string name="with_builder_bedrock_styles">Bedrock rawtext can express text color/format only with §; style fields on translate/score/selector are dropped, as are font/click/hover</string>
     <string name="with_builder_bedrock_keybind">Bedrock ignores keybind</string>
     <string name="with_builder_bedrock_nbt">Bedrock ignores NBT components</string>
     <string name="with_builder_bedrock_fallback">Bedrock ignores nested translate fallback</string>

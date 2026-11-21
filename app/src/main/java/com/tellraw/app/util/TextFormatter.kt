@@ -482,10 +482,10 @@ object TextFormatter {
     /**
      * 将文本转换为基岩版tellraw JSON格式，与Python版本保持一致
      */
-    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, target: com.tellraw.app.model.VersionSpec? = null): String {
+    fun convertToBedrockJson(text: String, mNHandling: String = "font", mnCFEnabled: Boolean = false, context: Context? = null, warnings: MutableList<String>? = null, nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN, target: com.tellraw.app.model.VersionSpec? = null, parseMarkers: Boolean = true): String {
         // 检查是否包含文本组件标记
         var plainText = text
-        if (text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
+        if (parseMarkers && text.contains(TextComponentHelper.MARKER_START) && text.contains(TextComponentHelper.MARKER_END)) {
             // 使用新的文本组件转换逻辑
             val components = TextComponentHelper.parseTextComponents(text)
             if (components.any { it.type != TextComponentHelper.ComponentType.TEXT }) {

@@ -504,6 +504,9 @@ object GridConditionEvaluator {
                 return CondEval(true, 6, neutral = true)
             }
             val ok = if (target == "@s" || target.startsWith("@s")) {
+                if (target != "@s") {
+                    notes.add("items 源 $target 的方括号条件未参与求值，网格按当前候选实体的物品近似")
+                }
                 matchesItemPredicate(entity.items, slots, predicate, notes)
             } else {
                 notes.add("items 条件的目标不是 @s（$target），网格按候选实体近似")
@@ -545,6 +548,9 @@ object GridConditionEvaluator {
             val target = tokens.getOrNull(i + 3) ?: return null
             val slots = tokens.getOrNull(i + 4) ?: return null
             val ok = if (target == "@s" || target.startsWith("@s")) {
+                if (target != "@s") {
+                    notes.add("slots 源 $target 的方括号条件未参与求值，网格按当前候选实体近似")
+                }
                 entityHasSlots(entity, slots)
             } else {
                 notes.add("slots 条件的目标不是 @s（$target），网格按候选实体近似")
@@ -593,6 +599,9 @@ object GridConditionEvaluator {
     private fun slotMatches(source: String, key: String): Boolean {
         val src = translateInventorySlotSource(source.removePrefix("slot."))
         val k = key.removePrefix("slot.")
+        if (src.startsWith("container") && !k.startsWith("container")) {
+            return containerMatchesPlayer(src, k)
+        }
         if (src == "*") return true
         if (src.endsWith(".*")) return k.startsWith(src.dropLast(1)) || k == src.dropLast(2)
         // 槽位区间，例如 hotbar.0..8 / inventory.0..8（后者已翻译成内部 9..17）。
@@ -612,6 +621,31 @@ object GridConditionEvaluator {
         return k == src
     }
 
+    /**
+     * 实体 items 的 Java 槽位源 `container.N`：0-8 是 hotbar，9-35 是 inventory。
+     * 内部键仍用 hotbar.N / inventory.N（inventory 已带 +9 偏移）。
+     */
+    private fun containerMatchesPlayer(src: String, key: String): Boolean {
+        if (src == "container" || src == "container.*") {
+            return key.startsWith("hotbar.") || key.startsWith("inventory.")
+        }
+        val rest = src.removePrefix("container.").trim()
+        val idx = key.substringAfterLast('.').toIntOrNull() ?: return false
+        val isHotbar = key.startsWith("hotbar.")
+        val isInventory = key.startsWith("inventory.")
+        if (!isHotbar && !isInventory) return false
+        if (rest == "*") return true
+        if (".." in rest) {
+            val lo = rest.substringBefore("..").toIntOrNull()
+            val hi = rest.substringAfter("..").toIntOrNull()
+            if (lo != null && idx < lo) return false
+            if (hi != null && idx > hi) return false
+            return true
+        }
+        val wanted = rest.toIntOrNull() ?: return false
+        return idx == wanted
+    }
+
     private fun matchesItemPredicate(
         items: Map<String, GridItem>,
         slots: String,
@@ -628,6 +662,10 @@ object GridConditionEvaluator {
             p.substring(bracketIndex + 1, p.length - 1)
         } else ""
 
+        if (idPart.startsWith("#")) {
+            notes.add("物品标签谓词 $idPart 未建模，已按未参与筛选处理")
+            return true
+        }
         if (idPart.startsWith("!")) {
             // Java 原版实测：item_predicate 的 ID 前不能写 !（! 只能加在 [] 内的测试项前），
             // 盲拆成“存在任意非该 ID 物品”会得到原版根本不会执行的结果。
