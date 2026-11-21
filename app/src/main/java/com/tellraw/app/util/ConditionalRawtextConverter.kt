@@ -14,7 +14,13 @@ import com.tellraw.app.model.VersionSpec
  */
 object ConditionalRawtextConverter {
 
-    data class Row(val selector: String, val params: String, val contentJson: String)
+    data class Row(
+        val selector: String,
+        val params: String,
+        val contentJson: String,
+        val key: String = "",
+        val args: List<JsonElement> = emptyList()
+    )
 
     fun parse(json: String): List<Row>? {
         val root = runCatching { JsonParser.parseString(json) }.getOrNull() ?: return null
@@ -36,7 +42,7 @@ object ConditionalRawtextConverter {
             } else ""
             val content = JsonArray()
             for (i in 1 until args.size()) content.add(args[i])
-            rows.add(Row(selector, params, content.toString()))
+            rows.add(Row(selector, params, content.toString(), key, args.toList()))
         }
         return rows.takeIf { it.isNotEmpty() }
     }
@@ -76,10 +82,69 @@ object ConditionalRawtextConverter {
                 tellrawTarget = "@s"
             }
             val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
-            out.add("$base ${inner.joinToString(" ")}$exclusions run tellraw $tellrawTarget ${row.contentJson}")
+            val jContent = javaContent(row, context, nbtSyntax, warnings) ?: row.contentJson
+            out.add("$base ${inner.joinToString(" ")}$exclusions run tellraw $tellrawTarget $jContent")
             if (row.params.isNotBlank()) earlier.add(row.params)
         }
         return out
+    }
+
+    /**
+     * 把 `%%n` 按 with 参数展开，再交给 Java 互转。
+     * 例：`%%2『传送主城』` + [selector, {"text":"A"}] -> A + 『传送主城』。
+     */
+    private fun javaContent(
+        row: Row,
+        context: Context?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        warnings: MutableList<String>?
+    ): String? {
+        if (row.key.isBlank() || row.args.isEmpty()) return null
+        val token = Regex("%%(\\d+)")
+        if (!token.containsMatchIn(row.key)) return row.contentJson
+        if (Regex("%%(?![0-9])").containsMatchIn(row.key)) {
+            warnings?.add("conditional rawtext 的 translate 含非数字 %% 参数，已保留原参数内容，可能有字面文本丢失")
+            return row.contentJson
+        }
+
+        val expanded = JsonArray()
+        fun addComponent(el: JsonElement) {
+            val nested = el.takeIf { it.isJsonObject }
+                ?.asJsonObject?.getAsJsonArray("rawtext")
+            if (nested != null) nested.forEach { expanded.add(it.deepCopy()) }
+            else expanded.add(el.deepCopy())
+        }
+        var cursor = 0
+        token.findAll(row.key).forEach { m ->
+            val literal = row.key.substring(cursor, m.range.first)
+            if (literal.isNotEmpty()) {
+                expanded.add(JsonObject().apply { addProperty("text", literal) })
+            }
+            val index = m.groupValues[1].toIntOrNull()
+            val arg = index?.let { row.args.getOrNull(it - 1) }
+            if (arg == null) {
+                warnings?.add("conditional rawtext 的 %%$index 没有对应参数，已保留原参数内容")
+                return row.contentJson
+            }
+            addComponent(arg)
+            cursor = m.range.last + 1
+        }
+        if (cursor < row.key.length) {
+            val tail = row.key.substring(cursor)
+            if (tail.isNotEmpty()) expanded.add(JsonObject().apply { addProperty("text", tail) })
+        }
+        if (expanded.size() == 0) return row.contentJson
+
+        val raw = JsonObject().apply { add("rawtext", expanded) }.toString()
+        val parsed = runCatching {
+            CommandInputParser.parse(raw, context, nbtSyntax)
+        }.getOrNull()
+        if (parsed == null) {
+            warnings?.add("conditional rawtext 内容无法转成 Java，已保留原参数内容")
+            return row.contentJson
+        }
+        warnings?.addAll(parsed.warnings)
+        return parsed.javaJson
     }
 
     private fun exclusionsForJava(

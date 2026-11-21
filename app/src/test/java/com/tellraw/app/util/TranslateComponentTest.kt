@@ -216,6 +216,17 @@ class TranslateComponentTest {
     }
 
     @Test
+    fun conditionalRawtextKeepsLiteralTextAroundPlaceholder() {
+        val raw = """{"rawtext":[
+            {"translate":"%%2『传送主城』","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"A"}]}}
+        ]}"""
+        val rows = ConditionalRawtextConverter.parse(raw)!!
+        val command = ConditionalRawtextConverter.toJava(rows).single()
+        assertTrue(command, command.contains("A"))
+        assertTrue(command, command.contains("『传送主城』"))
+    }
+
+    @Test
     fun conditionalRawtextConvertsToFirstMatchJavaCommands() {
         val raw = """{"rawtext":[
             {"translate":"%%2","with":{"rawtext":[{"selector":"@s[scores={menu=1}]"},{"text":"A"}]}},
