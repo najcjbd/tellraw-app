@@ -957,6 +957,25 @@ object TextComponentHelper {
     private val JAVA_COLOR_NAME_TO_CODE: Map<String, Char> =
         JAVA_COLORS.entries.associate { (code, name) -> name to code[0] }
 
+    /** 取某个 Simpler token 里保存的参数表 JSON。 */
+    fun simpleBlockJsonAt(text: String, position: Int): String? {
+        val components = parseTextComponents(text)
+        var pos = 0
+        for (component in components) {
+            val len = component.content.length +
+                component.subComponents.sumOf { it.content.length }
+            val inRange = position == pos || position in pos until (pos + len)
+            if (inRange && component.type == ComponentType.TRANSLATE &&
+                component.content == SIMPLE_TRANSLATE_KEY
+            ) {
+                return component.subComponents
+                    .firstOrNull { it.type == SubComponentType.WITH_JSON }?.content
+            }
+            pos += len
+        }
+        return null
+    }
+
     /** 从正常消息中移除 Simpler translate 保留组件（它由主生成单独展开）。 */
     fun removeSimpleTranslateBlocks(text: String): String {
         // 不能直接查 SIMPLE_TRANSLATE_KEY：componentsToText 会把 "_" 转义成 "\_"
@@ -1272,7 +1291,12 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToJavaJson(combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax, bedrockColorToRgb = bedrockColorToRgb, target = target, parseMarkers = false)
+            return flattenJavaJsonExtras(
+                TextFormatter.convertToJavaJson(
+                    combinedText, mNHandling, mnCFEnabled, context, nbtSyntax = nbtSyntax,
+                    bedrockColorToRgb = bedrockColorToRgb, target = target, parseMarkers = false
+                )
+            )
         }
 
         if (expandedComponents.size == 1 && expandedComponents[0].type == ComponentType.TEXT &&
@@ -1286,7 +1310,7 @@ object TextComponentHelper {
             } else {
                 val result = formatMap.toMutableMap()
                 result["text"] = plainText
-                return mapToJson(result)
+                return flattenJavaJsonExtras(mapToJson(result))
             }
         }
 
@@ -1597,29 +1621,7 @@ object TextComponentHelper {
                 }
                 subMap
             }
-            // 外层根组件的样式会被所有 extra 继承；非 TEXT 兄弟组件没有样式时应显式复位
-            val styleKeys = setOf(
-                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
-                "font", "insertion"
-            )
-            val rootStyle = result.filterKeys { it in styleKeys }
-            if (rootStyle.isNotEmpty()) {
-                if (result.containsKey("clickEvent") || result.containsKey("hoverEvent")) {
-                    warnings?.add("extra 子组件会继承父组件的 clickEvent/hoverEvent；Java JSON 没有显式取消写法，请检查子组件")
-                }
-                extra.forEach { subMap ->
-                    for ((key, value) in rootStyle) {
-                        if (subMap.containsKey(key)) continue
-                        when {
-                            // tellraw 默认前景色是白色（JSON 没有官方的 color:"reset"）
-                            key == "color" -> subMap["color"] = "white"
-                            key == "font" -> subMap["font"] = "minecraft:default"
-                            key == "insertion" -> subMap["insertion"] = ""
-                            value == true -> subMap[key] = false
-                        }
-                    }
-                }
-            }
+            // 多组件最终会输出 JSON 数组，每个组件自带样式，不再需要给 extra 补 white/false。
             // TEXT 的 § 分段可能已经产生 extra，这里要合并而不是覆盖
             val merged: MutableList<Any?> =
                 (result["extra"] as? List<*>)?.toMutableList() ?: mutableListOf()
@@ -1627,7 +1629,74 @@ object TextComponentHelper {
             result["extra"] = merged
         }
 
-        return mapToJson(result)
+        return flattenJavaJsonExtras(mapToJson(result))
+    }
+
+    private val JAVA_STYLE_KEYS = listOf(
+        "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
+        "font", "insertion", "clickEvent", "hoverEvent"
+    )
+
+    /**
+     * Java 的 extra 会继承父样式。为了输出可读，先把继承字段显式下沉，再展平成一级 extra，
+     * 最后合并相邻且样式完全相同的 text 片段。
+     */
+    private fun flattenJavaJsonExtras(json: String): String {
+        val root = runCatching { JsonParser.parseString(json).asJsonObject }.getOrNull()
+            ?: return json
+        val flat = mutableListOf<JsonObject>()
+
+        fun overlayStyle(target: JsonObject, inherited: JsonObject) {
+            JAVA_STYLE_KEYS.forEach { key ->
+                if (!target.has(key) && inherited.has(key)) {
+                    target.add(key, inherited.get(key).deepCopy())
+                }
+            }
+        }
+
+        fun walk(obj: JsonObject, inherited: JsonObject) {
+            val current = obj.deepCopy()
+            overlayStyle(current, inherited)
+            val extra = current.remove("extra")?.takeIf { it.isJsonArray }?.asJsonArray
+            flat.add(current)
+            extra?.forEach { child ->
+                if (child.isJsonObject) walk(child.asJsonObject, current)
+            }
+        }
+
+        // 根节点的 extra 来自“多个独立组件”，不能继承根组件样式；
+        // 每个组件内部自己的 extra（例如 § 分段）才继承该组件的样式。
+        val rootCopy = root.deepCopy()
+        val rootExtra = rootCopy.remove("extra")?.takeIf { it.isJsonArray }?.asJsonArray
+        flat.add(rootCopy)
+        rootExtra?.forEach { child ->
+            if (child.isJsonObject) walk(child.asJsonObject, JsonObject())
+        }
+
+        val merged = mutableListOf<JsonObject>()
+        for (item in flat) {
+            val prev = merged.lastOrNull()
+            val onlyTextAndStyle = item.keySet().all { it == "text" || it in JAVA_STYLE_KEYS }
+            val prevOnlyTextAndStyle = prev != null && prev.keySet().all {
+                it == "text" || it in JAVA_STYLE_KEYS
+            }
+            if (prev != null && onlyTextAndStyle && prevOnlyTextAndStyle &&
+                item.has("text") && prev.has("text") &&
+                JAVA_STYLE_KEYS.all { prev.get(it) == item.get(it) }
+            ) {
+                prev.addProperty("text", prev.get("text").asString + item.get("text").asString)
+            } else {
+                merged.add(item)
+            }
+        }
+
+        if (merged.isEmpty()) return "{}"
+        if (merged.size == 1) return merged[0].toString()
+        // 多个组件时输出 JSON 数组：每个组件自带完整样式，避免 extra 继承导致
+        // “后面组件要不要补 false / §r”这种跨版本歧义。
+        return JsonArray().apply {
+            merged.forEach { add(it) }
+        }.toString()
     }
     
     /**

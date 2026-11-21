@@ -4,6 +4,7 @@ import com.tellraw.app.util.TextComponentHelper.ComponentStyle
 import com.tellraw.app.util.TextComponentHelper.ComponentType
 import com.tellraw.app.util.TextComponentHelper.TextComponent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -151,6 +152,45 @@ class ComponentStyleTest {
         val java = TextComponentHelper.convertToJavaJson(listOf(comp))
         assertTrue(java, java.contains("\"text\":\"Hi\""))
         assertTrue(java, java.contains("\"color\":\"red\""))
+    }
+
+    @Test
+    fun javaOutputFlattensNestedExtrasAndMergesAdjacentSameStyleText() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "9", style = ComponentStyle(strikethrough = true)),
+            TextComponent(ComponentType.TEXT, "1", style = ComponentStyle(strikethrough = true)),
+            TextComponent(ComponentType.TEXT, "91", style = ComponentStyle(strikethrough = true)),
+            TextComponent(
+                ComponentType.TEXT, "78",
+                style = ComponentStyle(strikethrough = true, underlined = true)
+            )
+        )
+        val java = TextComponentHelper.convertToJavaJson(components)
+        val arr = com.google.gson.JsonParser.parseString(java).asJsonArray
+        assertEquals(2, arr.size())
+        assertEquals("9191", arr[0].asJsonObject.get("text").asString)
+        assertTrue(arr[0].asJsonObject.get("strikethrough").asBoolean)
+        assertEquals("78", arr[1].asJsonObject.get("text").asString)
+        assertTrue(arr[1].asJsonObject.get("underlined").asBoolean)
+        assertTrue(arr.all { !it.asJsonObject.has("extra") })
+    }
+
+    @Test
+    fun unstyledSelectorDoesNotNeedFalseInheritanceFlags() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "91", style = ComponentStyle(strikethrough = true)),
+            TextComponent(
+                ComponentType.TEXT, "78",
+                style = ComponentStyle(strikethrough = true, underlined = true)
+            ),
+            TextComponent(ComponentType.SELECTOR, "@a")
+        )
+        val java = TextComponentHelper.convertToJavaJson(components)
+        val arr = com.google.gson.JsonParser.parseString(java).asJsonArray
+        val selector = arr.first { it.asJsonObject.has("selector") }.asJsonObject
+        assertFalse(selector.has("strikethrough"))
+        assertFalse(selector.has("underlined"))
+        assertFalse(selector.has("color"))
     }
 
     @Test
