@@ -1729,8 +1729,11 @@ object TextComponentHelper {
             )
         }
 
-        val rawtext = expandedComponents.map { component ->
+        val rawtext = mutableListOf<Map<String, Any>>()
+        var pendingStyle = false
+        expandedComponents.forEach { component ->
             val item = mutableMapOf<String, Any>()
+            var textStyled = false
 
             when (component.type) {
                 ComponentType.TEXT -> {
@@ -1742,7 +1745,9 @@ object TextComponentHelper {
                     }
                     // 处理§代码
                     val prefix = component.style.legacyPrefix(warnings)
-                    item["text"] = prefix + processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
+                    val body = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
+                    textStyled = prefix.isNotEmpty() || '§' in body
+                    item["text"] = prefix + body
                 }
                 ComponentType.TRANSLATE -> {
                     if (component.content != SIMPLE_TRANSLATE_KEY && !component.style.isEmpty()) {
@@ -1869,7 +1874,15 @@ object TextComponentHelper {
                 }
             }
 
-            item
+            if (pendingStyle) {
+                if (component.type == ComponentType.TEXT) {
+                    item["text"] = "§r" + ((item["text"] as? String) ?: "")
+                } else {
+                    rawtext.add(mapOf("text" to "§r"))
+                }
+            }
+            rawtext.add(item)
+            pendingStyle = component.type == ComponentType.TEXT && textStyled
         }
 
         return """{"rawtext":${listToJson(rawtext)}}"""
