@@ -1739,10 +1739,17 @@ object TextComponentHelper {
         }
 
         val rawtext = mutableListOf<Map<String, Any>>()
-        var pendingStyle = false
+        var currentStyle = ""
+        val unknownStyle = "\u0001"
+        fun styleTransition(desired: String): String {
+            if (currentStyle == desired) return ""
+            return buildString {
+                if (currentStyle.isNotEmpty()) append("§r")
+                append(desired)
+            }
+        }
         expandedComponents.forEach { component ->
             val item = mutableMapOf<String, Any>()
-            var textStyled = false
 
             when (component.type) {
                 ComponentType.TEXT -> {
@@ -1753,15 +1760,12 @@ object TextComponentHelper {
                         warnings?.add("基岩 rawtext 不支持 font/clickEvent/hoverEvent/insertion 等样式字段；Java 输出已保留")
                     }
                     // 处理§代码
-                    val prefix = component.style.legacyPrefix(warnings)
+                    val desired = component.style.legacyPrefix(warnings)
                     val body = processSectionCodesToBedrock(component.content, mNHandling, mnCFEnabled)
-                    textStyled = prefix.isNotEmpty() || '§' in body
-                    item["text"] = prefix + body
+                    item["text"] = styleTransition(desired) + body
+                    currentStyle = if ('§' in body) unknownStyle else desired
                 }
                 ComponentType.TRANSLATE -> {
-                    if (component.content != SIMPLE_TRANSLATE_KEY && !component.style.isEmpty()) {
-                        warnings?.add("基岩 rawtext 不支持给 translate 组件加样式字段；Java 输出已保留")
-                    }
                     item["translate"] = component.content
                     if (component.content == SIMPLE_TRANSLATE_KEY) {
                         // marker 原样保留，由 Simpler translate 生成器替换。
@@ -1806,9 +1810,6 @@ object TextComponentHelper {
                     }
                 }
                 ComponentType.SCORE -> {
-                    if (!component.style.isEmpty()) {
-                        warnings?.add("基岩 rawtext 不支持给 score 组件加样式字段；Java 输出已保留")
-                    }
                     // SCORE组件已展开，每个组件只包含一个条目
                     val scoreEntries = parseScoreContent(component.content)
 
@@ -1827,9 +1828,6 @@ object TextComponentHelper {
                     }
                 }
                 ComponentType.SELECTOR -> {
-                    if (!component.style.isEmpty()) {
-                        warnings?.add("基岩 rawtext 不支持给 selector 组件加样式字段；Java 输出已保留")
-                    }
                     // SELECTOR组件已展开，每个组件只包含一个条目
                     val selectorString = component.content
                     val (selectorEntries, separatorEntries) = parseSelectorContent(selectorString)
@@ -1883,15 +1881,19 @@ object TextComponentHelper {
                 }
             }
 
-            if (pendingStyle) {
-                if (component.type == ComponentType.TEXT) {
-                    item["text"] = "§r" + ((item["text"] as? String) ?: "")
-                } else {
-                    rawtext.add(mapOf("text" to "§r"))
+            if (component.type != ComponentType.TEXT) {
+                if (component.style.font != null || component.style.insertion != null ||
+                    component.style.clickEvent != null || component.style.hoverEvent != null ||
+                    component.style.extra.size() > 0
+                ) {
+                    warnings?.add("基岩 rawtext 不支持 font/clickEvent/hoverEvent/insertion；Java 输出已保留")
                 }
+                val desired = component.style.legacyPrefix(warnings)
+                val transition = styleTransition(desired)
+                if (transition.isNotEmpty()) rawtext.add(mapOf("text" to transition))
+                currentStyle = desired
             }
             rawtext.add(item)
-            pendingStyle = component.type == ComponentType.TEXT && textStyled
         }
 
         return """{"rawtext":${listToJson(rawtext)}}"""
