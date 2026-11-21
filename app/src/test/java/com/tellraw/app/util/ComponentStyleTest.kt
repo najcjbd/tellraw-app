@@ -137,6 +137,23 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun sectionCodesInsideWithJsonAreConvertedForJava() {
+        val comp = TextComponentHelper.TextComponent(
+            ComponentType.TRANSLATE,
+            "chat.type.text",
+            mutableListOf(
+                TextComponentHelper.SubComponent(
+                    TextComponentHelper.SubComponentType.WITH_JSON,
+                    """[{"text":"§cHi"}]"""
+                )
+            )
+        )
+        val java = TextComponentHelper.convertToJavaJson(listOf(comp))
+        assertTrue(java, java.contains("\"text\":\"Hi\""))
+        assertTrue(java, java.contains("\"color\":\"red\""))
+    }
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()

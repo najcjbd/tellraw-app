@@ -464,7 +464,7 @@ private fun ArgTree(
                 if (translate != null && translate.args.isNotEmpty()) {
                     IconButton(
                         onClick = { onToggle(path) },
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,

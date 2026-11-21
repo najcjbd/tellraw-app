@@ -647,7 +647,74 @@ object TextComponentHelper {
     }
     
     /** TEXT 组件的 § 样式解析：复用纯文本转换器，得到可合并的 JSON 对象。 */
-    /** 递归处理 with JSON 内的 selector 组件，避免 hasitem/team 等跨版本参数原样透传。 */
+    /** 基岩 with JSON 里的 text 仍用 §；转 Java 时把 § 展开成字段，其他组件递归。 */
+    private fun normalizeWithJsonForJava(
+        el: JsonElement,
+        mNHandling: String,
+        mnCFEnabled: Boolean,
+        context: Context?,
+        warnings: MutableList<String>?,
+        separatorAsTextComponent: Boolean,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        bedrockColorToRgb: Boolean,
+        target: com.tellraw.app.model.VersionSpec?
+    ): JsonElement {
+        return when {
+            el.isJsonArray -> JsonArray().apply {
+                el.asJsonArray.forEach {
+                    add(normalizeWithJsonForJava(
+                        it, mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+            }
+            el.isJsonObject -> {
+                val o = el.asJsonObject
+                val out = o.deepCopy()
+                if (o.has("with")) {
+                    out.add("with", normalizeWithJsonForJava(
+                        o.get("with"), mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+                o.get("extra")?.let {
+                    out.add("extra", normalizeWithJsonForJava(
+                        it, mNHandling, mnCFEnabled, context, warnings,
+                        separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
+                    ))
+                }
+                val textEl = o.get("text")
+                if (textEl != null && textEl.isJsonPrimitive && '§' in textEl.asString) {
+                    val converted = runCatching {
+                        com.google.gson.Gson().fromJson(
+                            TextFormatter.convertToJavaJson(
+                                textEl.asString, mNHandling, mnCFEnabled, context, warnings,
+                                separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target,
+                                parseMarkers = false
+                            ),
+                            JsonObject::class.java
+                        )
+                    }.getOrNull()
+                    if (converted != null) {
+                        converted.entrySet().forEach { (k, v) ->
+                            when (k) {
+                                "extra" -> {
+                                    val merged = JsonArray()
+                                    v.takeIf { it.isJsonArray }?.asJsonArray?.forEach { merged.add(it) }
+                                    o.get("extra")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { merged.add(it) }
+                                    if (merged.size() > 0) out.add("extra", merged)
+                                }
+                                "text" -> out.add("text", v)
+                                else -> if (!o.has(k)) out.add(k, v)
+                            }
+                        }
+                    }
+                }
+                out
+            }
+            else -> el.deepCopy()
+        }
+    }
     private fun filterJsonSelectors(
         el: JsonElement,
         type: SelectorType,
@@ -1256,9 +1323,13 @@ object TextComponentHelper {
                         }
                         val withComponents = items.mapNotNull { item ->
                             if (item.json != null) {
-                                filterJsonSelectors(
-                                    item.json, SelectorType.JAVA, context,
-                                    nbtSyntax, target, warnings
+                                normalizeWithJsonForJava(
+                                    filterJsonSelectors(
+                                        item.json, SelectorType.JAVA, context,
+                                        nbtSyntax, target, warnings
+                                    ),
+                                    mNHandling, mnCFEnabled, context, warnings,
+                                    separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
                                 )
                             } else {
                                 val param = item.raw
@@ -1388,9 +1459,13 @@ object TextComponentHelper {
                                 }
                                 val withComponents = items.mapNotNull { item ->
                                     if (item.json != null) {
-                                        filterJsonSelectors(
-                                            item.json, SelectorType.JAVA, context,
-                                            nbtSyntax, target, warnings
+                                        normalizeWithJsonForJava(
+                                            filterJsonSelectors(
+                                                item.json, SelectorType.JAVA, context,
+                                                nbtSyntax, target, warnings
+                                            ),
+                                            mNHandling, mnCFEnabled, context, warnings,
+                                            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
                                         )
                                     } else {
                                         val param = item.raw

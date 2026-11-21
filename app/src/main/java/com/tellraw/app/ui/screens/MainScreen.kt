@@ -1081,42 +1081,42 @@ private fun LandscapeLayout(
                 )
                 IconButton(
                     onClick = onNavigateToGrid,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.Apps,
                         contentDescription = "网格实体编辑器",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = { showHistoryDialog.value = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.History, 
                         contentDescription = stringResource(R.string.history),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = { showSettingsDialog.value = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Default.Settings,
                         contentDescription = stringResource(R.string.settings_title),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = onNavigateToHelp,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Help,
                         contentDescription = stringResource(R.string.help),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
