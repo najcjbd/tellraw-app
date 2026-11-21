@@ -65,6 +65,15 @@ class CommandInputParserAuditTest {
     }
 
     @Test
+    fun nullTextBecomesEmptyNotLiteralNull() {
+        val r = parse("""{"text":null}""")
+        assertNotNull(r)
+        assertTrue(r!!.components.all { it.content != "null" })
+        assertFalse(r.javaJson.contains("\"text\":\"null\""))
+    }
+
+
+    @Test
     fun unsupportedStyleFieldsArePreserved() {
         val r = parse(
             """{"text":"A","color":"#12AB34","clickEvent":{"action":"run_command","value":"/say hi"},"font":"minecraft:uniform"}"""

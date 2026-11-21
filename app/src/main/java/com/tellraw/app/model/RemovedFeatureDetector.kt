@@ -26,6 +26,9 @@ object RemovedFeatureDetector {
         if (Regex("""\bswing_animation\s*[:=]""").containsMatchIn(text)) {
             return Hit(FeatureGate.RemovedFeature.SWING_ANIMATION, "swing_animation", spec(26, 2))
         }
+        if (Regex("""\bcondition"?\s*:""").containsMatchIn(text)) {
+            return Hit(FeatureGate.RemovedFeature.PREDICATE_CONDITION_KEY, "condition", spec(26, 2))
+        }
         return null
     }
 }

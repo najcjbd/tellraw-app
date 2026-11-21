@@ -92,6 +92,10 @@ object SelectorEvaluator {
         // 同一条选择器里两版实体 ID 同时出现 -> 提醒（不改变求值，只提示可能写重/混用）
         EntityIdAliases.detectMixedEditionIds(selector)?.let { notes.add(it) }
         val s = selector.trim()
+        if ('[' in s && !s.endsWith("]")) {
+            notes.add("选择器方括号未闭合：$selector")
+            return Result(emptyList(), notes)
+        }
         val base = s.substringBefore('[').trim()
         val paramsPart = if ('[' in s && s.endsWith("]")) s.substringAfter('[').dropLast(1) else ""
         val params = if (paramsPart.isBlank()) emptyList()
@@ -431,6 +435,7 @@ object SelectorEvaluator {
 
     private fun matchTeam(e: GridEntity, value: String): Boolean = when {
         value == "!" -> !e.team.isNullOrBlank()
+        value.startsWith("!") -> e.team != value.drop(1)
         value.isEmpty() -> e.team.isNullOrBlank()
         else -> e.team == value
     }

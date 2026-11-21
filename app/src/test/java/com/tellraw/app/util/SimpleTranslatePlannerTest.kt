@@ -19,7 +19,8 @@ class SimpleTranslatePlannerTest {
     private fun plan(
         table: Table,
         includeDefaultFallback: Boolean = true,
-        bedrockFirstMatch: Boolean = false
+        bedrockFirstMatch: Boolean = false,
+        target: VersionSpec? = VersionSpec.LATEST
     ): SimpleTranslatePlanner.Result {
         val warnings = mutableListOf<String>()
         return SimpleTranslatePlanner.plan(
@@ -33,7 +34,7 @@ class SimpleTranslatePlannerTest {
             includeDefaultFallback = includeDefaultFallback,
             context = null,
             nbtSyntax = VersionDiff.NbtSyntax.MODERN,
-            target = VersionSpec.LATEST,
+            target = target,
             mNHandling = "font",
             mnCFEnabled = false,
             separatorAsTextComponent = false,
@@ -41,6 +42,70 @@ class SimpleTranslatePlannerTest {
             warnings = warnings
         )
     }
+
+    @Test
+    fun oldTargetDowngradesGeneratedExecuteToPlainTellraw() {
+        val result = plan(
+            Table(rows = listOf(Row(params = "tag=a", content = listOf(WithArgDraft.Text("A"))))),
+            target = VersionSpec(VersionSpec.Edition.JAVA, listOf(1, 12, 2))
+        )
+        assertTrue(result.java.all { it.startsWith("tellraw ") })
+        assertTrue(result.java.none { it.contains("execute ") })
+        assertTrue(result.warnings.any { it.contains("不支持 execute") })
+    }
+
+    @Test
+    fun emptyTableAndMissingMarkerReturnNoCommands() {
+        val empty = plan(Table(rows = emptyList()))
+        assertTrue(empty.java.isEmpty())
+        assertTrue(empty.warnings.any { it.contains("没有") })
+
+        val warnings = mutableListOf<String>()
+        val missing = SimpleTranslatePlanner.plan(
+            table = Table(rows = listOf(Row(params = "tag=a", content = listOf(WithArgDraft.Text("A"))))),
+            javaMessageJson = """{"text":"x"}""",
+            bedrockMessageJson = """{"rawtext":[{"text":"x"}]}""",
+            javaSelector = "@a",
+            bedrockSelector = "@a",
+            javaPrefix = null,
+            bedrockPrefix = null,
+            includeDefaultFallback = false,
+            context = null,
+            nbtSyntax = VersionDiff.NbtSyntax.MODERN,
+            target = VersionSpec.LATEST,
+            mNHandling = "font",
+            mnCFEnabled = false,
+            separatorAsTextComponent = false,
+            bedrockColorToRgb = true,
+            warnings = warnings
+        )
+        assertTrue(missing.java.isEmpty())
+        assertTrue(warnings.any { it.contains("没有进入") })
+    }
+
+    @Test
+    fun tableCodecRoundTripAndDuplicateAliasWarning() {
+        val table = Table(
+            rows = listOf(Row(id = "r0", params = "tag=a", content = listOf(WithArgDraft.Text("A", color = "red")))),
+            aliases = listOf(Alias("a", listOf(WithArgDraft.Text("b")))),
+            bedrockFirstMatch = true
+        )
+        val decoded = SimpleTranslatePlanner.decode(SimpleTranslatePlanner.encode(table))!!
+        assertEquals("tag=a", decoded.rows.single().params)
+        assertEquals("red", (decoded.rows.single().content.single() as WithArgDraft.Text).color)
+        assertEquals("a", decoded.aliases.single().from)
+        assertTrue(decoded.bedrockFirstMatch)
+        assertEquals(null, SimpleTranslatePlanner.decode("{bad"))
+
+        val duplicate = plan(
+            Table(
+                rows = listOf(Row(params = "tag=a", content = listOf(WithArgDraft.Text("x")))),
+                aliases = listOf(Alias("a", listOf(WithArgDraft.Text("b"))), Alias("a", listOf(WithArgDraft.Text("c"))))
+            )
+        )
+        assertTrue(duplicate.warnings.any { it.contains("别名") && it.contains("重复") })
+    }
+
 
     @Test
     fun javaReplacesTokenInPlaceAndKeepsSurroundingText() {

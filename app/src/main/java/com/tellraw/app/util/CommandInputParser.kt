@@ -373,6 +373,7 @@ object CommandInputParser {
 
     private fun str(o: JsonObject, key: String): String {
         val e = o.get(key) ?: return ""
+        if (e.isJsonNull) return ""
         return if (e.isJsonPrimitive) e.asString else e.toString()
     }
 }

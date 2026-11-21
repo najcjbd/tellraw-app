@@ -230,6 +230,74 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun bedrockInlineSectionMarksStateUnknownAndResetsNextText() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "§cA"),
+            TextComponent(ComponentType.TEXT, "B")
+        )
+        val arr = com.google.gson.JsonParser.parseString(
+            TextComponentHelper.convertToBedrockJson(components)
+        ).asJsonObject.getAsJsonArray("rawtext")
+        assertEquals("§cA", arr[0].asJsonObject.get("text").asString)
+        assertEquals("§rB", arr[1].asJsonObject.get("text").asString)
+    }
+
+    @Test
+    fun javaFlattensNestedExtraAndMaterializesInheritedStyle() {
+        val r = CommandInputParser.parse(
+            """{"text":"A","color":"red","extra":[{"text":"B","extra":[{"text":"C"}]}]}"""
+        )!!
+        val root = com.google.gson.JsonParser.parseString(
+            TextComponentHelper.convertToJavaJson(r.components)
+        ).asJsonObject
+        assertEquals("ABC", root.get("text").asString)
+        assertEquals("red", root.get("color").asString)
+        assertFalse(root.has("extra"))
+    }
+
+    @Test
+    fun scoreObjectiveAndBackslashSurviveRoundTrip() {
+        val r = CommandInputParser.parse(
+            """{"score":{"name":"a\\b","objective":"c:d,e"}}"""
+        )!!
+        val score = com.google.gson.JsonParser.parseString(r.javaJson)
+            .asJsonObject.getAsJsonObject("score")
+        assertEquals("""a\b""", score.get("name").asString)
+        assertEquals("c:d,e", score.get("objective").asString)
+    }
+
+    @Test
+    fun bedrockMultiComponentHonoursMnCFMode() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "§ma"),
+            TextComponent(ComponentType.SELECTOR, "@a")
+        )
+        val bedrock = TextComponentHelper.convertToBedrockJson(
+            components, mnCFEnabled = true
+        )
+        assertFalse(bedrock, bedrock.contains("§m"))
+        assertTrue(bedrock, bedrock.contains("\"text\":\"a\""))
+    }
+
+    @Test
+    fun sectionCodesInWithStringItemsAreConvertedForJava() {
+        val comp = TextComponentHelper.TextComponent(
+            ComponentType.TRANSLATE,
+            "k",
+            mutableListOf(
+                TextComponentHelper.SubComponent(
+                    TextComponentHelper.SubComponentType.WITH_JSON,
+                    """["§cA"]"""
+                )
+            )
+        )
+        val java = TextComponentHelper.convertToJavaJson(listOf(comp))
+        assertTrue(java, java.contains("\"color\":\"red\""))
+        assertTrue(java, java.contains("\"text\":\"A\""))
+    }
+
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()

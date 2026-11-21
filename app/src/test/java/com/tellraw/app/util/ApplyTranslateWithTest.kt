@@ -26,6 +26,20 @@ class ApplyTranslateWithTest {
         component.subComponents.firstOrNull { it.type == SubComponentType.WITH_JSON }?.content
 
     @Test
+    fun ordinalTargetingEditsSecondTranslateWithoutTouchingFirst() {
+        val start = markers(text("A"), translate("one"), translate("two"))
+        val result = TextComponentHelper.applyTranslateWithAtOrdinal(
+            start, 2, "changed", "fb", """[{"text":"x"}]"""
+        )!!
+        val components = parse(result).filter {
+            it.type == ComponentType.TRANSLATE
+        }
+        assertEquals("one", components[0].content)
+        assertEquals("changed", components[1].content)
+    }
+
+
+    @Test
     fun replacesPlainWithAndKeepsFallback() {
         val start = markers(
             translate(

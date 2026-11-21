@@ -17,6 +17,10 @@ class RemovedFeatureDetectorTest {
             FeatureGate.RemovedFeature.SWING_ANIMATION,
             RemovedFeatureDetector.detect("item {swing_animation:1}")!!.feature
         )
+        assertEquals(
+            FeatureGate.RemovedFeature.PREDICATE_CONDITION_KEY,
+            RemovedFeatureDetector.detect("""{"condition":"minecraft:entity_properties"}""")!!.feature
+        )
 
         assertNull(RemovedFeatureDetector.detect("{\"text\":\"a\"}"))
         // 标签/名字的值里出现同样单词，不算使用了该特性

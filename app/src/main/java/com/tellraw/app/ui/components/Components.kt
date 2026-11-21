@@ -1473,7 +1473,7 @@ fun HistoryDialog(
     onSearch: (String) -> Unit = {},
     onShowStorageSettings: () -> Unit = {}
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
@@ -2242,7 +2242,7 @@ fun FilenameInputDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    var filename by remember { mutableStateOf(currentFilename) }
+    var filename by rememberSaveable(currentFilename) { mutableStateOf(currentFilename) }
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
@@ -2535,7 +2535,7 @@ fun DirectoryPickerDialog(
     onDismiss: () -> Unit,
     onDirectorySelected: (String) -> Unit
 ) {
-    var currentPath by remember { mutableStateOf(initialPath) }
+    var currentPath by rememberSaveable(initialPath) { mutableStateOf(initialPath) }
     var directories by remember { mutableStateOf<List<String>>(emptyList()) }
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -2879,7 +2879,7 @@ fun ImageFilePickerDialog(
     onDismiss: () -> Unit,
     onImageSelected: (String) -> Unit
 ) {
-    var currentPath by remember { mutableStateOf(initialPath) }
+    var currentPath by rememberSaveable(initialPath) { mutableStateOf(initialPath) }
     var entries by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
     val imageExt = setOf("png", "jpg", "jpeg", "webp", "bmp")
 
