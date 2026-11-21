@@ -56,8 +56,9 @@ class ComponentStyleTest {
             ComponentType.TRANSLATE, "chat.type.text",
             style = ComponentStyle(color = "red")
         )
-        TextComponentHelper.convertToBedrockJson(listOf(translate), warnings = warnings)
-        assertTrue(warnings.any { it.contains("translate") && it.contains("样式") })
+        val translated = TextComponentHelper.convertToBedrockJson(listOf(translate), warnings = warnings)
+        assertTrue(translated, translated.contains("\"text\":\"§c\""))
+        assertTrue(translated, translated.contains("\"translate\":\"chat.type.text\""))
     }
 
     @Test
@@ -196,6 +197,19 @@ class ComponentStyleTest {
     }
 
     @Test
+    fun bedrockStylesSelectorThroughPrecedingFormatState() {
+        val components = listOf(
+            TextComponent(ComponentType.TEXT, "A"),
+            TextComponent(ComponentType.SELECTOR, "@a", style = ComponentStyle(color = "red"))
+        )
+        val bedrock = TextComponentHelper.convertToBedrockJson(components)
+        val arr = com.google.gson.JsonParser.parseString(bedrock).asJsonObject.getAsJsonArray("rawtext")
+        val selectorIndex = arr.indexOfFirst { it.asJsonObject.has("selector") }
+        assertTrue(selectorIndex > 0)
+        assertEquals("§c", arr[selectorIndex - 1].asJsonObject.get("text").asString)
+    }
+
+    @Test
     fun bedrockResetsFormattingBeforeUnstyledSibling() {
         val components = listOf(
             TextComponent(ComponentType.TEXT, "91", style = ComponentStyle(strikethrough = true)),
@@ -230,7 +244,8 @@ class ComponentStyleTest {
         val r = CommandInputParser.parse("""{"text":"A","color":"red","extra":[{"text":"B"}]}""")!!
         val bedrock = TextComponentHelper.convertToBedrockJson(r.components)
         assertTrue(bedrock, bedrock.contains("§cA"))
-        assertTrue(bedrock, bedrock.contains("§cB"))
+        assertTrue("父样式应通过格式状态延续，而不是重复写 §c：$bedrock", bedrock.contains("\"text\":\"B\""))
+        assertFalse(bedrock, bedrock.contains("§cB"))
     }
 
     @Test
