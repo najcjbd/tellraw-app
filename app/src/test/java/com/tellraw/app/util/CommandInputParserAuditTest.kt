@@ -57,8 +57,10 @@ class CommandInputParserAuditTest {
         val r = parse("""[{"text":"A","color":"red"},{"text":"B"}]""")
         assertNotNull(r)
         val json = TextComponentHelper.convertToJavaJson(r!!.components, context = null)
-        val arr = com.google.gson.JsonParser.parseString(json).asJsonArray
-        val b = arr.first { it.asJsonObject.get("text")?.asString == "B" }.asJsonObject
+        val root = com.google.gson.JsonParser.parseString(json).asJsonObject
+        val b = root.getAsJsonArray("extra").first {
+            it.asJsonObject.get("text")?.asString == "B"
+        }.asJsonObject
         assertFalse("数组兄弟不应生成 color:white 复位：$b", b.has("color"))
     }
 

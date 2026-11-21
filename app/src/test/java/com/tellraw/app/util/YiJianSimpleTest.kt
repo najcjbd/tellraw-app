@@ -128,7 +128,7 @@ class YiJianSimpleTest {
         // 根据意见.txt规则：如果同一selector文本组件第一个@前面有文本，那就第一个@前面的文本作为独立的selector组件参数
         // 所以text@a@p应该被展开为：{"selector":"text","extra":[{"selector":"@a"},{"selector":"@p"}]}
         val json = TextComponentHelper.convertToJavaJson(components)
-        val expectedJson = """[{"selector":"text"},{"selector":"@a"},{"selector":"@p"}]"""
+        val expectedJson = """{"text":"","extra":[{"selector":"text"},{"selector":"@a"},{"selector":"@p"}]}"""
         assertTrue("JSON输出应该包含'$expectedJson'", json.contains(expectedJson))
     }
     
@@ -145,7 +145,7 @@ class YiJianSimpleTest {
         val expandedComponents = TextComponentHelper.expandComponents(components)
         val json = TextComponentHelper.convertToJavaJson(expandedComponents)
         // separator应该是包含"text"键的对象
-        val expectedJson = """[{"selector":"@a","separator":"kk"},{"selector":"@p","separator":"kk"},{"selector":"@e","separator":"66666"},{"selector":"@r","separator":"66666"}]"""
+        val expectedJson = """{"text":"","extra":[{"selector":"@a","separator":"kk"},{"selector":"@p","separator":"kk"},{"selector":"@e","separator":"66666"},{"selector":"@r","separator":"66666"}]}"""
         assertTrue("JSON输出应该包含'$expectedJson'", json.contains(expectedJson))
     }
     
