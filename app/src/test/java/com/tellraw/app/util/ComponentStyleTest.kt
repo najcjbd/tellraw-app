@@ -298,6 +298,18 @@ class ComponentStyleTest {
 
 
     @Test
+    fun javaSeparatorSectionCodesBecomeColorFields() {
+        val r = CommandInputParser.parse(
+            """{"selector":"@a","separator":"§c-"}"""
+        )!!
+        val sep = com.google.gson.JsonParser.parseString(r.javaJson)
+            .asJsonObject.getAsJsonObject("separator")
+        assertEquals("-", sep.get("text").asString)
+        assertEquals("red", sep.get("color").asString)
+    }
+
+
+    @Test
     fun parserKeepsStyleOnTranslateInsteadOfDroppingIt() {
         val r = CommandInputParser.parse("""{"translate":"chat.type.text","color":"red","bold":true}""")!!
         val component = r.components.single()

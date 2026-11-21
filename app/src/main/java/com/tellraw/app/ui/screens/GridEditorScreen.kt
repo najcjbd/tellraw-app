@@ -267,6 +267,7 @@ fun GridEditorScreen(
     }
 
     var selectorText by rememberSaveable { mutableStateOf(selectorFromMain.ifBlank { savedUi.selector }) }
+    var writeBackNotice by rememberSaveable { mutableStateOf("") }
     var conditions by rememberSaveable { mutableStateOf(savedUi.conditions) }
     var randomNonce by rememberSaveable { mutableStateOf(0) }
     // 旋转后 LaunchedEffect 会重跑；记住上次已同步的主选择器，避免把网格内草稿又覆盖掉。
@@ -939,11 +940,27 @@ fun GridEditorScreen(
                 maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
-                    TextButton(onClick = { viewModel.applyGridWriteBack(selectorText) }) {
+                    TextButton(onClick = {
+                        if (tagPlan != null) {
+                            writeBackNotice = "多行 tag 方案包含临时 tag，无法无损写回主生成；请保留此方案或使用整条命令转换"
+                        } else if (viewModel.applyGridWriteBack(selectorText)) {
+                            lastSyncedMainSelector = viewModel.selectorInput.value
+                            writeBackNotice = "已写回主界面"
+                        } else {
+                            writeBackNotice = "无法解析为选择器或整条命令"
+                        }
+                    }) {
                         Text("写回主界面")
                     }
                 }
             )
+            if (writeBackNotice.isNotBlank()) {
+                Text(
+                    writeBackNotice,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             OutlinedTextField(
                 value = conditions,
                 onValueChange = { conditions = it },

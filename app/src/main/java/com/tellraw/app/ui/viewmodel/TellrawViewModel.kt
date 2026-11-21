@@ -1030,7 +1030,11 @@ class TellrawViewModel @Inject constructor(
             ?: (syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value))
         val r = try {
             com.tellraw.app.util.CommandInputParser.parse(
-                input, applicationContext, nbtSyntax, targetVersionSpec()
+                input, applicationContext, nbtSyntax, targetVersionSpec(),
+                mNHandling = if (_useJavaFontStyle.value) "font" else "color",
+                mnCFEnabled = _mnCFEnabled.value,
+                separatorAsTextComponent = _separatorAsTextComponent.value,
+                bedrockColorToRgb = _bedrockColorToRgb.value
             )
         } catch (e: Exception) {
             null
@@ -1209,7 +1213,11 @@ class TellrawViewModel @Inject constructor(
         val r = try {
             com.tellraw.app.util.CommandInputParser.parse(
                 _rawConvertInput.value, applicationContext, nbtSyntax,
-                versionOverride ?: targetVersionSpec()
+                versionOverride ?: targetVersionSpec(),
+                mNHandling = if (_useJavaFontStyle.value) "font" else "color",
+                mnCFEnabled = _mnCFEnabled.value,
+                separatorAsTextComponent = _separatorAsTextComponent.value,
+                bedrockColorToRgb = _bedrockColorToRgb.value
             )
         } catch (e: Exception) {
             _rawConvertWarnings.value = listOf(applicationContext.getString(R.string.raw_convert_unrecognized))
@@ -1456,7 +1464,8 @@ class TellrawViewModel @Inject constructor(
                 var contentAs: com.tellraw.app.util.ContentAsRewriter.Result? = null
                 if (!_asSensitive.value && javaNegation == null && simpleTable == null) {
                     val r = com.tellraw.app.util.ContentAsRewriter.rewrite(
-                        javaTarget, messageToUse, _executePrefixInput.value, nbtSyntax
+                        javaTarget, messageToUse, _executePrefixInput.value, nbtSyntax,
+                        applicationContext, target
                     )
                     allReminders.addAll(r.notes)
                     if (r.applied) contentAs = r

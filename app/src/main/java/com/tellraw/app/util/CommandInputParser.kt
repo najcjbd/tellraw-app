@@ -45,7 +45,11 @@ object CommandInputParser {
         input: String,
         context: Context? = null,
         nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
-        target: com.tellraw.app.model.VersionSpec? = null
+        target: com.tellraw.app.model.VersionSpec? = null,
+        mNHandling: String = "font",
+        mnCFEnabled: Boolean = false,
+        separatorAsTextComponent: Boolean = false,
+        bedrockColorToRgb: Boolean = true
     ): Result? {
         val warnings = mutableListOf<String>()
         var s = input.trim()
@@ -86,12 +90,12 @@ object CommandInputParser {
 
         // 4) 生成两版 JSON（复用既有转换器）
         val javaJson = TextComponentHelper.convertToJavaJson(
-            components, context = context, warnings = warnings,
-            nbtSyntax = nbtSyntax, target = target
+            components, mNHandling, mnCFEnabled, context, warnings,
+            separatorAsTextComponent, nbtSyntax, bedrockColorToRgb, target
         )
         val bedrockJson = TextComponentHelper.convertToBedrockJson(
-            components, context = context, warnings = warnings,
-            nbtSyntax = nbtSyntax, target = target
+            components, mNHandling, mnCFEnabled, context, warnings,
+            nbtSyntax, target
         )
 
         // 5) 目标选择器：双版本过滤（混合参数时用混合模式）

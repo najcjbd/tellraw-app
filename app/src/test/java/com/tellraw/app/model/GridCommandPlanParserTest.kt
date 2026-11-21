@@ -40,6 +40,32 @@ class GridCommandPlanParserTest {
     }
 
     @Test
+    fun tagRemoveBeforeTellrawIsAppliedInOrder() {
+        val input = """
+            tag @a add t
+            tag @a remove t
+            tellraw @a[tag=t] {"text":"ok"}
+        """.trimIndent()
+        val plan = GridCommandPlanParser.parse(input)!!
+        val entities = listOf(player("p1"), player("p2"))
+        val result = GridCommandPlanParser.evaluate(plan, entities, Triple(0.0, -60.0, 0.0))
+        assertTrue(result.matched.isEmpty())
+    }
+
+    @Test
+    fun bareTagAtSWithoutExecutorDoesNotTagEveryCandidate() {
+        val input = """
+            tag @s add t
+            tellraw @a[tag=t] {"text":"ok"}
+        """.trimIndent()
+        val plan = GridCommandPlanParser.parse(input)!!
+        val entities = listOf(player("p1"), player("p2"))
+        val result = GridCommandPlanParser.evaluate(plan, entities, Triple(0.0, -60.0, 0.0))
+        assertTrue(result.matched.isEmpty())
+    }
+
+
+    @Test
     fun parsesTagAddTellrawAndIgnoresRemoveForSelection() {
         val input = """
             execute as @a at @s if items entity @s hotbar.* minecraft:diamond run tag @s add tellraw_a1_t

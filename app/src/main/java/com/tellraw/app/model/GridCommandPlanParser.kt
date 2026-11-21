@@ -26,7 +26,12 @@ import kotlin.math.sqrt
  */
 object GridCommandPlanParser {
 
-    data class TaggedCondition(val tag: String, val prefix: String, val tagTarget: String)
+    data class TaggedCondition(
+        val tag: String,
+        val prefix: String,
+        val tagTarget: String,
+        val remove: Boolean = false
+    )
 
     data class TagPlan(
         val tellrawSelector: String,
@@ -46,6 +51,7 @@ object GridCommandPlanParser {
         var tellrawSelector: String? = null
         var finalPrefix: String? = null
         val conditions = mutableListOf<TaggedCondition>()
+        var seenTellraw = false
 
         fun parseTellrawSelector(text: String): String? {
             val rest = text.removePrefix("tellraw").trimStart()
@@ -61,6 +67,7 @@ object GridCommandPlanParser {
             when {
                 line == "tellraw" || line.startsWith("tellraw ") -> {
                     val sel = parseTellrawSelector(line) ?: continue
+                    seenTellraw = true
                     if (tellrawSelector == null) tellrawSelector = sel
                     else if (tellrawSelector != sel) notes.add("检测到多条不同的 tellraw 行，按第一条模拟")
                 }
@@ -69,16 +76,24 @@ object GridCommandPlanParser {
                     val prefix = stripInjectedAnchor(line.substring(0, runIdx).trim())
                     val rest = line.substring(runIdx + 3).trimStart()
                     if (rest.startsWith("tag ")) {
-                        if (" add " !in rest) continue
+                        if (seenTellraw) {
+                            notes.add("tellraw 之后的 tag 行不影响收信人选择模拟")
+                            continue
+                        }
                         val body = rest.removePrefix("tag ").trim()
                         val addIdx = body.indexOf(" add ")
-                        if (addIdx <= 0) continue
-                        val tagTarget = body.substring(0, addIdx).trim()
-                        val tag = body.substring(addIdx + 5).trim().substringBefore(' ')
+                        val removeIdx = body.indexOf(" remove ")
+                        val idx = if (addIdx > 0) addIdx else removeIdx
+                        if (idx <= 0) continue
+                        val remove = addIdx <= 0
+                        val tagTarget = body.substring(0, idx).trim()
+                        val keywordLen = if (remove) 8 else 5
+                        val tag = body.substring(idx + keywordLen).trim().substringBefore(' ')
                         if (tagTarget.isBlank() || tag.isBlank()) continue
-                        conditions.add(TaggedCondition(tag, prefix, tagTarget))
+                        conditions.add(TaggedCondition(tag, prefix, tagTarget, remove))
                     } else if (rest == "tellraw" || rest.startsWith("tellraw ")) {
                         val sel = parseTellrawSelector(rest) ?: continue
+                        seenTellraw = true
                         if (tellrawSelector == null) {
                             tellrawSelector = sel
                             finalPrefix = prefix.takeIf { it != "execute" }
@@ -88,16 +103,22 @@ object GridCommandPlanParser {
                     }
                 }
                 line.startsWith("tag ") -> {
+                    if (seenTellraw) {
+                        notes.add("tellraw 之后的 tag 行不影响收信人选择模拟")
+                        continue
+                    }
                     val body = line.removePrefix("tag ").trim()
-                    if (" add " in body) {
-                        val addIdx = body.indexOf(" add ")
-                        val tagTarget = body.substring(0, addIdx).trim()
-                        val tag = body.substring(addIdx + 5).trim().substringBefore(' ')
+                    val addIdx = body.indexOf(" add ")
+                    val removeIdx = body.indexOf(" remove ")
+                    val idx = if (addIdx > 0) addIdx else removeIdx
+                    if (idx > 0) {
+                        val remove = addIdx <= 0
+                        val tagTarget = body.substring(0, idx).trim()
+                        val keywordLen = if (remove) 8 else 5
+                        val tag = body.substring(idx + keywordLen).trim().substringBefore(' ')
                         if (tagTarget.isNotBlank() && tag.isNotBlank()) {
-                            conditions.add(TaggedCondition(tag, "execute", tagTarget))
+                            conditions.add(TaggedCondition(tag, "execute", tagTarget, remove))
                         }
-                    } else if (" remove " in body) {
-                        notes.add("裸 tag remove 行未参与收信人选择模拟（当前只建模 tag add）")
                     } else {
                         notes.add("无法识别的 tag 行：$line")
                     }
@@ -207,19 +228,19 @@ object GridCommandPlanParser {
                 continue
             }
             for (ctx in contexts) {
-                if (condition.tagTarget == "@s") {
-                    virtualTags.getOrPut(ctx.entity.uid) { mutableSetOf() }.add(condition.tag)
-                } else {
-                    val tr = SelectorEvaluator.evaluate(
-                        selector = condition.tagTarget,
-                        entities = currentEntities(),
-                        executor = ctx.entity,
-                        edition = edition,
-                        origin = ctx.origin,
-                        target = target
-                    )
-                    notes.addAll(tr.notes)
-                    for (m in tr.matched) {
+                val targets = if (condition.tagTarget == "@s") listOf(ctx.entity)
+                else SelectorEvaluator.evaluate(
+                    selector = condition.tagTarget,
+                    entities = currentEntities(),
+                    executor = ctx.entity,
+                    edition = edition,
+                    origin = ctx.origin,
+                    target = target
+                ).also { notes.addAll(it.notes) }.matched
+                for (m in targets) {
+                    if (condition.remove) {
+                        virtualTags[m.uid]?.remove(condition.tag)
+                    } else {
                         virtualTags.getOrPut(m.uid) { mutableSetOf() }.add(condition.tag)
                     }
                 }
@@ -300,8 +321,17 @@ object GridCommandPlanParser {
         transients: MutableList<GridEntity>? = null
     ): List<ExecContext> {
         val parts = ExecuteConverter.parseExecuteParts(prefix, notes) ?: return emptyList()
-        var contexts = if (executor != null) {
-            listOf(
+        // 没有执行者时，命令由命令源从 baseOrigin 执行；不能把每个候选实体都当成 @s。
+        val sourceEntity = executor ?: GridEntity(
+            uid = "__command_source", id = "minecraft:player",
+            x = baseOrigin.first, y = baseOrigin.second, z = baseOrigin.third
+        )
+        val hasEntityModifier = parts.any {
+            it.tokens.firstOrNull() in setOf("as", "on")
+        }
+        val hasSummon = parts.any { it.tokens.firstOrNull() == "summon" }
+        var contexts = when {
+            executor != null -> listOf(
                 ExecContext(
                     entity = executor,
                     origin = baseOrigin,
@@ -310,8 +340,10 @@ object GridCommandPlanParser {
                     dimension = world.dimension
                 )
             )
-        } else {
-            entities.map {
+            !hasEntityModifier || hasSummon -> listOf(
+                ExecContext(sourceEntity, baseOrigin, 0.0, 0.0, world.dimension)
+            )
+            else -> entities.map {
                 ExecContext(
                     entity = it,
                     origin = baseOrigin,
@@ -320,20 +352,6 @@ object GridCommandPlanParser {
                     dimension = world.dimension
                 )
             }
-        }
-
-        // summon 从命令源执行时只有一个源；否则后面的 at/as 会按每个网格实体重复生成。
-        if (executor == null &&
-            parts.any { it.tokens.firstOrNull() == "summon" }
-        ) {
-            val source = contexts.firstOrNull() ?: ExecContext(
-                GridEntity(
-                    uid = "__command_source", id = "minecraft:player",
-                    x = baseOrigin.first, y = baseOrigin.second, z = baseOrigin.third
-                ),
-                baseOrigin, 0.0, 0.0, world.dimension
-            )
-            contexts = listOf(source.copy(origin = baseOrigin, yaw = 0.0, pitch = 0.0))
         }
 
         fun selectEntities(selector: String, ctx: ExecContext): List<GridEntity> =

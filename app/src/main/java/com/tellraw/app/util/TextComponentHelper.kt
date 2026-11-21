@@ -1474,10 +1474,16 @@ object TextComponentHelper {
                     // 从副组件中提取separator
                     val separatorSubComponent = mainComponent.subComponents.find { it.type == SubComponentType.SEPARATOR }
                     if (separatorSubComponent != null) {
-                        result["separator"] = separatorJsonValue(separatorSubComponent.content, separatorAsTextComponent)
+                        result["separator"] = separatorJsonValue(
+                            separatorSubComponent.content, separatorAsTextComponent,
+                            mNHandling, mnCFEnabled, context, warnings, nbtSyntax, target
+                        )
                     } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                         // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                        result["separator"] = separatorJsonValue(separatorEntries[0]!!, separatorAsTextComponent)
+                        result["separator"] = separatorJsonValue(
+                            separatorEntries[0]!!, separatorAsTextComponent,
+                            mNHandling, mnCFEnabled, context, warnings, nbtSyntax, target
+                        )
                     }
                 }
             }
@@ -1626,10 +1632,16 @@ object TextComponentHelper {
                             // 从副组件中提取separator
                             val separatorSubComponent = sub.subComponents.find { it.type == SubComponentType.SEPARATOR }
                             if (separatorSubComponent != null) {
-                                subMap["separator"] = separatorJsonValue(separatorSubComponent.content, separatorAsTextComponent)
+                                subMap["separator"] = separatorJsonValue(
+                                    separatorSubComponent.content, separatorAsTextComponent,
+                                    mNHandling, mnCFEnabled, context, warnings, nbtSyntax, target
+                                )
                             } else if (separatorEntries.isNotEmpty() && separatorEntries[0] != null) {
                                 // 如果没有副组件中的separator，使用parseSelectorContent返回的separator
-                                subMap["separator"] = separatorJsonValue(separatorEntries[0]!!, separatorAsTextComponent)
+                                subMap["separator"] = separatorJsonValue(
+                                    separatorEntries[0]!!, separatorAsTextComponent,
+                                    mNHandling, mnCFEnabled, context, warnings, nbtSyntax, target
+                                )
                             }
                         }
                     }
@@ -2980,10 +2992,29 @@ object TextComponentHelper {
      * separator 的输出形态：
      * 默认输出纯字符串；开关打开时输出文本组件 {"text": "..."}，方便玩家手动替换该组件（如加颜色）
      */
-    private fun separatorJsonValue(content: String, asTextComponent: Boolean): Any {
+    private fun separatorJsonValue(
+        content: String,
+        asTextComponent: Boolean,
+        mNHandling: String,
+        mnCFEnabled: Boolean,
+        context: Context?,
+        warnings: MutableList<String>?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        target: com.tellraw.app.model.VersionSpec?
+    ): Any {
         val trimmed = content.trim()
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
             runCatching { JsonParser.parseString(trimmed) }.getOrNull()?.let { return it }
+        }
+        if ('§' in content) {
+            runCatching {
+                JsonParser.parseString(
+                    TextFormatter.convertToJavaJson(
+                        content, mNHandling, mnCFEnabled, context, warnings,
+                        false, nbtSyntax, true, target, parseMarkers = false
+                    )
+                )
+            }.getOrNull()?.let { return it }
         }
         return if (asTextComponent) mapOf("text" to content) else content
     }
