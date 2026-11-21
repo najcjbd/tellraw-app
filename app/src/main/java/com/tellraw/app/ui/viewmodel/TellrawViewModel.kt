@@ -997,7 +997,9 @@ class TellrawViewModel @Inject constructor(
         val nbtSyntax = syntaxOverride
             ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
         val r = try {
-            com.tellraw.app.util.CommandInputParser.parse(input, applicationContext, nbtSyntax)
+            com.tellraw.app.util.CommandInputParser.parse(
+                input, applicationContext, nbtSyntax, targetVersionSpec()
+            )
         } catch (e: Exception) {
             null
         }
@@ -1110,7 +1112,10 @@ class TellrawViewModel @Inject constructor(
     fun applyRawConvertToGenerator() {
         val nbtSyntax = syntaxOverride ?: com.tellraw.app.util.VersionDiff.NbtSyntax.from(_nbtSyntax.value)
         val r = try {
-            com.tellraw.app.util.CommandInputParser.parse(_rawConvertInput.value, applicationContext, nbtSyntax)
+            com.tellraw.app.util.CommandInputParser.parse(
+                _rawConvertInput.value, applicationContext, nbtSyntax,
+                versionOverride ?: targetVersionSpec()
+            )
         } catch (e: Exception) {
             _rawConvertWarnings.value = listOf(applicationContext.getString(R.string.raw_convert_unrecognized))
             return

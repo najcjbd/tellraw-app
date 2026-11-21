@@ -1401,16 +1401,22 @@ object TextComponentHelper {
             }
             // 外层根组件的样式会被所有 extra 继承；非 TEXT 兄弟组件没有样式时应显式复位
             val styleKeys = setOf(
-                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated"
+                "color", "bold", "italic", "underlined", "strikethrough", "obfuscated",
+                "font", "insertion"
             )
             val rootStyle = result.filterKeys { it in styleKeys }
             if (rootStyle.isNotEmpty()) {
+                if (result.containsKey("clickEvent") || result.containsKey("hoverEvent")) {
+                    warnings?.add("extra 子组件会继承父组件的 clickEvent/hoverEvent；Java JSON 没有显式取消写法，请检查子组件")
+                }
                 extra.forEach { subMap ->
                     for ((key, value) in rootStyle) {
                         if (subMap.containsKey(key)) continue
                         when {
                             // tellraw 默认前景色是白色（JSON 没有官方的 color:"reset"）
                             key == "color" -> subMap["color"] = "white"
+                            key == "font" -> subMap["font"] = "minecraft:default"
+                            key == "insertion" -> subMap["insertion"] = ""
                             value == true -> subMap[key] = false
                         }
                     }

@@ -44,7 +44,8 @@ object CommandInputParser {
     fun parse(
         input: String,
         context: Context? = null,
-        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN
+        nbtSyntax: VersionDiff.NbtSyntax = VersionDiff.NbtSyntax.MODERN,
+        target: com.tellraw.app.model.VersionSpec? = null
     ): Result? {
         val warnings = mutableListOf<String>()
         var s = input.trim()
@@ -96,11 +97,16 @@ object CommandInputParser {
                 bedrockSel = selector
             } else {
                 val mixed = SelectorConverter.convertForMixedMode(selector, context, warnings, nbtSyntax)
-                val mixedWorked = mixed.first != selector || mixed.second != selector
-                javaSel = if (mixedWorked) mixed.first
-                    else SelectorConverter.filterSelectorParameters(selector, SelectorType.JAVA, context, nbtSyntax).first
-                bedrockSel = if (mixedWorked) mixed.second
-                    else SelectorConverter.filterSelectorParameters(selector, SelectorType.BEDROCK, context, nbtSyntax).first
+                val (j, _, jReminders) = SelectorConverter.filterSelectorParameters(
+                    mixed.first, SelectorType.JAVA, context, nbtSyntax, target
+                )
+                val (b, _, bReminders) = SelectorConverter.filterSelectorParameters(
+                    mixed.second, SelectorType.BEDROCK, context, nbtSyntax, target
+                )
+                warnings.addAll(jReminders)
+                warnings.addAll(bReminders)
+                javaSel = j
+                bedrockSel = b
             }
         }
 
