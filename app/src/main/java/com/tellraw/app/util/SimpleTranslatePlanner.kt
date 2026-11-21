@@ -348,6 +348,10 @@ object SimpleTranslatePlanner {
         target: VersionSpec?,
         warnings: MutableList<String>
     ): String = earlier.mapNotNull { params ->
+        if (params.contains("=!") || params.contains("quantity=0")) {
+            warnings.add("Java 选择器无法精确表达反选参数「$params」，该排除条件已省略（后面行可能重复显示）")
+            return@mapNotNull null
+        }
         val filtered = filterJava("@s[$params]", context, nbtSyntax, target, warnings)
         val inner = when {
             filtered.startsWith("@s[") && filtered.endsWith("]") ->
@@ -420,11 +424,33 @@ object SimpleTranslatePlanner {
     ): String {
         val merged = appendSelectorParams(baseSelector, params)
         val selector = filterBedrock(merged, context, nbtSyntax, target, warnings)
-        val exclusions = earlier.joinToString("") { " unless entity @s[$it]" }
+        val exclusions = exclusionsForBedrock(earlier, context, nbtSyntax, target, warnings)
         val base = prefix?.trim()?.takeIf { it.isNotEmpty() } ?: "execute"
         val raw = rawtextJson(items)
         return "$base as $selector$exclusions run tellraw @s $raw"
     }
+
+    private fun exclusionsForBedrock(
+        earlier: List<String>,
+        context: Context?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        target: VersionSpec?,
+        warnings: MutableList<String>
+    ): String = earlier.mapNotNull { params ->
+        val filtered = filterBedrock("@s[$params]", context, nbtSyntax, target, warnings)
+        val inner = when {
+            filtered.startsWith("@s[") && filtered.endsWith("]") ->
+                filtered.substring(3, filtered.length - 1)
+            filtered == "@s" -> ""
+            else -> filtered
+        }
+        if (inner.isBlank()) {
+            warnings.add("基岩选择器无法表达收信人参数「$params」，该排除条件已省略（后面行可能重复显示）")
+            null
+        } else {
+            " unless entity @s[$inner]"
+        }
+    }.joinToString("")
 
     private fun buildBedrockConditional(
         prepared: List<PreparedRow>,
@@ -603,7 +629,8 @@ object SimpleTranslatePlanner {
                         TextComponent(
                             ComponentType.NBT,
                             TextComponentHelper.encodeNbtContent(
-                                draft.path, draft.source, draft.interpret, draft.separator
+                                draft.path, draft.source, draft.target,
+                                draft.interpret, draft.separator
                             ),
                             style = componentStyle(draft.retained)
                         )

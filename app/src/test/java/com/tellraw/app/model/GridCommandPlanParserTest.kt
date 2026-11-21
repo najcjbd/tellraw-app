@@ -26,6 +26,20 @@ class GridCommandPlanParserTest {
         )
 
     @Test
+    fun bareTagAddIsSharedWithFollowingTagConditions() {
+        val input = """
+            tag @a add t1
+            tag @a[tag=t1] add t2
+            tellraw @a[tag=t2] {"text":"ok"}
+        """.trimIndent()
+        val plan = GridCommandPlanParser.parse(input)
+        requireNotNull(plan)
+        val entities = listOf(player("p1"), player("p2"))
+        val result = GridCommandPlanParser.evaluate(plan, entities, Triple(0.0, -60.0, 0.0))
+        assertEquals(setOf("p1", "p2"), result.matched.map { it.uid }.toSet())
+    }
+
+    @Test
     fun parsesTagAddTellrawAndIgnoresRemoveForSelection() {
         val input = """
             execute as @a at @s if items entity @s hotbar.* minecraft:diamond run tag @s add tellraw_a1_t

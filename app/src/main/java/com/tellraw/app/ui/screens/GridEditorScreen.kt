@@ -937,7 +937,7 @@ fun GridEditorScreen(
                 maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
-                    TextButton(onClick = { viewModel.updateSelector(selectorText) }) {
+                    TextButton(onClick = { viewModel.applyGridWriteBack(selectorText) }) {
                         Text("写回主界面")
                     }
                 }

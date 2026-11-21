@@ -85,8 +85,14 @@ object CommandInputParser {
         if (components.isEmpty() && warnings.isEmpty()) return null
 
         // 4) 生成两版 JSON（复用既有转换器）
-        val javaJson = TextComponentHelper.convertToJavaJson(components, context = context, warnings = warnings)
-        val bedrockJson = TextComponentHelper.convertToBedrockJson(components, context = context, warnings = warnings)
+        val javaJson = TextComponentHelper.convertToJavaJson(
+            components, context = context, warnings = warnings,
+            nbtSyntax = nbtSyntax, target = target
+        )
+        val bedrockJson = TextComponentHelper.convertToBedrockJson(
+            components, context = context, warnings = warnings,
+            nbtSyntax = nbtSyntax, target = target
+        )
 
         // 5) 目标选择器：双版本过滤（混合参数时用混合模式）
         var javaSel: String? = null
@@ -315,11 +321,16 @@ object CommandInputParser {
                 TextComponent(ComponentType.KEYBIND, str(obj, "keybind"), style = effectiveStyle)
             )
             obj.has("nbt") -> {
+                val explicit = listOf("entity", "block", "storage").firstOrNull { key ->
+                    obj.has(key) && obj.get(key).isJsonPrimitive &&
+                        obj.get(key).asJsonPrimitive.isString
+                }
                 val nbtSpec = TextComponentHelper.encodeNbtContent(
                     path = str(obj, "nbt"),
-                    source = obj.get("source")?.takeIf {
+                    source = explicit ?: obj.get("source")?.takeIf {
                         it.isJsonPrimitive && it.asJsonPrimitive.isString
                     }?.asString,
+                    target = explicit?.let { obj.get(it)?.asString },
                     interpret = obj.get("interpret")?.takeIf {
                         it.isJsonPrimitive && it.asJsonPrimitive.isBoolean
                     }?.asBoolean,

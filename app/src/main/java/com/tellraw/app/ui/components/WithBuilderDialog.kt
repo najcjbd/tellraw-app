@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -96,6 +97,7 @@ fun WithBuilderDialog(
                 modifier = Modifier
                     .padding(16.dp)
                     .heightIn(max = 680.dp)
+                    .imePadding()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -787,6 +789,7 @@ private fun InlineNbtEditor(
 ) {
     var path by rememberSaveable(nodeKey) { mutableStateOf(original.path) }
     var source by rememberSaveable(nodeKey) { mutableStateOf(original.source) }
+    var target by rememberSaveable(nodeKey) { mutableStateOf(original.target.orEmpty()) }
     var interpret by rememberSaveable(nodeKey) { mutableStateOf(original.interpret) }
     var separator by rememberSaveable(nodeKey) { mutableStateOf(original.separator.orEmpty()) }
 
@@ -800,6 +803,7 @@ private fun InlineNbtEditor(
             original.copy(
                 path = path,
                 source = source,
+                target = target.trim().ifEmpty { null },
                 interpret = interpret,
                 separator = separatorOut
             )
@@ -834,6 +838,13 @@ private fun InlineNbtEditor(
         }
     }
     TriStateChip(R.string.with_builder_nbt_interpret, interpret) { interpret = it; emit() }
+    OutlinedTextField(
+        value = target,
+        onValueChange = { target = it; emit() },
+        label = { Text("来源目标（@s / 方块坐标 / storage id）") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
     OutlinedTextField(
         value = separator,
         onValueChange = { separator = it; emit() },
@@ -1297,6 +1308,7 @@ private fun NbtItemDialog(
 ) {
     var path by remember(original) { mutableStateOf(original.path) }
     var source by remember(original) { mutableStateOf(original.source) }
+    var target by remember(original) { mutableStateOf(original.target.orEmpty()) }
     var interpret by remember(original) { mutableStateOf(original.interpret) }
     var separator by remember(original) { mutableStateOf(original.separator.orEmpty()) }
     var retained by remember(original) { mutableStateOf(original.retained) }
@@ -1313,6 +1325,7 @@ private fun NbtItemDialog(
                 original.copy(
                     path = path,
                     source = source,
+                    target = target.trim().ifEmpty { null },
                     interpret = interpret,
                     separator = separatorOut,
                     retained = retained
@@ -1351,6 +1364,13 @@ private fun NbtItemDialog(
             }
         }
         TriStateChip(R.string.with_builder_nbt_interpret, interpret) { interpret = it }
+        OutlinedTextField(
+            value = target,
+            onValueChange = { target = it },
+            label = { Text("来源目标（@s / 方块坐标 / storage id）") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
         OutlinedTextField(
             value = separator,
             onValueChange = { separator = it },

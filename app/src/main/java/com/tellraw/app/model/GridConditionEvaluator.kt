@@ -593,6 +593,9 @@ object GridConditionEvaluator {
     private fun slotMatches(source: String, key: String): Boolean {
         val src = translateInventorySlotSource(source.removePrefix("slot."))
         val k = key.removePrefix("slot.")
+        if (src.startsWith("container") && !k.startsWith("container")) {
+            return containerMatchesPlayer(src, k)
+        }
         if (src == "*") return true
         if (src.endsWith(".*")) return k.startsWith(src.dropLast(1)) || k == src.dropLast(2)
         // 槽位区间，例如 hotbar.0..8 / inventory.0..8（后者已翻译成内部 9..17）。
@@ -610,6 +613,31 @@ object GridConditionEvaluator {
         // 槽位名不带编号时，视为该类的任意槽
         if (src.count { it == '.' } == 0) return k == src || k.startsWith("$src.")
         return k == src
+    }
+
+    /**
+     * 实体 items 的 Java 槽位源 `container.N`：0-8 是 hotbar，9-35 是 inventory。
+     * 内部键仍用 hotbar.N / inventory.N（inventory 已带 +9 偏移）。
+     */
+    private fun containerMatchesPlayer(src: String, key: String): Boolean {
+        if (src == "container" || src == "container.*") {
+            return key.startsWith("hotbar.") || key.startsWith("inventory.")
+        }
+        val rest = src.removePrefix("container.").trim()
+        val idx = key.substringAfterLast('.').toIntOrNull() ?: return false
+        val isHotbar = key.startsWith("hotbar.")
+        val isInventory = key.startsWith("inventory.")
+        if (!isHotbar && !isInventory) return false
+        if (rest == "*") return true
+        if (".." in rest) {
+            val lo = rest.substringBefore("..").toIntOrNull()
+            val hi = rest.substringAfter("..").toIntOrNull()
+            if (lo != null && idx < lo) return false
+            if (hi != null && idx > hi) return false
+            return true
+        }
+        val wanted = rest.toIntOrNull() ?: return false
+        return idx == wanted
     }
 
     private fun matchesItemPredicate(

@@ -2,6 +2,7 @@ package com.tellraw.app.ui.screens
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.tellraw.app.MainActivity
@@ -397,6 +398,13 @@ fun MainScreen(
         )
     }
 
+    // 横屏的面板不是 Dialog，必须显式接管返回键；否则返回会直接退出 Activity。
+    BackHandler(enabled = showSettingsDialog.value) { showSettingsDialog.value = false }
+    BackHandler(enabled = showHistoryDialog.value) { showHistoryDialog.value = false }
+    BackHandler(enabled = showStorageSettingsDialog) { viewModel.hideStorageSettingsDialog() }
+    BackHandler(enabled = showFilenameDialog != null) { viewModel.hideFilenameDialog() }
+    BackHandler(enabled = showFileExistsDialog != null) { viewModel.hideFileExistsDialog() }
+
     if (showSimpleTranslateGroups) {
         SimpleTranslateGroupDialog(
             initialBlockJson = simpleInitialBlock,
@@ -572,6 +580,7 @@ private fun PortraitLayout(
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
 
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
@@ -651,7 +660,7 @@ private fun PortraitLayout(
                     style = MaterialTheme.typography.titleMedium
                 )
                 
-                if (simpleTranslate) {
+                if (simpleTranslate || simpleBlockActive) {
                     TranslateTokenBar(
                         markers = messageMarkers,
                         onOpen = { position, ordinal ->
@@ -696,7 +705,7 @@ private fun PortraitLayout(
                     maxLines = 3
                 )
 
-                if (simpleTranslate) {
+                if (simpleTranslate || simpleBlockActive) {
                     OutlinedButton(
                         onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
                         modifier = Modifier.fillMaxWidth()
@@ -1046,6 +1055,7 @@ private fun LandscapeLayout(
 ) {
     val messageMarkers by viewModel.messageInputWithMarkers.collectAsState()
     val simpleTranslate by viewModel.simpleTranslateNesting.collectAsState()
+    val simpleBlockActive by viewModel.simpleBlockActive.collectAsState()
 
     val executePrefixEnabled by viewModel.executePrefixEnabled.collectAsState()
     val executePrefixInput by viewModel.executePrefixInput.collectAsState()
@@ -1177,7 +1187,7 @@ private fun LandscapeLayout(
                             style = MaterialTheme.typography.titleMedium
                         )
                         
-                        if (simpleTranslate) {
+                        if (simpleTranslate || simpleBlockActive) {
                             TranslateTokenBar(
                                 markers = messageMarkers,
                                 onOpen = { position, ordinal ->
@@ -1222,7 +1232,7 @@ private fun LandscapeLayout(
                             maxLines = 5
                         )
 
-                        if (simpleTranslate) {
+                        if (simpleTranslate || simpleBlockActive) {
                             OutlinedButton(
                                 onClick = { onOpenSimpleTranslate(viewModel.currentSimpleBlockJson()) },
                                 modifier = Modifier.fillMaxWidth()

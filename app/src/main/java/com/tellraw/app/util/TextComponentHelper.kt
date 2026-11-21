@@ -7,6 +7,7 @@ package com.tellraw.app.util
 import android.content.Context
 import androidx.annotation.StringRes
 import com.tellraw.app.R
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -646,6 +647,39 @@ object TextComponentHelper {
     }
     
     /** TEXT 组件的 § 样式解析：复用纯文本转换器，得到可合并的 JSON 对象。 */
+    /** 递归处理 with JSON 内的 selector 组件，避免 hasitem/team 等跨版本参数原样透传。 */
+    private fun filterJsonSelectors(
+        el: JsonElement,
+        type: SelectorType,
+        context: Context?,
+        nbtSyntax: VersionDiff.NbtSyntax,
+        target: com.tellraw.app.model.VersionSpec?,
+        warnings: MutableList<String>?
+    ): JsonElement {
+        if (context == null) return el.deepCopy()
+        return when {
+            el.isJsonArray -> JsonArray().apply {
+                el.asJsonArray.forEach {
+                    add(filterJsonSelectors(it, type, context, nbtSyntax, target, warnings))
+                }
+            }
+            el.isJsonObject -> JsonObject().apply {
+                el.asJsonObject.entrySet().forEach { (k, v) ->
+                    if (k == "selector" && v.isJsonPrimitive && v.asJsonPrimitive.isString) {
+                        val (filtered, _, reminders) = SelectorConverter.filterSelectorParameters(
+                            v.asString, type, context, nbtSyntax, target
+                        )
+                        warnings?.addAll(reminders)
+                        addProperty(k, filtered)
+                    } else {
+                        add(k, filterJsonSelectors(v, type, context, nbtSyntax, target, warnings))
+                    }
+                }
+            }
+            else -> el.deepCopy()
+        }
+    }
+
     private fun plainTextComponentMap(
         content: String,
         mNHandling: String,
@@ -1185,7 +1219,10 @@ object TextComponentHelper {
                         }
                         val withComponents = items.mapNotNull { item ->
                             if (item.json != null) {
-                                item.json
+                                filterJsonSelectors(
+                                    item.json, SelectorType.JAVA, context,
+                                    nbtSyntax, target, warnings
+                                )
                             } else {
                                 val param = item.raw
                                 val map = plainTextComponentMap(
@@ -1271,14 +1308,9 @@ object TextComponentHelper {
                 }
             }
             ComponentType.KEYBIND -> result["keybind"] = mainComponent.content
-            ComponentType.NBT -> {
-                val spec = parseNbtContent(mainComponent.content)
-                result["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString
-                    ?: mainComponent.content
-                spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString?.let { result["source"] = it }
-                spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { result["interpret"] = it }
-                spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { result["separator"] = it }
-            }
+            ComponentType.NBT -> writeNbtSpec(
+                parseNbtContent(mainComponent.content), mainComponent.content, result, warnings
+            )
         }
 
         if (!(mainComponent.type == ComponentType.TRANSLATE &&
@@ -1319,7 +1351,10 @@ object TextComponentHelper {
                                 }
                                 val withComponents = items.mapNotNull { item ->
                                     if (item.json != null) {
-                                        item.json
+                                        filterJsonSelectors(
+                                            item.json, SelectorType.JAVA, context,
+                                            nbtSyntax, target, warnings
+                                        )
                                     } else {
                                         val param = item.raw
                                         val map = plainTextComponentMap(
@@ -1403,14 +1438,9 @@ object TextComponentHelper {
                         }
                     }
                     ComponentType.KEYBIND -> subMap["keybind"] = sub.content
-                    ComponentType.NBT -> {
-                        val spec = parseNbtContent(sub.content)
-                        subMap["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString
-                            ?: sub.content
-                        spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString?.let { subMap["source"] = it }
-                        spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { subMap["interpret"] = it }
-                        spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { subMap["separator"] = it }
-                    }
+                    ComponentType.NBT -> writeNbtSpec(
+                        parseNbtContent(sub.content), sub.content, subMap, warnings
+                    )
                 }
                 if (!(sub.type == ComponentType.TRANSLATE &&
                         sub.content == SIMPLE_TRANSLATE_KEY)
@@ -1476,7 +1506,10 @@ object TextComponentHelper {
         if (allTextComponents) {
             // 所有组件都是TEXT组件，合并内容并使用原有的text文本处理逻辑
             val combinedText = expandedComponents.joinToString("") { it.content }
-            return TextFormatter.convertToBedrockJson(combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax, target = target)
+            return TextFormatter.convertToBedrockJson(
+                combinedText, mNHandling, mnCFEnabled, nbtSyntax = nbtSyntax,
+                target = target, parseMarkers = false
+            )
         }
 
         val rawtext = expandedComponents.map { component ->
@@ -1518,7 +1551,14 @@ object TextComponentHelper {
                             val withRawtext = mutableListOf<Any>()
                             for (item in items) {
                                 if (item.json != null) {
-                                    jsonWithToBedrock(item.json, warnings, withRawtext)
+                                    jsonWithToBedrock(
+                                        filterJsonSelectors(
+                                            item.json, SelectorType.BEDROCK, context,
+                                            nbtSyntax, target, warnings
+                                        ),
+                                        warnings,
+                                        withRawtext
+                                    )
                                 } else {
                                     withRawtext.add(
                                         mapOf<String, Any>(
@@ -1709,17 +1749,39 @@ object TextComponentHelper {
     fun encodeNbtContent(
         path: String,
         source: String? = null,
+        target: String? = null,
         interpret: Boolean? = null,
         separator: String? = null
     ): String = JsonObject().apply {
         addProperty("path", path)
         source?.let { addProperty("source", it) }
+        target?.let { addProperty("target", it) }
         interpret?.let { addProperty("interpret", it) }
         separator?.let { addProperty("separator", it) }
     }.toString()
 
     fun parseNbtContent(content: String): JsonObject? =
         runCatching { JsonParser.parseString(content).asJsonObject }.getOrNull()
+
+    private fun writeNbtSpec(
+        spec: JsonObject?,
+        rawContent: String,
+        target: MutableMap<String, Any>,
+        warnings: MutableList<String>?
+    ) {
+        target["nbt"] = spec?.get("path")?.takeIf { it.isJsonPrimitive }?.asString ?: rawContent
+        val source = spec?.get("source")?.takeIf { it.isJsonPrimitive }?.asString
+        val sourceTarget = spec?.get("target")?.takeIf { it.isJsonPrimitive }?.asString
+        if (source != null) {
+            if (source in setOf("entity", "block", "storage") && sourceTarget != null) {
+                target[source] = sourceTarget
+            } else {
+                warnings?.add("NBT 组件缺少 $source 目标，已省略来源字段；请在 NBT 编辑器里填写目标")
+            }
+        }
+        spec?.get("interpret")?.takeIf { it.isJsonPrimitive }?.asBoolean?.let { target["interpret"] = it }
+        spec?.get("separator")?.takeIf { it.isJsonPrimitive }?.asString?.let { target["separator"] = it }
+    }
         
     /**
      * 解析selector组件内容
@@ -2463,6 +2525,14 @@ object TextComponentHelper {
                                 )
                             )
                         )
+                    }
+                    o.has("keybind") || o.has("nbt") || o.has("object") -> {
+                        warnings?.add("基岩 rawtext with 不支持 keybind/nbt/object 组件；该项已保留为空文本以维持参数序号")
+                        out.add(mapOf("text" to ""))
+                    }
+                    else -> if (!o.has("extra")) {
+                        warnings?.add("基岩 rawtext with 无法识别该组件；已保留为空文本以维持参数序号：$o")
+                        out.add(mapOf("text" to ""))
                     }
                 }
                 o.get("extra")?.let { extra -> jsonWithToBedrock(extra, warnings, out) }

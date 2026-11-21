@@ -37,8 +37,8 @@ object ConditionalRawtextConverter {
             val selector = args[0].takeIf { it.isJsonObject }
                 ?.asJsonObject?.get("selector")?.takeIf { it.isJsonPrimitive }?.asString
                 ?: return null
-            val params = if (selector.startsWith("@s[") && selector.endsWith("]")) {
-                selector.substring(3, selector.length - 1)
+            val params = if (selector.contains('[') && selector.endsWith("]")) {
+                selector.substringAfter('[').dropLast(1)
             } else ""
             val content = JsonArray()
             for (i in 1 until args.size()) content.add(args[i])
@@ -60,6 +60,11 @@ object ConditionalRawtextConverter {
         val out = mutableListOf<String>()
         val base = prefix.trim().takeIf { it.isNotEmpty() } ?: "execute"
         for (row in rows) {
+            if (!row.selector.startsWith("@s")) {
+                warnings?.add(
+                    "conditional rawtext 的条件选择器是 ${row.selector.substringBefore('[')}，不是 @s；已把方括号参数按收件人条件近似处理"
+                )
+            }
             val raw = appendSelectorParams(baseSelector.ifBlank { "@a" }, row.params)
             val negation = ExecuteConverter.bedrockSelectorNegation(
                 raw, warnings ?: mutableListOf(), preferExecute = true, nbtSyntax = nbtSyntax
@@ -82,7 +87,7 @@ object ConditionalRawtextConverter {
                 tellrawTarget = "@s"
             }
             val exclusions = exclusionsForJava(earlier, context, nbtSyntax, target, warnings)
-            val jContent = javaContent(row, context, nbtSyntax, warnings) ?: row.contentJson
+            val jContent = javaContent(row, context, nbtSyntax, target, warnings) ?: row.contentJson
             out.add("$base ${inner.joinToString(" ")}$exclusions run tellraw $tellrawTarget $jContent")
             if (row.params.isNotBlank()) earlier.add(row.params)
         }
@@ -97,6 +102,7 @@ object ConditionalRawtextConverter {
         row: Row,
         context: Context?,
         nbtSyntax: VersionDiff.NbtSyntax,
+        target: VersionSpec?,
         warnings: MutableList<String>?
     ): String? {
         if (row.key.isBlank() || row.args.isEmpty()) return null
@@ -137,7 +143,7 @@ object ConditionalRawtextConverter {
 
         val raw = JsonObject().apply { add("rawtext", expanded) }.toString()
         val parsed = runCatching {
-            CommandInputParser.parse(raw, context, nbtSyntax)
+            CommandInputParser.parse(raw, context, nbtSyntax, target)
         }.getOrNull()
         if (parsed == null) {
             warnings?.add("conditional rawtext 内容无法转成 Java，已保留原参数内容")
@@ -154,6 +160,10 @@ object ConditionalRawtextConverter {
         target: VersionSpec?,
         warnings: MutableList<String>?
     ): String = earlier.mapNotNull { params ->
+        if (params.contains("=!") || params.contains("quantity=0")) {
+            warnings?.add("Java 选择器无法精确表达反选条件「$params」，该排除已省略")
+            return@mapNotNull null
+        }
         val filtered = filterJava("@s[$params]", context, nbtSyntax, target, warnings)
         val inner = when {
             filtered.startsWith("@s[") && filtered.endsWith("]") ->

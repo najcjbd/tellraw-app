@@ -143,6 +143,17 @@ class GridConditionAuditTest {
             entity = p, all = listOf(p)
         )
         assertTrue(inv0.notes.joinToString(), inv0.ok)
+
+        val hotbar = EditableGridEntity(
+            uid = "h", id = "minecraft:player",
+            inventory = "0=minecraft:stone"
+        ).toGridEntity()
+        assertTrue(
+            eval(
+                "if items entity @s container.0 minecraft:stone",
+                entity = hotbar, all = listOf(hotbar)
+            ).ok
+        )
     }
 
     @Test

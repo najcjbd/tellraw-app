@@ -115,6 +115,11 @@ class ComponentStyleTest {
         assertTrue(nbt.javaJson, nbt.javaJson.contains("\"nbt\":\"Health\""))
         assertTrue(nbt.javaJson, nbt.javaJson.contains("\"interpret\":true"))
 
+        val entityNbt = CommandInputParser.parse(
+            """{"nbt":"Health","entity":"@s"}"""
+        )!!
+        assertTrue(entityNbt.javaJson, entityNbt.javaJson.contains("\"entity\":\"@s\""))
+
         val warnings = mutableListOf<String>()
         TextComponentHelper.convertToBedrockJson(nbt.components, warnings = warnings)
         assertTrue(warnings.any { it.contains("nbt") })

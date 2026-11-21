@@ -88,7 +88,19 @@ object GridCommandPlanParser {
                     }
                 }
                 line.startsWith("tag ") -> {
-                    notes.add("tag remove 行在 tellraw 之后执行，不参与收信人选择模拟")
+                    val body = line.removePrefix("tag ").trim()
+                    if (" add " in body) {
+                        val addIdx = body.indexOf(" add ")
+                        val tagTarget = body.substring(0, addIdx).trim()
+                        val tag = body.substring(addIdx + 5).trim().substringBefore(' ')
+                        if (tagTarget.isNotBlank() && tag.isNotBlank()) {
+                            conditions.add(TaggedCondition(tag, "execute", tagTarget))
+                        }
+                    } else if (" remove " in body) {
+                        notes.add("裸 tag remove 行未参与收信人选择模拟（当前只建模 tag add）")
+                    } else {
+                        notes.add("无法识别的 tag 行：$line")
+                    }
                 }
             }
         }
@@ -170,6 +182,11 @@ object GridCommandPlanParser {
         val virtualTags = mutableMapOf<String, MutableSet<String>>()
         val edition = if (target?.edition == VersionSpec.Edition.BEDROCK) "bedrock" else "java"
 
+        fun currentEntities(): List<GridEntity> = entities.map { e ->
+            val added = virtualTags[e.uid]
+            if (added.isNullOrEmpty()) e else e.copy(tags = e.tags + added)
+        }
+
         for (condition in plan.conditions) {
             if (prefixHasSummon(condition.prefix)) {
                 notes.add("summon 只在单链模拟中支持；tag 方案里未建模")
@@ -177,7 +194,7 @@ object GridCommandPlanParser {
             }
             val contexts = evaluateParts(
                 prefix = condition.prefix,
-                entities = entities,
+                entities = currentEntities(),
                 executor = executor,
                 edition = edition,
                 baseOrigin = baseOrigin,
@@ -195,7 +212,7 @@ object GridCommandPlanParser {
                 } else {
                     val tr = SelectorEvaluator.evaluate(
                         selector = condition.tagTarget,
-                        entities = entities,
+                        entities = currentEntities(),
                         executor = ctx.entity,
                         edition = edition,
                         origin = ctx.origin,
@@ -209,10 +226,7 @@ object GridCommandPlanParser {
             }
         }
 
-        val augmented = entities.map { e ->
-            val added = virtualTags[e.uid]
-            if (added.isNullOrEmpty()) e else e.copy(tags = e.tags + added)
-        }
+        val augmented = currentEntities()
         val matched = if (plan.finalPrefix != null) {
             if (prefixHasSummon(plan.finalPrefix)) {
                 notes.add("summon 只在单链模拟中支持；tag 最终行未建模")

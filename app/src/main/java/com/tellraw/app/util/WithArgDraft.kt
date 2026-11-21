@@ -106,6 +106,7 @@ sealed interface WithArgDraft {
     data class Nbt(
         val path: String,
         val source: String? = null,
+        val target: String? = null,
         val interpret: Boolean? = null,
         val separator: String? = null,
         val retained: JsonObject = JsonObject()
@@ -113,7 +114,15 @@ sealed interface WithArgDraft {
         override fun toJson(): JsonElement {
             val o = retained.deepCopy()
             o.addProperty("nbt", path)
-            addOptional(o, "source", source)
+            // Java 组件格式：entity/block/storage 指向具体目标，而不是自定义 source 字段。
+            when (source) {
+                "entity", "block", "storage" -> {
+                    if (target != null) o.addProperty(source, target)
+                    else o.addProperty("source", source)
+                }
+                null -> Unit
+                else -> o.addProperty("source", source)
+            }
             addOptionalBool(o, "interpret", interpret)
             // 空 separator 与缺省 separator 语义不同，保留原样
             separator?.let { o.addProperty("separator", it) }
@@ -304,10 +313,14 @@ object WithArgCodec {
         if (o.has("source") && !isStringField(o, "source")) return null
         if (o.has("separator") && !isStringField(o, "separator")) return null
         if (o.has("interpret") && !isBoolField(o, "interpret")) return null
-        val source = if (o.has("source")) o.get("source").asString else null
+        val explicit = listOf("entity", "block", "storage").firstOrNull { key ->
+            o.has(key) && isStringField(o, key)
+        }
+        val source = explicit ?: if (o.has("source")) o.get("source").asString else null
+        val target = if (explicit != null) o.get(explicit).asString else null
         val interpret = boolValue(o, "interpret")
         val separator = if (o.has("separator")) o.get("separator").asString else null
-        return WithArgDraft.Nbt(path, source, interpret, separator, retainedOf(o))
+        return WithArgDraft.Nbt(path, source, target, interpret, separator, retainedOf(o))
     }
 
     private fun isStringField(o: JsonObject, key: String): Boolean {
